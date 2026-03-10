@@ -1,0 +1,119 @@
+/* Re-usable colorset derived from the Depression Center's Knowledge Base styles */
+/* See https://github.com/DepressionCenter/EFDC-TDX-KB */
+
+/* -----------Page Header----------- */
+body {
+  background-color: #feffff;  /* U-M KB page background */
+  color: #00274c;             /* Default text color */
+}
+
+/* Header styling for document title */
+h1, h2, h3, h4, h5 {
+  color: #00274c;             /* U-M blue for headings */
+}
+
+/* -----------Links----------- */
+a {
+  color: #00274c;
+  text-decoration: underline;
+  transition: all 0.2s;
+}
+a:hover, a:focus {
+  color: #ffcb05;             /* Maize on hover */
+  background-color: #00274c;  /* Good contrast for maize */
+  text-decoration: underline;
+  outline: 2px solid #ffcb05; /* visible for keyboard users */
+}
+
+/* -----------Navigation----------- */
+/* Suppose nav is styled as .navbar or .toc */
+.navbar, .toc {
+  background-color: #174992;
+  border-top: 0px solid;
+  border-bottom: 0px solid;
+}
+/* Navigation links */
+.navbar a, .toc a {
+  color: #feffff;
+}
+.navbar a.selected, .toc a.selected {
+  border-bottom: 2px solid #174492;
+}
+.navbar a:hover, .toc a:hover {
+  border-bottom: 2px solid #ffcb05;
+}
+
+/* -----------Buttons----------- */
+.btn, button, input[type="button"], input[type="submit"] {
+  font-weight: bold;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+/* Primary Buttons */
+.btn-primary, .btn-primary:visited {
+  background-color: #ffcb05;
+  color: #00274c;
+}
+.btn-primary:hover, .btn-primary:focus {
+  background-color: #feffff;
+  color: #00274c;
+  border: 2px solid #ffcb05;
+}
+
+/* Secondary Buttons */
+.btn-secondary, .btn-secondary:visited {
+  background-color: #174492;
+  color: #feffff;
+}
+.btn-secondary:hover, .btn-secondary:focus {
+  background-color: #00274c;
+  color: #feffff;
+  border: 2px solid #174492;
+}
+
+/* Action Buttons */
+.btn-action, .btn-action:visited {
+  background-color: #ffcb05;
+  color: #00274c;
+}
+.btn-action:hover, .btn-action:focus {
+  background-color: #75988d;
+  color: #00274c;
+  border: 2px solid #75988d;
+}
+
+/* Selected Button (example: active state) */
+button.selected, .btn.selected, .btn-primary.selected, .btn-secondary.selected {
+  color: #feffff;
+  background-color: #00274c;
+}
+
+/* -----------Grid Row Highlight----------- */
+tr.highlight, .row.highlight {
+  background-color: #174992;
+  color: #feffff;
+}
+
+/* -----------Category Items----------- */
+/* Example selectors for category blocks */
+.category-icon {
+  color: #174492;
+  font-size: 130%;
+}
+.category-description {
+  color: #373d40;
+}
+
+/* -----------Miscellaneous Link Colors----------- */
+/* Links in navigation or special sections */
+.toc a, .navbar a, .category a {
+  color: #174492;
+}
+.toc a:hover, .navbar a:hover, .category a:hover {
+  color: #174492;
+  border-bottom: 2px solid #ffcb05;
+}

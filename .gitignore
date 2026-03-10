@@ -1,0 +1,16 @@
+# .gitignore - special file for Git telling it which files to ignore when committing changes to the repository
+
+# Ignore RStudio project files/folders
+.Rproj.user/
+*.Rproj
+
+# Ignore R cache and history
+.RData
+.RHistory
+.Rhistory
+.Ruserdata
+.Rapp.history
+
+# Ignore all data files except the one that's tracked
+# Example: .csv
+# Example: !sample-data.csv
