@@ -1,0 +1,739 @@
+<!--
+This file is part of DataLaVista
+ReportDesigner.html
+Author(s): Gabriel Mongefranco.
+Created: 2026-03-10
+Last Modified: 2026-03-10
+Summary: Code for designing reports and dashboards.
+Notes: See README file for documentation and full license information.
+
+Copyright © 2026 The Regents of the University of Michigan
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU General Public License for more details.
+You should have received a copy of the GNU General Public License along
+with this program. If not, see <https://www.gnu.org/licenses/>.
+
+-->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/alasql/4.1.0/alasql.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/addon/hint/show-hint.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/sql/sql.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/addon/hint/show-hint.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/addon/hint/sql-hint.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+
+<style>
+    /* Base Styles */
+    :root { --primary: #0078d4; --bg: #faf9f8; --border: #edebe9; --text: #323130; }
+    body { font-family: 'Segoe UI', Tahoma, sans-serif; background: var(--bg); margin: 0; color: var(--text); height: 100vh; display: flex; flex-direction: column; }
+    .btn { background: var(--primary); color: #fff; border: none; padding: 8px 16px; cursor: pointer; border-radius: 2px; font-weight: bold; }
+    .btn:hover { background: #005a9e; }
+    .btn:disabled { background: #c8c6c4; cursor: not-allowed; }
+    .btn-secondary { background: #605e5c; color: #fff; border: none; cursor: pointer; border-radius: 2px; padding: 4px 10px; font-size: 11px;}
+    .btn-secondary:hover { background: #323130; }
+
+    /* Tabs Navigation */
+    .tabs { display: flex; background: #fff; border-bottom: 1px solid var(--border); padding: 0 20px; flex-shrink: 0; }
+    .tab { padding: 15px 20px; cursor: pointer; border-bottom: 3px solid transparent; font-weight: bold; color: #605e5c; }
+    .tab.active { border-bottom-color: var(--primary); color: var(--primary); background: #f3f2f1; }
+    .tab-content { display: none; padding: 20px; flex-grow: 1; overflow-y: auto; }
+    .tab-content.active { display: block; }
+
+    /* Tab 1: Data */
+    .ide-header { display: flex; gap: 10px; margin-bottom: 15px; align-items: center; background: #fff; padding: 15px; border: 1px solid var(--border); }
+    .ide-header input { flex-grow: 1; padding: 8px; border: 1px solid #ccc; }
+    .CodeMirror { border: 1px solid #8a8886; border-radius: 2px; height: 250px; font-size: 14px; }
+    .results-table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 11px; background: #fff; }
+    .results-table th, .results-table td { border: 1px solid #ccc; padding: 6px; text-align: left; }
+    .results-table th { background: #edebe9; }
+
+    /* Tab 2: Designer Layout */
+    .designer-wrapper { display: flex; height: calc(100vh - 100px); gap: 15px; margin: -20px; padding: 20px; background: #f3f2f1; }
+    .canvas { flex-grow: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 15px; align-content: start; overflow-y: auto; }
+    .right-panels { display: flex; gap: 10px; width: 550px; flex-shrink: 0; }
+    
+    /* Panels */
+    .panel { background: #fff; border: 1px solid var(--border); display: flex; flex-direction: column; width: 50%; }
+    .panel-header { background: #edebe9; padding: 10px; font-weight: bold; font-size: 12px; display: flex; justify-content: space-between; cursor: pointer; }
+    .panel-body { padding: 10px; overflow-y: auto; flex-grow: 1; }
+    
+    /* Draggables & Slots */
+    .drag-item { background: #f3f2f1; border: 1px solid #ccc; padding: 6px 8px; margin-bottom: 5px; font-size: 12px; cursor: grab; display: flex; align-items: center; gap: 8px; font-weight: 500;}
+    .drag-item:active { cursor: grabbing; }
+    .canvas-slot { background: #fff; border: 2px dashed #ccc; min-height: 280px; display: flex; align-items: center; justify-content: center; flex-direction: column; position: relative; overflow: hidden; }
+    .canvas-slot.drag-over { border-color: var(--primary); background: #eff6fc; }
+    .canvas-slot.active-visual { border: 2px solid var(--primary); }
+    
+    /* Rendered Visual */
+    .visual-container { width: 100%; height: 100%; display: flex; flex-direction: column; cursor: pointer; }
+    .visual-header { padding: 6px 10px; background: #faf9f8; border-bottom: 1px solid #edebe9; font-size: 12px; font-weight: bold; display: flex; justify-content: space-between; align-items: center; z-index: 10; }
+    .visual-body { flex-grow: 1; width: 100%; height: 100%; position: relative; overflow: auto; padding: 10px; box-sizing: border-box; }
+    .chart-render-target { width: 100%; height: 100%; min-height: 220px; }
+    .card-render-target { display: flex; align-items: center; justify-content: center; font-size: 32px; font-weight: bold; color: var(--primary); height: 100%; flex-direction: column; }
+    .card-render-target span { font-size: 14px; color: #666; font-weight: normal; margin-top: 5px; }
+
+    /* Properties Form */
+    .prop-group { margin-bottom: 12px; border: 1px solid var(--border); padding: 8px; background: #faf9f8; }
+    .prop-group label { display: block; font-size: 11px; font-weight: bold; margin-bottom: 4px; color: #605e5c; }
+    .prop-group input, .prop-group select, .prop-group textarea { width: 100%; padding: 4px; font-size: 11px; border: 1px solid #ccc; margin-bottom: 5px; box-sizing: border-box; }
+    .field-row { display: flex; gap: 5px; margin-bottom: 5px; align-items: center; }
+    .field-row select { margin-bottom: 0; }
+    .move-btn { background: #e1dfdd; border: 1px solid #ccc; cursor: pointer; padding: 3px 6px; font-size: 10px; }
+    .move-btn:hover { background: #d2d0ce; }
+
+    /* Tab 3: Code */
+    textarea.config-output { width: 100%; height: 60vh; padding: 15px; font-family: Consolas, monospace; font-size: 12px; border: 1px solid #ccc; background: #2b2b2b; color: #a9b7c6; white-space: pre; }
+	
+	
+	/* Filter Bar */
+    .visual-filter-bar { padding: 6px 10px; background: #fff; border-bottom: 1px solid #edebe9; display: none; gap: 15px; flex-wrap: wrap; }
+    .filter-control { display: flex; flex-direction: column; font-size: 10px; }
+    .filter-control label { font-weight: bold; margin-bottom: 3px; color: #323130; }
+    .filter-control input, .filter-control select { padding: 3px; border: 1px solid #a19f9d; border-radius: 2px; font-size: 11px; }
+
+</style>
+
+<div class="tabs">
+    <div class="tab active" onclick="ide.switchTab('tab-data')">1. Data Schema & SQL</div>
+    <div class="tab" onclick="ide.switchTab('tab-design')">2. Live Dashboard Designer</div>
+    <div class="tab" onclick="ide.switchTab('tab-code')">3. Export Code</div>
+</div>
+
+<div id="tab-data" class="tab-content active">
+    <div class="ide-header">
+        <input type="text" id="ide-siteUrl" value="/" placeholder="SharePoint Site URL">
+        <button class="btn" id="btn-connect" onclick="ide.connect()">Connect & Load Schema</button>
+        <span id="ide-status" style="font-size: 12px; color: #605e5c;"></span>
+    </div>
+    <div id="ide-editor-section" style="display: none;">
+        <textarea id="ide-sql"></textarea><br>
+        <button class="btn" style="margin-top:10px;" onclick="ide.runQuery()">▶ Run Query</button>
+        <div id="ide-results"></div>
+    </div>
+</div>
+
+<div id="tab-design" class="tab-content">
+    <div class="designer-wrapper">
+        <div class="canvas" id="canvas-area">
+            <div class="canvas-slot" id="slot-1" ondragover="ide.allowDrop(event)" ondragleave="ide.leaveDrop(event)" ondrop="ide.dropOnSlot(event, 'slot-1')">
+                <div style="color:#a19f9d; text-align:center;">Drag a Field here to create a Table<br><span style="font-size:11px;">or drag a Visual from the Toolbox</span></div>
+            </div>
+            <div class="canvas-slot" id="slot-2" ondragover="ide.allowDrop(event)" ondragleave="ide.leaveDrop(event)" ondrop="ide.dropOnSlot(event, 'slot-2')">
+                <div style="color:#a19f9d; text-align:center;">Drag a Field here to create a Table</div>
+            </div>
+            <div class="canvas-slot" id="slot-3" ondragover="ide.allowDrop(event)" ondragleave="ide.leaveDrop(event)" ondrop="ide.dropOnSlot(event, 'slot-3')">
+                <div style="color:#a19f9d; text-align:center;">Drag a Field here to create a Table</div>
+            </div>
+            <div class="canvas-slot" id="slot-4" ondragover="ide.allowDrop(event)" ondragleave="ide.leaveDrop(event)" ondrop="ide.dropOnSlot(event, 'slot-4')">
+                <div style="color:#a19f9d; text-align:center;">Drag a Field here to create a Table</div>
+            </div>
+        </div>
+
+        <div class="right-panels">
+            <div class="panel">
+                <div class="panel-header"><span>Toolbox & Properties</span></div>
+                <div class="panel-body">
+                    <div id="toolbox-tools">
+                        <div style="font-size:11px; margin-bottom:10px; color:#666;">Drag a visual to the canvas.</div>
+                        <div class="drag-item" draggable="true" ondragstart="ide.dragStart(event, 'visual', 'table')">🗄️ Table Grid</div>
+                        <div class="drag-item" draggable="true" ondragstart="ide.dragStart(event, 'visual', 'bar')">📊 Bar Chart</div>
+                        <div class="drag-item" draggable="true" ondragstart="ide.dragStart(event, 'visual', 'line')">📈 Line Chart</div>
+                        <div class="drag-item" draggable="true" ondragstart="ide.dragStart(event, 'visual', 'pie')">🥧 Pie Chart</div>
+                        <div class="drag-item" draggable="true" ondragstart="ide.dragStart(event, 'visual', 'card')">1️⃣ KPI Card</div>
+                        <div class="drag-item" draggable="true" ondragstart="ide.dragStart(event, 'visual', 'text')">📝 Text Box</div>
+                    </div>
+                    
+                    <div id="toolbox-props" style="display:none;">
+                        <button class="btn-secondary" style="width:100%; margin-bottom:10px;" onclick="ide.deselectVisual()">← Back to Toolbox</button>
+                        
+                        <label style="font-size:11px; font-weight:bold;">Title</label>
+                        <input type="text" id="prop-title" style="width:100%; margin-bottom:10px; padding:4px;" onchange="ide.updateVisualProp('title', this.value)">
+                        
+                        <label style="font-size:11px; font-weight:bold;">Visual Type</label>
+                        <select id="prop-type" style="width:100%; margin-bottom:10px; padding:4px;" onchange="ide.updateVisualType(this.value)">
+                            <option value="table">Table</option>
+                            <option value="bar">Bar Chart</option>
+                            <option value="line">Line Chart</option>
+                            <option value="pie">Pie Chart</option>
+                            <option value="card">KPI Card</option>
+                            <option value="text">Text Box</option>
+                        </select>
+
+                        <div id="dynamic-fields-ui"></div>
+
+                        <h4 style="margin-top:15px; border-bottom:1px solid #ccc; padding-bottom:5px; font-size:12px;">Filters</h4>
+                        <div id="prop-filters"></div>
+                        <button class="btn-secondary" style="margin-top:5px;" onclick="ide.addFilter()">+ Add Filter</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-header"><span>Available Fields</span></div>
+                <div class="panel-body">
+                    <div style="font-size:11px; margin-bottom:10px; color:#666;">Drag fields onto visuals.</div>
+                    <div id="fields-container"><em>Run query first...</em></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="tab-code" class="tab-content">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+        <h3 style="margin:0;">Dashboard Configuration Code</h3>
+        <button class="btn" onclick="ide.copyConfig()">Copy Config</button>
+    </div>
+    <textarea id="ide-config-output" class="config-output" readonly></textarea>
+</div>
+
+<script>
+// --- CUSTOM ALASQL AGGREGATORS ---
+alasql.aggr.MAXDATE = function(v, s, stage) {
+    if (stage === 1) return v;
+    if (stage === 2) {
+        if (v == null || v === '') return s; 
+        if (s == null || s === '') return v;
+        return (v > s) ? v : s;
+    }
+    if (stage === 3) return s;
+};
+
+alasql.aggr.MINDATE = function(v, s, stage) {
+    if (stage === 1) return v;
+    if (stage === 2) {
+        if (v == null || v === '') return s; 
+        if (s == null || s === '') return v;
+        return (v < s) ? v : s;
+    }
+    if (stage === 3) return s;
+};
+
+window.ide = {
+    siteUrl: "", listsData: [], schema: {}, sqlEditor: null, lastResults: [], usedListsConfig: [], 
+    currentColumns: [], chartInstances: {}, selectedSlot: null, visuals: {}, 
+
+    switchTab: function(tabId) {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        event.currentTarget.classList.add('active');
+        document.getElementById(tabId).classList.add('active');
+        
+        if (tabId === 'tab-data' && this.sqlEditor) { setTimeout(() => { this.sqlEditor.refresh(); }, 50); }
+        if (tabId === 'tab-design') { setTimeout(() => { Object.keys(this.visuals).forEach(id => this.renderLiveVisual(id)); }, 100); }
+        if (tabId === 'tab-code') this.updateConfigText();
+    },
+
+    getApiBase: function() {
+        let url = document.getElementById('ide-siteUrl').value.trim();
+        if (url.endsWith('/')) url = url.slice(0, -1);
+        if (url === "" || url === window.location.origin) {
+            if (typeof _spPageContextInfo !== "undefined" && _spPageContextInfo.webAbsoluteUrl) { url = _spPageContextInfo.webAbsoluteUrl; } 
+            else { url = window.location.origin + (window.location.pathname.match(/(\/sites\/[^\/]+)/i) || [""])[0]; }
+        }
+        document.getElementById('ide-siteUrl').value = url;
+        return url;
+    },
+
+    connect: async function() {
+        this.siteUrl = this.getApiBase();
+        document.getElementById('btn-connect').disabled = true;
+        document.getElementById('ide-status').innerText = "Fetching schema...";
+        try {
+            const listRes = await fetch(`${this.siteUrl}/_api/web/lists?$select=Id,Title,Hidden,BaseType&$top=200&$filter=Hidden eq false and BaseType ne 1`, { headers: { "Accept": "application/json;odata=nometadata" }});
+            const lists = (await listRes.json()).value;
+            this.listsData = []; this.schema = {};
+            const fieldPromises = lists.map(async (l) => {
+                try {
+                    const alias = l.Title.replace(/[^a-zA-Z0-9_]/g, ''); 
+                    const fRes = await fetch(`${this.siteUrl}/_api/web/lists(guid'${l.Id}')/fields?$select=InternalName,TypeAsString,Hidden&$filter=Hidden eq false`, { headers: { "Accept": "application/json;odata=nometadata" }});
+                    if (!fRes.ok) return;
+                    let fields = [], selectArr = [];
+                    (await fRes.json()).value.forEach(f => {
+                        const blocklist = ['ItemChildCount', 'FolderChildCount', 'Attachments', 'MetaInfo', 'ContentType', 'Edit', 'DocIcon', 'AppAuthor', 'AppEditor'];
+                        if (f.Hidden || f.InternalName.startsWith('_') || blocklist.includes(f.InternalName)) return;
+                        let qName = f.InternalName;
+                        if (f.TypeAsString.includes('Lookup') || f.TypeAsString.includes('User')) qName += "Id";
+                        fields.push(qName); selectArr.push(qName);
+                    });
+                    if (fields.length > 0) {
+                        this.schema[alias] = fields;
+                        this.listsData.push({ id: l.Id, title: l.Title, alias: alias, allFieldsForSelect: selectArr.join(',') });
+                    }
+                } catch (e) {}
+            });
+            await Promise.all(fieldPromises);
+            document.getElementById('ide-status').innerText = `Loaded ${Object.keys(this.schema).length} tables`;
+            document.getElementById('ide-editor-section').style.display = 'block';
+            this.initEditor();
+        } catch (e) { document.getElementById('ide-status').innerText = "Error: " + e.message; }
+        finally { document.getElementById('btn-connect').disabled = false; }
+    },
+
+    initEditor: function() {
+        // Define a custom AlaSQL dialect for CodeMirror
+        if (!CodeMirror.mimeModes["text/x-alasql"]) {
+            const keywords = "ABSOLUTE ACTION ADD AGGR ALL ALTER AND ANTI ANY APPLY ARRAY AS ASC ASSERT ATTACH AUTO_INCREMENT AUTOINCREMENT AVG BEGIN BETWEEN BREAK BY CALL CASE CAST CHECK CLASS CLOSE COLLATE COLUMN COLUMNS COMMIT CONSTRAINT CONTENT CONTINUE CONVERT CORRESPONDING COUNT CREATE CROSS CUBE CURRENT_TIMESTAMP CURSOR DATABASE DECLARE DEFAULT DELETE DELETED DESC DETACH DISTINCT DOUBLEPRECISION DROP ECHO EDGE ELSE END ENUM EXCEPT EXISTS EXPLAIN FALSE FETCH FIRST FOREIGN FROM GO GRAPH GROUP GROUPING HAVING HELP IDENTITY IF IN INDEX INNER INSERT INSERTED INTERSECT INTO IS JOIN KEY LAST LEFT LET LIKE LIMIT LOOP MATCHED MATRIX MAX MERGE MIN MINUS MODIFY NATURAL NEW NEXT NO NOCASE NOT NULL OFFSET OFF ON ONLY OPEN OPTION OR ORDER OUTER OVER PARTITION PATH PERCENT PLAN PRIMARY PRINT PRIOR QUERY READ RECORDSET REDUCE REFERENCES RELATIVE REMOVE RENAME REQUIRE RESTORE RETURN RETURNS RIGHT ROLLBACK ROLLUP ROW SCHEMA SCHEMAS SEARCH SELECT SEMI SET SETS SHOW SOME SOURCE STORE STRATEGY SUM TABLE TABLES TARGET TEMP TEMPORARY TEXTSTRING THEN TIMEOUT TO TOP TRAN TRANSACTION TRIGGER TRUE TRUNCATE UNION UNIQUE UPDATE USE USING VALUE VERTEX VIEW WHEN WHERE WHILE WITH WORK".split(" ").reduce((a,b)=>{a[b]=true; return a;}, {});
+            const builtins = "SUBSTRING MID INSTR TRIM NEWID UUID GEN_RANDOM_UUID ROWNUM ROW_NUMBER COALESCE ABS IIF IFNULL LOWER UPPER LCASE UCASE LEN LENGTH YEAR DAYOFWEEK OBJECT_ID".split(" ").reduce((a,b)=>{a[b]=true; return a;}, {});
+            
+            CodeMirror.defineMIME("text/x-alasql", {
+                name: "sql",
+                keywords: keywords,
+                builtin: builtins,
+                atoms: {"false": true, "true": true, "null": true},
+                operatorChars: /^[*+\-%<>!=&|~^]/
+            });
+        }
+
+        if (!this.sqlEditor) {
+            this.sqlEditor = CodeMirror.fromTextArea(document.getElementById('ide-sql'), { 
+                mode: 'text/x-alasql', // Use our new custom dialect
+                lineNumbers: true, 
+                extraKeys: {"Ctrl-Space": "autocomplete"}, 
+                hintOptions: { tables: this.schema } 
+            });
+
+            this.sqlEditor.on("keyup", function (cm, event) {
+                if (!cm.state.completionActive && event.keyCode >= 65 && event.keyCode <= 90) {
+                    CodeMirror.commands.autocomplete(cm, null, {completeSingle: false});
+                }
+            });
+
+        } else { 
+            this.sqlEditor.setOption("hintOptions", { tables: this.schema }); 
+            this.sqlEditor.refresh(); 
+        }
+    },
+
+    runQuery: async function() {
+        const sql = this.sqlEditor.getValue();
+        if (!sql.trim()) return;
+		
+		// FIX FOR MIN/MAX WHEN USING DATES: Secretly swap MIN/MAX to our custom functions before execution
+        const executeSql = sql.replace(/\bMIN\s*\(/ig, 'MINDATE(')
+                              .replace(/\bMAX\s*\(/ig, 'MAXDATE(');
+							
+        document.getElementById('ide-results').innerHTML = "<em>Fetching data...</em>";
+        try {
+            this.usedListsConfig = this.listsData.filter(l => new RegExp(`\\b${l.alias.toUpperCase()}\\b`).test(sql.toUpperCase()));
+            alasql('DROP TABLE IF EXISTS ' + this.usedListsConfig.map(l => l.alias).join(', '));
+            
+            //const isoRegex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/;
+			const isoRegex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/;
+
+            for (const list of this.usedListsConfig) {
+                const res = await fetch(`${this.siteUrl}/_api/web/lists(guid'${list.id}')/items?$select=${list.allFieldsForSelect}&$top=5000`, { headers: { "Accept": "application/json;odata=nometadata" }});
+                let items = (await res.json()).value;
+                
+                const isoRegex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/;
+                const fieldList = list.allFieldsForSelect.split(','); // Get our exact schema columns
+
+                // Normalize the data
+                items.forEach(row => {
+                    // 1. Force missing SharePoint fields to be 'null' instead of 'undefined'
+                    fieldList.forEach(f => {
+                        if (row[f] === undefined) row[f] = null;
+                    });
+
+                    // 2. Clean the ISO dates into sortable strings
+                    Object.keys(row).forEach(k => {
+                        if (typeof row[k] === 'string' && isoRegex.test(row[k])) {
+                            row[k] = row[k].replace('T', ' ').replace('Z', '').replace(/\.\d+$/, '');
+                            if (row[k].endsWith(' 00:00:00')) row[k] = row[k].substring(0, 10);
+                        }
+                    });
+                });
+
+                alasql(`CREATE TABLE ${list.alias}`);
+                alasql.tables[list.alias].data = items;
+            }
+			
+            // Execute the MODIFIED string, not the original raw editor string
+            this.lastResults = alasql(executeSql); 
+            
+            this.currentColumns = this.lastResults.length > 0 ? Object.keys(this.lastResults[0]) : [];
+            this.renderPage();
+            this.populateFieldsPanel();
+            Object.keys(this.visuals).forEach(id => this.renderLiveVisual(id));
+        } catch (e) { 
+            document.getElementById('ide-results').innerHTML = `<b style="color:red">Error: ${e.message}</b>`; 
+        }
+    },
+
+    renderPage: function() {
+        let displayData = this.lastResults.slice(0, 15);
+        if (!displayData.length) return;
+        let html = `<table class="results-table"><tr>${this.currentColumns.map(c => `<th>${c}</th>`).join('')}</tr>`;
+        displayData.forEach(row => html += `<tr>${this.currentColumns.map(c => `<td>${row[c] || ''}</td>`).join('')}</tr>`);
+        document.getElementById('ide-results').innerHTML = html + `<div style="margin-top:10px; font-size:11px;">Previewing 15 rows.</div>`;
+    },
+
+    populateFieldsPanel: function() {
+        document.getElementById('fields-container').innerHTML = this.currentColumns.map(col => `<div class="drag-item" draggable="true" ondragstart="ide.dragStart(event, 'field', '${col}')">☷ ${col}</div>`).join('');
+    },
+
+    dragStart: function(e, type, value) { e.dataTransfer.setData("dragType", type); e.dataTransfer.setData("dragValue", value); },
+    allowDrop: function(e) { e.preventDefault(); e.currentTarget.classList.add('drag-over'); },
+    leaveDrop: function(e) { e.currentTarget.classList.remove('drag-over'); },
+
+    dropOnSlot: function(e, slotId) {
+        e.preventDefault();
+        e.currentTarget.classList.remove('drag-over');
+        const type = e.dataTransfer.getData("dragType");
+        const val = e.dataTransfer.getData("dragValue");
+
+        if (!this.visuals[slotId]) {
+            this.visuals[slotId] = { 
+                title: type === 'field' ? val + ' Table' : 'New ' + val, 
+                type: type === 'visual' ? val : 'table', 
+                fields: [], filters: [], content: type === 'text' ? 'Double click to edit text' : ''
+            };
+            this.buildVisualShell(slotId);
+        }
+
+        if (type === 'field' && this.visuals[slotId].type !== 'text') {
+            const isNum = !isNaN(parseFloat(this.lastResults[0][val]));
+            const defaultAgg = isNum && this.visuals[slotId].type !== 'table' ? 'SUM' : 'none';
+            if (this.visuals[slotId].type !== 'table' && this.visuals[slotId].fields.length >= 2) { this.visuals[slotId].fields[1] = { name: val, agg: defaultAgg }; } 
+            else { this.visuals[slotId].fields.push({ name: val, agg: defaultAgg }); }
+        }
+        
+        this.selectVisual(slotId);
+        this.renderLiveVisual(slotId);
+    },
+
+    // UI UPDATE: Added a Filter Bar container below the visual header
+    buildVisualShell: function(slotId) {
+        const conf = this.visuals[slotId];
+        const slot = document.getElementById(slotId);
+        slot.innerHTML = `
+            <div class="visual-container" onclick="ide.selectVisual('${slotId}')">
+                <div class="visual-header">
+                    <span id="title-${slotId}">${conf.title}</span>
+                    <button class="btn-secondary" style="padding:2px 6px; background:#a4262c" onclick="event.stopPropagation(); ide.removeVisual('${slotId}')">X</button>
+                </div>
+                <div class="visual-filter-bar" id="filterbar-${slotId}"></div>
+                <div class="visual-body" id="render-${slotId}"></div>
+            </div>
+        `;
+    },
+
+    removeVisual: function(slotId) {
+        if (this.chartInstances[slotId]) { this.chartInstances[slotId].dispose(); delete this.chartInstances[slotId]; }
+        delete this.visuals[slotId];
+        if (this.selectedSlot === slotId) this.deselectVisual();
+        document.getElementById(slotId).innerHTML = '<div style="color:#a19f9d; text-align:center;">Drag a Field or Visual here</div>';
+    },
+
+    selectVisual: function(slotId) {
+        document.querySelectorAll('.canvas-slot').forEach(s => s.classList.remove('active-visual'));
+        document.getElementById(slotId).classList.add('active-visual');
+        this.selectedSlot = slotId;
+        document.getElementById('toolbox-tools').style.display = 'none';
+        document.getElementById('toolbox-props').style.display = 'block';
+        const conf = this.visuals[slotId];
+        document.getElementById('prop-title').value = conf.title;
+        document.getElementById('prop-type').value = conf.type;
+        this.renderPropertiesUI();
+        this.renderFiltersUI();
+    },
+
+    deselectVisual: function() {
+        document.querySelectorAll('.canvas-slot').forEach(s => s.classList.remove('active-visual'));
+        this.selectedSlot = null;
+        document.getElementById('toolbox-tools').style.display = 'block';
+        document.getElementById('toolbox-props').style.display = 'none';
+    },
+
+    renderPropertiesUI: function() {
+        const conf = this.visuals[this.selectedSlot];
+        const container = document.getElementById('dynamic-fields-ui');
+        let html = '';
+
+        if (conf.type === 'text') {
+            html += `<div class="prop-group"><label>Text Content (HTML Allowed)</label><textarea style="height:100px;" onchange="ide.updateVisualProp('content', this.value)">${conf.content || ''}</textarea></div>`;
+            container.innerHTML = html;
+            return;
+        }
+
+        const fieldOptions = this.currentColumns.map(c => `<option value="${c}">${c}</option>`).join('');
+        const aggOptions = `
+    <option value="none">None</option>
+    <option value="COUNT">Count</option>
+    <option value="COUNT(DISTINCT">Count (Distinct)</option>
+    <option value="SUM">Sum</option>
+    <option value="AVG">Average</option>
+    <option value="MEDIAN">Median</option>
+    <option value="MINDATE">Min</option>
+    <option value="MAXDATE">Max</option>
+    <option value="FIRST">First</option>
+    <option value="LAST">Last</option>
+    <option value="STDEV">Std Dev</option>
+    <option value="VAR">Variance</option>
+    `.replace(/\n\s+/g, '');
+
+        if (conf.type === 'table') {
+            html += `<div class="prop-group"><label>Table Columns</label>`;
+            conf.fields.forEach((f, i) => {
+                html += `<div class="field-row">
+                    <button class="move-btn" onclick="ide.moveField(${i}, -1)">↑</button><button class="move-btn" onclick="ide.moveField(${i}, 1)">↓</button>
+                    <select onchange="ide.updateField(${i}, 'name', this.value)" style="flex-grow:1"><option value="${f.name}">${f.name}</option>${fieldOptions}</select>
+                    <select onchange="ide.updateField(${i}, 'agg', this.value)" style="width:35%">${aggOptions.replace(`value="${f.agg}"`, `value="${f.agg}" selected`)}</select>
+                    <button class="btn-secondary" style="background:#a4262c; padding:3px 6px;" onclick="ide.removeField(${i})">X</button>
+                </div>`;
+            });
+            html += `<button class="btn-secondary" onclick="ide.addField()">+ Add Column</button></div>`;
+        } 
+        else if (conf.type === 'card') {
+            const f = conf.fields[0] || {name: '', agg: 'COUNT'};
+            html += `<div class="prop-group"><label>Value Field</label><select onchange="ide.updateSingleField(0, 'name', this.value)"><option value="">- Select -</option>${fieldOptions.replace(`value="${f.name}"`, `value="${f.name}" selected`)}</select><label>Aggregation</label><select onchange="ide.updateSingleField(0, 'agg', this.value)">${aggOptions.replace(`value="${f.agg}"`, `value="${f.agg}" selected`)}</select></div>`;
+        }
+        else { 
+            const fx = conf.fields[0] || {name: '', agg: 'none'};
+            const fy = conf.fields[1] || {name: '', agg: 'SUM'};
+            html += `<div class="prop-group"><label>Category (X-Axis)</label><select onchange="ide.updateSingleField(0, 'name', this.value)"><option value="">- Select -</option>${fieldOptions.replace(`value="${fx.name}"`, `value="${fx.name}" selected`)}</select></div><div class="prop-group"><label>Value (Y-Axis)</label><div class="field-row"><select onchange="ide.updateSingleField(1, 'name', this.value)" style="width:60%"><option value="">- Select -</option>${fieldOptions.replace(`value="${fy.name}"`, `value="${fy.name}" selected`)}</select><select onchange="ide.updateSingleField(1, 'agg', this.value)" style="width:40%">${aggOptions.replace(`value="${fy.agg}"`, `value="${fy.agg}" selected`)}</select></div></div>`;
+        }
+        container.innerHTML = html;
+    },
+
+    updateVisualProp: function(prop, value) { this.visuals[this.selectedSlot][prop] = value; if(prop === 'title') document.getElementById(`title-${this.selectedSlot}`).innerText = value; this.renderLiveVisual(this.selectedSlot); },
+    updateVisualType: function(newType) { this.visuals[this.selectedSlot].type = newType; this.renderPropertiesUI(); this.renderLiveVisual(this.selectedSlot); },
+    addField: function() { this.visuals[this.selectedSlot].fields.push({ name: this.currentColumns[0], agg: 'none' }); this.renderPropertiesUI(); this.renderLiveVisual(this.selectedSlot); },
+    removeField: function(idx) { this.visuals[this.selectedSlot].fields.splice(idx, 1); this.renderPropertiesUI(); this.renderLiveVisual(this.selectedSlot); },
+    moveField: function(idx, dir) { const fields = this.visuals[this.selectedSlot].fields; if ((dir === -1 && idx > 0) || (dir === 1 && idx < fields.length - 1)) { const temp = fields[idx + dir]; fields[idx + dir] = fields[idx]; fields[idx] = temp; this.renderPropertiesUI(); this.renderLiveVisual(this.selectedSlot); } },
+    updateField: function(idx, prop, val) { this.visuals[this.selectedSlot].fields[idx][prop] = val; this.renderLiveVisual(this.selectedSlot); },
+    updateSingleField: function(idx, prop, val) { if (!this.visuals[this.selectedSlot].fields[idx]) this.visuals[this.selectedSlot].fields[idx] = { name: '', agg: 'none' }; this.visuals[this.selectedSlot].fields[idx][prop] = val; this.renderLiveVisual(this.selectedSlot); },
+
+    // --- FILTERS LOGIC ---
+    renderFiltersUI: function() {
+        const conf = this.visuals[this.selectedSlot];
+        let html = '';
+        conf.filters.forEach((f, idx) => {
+            const opts = this.currentColumns.map(c => `<option value="${c}" ${f.field === c ? 'selected' : ''}>${c}</option>`).join('');
+            
+            // Build the default values inputs based on filter type
+            let defaultsHtml = '';
+            if (f.uiType === 'dateRange') {
+                defaultsHtml = `<div style="display:flex; gap:5px; margin-top:4px;">
+                    <input type="date" value="${f.defaultVal || ''}" title="Start Date" onchange="ide.updateFilterProp(${idx}, 'defaultVal', this.value)" style="width:50%; font-size:10px;">
+                    <input type="date" value="${f.defaultVal2 || ''}" title="End Date" onchange="ide.updateFilterProp(${idx}, 'defaultVal2', this.value)" style="width:50%; font-size:10px;">
+                </div>`;
+            } else {
+                defaultsHtml = `<input type="text" placeholder="Default Value" value="${f.defaultVal || ''}" onchange="ide.updateFilterProp(${idx}, 'defaultVal', this.value)" style="width:100%; margin-top:4px; font-size:11px; padding:4px; box-sizing:border-box;">`;
+            }
+
+            html += `
+            <div style="background:#f3f2f1; padding:8px; margin-bottom:8px; border:1px solid #ccc;">
+                <div style="display:flex; justify-content:space-between; margin-bottom:6px;"><b>Filter ${idx+1}</b> <span style="cursor:pointer; color:red;" onclick="ide.removeFilter(${idx})">X</span></div>
+                <select onchange="ide.updateFilterProp(${idx}, 'field', this.value)" style="width:100%; margin-bottom:4px; font-size:11px;"><option value="">- Field -</option>${opts}</select>
+                <select onchange="ide.updateFilterType(${idx}, this.value)" style="width:100%; font-size:11px;">
+                    <option value="dropdown" ${f.uiType === 'dropdown' ? 'selected' : ''}>Dropdown</option>
+                    <option value="text" ${f.uiType === 'text' ? 'selected' : ''}>Text Search</option>
+                    <option value="dateRange" ${f.uiType === 'dateRange' ? 'selected' : ''}>Date Range</option>
+                </select>
+                ${defaultsHtml}
+            </div>`;
+        });
+        document.getElementById('prop-filters').innerHTML = html;
+    },
+    
+    addFilter: function() { 
+        this.visuals[this.selectedSlot].filters.push({ field: '', uiType: 'dropdown', defaultVal: '', defaultVal2: '' }); 
+        this.renderFiltersUI(); 
+    },
+    removeFilter: function(idx) { 
+        this.visuals[this.selectedSlot].filters.splice(idx, 1); 
+        this.renderFiltersUI(); 
+        this.renderLiveVisual(this.selectedSlot);
+    },
+    updateFilterProp: function(idx, prop, val) {
+        this.visuals[this.selectedSlot].filters[idx][prop] = val;
+        // Wipe interactive state when config changes
+        delete this.visuals[this.selectedSlot].filters[idx].currentVal;
+        delete this.visuals[this.selectedSlot].filters[idx].currentVal2;
+        if(prop === 'field') this.renderFiltersUI(); 
+        this.renderLiveVisual(this.selectedSlot);
+    },
+    updateFilterType: function(idx, val) {
+        this.visuals[this.selectedSlot].filters[idx].uiType = val;
+        this.visuals[this.selectedSlot].filters[idx].defaultVal = '';
+        this.visuals[this.selectedSlot].filters[idx].defaultVal2 = '';
+        delete this.visuals[this.selectedSlot].filters[idx].currentVal;
+        delete this.visuals[this.selectedSlot].filters[idx].currentVal2;
+        this.renderFiltersUI();
+        this.renderLiveVisual(this.selectedSlot);
+    },
+
+    // Fired when the user interacts with the generated filter widget on the canvas
+    setWidgetFilter: function(slotId, idx, prop, val) {
+        this.visuals[slotId].filters[idx][prop] = val;
+        this.renderLiveVisual(slotId, true); // True = don't wipe the filter inputs to maintain focus
+    },
+
+    // --- LIVE RENDERING ENGINE ---
+    renderLiveVisual: function(slotId, preserveFilters = false) {
+        const conf = this.visuals[slotId];
+        if (!conf) return;
+        const container = document.getElementById(`render-${slotId}`);
+        const filterBar = document.getElementById(`filterbar-${slotId}`);
+        if (!container || !filterBar) return;
+
+        if (this.chartInstances[slotId]) {
+            this.chartInstances[slotId].dispose();
+            delete this.chartInstances[slotId];
+        }
+
+        if (conf.type === 'text') {
+            filterBar.style.display = 'none';
+            container.innerHTML = `<div style="padding:10px; width:100%; height:100%; box-sizing:border-box; overflow-y:auto; word-wrap:break-word;">${conf.content || '<em style="color:#a19f9d">Configure text in properties...</em>'}</div>`;
+            return;
+        }
+
+        // Render Filter Bar
+        if (conf.filters && conf.filters.length > 0) {
+            filterBar.style.display = 'flex';
+            if (!preserveFilters) {
+                let fbHtml = '';
+                conf.filters.forEach((f, idx) => {
+                    if(!f.field) return;
+                    let val1 = f.currentVal !== undefined ? f.currentVal : (f.defaultVal || '');
+                    let val2 = f.currentVal2 !== undefined ? f.currentVal2 : (f.defaultVal2 || '');
+                    
+                    fbHtml += `<div class="filter-control"><label>${f.field}</label>`;
+                    if (f.uiType === 'dateRange') {
+                        fbHtml += `<div style="display:flex; gap:4px;">
+                            <input type="date" value="${val1}" oninput="ide.setWidgetFilter('${slotId}', ${idx}, 'currentVal', this.value)">
+                            <input type="date" value="${val2}" oninput="ide.setWidgetFilter('${slotId}', ${idx}, 'currentVal2', this.value)">
+                        </div>`;
+                    } else if (f.uiType === 'dropdown') {
+                        // Dynamically fetch options from base data
+                        let distinct = alasql(`SELECT DISTINCT \`${f.field}\` FROM ? WHERE \`${f.field}\` IS NOT NULL ORDER BY \`${f.field}\``, [this.lastResults]).map(r => r[f.field]);
+                        fbHtml += `<select onchange="ide.setWidgetFilter('${slotId}', ${idx}, 'currentVal', this.value)">
+                            <option value="">All</option>
+                            ${distinct.map(d => `<option value="${d}" ${d == val1 ? 'selected':''}>${d}</option>`).join('')}
+                        </select>`;
+                    } else { // text search
+                        fbHtml += `<input type="text" placeholder="Search..." value="${val1}" oninput="ide.setWidgetFilter('${slotId}', ${idx}, 'currentVal', this.value)">`;
+                    }
+                    fbHtml += `</div>`;
+                });
+                filterBar.innerHTML = fbHtml;
+            }
+        } else {
+            filterBar.style.display = 'none';
+        }
+
+        if (!conf.fields || conf.fields.length === 0 || !conf.fields[0].name || this.lastResults.length === 0) {
+            container.innerHTML = '<div style="color:#a19f9d; text-align:center; padding-top:20px;">Assign fields in properties</div>';
+            return;
+        }
+
+        try {
+            // Build Select
+            let selectParts = [];
+            let groupByParts = [];
+            let hasAgg = false;
+
+            conf.fields.forEach((f, i) => {
+                if (!f.name) return;
+                let colAlias = `col_${i}`;
+                if (f.agg === 'none') {
+                    selectParts.push(`\`${f.name}\` AS ${colAlias}`);
+                    groupByParts.push(`\`${f.name}\``);
+                } else if (f.agg.includes('DISTINCT')) {
+                    selectParts.push(`COUNT(DISTINCT \`${f.name}\`) AS ${colAlias}`);
+                    hasAgg = true;
+                } else {
+                    selectParts.push(`${f.agg}(\`${f.name}\`) AS ${colAlias}`);
+                    hasAgg = true;
+                }
+            });
+
+            // Build Where from Filters
+            let whereParts = [];
+            if (conf.filters) {
+                conf.filters.forEach(f => {
+                    if(!f.field) return;
+                    let val1 = f.currentVal !== undefined ? f.currentVal : f.defaultVal;
+                    let val2 = f.currentVal2 !== undefined ? f.currentVal2 : f.defaultVal2;
+                    
+                    if (f.uiType === 'dateRange') {
+                        if (val1) whereParts.push(`\`${f.field}\` >= '${val1}'`);
+                        if (val2) whereParts.push(`\`${f.field}\` <= '${val2}'`);
+                    } else if (f.uiType === 'dropdown' && val1) {
+                        whereParts.push(`\`${f.field}\` = '${val1.replace(/'/g, "''")}'`);
+                    } else if (f.uiType === 'text' && val1) {
+                        whereParts.push(`\`${f.field}\` LIKE '%${val1.replace(/'/g, "''")}%'`);
+                    }
+                });
+            }
+
+            let sql = `SELECT ${selectParts.join(', ')} FROM ?`;
+            if (whereParts.length > 0) sql += ` WHERE ${whereParts.join(' AND ')}`;
+            if (hasAgg && groupByParts.length > 0) sql += ` GROUP BY ${groupByParts.join(', ')}`;
+            
+            let chartData = alasql(sql, [this.lastResults]);
+
+            // Render Output
+            if (conf.type === 'table') {
+                let html = `<table class="results-table"><tr>${conf.fields.map(f => `<th>${f.agg !== 'none'?f.agg+' ':''}${f.name}</th>`).join('')}</tr>`;
+                chartData.slice(0, 50).forEach(row => { html += `<tr>${conf.fields.map((f, i) => `<td>${row['col_'+i] ?? ''}</td>`).join('')}</tr>`; });
+                container.innerHTML = html + `</table>`;
+            } 
+            else if (conf.type === 'card') {
+                let val = chartData.length > 0 ? chartData[0]['col_0'] : 0;
+                if(typeof val === 'number') val = val.toLocaleString(undefined, {maximumFractionDigits: 2});
+                container.innerHTML = `<div class="card-render-target">${val}<span>${conf.fields[0].name}</span></div>`;
+            }
+            else {
+                if(conf.fields.length < 2 || !conf.fields[1].name) {
+                    container.innerHTML = '<div style="color:#a19f9d; text-align:center; padding-top:20px;">Charts require both a Category and a Value field.</div>';
+                    return;
+                }
+
+                container.innerHTML = `<div id="chart-tgt-${slotId}" class="chart-render-target"></div>`;
+                this.chartInstances[slotId] = echarts.init(document.getElementById(`chart-tgt-${slotId}`));
+                
+                let categories = chartData.map(r => r.col_0);
+                let values = chartData.map(r => r.col_1);
+
+                let option = { tooltip: { trigger: 'item' }, grid: { left: '10%', right: '5%', bottom: '15%', top: '10%' } };
+                if (conf.type === 'pie') {
+                    let pieData = categories.map((c, i) => ({ name: c || 'Blank', value: values[i] }));
+                    option.series = [{ type: 'pie', radius: '70%', data: pieData }];
+                } else {
+                    option.xAxis = { type: 'category', data: categories, axisLabel: { interval: 0, rotate: 30, fontSize: 10 } };
+                    option.yAxis = { type: 'value' };
+                    option.series = [{ type: conf.type, data: values, color: '#0078d4' }];
+                }
+                this.chartInstances[slotId].setOption(option, true);
+                this.chartInstances[slotId].resize();
+            }
+        } catch (e) {
+            container.innerHTML = `<div style="color:red; font-size:11px;">Render Error: ${e.message}</div>`;
+        }
+    },
+
+    updateConfigText: function() {
+        const config = {
+            _license: "This file is part of DataLaVista. Copyright © 2026 The Regents of the University of Michigan. This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version. This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details. You should have received a copy of the GNU General Public License along with this program. If not, see <https://www.gnu.org/licenses/>.",
+            siteUrl: this.siteUrl,
+            lists: this.usedListsConfig.map(l => ({ listId: l.id, alias: l.alias, select: l.allFieldsForSelect })),
+            sqlQuery: this.sqlEditor ? this.sqlEditor.getValue() : "",
+            visuals: Object.keys(this.visuals).map(slotId => ({ slot: slotId, ...this.visuals[slotId] }))
+        };
+        document.getElementById('ide-config-output').value = "const dashboardConfig = " + JSON.stringify(config, null, 2) + ";";
+    },
+
+    copyConfig: function() { document.getElementById("ide-config-output").select(); document.execCommand("copy"); alert("Config Copied!"); }
+};
+
+window.addEventListener('resize', () => { Object.values(ide.chartInstances).forEach(c => c.resize()); });
+</script>
