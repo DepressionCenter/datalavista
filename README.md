@@ -75,11 +75,6 @@ Most enterprise data is trapped behind bloated frameworks or expensive BI tools.
 
 
 
-
-## Additional Resources
-+ < Links to study website, related projects, etc. >
-
-
 ## Contributing
 ***I'll be back... with a better report.***
 The mission is far from over. Future updates will include:
