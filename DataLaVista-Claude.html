@@ -1405,7 +1405,7 @@ const ALASQL_KEYWORDS = [
   'TIES','FETCH','FIRST','NEXT','ONLY','ROWS','ONLY','SKIP','ARRAY',
   'MATRIX','OF','STRING','NUMBER','DATE','BOOLEAN','OBJECT','SEARCH',
   'REPLACE','REMOVE','RENAME','MODIFY','REINDEX','TRUNCATE','BEGIN',
-  'COMMIT','ROLLBACK','TRANSACTION','SAVEPOINT','RELEASE'
+  'COMMIT','ROLLBACK','TRANSACTION','SAVEPOINT','RELEASE','ARRAYJOIN'
 ];
 
 const AGG_OPTIONS = ['','COUNT','COUNT(DISTINCT)','SUM','AVG','MEDIAN','MIN','MAX','FIRST','LAST','STDEV','VAR'];
@@ -1550,15 +1550,18 @@ function setupAlaSQL() {
   
   
   alasql.fn.ARRAYJOIN = function(lookupArray, itemKey) {
-    if (!lookupArray || !Array.isArray(lookupArray)) return false;
+    // Return false if the array is invalid or the itemKey is missing
+    if (!lookupArray || !Array.isArray(lookupArray) || itemKey == null) return false;
     
-    // Checks if any object in the raw SharePoint array matches the scalar ID
+    const keyStr = itemKey.toString();
+
+    // Safely check for Id, ID, or id using optional chaining (?.)
     return lookupArray.some(member => 
-        member.Id.toString() === itemKey.toString() || 
-        member.ID.toString() === itemKey.toString() || 
-        member.id.toString() === itemKey.toString()
+        member?.Id?.toString() === keyStr || 
+        member?.ID?.toString() === keyStr || 
+        member?.id?.toString() === keyStr
     );
-  };
+};
   
   
   console.log('AlaSQL custom functions registered: ARRAYJOIN');
@@ -1865,9 +1868,20 @@ async function fetchSPItemsWithRetry(siteUrl, listGuid, selectStr, expandStr, to
     for (let i = 0; i < retries; i++) {
         let url = `${siteUrl}/_api/web/lists(guid'${listGuid}')/items?$top=${top}&$select=${currentSelect.join(',')}&$expand=${currentExpand.join(',')}`;
         try {
-            const json = await spFetch(url);
-            return extractRows(json);
-        } catch (e) {
+                const json = await spFetch(url);
+
+                // Scrub OData artifacts before passing SP JSON response to alasql
+                let items = extractRows(json);
+                items.forEach(row => {
+                    Object.keys(row).forEach(key => {
+                        if (key.includes('@odata')) {
+                            delete row[key];
+                        }
+                    });
+                });
+
+                return items;
+            } catch (e) {
             const errorStr = e.message || '';
             const match = errorStr.match(/(?:Column|The field or property) '([^']+)' does not exist/i);
             
@@ -1895,6 +1909,11 @@ async function fetchTableData(tableName, fetchAll = false) {
     setStatus(`⏳ Fetching data for ${tableName}...`);
     
     // VERY IMPORTANT: Use the original physical SP fields to build the query!
+    if(fetchAll) {
+        console.log("*** FETCHING ALL ITEMS ***");
+        console.log(t.originalFields);
+        console.log(t.fields);
+    }
     const spFields = t.originalFields || t.fields;
     let rawData = [];
     
@@ -1904,23 +1923,31 @@ async function fetchTableData(tableName, fetchAll = false) {
         const baseExpand = new Set(['Author', 'Editor']);
         
         spFields.forEach(f => {
-            const isPeople = f.TypeAsString?.includes('User');
-            const isLookup = f.TypeAsString?.includes('Lookup');
-            const isTax = f.TypeAsString?.includes('Taxonomy') || f.InternalName === 'TaxKeyword';
+            // Support both SP original fields (InternalName) and fallback logical fields (internalName)
+            const internalName = f.InternalName || f.internalName;
+            if (!internalName) return;
+
+            // Support both SP TypeAsString and fallback type
+            const typeStr = (f.TypeAsString || f.type || '').toLowerCase();
+
+            const isPeople = typeStr.includes('user');
+            const isLookup = typeStr.includes('lookup');
+            const isTax = typeStr.includes('taxonomy') || typeStr === 'taxkeyword' || internalName === 'TaxKeyword';
 
             if (isPeople) { 
-                baseSelect.add(`${f.InternalName}/Id`);
-                baseSelect.add(`${f.InternalName}/Title`);
-                baseSelect.add(`${f.InternalName}/Name`);
-                baseExpand.add(f.InternalName);
+                baseSelect.add(`${internalName}/Id`);
+                baseSelect.add(`${internalName}/Title`);
+                baseSelect.add(`${internalName}/Name`);
+                baseExpand.add(internalName);
             } else if (isLookup) { 
-                baseSelect.add(`${f.InternalName}/Id`);
-                baseSelect.add(`${f.InternalName}/Title`);
-                baseExpand.add(f.InternalName);
+                baseSelect.add(`${internalName}/Id`);
+                baseSelect.add(`${internalName}/Title`);
+                baseExpand.add(internalName);
             } else if (isTax) {
-                baseSelect.add(f.InternalName);
+                // Bug fix retained: TaxKeywords should only be added to select, not expand
+                baseSelect.add(internalName);
             } else {
-                baseSelect.add(f.InternalName);
+                baseSelect.add(internalName);
             }
         });
 
@@ -1991,32 +2018,6 @@ async function deriveStructureFromSample(dataArray) {
 }
 
 
-async function fetchSPItems(siteUrl, listGuid, fieldSpec, top = 5000) {
-  // fieldSpec is { select:[], expand:[] } from getSelectFields, or a plain array (legacy)
-  let selectStr = '', expandStr = '';
-  if (Array.isArray(fieldSpec)) {
-    selectStr = fieldSpec.join(',');
-  } else if (fieldSpec) {
-    selectStr = (fieldSpec.select || []).join(',');
-    expandStr = (fieldSpec.expand || []).join(',');
-  }
-  let url = `${siteUrl}/_api/web/lists(guid'${listGuid}')/items?$top=${top}`;
-  if (selectStr) url += `&$select=${selectStr}`;
-  if (expandStr) url += `&$expand=${expandStr}`;
-  let allItems = [];
-  let nextUrl = url;
-  while (nextUrl) {
-    const json = await spFetch(nextUrl);
-    const items = extractRows(json);
-    allItems = allItems.concat(items);
-    // Check for next page
-    if (json['odata.nextLink']) nextUrl = json['odata.nextLink'];
-    else if (json.d && json.d.__next) nextUrl = json.d.__next;
-    else nextUrl = null;
-    if (allItems.length >= top) { allItems = allItems.slice(0, top); break; }
-  }
-  return allItems;
-}
 
 // ============================================================
 // FIELD NORMALIZATION
@@ -5266,15 +5267,18 @@ const CONFIG = ${configJSON};
   console.log('AlaSQL aggregators registered: MIN/MAX/MINDATE/MAXDATE/SUM/LAST');
   
   alasql.fn.ARRAYJOIN = function(lookupArray, itemKey) {
-    if (!lookupArray || !Array.isArray(lookupArray)) return false;
+    // Return false if the array is invalid or the itemKey is missing
+    if (!lookupArray || !Array.isArray(lookupArray) || itemKey == null) return false;
     
-    // Checks if any object in the raw SharePoint array matches the scalar ID
+    const keyStr = itemKey.toString();
+
+    // Safely check for Id, ID, or id using optional chaining (?.)
     return lookupArray.some(member => 
-        member.Id.toString() === itemKey.toString() || 
-        member.ID.toString() === itemKey.toString() || 
-        member.id.toString() === itemKey.toString()
+        member?.Id?.toString() === keyStr || 
+        member?.ID?.toString() === keyStr || 
+        member?.id?.toString() === keyStr
     );
-  };
+};
   
   console.log('AlaSQL custom functions registered: ARRAYJOIN');
 const ISO_RE=/^\\d{4}-\\d{2}-\\d{2}T/;
@@ -5630,7 +5634,6 @@ window.dlv = {
   extractRows,
   fetchSPLists,
   fetchSPFields,
-  fetchSPItems,
   normalizeDate,
   normalizeObject,
   normalizeRow,

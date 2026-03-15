@@ -1405,7 +1405,7 @@
     'TIES','FETCH','FIRST','NEXT','ONLY','ROWS','ONLY','SKIP','ARRAY',
     'MATRIX','OF','STRING','NUMBER','DATE','BOOLEAN','OBJECT','SEARCH',
     'REPLACE','REMOVE','RENAME','MODIFY','REINDEX','TRUNCATE','BEGIN',
-    'COMMIT','ROLLBACK','TRANSACTION','SAVEPOINT','RELEASE'
+    'COMMIT','ROLLBACK','TRANSACTION','SAVEPOINT','RELEASE','ARRAYJOIN'
     ];
 
     const AGG_OPTIONS = ['','COUNT','COUNT(DISTINCT)','SUM','AVG','MEDIAN','MIN','MAX','FIRST','LAST','STDEV','VAR'];
@@ -1550,15 +1550,18 @@
     
     
     alasql.fn.ARRAYJOIN = function(lookupArray, itemKey) {
-        if (!lookupArray || !Array.isArray(lookupArray)) return false;
-        
-        // Checks if any object in the raw SharePoint array matches the scalar ID
-        return lookupArray.some(member => 
-            member.Id.toString() === itemKey.toString() || 
-            member.ID.toString() === itemKey.toString() || 
-            member.id.toString() === itemKey.toString()
-        );
-    };
+    // Return false if the array is invalid or the itemKey is missing
+    if (!lookupArray || !Array.isArray(lookupArray) || itemKey == null) return false;
+    
+    const keyStr = itemKey.toString();
+
+    // Safely check for Id, ID, or id using optional chaining (?.)
+    return lookupArray.some(member => 
+        member?.Id?.toString() === keyStr || 
+        member?.ID?.toString() === keyStr || 
+        member?.id?.toString() === keyStr
+    );
+};
     
     
     console.log('AlaSQL custom functions registered: ARRAYJOIN');
@@ -1875,7 +1878,18 @@
             let url = `${siteUrl}/_api/web/lists(guid'${listGuid}')/items?$top=${top}&$select=${currentSelect.join(',')}&$expand=${currentExpand.join(',')}`;
             try {
                 const json = await spFetch(url);
-                return extractRows(json);
+
+                // Scrub OData artifacts before passing SP JSON response to alasql
+                let items = extractRows(json);
+                items.forEach(row => {
+                    Object.keys(row).forEach(key => {
+                        if (key.includes('@odata')) {
+                            delete row[key];
+                        }
+                    });
+                });
+
+                return items;
             } catch (e) {
                 const errorStr = e.message || '';
                 const match = errorStr.match(/(?:Column|The field or property) '([^']+)' does not exist/i);
@@ -5051,15 +5065,18 @@
     console.log('AlaSQL aggregators registered: MIN/MAX/MINDATE/MAXDATE/SUM/LAST');
     
     alasql.fn.ARRAYJOIN = function(lookupArray, itemKey) {
-        if (!lookupArray || !Array.isArray(lookupArray)) return false;
-        
-        // Checks if any object in the raw SharePoint array matches the scalar ID
-        return lookupArray.some(member => 
-            member.Id.toString() === itemKey.toString() || 
-            member.ID.toString() === itemKey.toString() || 
-            member.id.toString() === itemKey.toString()
-        );
-    };
+    // Return false if the array is invalid or the itemKey is missing
+    if (!lookupArray || !Array.isArray(lookupArray) || itemKey == null) return false;
+    
+    const keyStr = itemKey.toString();
+
+    // Safely check for Id, ID, or id using optional chaining (?.)
+    return lookupArray.some(member => 
+        member?.Id?.toString() === keyStr || 
+        member?.ID?.toString() === keyStr || 
+        member?.id?.toString() === keyStr
+    );
+};
     
     console.log('AlaSQL custom functions registered: ARRAYJOIN');
     const ISO_RE=/^\\d{4}-\\d{2}-\\d{2}T/;
