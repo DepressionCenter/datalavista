@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tech Noir Query</title>
+<style>
+  /* Import a retro 80s pixel font from Google Fonts */
+  @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+  body {
+    background-color: #111;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    margin: 0;
+  }
+
+  .scene-container {
+    position: relative;
+    display: inline-block;
+    max-width: 100%;
+    /* Subtle CRT screen glow around the edge */
+    box-shadow: 0 0 20px rgba(0, 255, 0, 0.2); 
+  }
+
+  .background-image {
+    width: 100%;
+    max-width: 800px; /* Adjust based on your preference */
+    height: auto;
+    display: block;
+    border-radius: 4px;
+  }
+
+  .subtitle-container {
+    position: absolute;
+    bottom: 8%;
+    width: 100%;
+    text-align: center;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 24px;
+    color: #00ff00; /* Classic terminal green */
+    /* Heavy black text-shadow to make it pop against the background */
+    text-shadow: 3px 3px 0 #000, -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000, 2px 2px 0 #000;
+  }
+
+  /* Blinking cursor effect */
+  .cursor {
+    display: inline-block;
+    width: 14px;
+    height: 24px;
+    background-color: #00ff00;
+    vertical-align: bottom;
+    margin-left: 5px;
+    animation: blink 1s step-end infinite;
+  }
+
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0; }
+  }
+
+  /* Make font smaller on mobile */
+  @media (max-width: 600px) {
+    .subtitle-container { font-size: 14px; }
+    .cursor { height: 14px; width: 8px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="scene-container">
+  <img src="https://storage.googleapis.com/gweb-uniblog-publish-prod/images/Gemini_flash_image.width-1200.jpg" alt="Terminator Scene" class="background-image" id="terminator-bg">
+  
+  <div class="subtitle-container">
+    <span id="typewriter-text"></span><span class="cursor"></span>
+  </div>
+</div>
+
+<script>
+  // The phrase we want to animate
+  const text = "COME WITH ME IF YOU WANT TO QUERY.";
+  const typingSpeed = 120; // Milliseconds per letter. Lower is faster.
+  let i = 0;
+
+  function typeWriter() {
+    if (i < text.length) {
+      document.getElementById("typewriter-text").innerHTML += text.charAt(i);
+      i++;
+      // Wait a bit, then type the next letter
+      setTimeout(typeWriter, typingSpeed);
+    }
+  }
+
+  // Add a slight delay before the typing starts for dramatic effect
+  window.onload = function() {
+    setTimeout(typeWriter, 1000); 
+  };
+</script>
+
+</body>
+</html>

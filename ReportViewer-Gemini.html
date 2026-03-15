@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DataLaVista Dashboard</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/alasql/4.1.0/alasql.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+    
+    <style>
+        #dlv-report {
+            font-family: 'Segoe UI', Tahoma, sans-serif;
+            background: #f3f2f1;
+            padding: 20px;
+            color: #323130;
+            box-sizing: border-box;
+            width: 100%;
+        }
+        #dlv-report * { box-sizing: border-box; }
+        .dlv-grid { display: flex; flex-wrap: wrap; gap: 15px; width: 100%; align-content: flex-start; }
+        .dlv-widget { background: #fff; border: 1px solid #edebe9; box-shadow: 0 2px 4px rgba(0,0,0,0.05); padding: 15px; display: flex; flex-direction: column; }
+        .dlv-title { font-weight: bold; margin-bottom: 15px; font-size: 14px; }
+        .dlv-table { border-collapse: collapse; width: 100%; font-size: 12px; text-align: left; }
+        .dlv-table th, .dlv-table td { border: 1px solid #ccc; padding: 6px; }
+        .dlv-table th { background: #edebe9; position: sticky; top: 0; }
+    </style>
+</head>
+<body>
+
+<div id="dlv-report">
+    <div id="dlv-status">Initializing dashboard...</div>
+    <div class="dlv-grid" id="dlv-grid"></div>
+</div>
+
+<script>
+    // =========================================================================
+    // PASTE YOUR GENERATED JSON CONFIGURATION BELOW
+    // =========================================================================
+    const dashboardConfig = {
+        // Example empty placeholder. Replace this entire object.
+        "_license": "This file is part of DataLaVista...",
+        "dataSourceUrl": "",
+        "tableMap": {},
+        "sqlQuery": "",
+        "widgets": []
+    };
+    // =========================================================================
+
+    // Custom Aggregators for AlaSQL (Mirroring Designer Logic)
+    alasql.aggr.MINDATE = function(v,s,stage){ if(stage===1) return v; if(stage===2){ if(v==null||v==='') return s; if(s==null||s==='') return v; return(v<s)?v:s; } if(stage===3) return s; };
+    alasql.aggr.MAXDATE = function(v,s,stage){ if(stage===1) return v; if(stage===2){ if(v==null||v==='') return s; if(s==null||s==='') return v; return(v>s)?v:s; } if(stage===3) return s; };
+    alasql.aggr.SUM = function(v,s,stage){ var val=parseFloat(v)||0; if(stage===1) return val; if(stage===2) return s+val; if(stage===3) return s; };
+
+    async function loadReport() {
+        const statusDiv = document.getElementById('dlv-status');
+        const grid = document.getElementById('dlv-grid');
+
+        if (!dashboardConfig.dataSourceUrl) {
+            statusDiv.innerHTML = '<span style="color:red;">Error: Dashboard configuration is empty. Paste your JSON in the HTML file.</span>';
+            return;
+        }
+
+        statusDiv.innerText = 'Fetching data from SharePoint...';
+
+        try {
+            let sql = dashboardConfig.sqlQuery;
+            if(!sql) { statusDiv.innerHTML = '<span style="color:red;">No SQL Query defined.</span>'; return; }
+            sql = sql.replace(/\bMIN\(/gi, 'MINDATE(').replace(/\bMAX\(/gi, 'MAXDATE(');
+
+            let tableMatches = sql.match(/\[([^\]]+)\]/g) || [];
+            let tablesToFetch = [...new Set(tableMatches.map(t => t.replace(/\[|\]/g, '')))];
+
+            let fetchPromises = tablesToFetch.map(async (tAlias) => {
+                const listTitle = dashboardConfig.tableMap[tAlias] || tAlias; 
+                const headers = { "Accept": "application/json;odata=nometadata" };
+                let url = dashboardConfig.dataSourceUrl + "/_api/web/lists/getbytitle('" + listTitle + "')/items?$top=50000";
+                
+                const res = await fetch(url, { headers });
+                if(!res.ok) throw new Error("Failed to fetch list: " + listTitle);
+                const data = await res.json();
+                let items = data.value || (data.d && data.d.results) || [];
+                
+                items = items.map(item => {
+                    let row = {};
+                    Object.keys(item).forEach(k => {
+                        let val = item[k];
+                        if(typeof val === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(val)) {
+                            let d = val.replace('T', ' ').replace('Z', '');
+                            if (d.endsWith('00:00:00')) d = d.substring(0, 10);
+                            row[k] = d;
+                        } else if (val && typeof val === 'object') {
+                            if (Array.isArray(val)) {
+                                row[k] = val.map(v => v.Label || v.Title || v.Name || v).join(', ');
+                            } else {
+                                if(val.results) row[k] = val.results.map(v => v.Label || v.Title || v.Name || v).join(', ');
+                                else row[k] = val.Label || val.Title || val.Name || JSON.stringify(val);
+                            }
+                        } else {
+                            row[k] = val;
+                        }
+                    });
+                    return row;
+                });
+
+                alasql('DROP TABLE IF EXISTS [' + tAlias + ']');
+                alasql('CREATE TABLE [' + tAlias + ']');
+                alasql.tables[tAlias].data = items;
+            });
+
+            await Promise.all(fetchPromises);
+            
+            statusDiv.innerText = 'Processing query...';
+            const queryResult = alasql(sql);
+            statusDiv.style.display = 'none';
+
+            dashboardConfig.widgets.forEach(w => {
+                const el = document.createElement('div');
+                el.className = 'dlv-widget';
+                el.style.width = `calc(${w.width}% - 15px)`;
+                el.style.height = w.height + 'px';
+                if(w.bgColor) el.style.backgroundColor = w.bgColor;
+                
+                const uniqueId = 'view_chart_' + w.id;
+                el.innerHTML = `
+                    <div class="dlv-title">${w.title}</div>
+                    <div id="${uniqueId}" style="flex-grow:1; position:relative; min-height:200px;"></div>
+                `;
+                grid.appendChild(el);
+
+                setTimeout(() => {
+                    const eContainer = document.getElementById(uniqueId);
+                    if(!eContainer) return;
+
+                    let data = queryResult;
+                    if (w.xField && w.agg !== 'None') {
+                        let aggSql = w.agg === 'COUNT' ? 'COUNT(*)' : `${w.agg}([${w.yField}])`;
+                        let q = `SELECT [${w.xField}] AS name, ${aggSql} AS value FROM ? GROUP BY [${w.xField}]`;
+                        data = alasql(q, [queryResult]);
+                    } else if (w.xField && w.yField) {
+                        data = data.map(r => ({ name: r[w.xField], value: r[w.yField] }));
+                    }
+
+                    if (w.type === 'card') {
+                        let val = data.length ? (data[0].value !== undefined ? data[0].value : Object.values(data[0])[0]) : 0;
+                        eContainer.innerHTML = `<div style="display:flex; align-items:center; justify-content:center; height:100%; font-size:36px; font-weight:bold; color:#0078d4;">${val}</div>`;
+                        return;
+                    }
+                    
+                    if (w.type === 'table') {
+                        if(data.length === 0) { eContainer.innerHTML = "No data."; return; }
+                        let html = '<div style="width:100%; height:100%; overflow:auto;"><table class="dlv-table"><thead><tr>';
+                        Object.keys(data[0]).forEach(k => html += `<th>${k}</th>`);
+                        html += '</tr></thead><tbody>';
+                        data.forEach(row => {
+                            html += '<tr>';
+                            Object.values(row).forEach(v => html += `<td>${v !== null ? v : ''}</td>`);
+                            html += '</tr>';
+                        });
+                        html += '</tbody></table></div>';
+                        eContainer.innerHTML = html;
+                        return;
+                    }
+
+                    if (typeof echarts !== 'undefined') {
+                        const myChart = echarts.init(eContainer);
+                        let options = {
+                            tooltip: { trigger: 'item' },
+                            color: ['#0078d4', '#2b88d8', '#005a9e', '#106ebe', '#004578']
+                        };
+                        if (w.type === 'pie') {
+                            options.series = [{ type: 'pie', radius: '60%', data: data }];
+                        } else {
+                            options.xAxis = { type: 'category', data: data.map(d => String(d.name)) };
+                            options.yAxis = { type: 'value' };
+                            options.series = [{ type: w.type, data: data.map(d => d.value) }];
+                        }
+                        myChart.setOption(options);
+                        window.addEventListener('resize', () => myChart.resize());
+                    }
+                }, 50);
+            });
+
+        } catch(e) {
+            statusDiv.innerHTML = `<span style="color:red;">Error rendering dashboard: ${e.message}</span>`;
+        }
+    }
+
+    if(document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', loadReport);
+    } else {
+        loadReport();
+    }
+</script>
+</body>
+</html>
