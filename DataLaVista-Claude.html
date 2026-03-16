@@ -1405,7 +1405,7 @@ const ALASQL_KEYWORDS = [
   'TIES','FETCH','FIRST','NEXT','ONLY','ROWS','ONLY','SKIP','ARRAY',
   'MATRIX','OF','STRING','NUMBER','DATE','BOOLEAN','OBJECT','SEARCH',
   'REPLACE','REMOVE','RENAME','MODIFY','REINDEX','TRUNCATE','BEGIN',
-  'COMMIT','ROLLBACK','TRANSACTION','SAVEPOINT','RELEASE','ARRAYJOIN'
+  'COMMIT','ROLLBACK','TRANSACTION','SAVEPOINT','RELEASE','INCLUDES'
 ];
 
 const AGG_OPTIONS = ['','COUNT','COUNT(DISTINCT)','SUM','AVG','MEDIAN','MIN','MAX','FIRST','LAST','STDEV','VAR'];
@@ -1549,7 +1549,7 @@ function setupAlaSQL() {
   console.log('AlaSQL aggregators registered: MIN/MAX/MINDATE/MAXDATE/SUM/LAST');
   
   
-  alasql.fn.ARRAYJOIN = function(lookupArray, itemKey) {
+  alasql.fn.INCLUDES = function(lookupArray, itemKey) {
     // Return false if the array is invalid or the itemKey is missing
     if (!lookupArray || !Array.isArray(lookupArray) || itemKey == null) return false;
     
@@ -1564,7 +1564,7 @@ function setupAlaSQL() {
 };
   
   
-  console.log('AlaSQL custom functions registered: ARRAYJOIN');
+  console.log('AlaSQL custom functions registered: INCLUDES');
 }
 
 // Preprocess SQL: replace MIN( and MAX( with MINDATE( and MAXDATE(
@@ -5266,7 +5266,7 @@ const CONFIG = ${configJSON};
 
   console.log('AlaSQL aggregators registered: MIN/MAX/MINDATE/MAXDATE/SUM/LAST');
   
-  alasql.fn.ARRAYJOIN = function(lookupArray, itemKey) {
+  alasql.fn.INCLUDES = function(lookupArray, itemKey) {
     // Return false if the array is invalid or the itemKey is missing
     if (!lookupArray || !Array.isArray(lookupArray) || itemKey == null) return false;
     
@@ -5280,7 +5280,7 @@ const CONFIG = ${configJSON};
     );
 };
   
-  console.log('AlaSQL custom functions registered: ARRAYJOIN');
+  console.log('AlaSQL custom functions registered: INCLUDES');
 const ISO_RE=/^\\d{4}-\\d{2}-\\d{2}T/;
 function normDate(v){if(typeof v!=='string')return v;if(ISO_RE.test(v)){let d=v.replace('T',' ').replace('Z','').replace(/\\.\\d+$/,'');if(d.endsWith(' 00:00:00'))d=d.replace(' 00:00:00','');return d;}return v;}
 
