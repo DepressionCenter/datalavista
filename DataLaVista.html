@@ -1010,15 +1010,15 @@ hr.divider { border: none; border-top: 1px solid var(--border); margin: 4px 0; }
 
 <!-- TOP TOOLBAR -->
 <div id="toolbar">
-	<div class="logo">DataLa<span>Vista</span></div>
-	<div class="toolbar-sep"></div>
-	<button class="btn btn-default btn-sm" id="btn-connect" onclick="showPopup()">⚡ Connect &nbsp; Load</button>
-	<button class="btn btn-default btn-sm" id="btn-save-config" onclick="saveConfig()" disabled>💾 Save Config</button>
-	<div class="toolbar-sep"></div>
-	<div id="status-bar">Not connected — click Connect / Load to begin</div>
-	<div class="toolbar-spacer"></div>
-	<button class="btn btn-ghost btn-sm" onclick="showHelp()" title="Help">❓</button>
-</div>
+    <div class="logo">DataLa<span>Vista</span></div>
+    <div class="toolbar-sep"></div>
+    <button class="btn btn-default btn-sm" id="btn-connect" title="Come with me if you want to load... more data." onclick="showPopup()">⚡ Connect &nbsp; Load</button>
+    <button class="btn btn-default btn-sm" id="btn-save-config" title="Come with me if you want your report to live." onclick="saveConfig()" disabled>💾 Save Config</button>
+    <div class="toolbar-sep"></div>
+    <div id="status-bar">Not connected — click Connect / Load to begin</div>
+    <div class="toolbar-spacer"></div>
+    <button class="btn btn-ghost btn-sm" onclick="showHelp()" title="Help">❓</button>
+  </div>
 
 <!-- POPUP OVERLAY -->
 <div id="popup-overlay" class="active">
@@ -1357,13 +1357,238 @@ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 GNU General Public License for more details.
 You should have received a copy of the GNU General Public License along
 with this program. If not, see <https://www.gnu.org/licenses/>.
+================================================================ */
 
-============================================================ */
+
+
+/* ============================================================
+Data La Vista Core
+[I'll be backbone...]
+=============================================================== */
+const DataLaVista = {
+    /* ===== CONSTANTS ===== */
+    FIELD_TYPE_ICONS: {
+        'text': {icon:'T', cls:'type-text'},
+        'number': {icon:'#', cls:'type-number'},
+        'date': {icon:'📅', cls:'type-date'},
+        'bool': {icon:'✓', cls:'type-bool'},
+        'lookup': {icon:'⇒', cls:'type-lookup'},
+        'array': {icon:'⊞', cls:'type-array'},
+        'default': {icon:'·', cls:'type-text'}
+    },
+
+    DATE_MACRO_OPS: [
+        { val: 'TODAY',          label: '= ☀️ Today',                 hasInput: false },
+        { val: 'THIS_WEEK',      label: '= 📆 This Week',             hasInput: false },
+        { val: 'LAST_WEEK',      label: '= 📆 Last Week',             hasInput: false },
+        { val: 'THIS_BIZ_WEEK',  label: '= 👩🏾‍💼 This Business Week',    hasInput: false },
+        { val: 'LAST_BIZ_WEEK',  label: '= 👨🏻‍💼 Last Businss Week',     hasInput: false },
+        { val: 'THIS_MONTH',     label: '= 📅 This Month',            hasInput: false },
+        { val: 'LAST_MONTH',     label: '= 📅 Last Month',            hasInput: false },
+        { val: 'THIS_YEAR',      label: '= 🎂 This Year',             hasInput: false },
+        { val: 'LAST_YEAR',      label: '= 🎂 Last Year',             hasInput: false },
+        { val: 'THIS_FISCAL',    label: '= 📒 This Fiscal Year',      hasInput: false },
+        { val: 'LAST_FISCAL',    label: '= 📒 Last Fiscal Year',      hasInput: false },
+        { val: 'THIS_ACADEMIC',  label: '= 🎓 This Academic Year',    hasInput: false },
+        { val: 'LAST_ACADEMIC',  label: '= 🎓 Last Academic Year',    hasInput: false },
+        { val: 'PAST_X_DAYS',    label: '= ⏳☀️ Past X Days',         hasInput: true  },
+        { val: 'PAST_X_MONTHS',  label: '= ⏳📅 Past X Months',       hasInput: true  },
+        { val: 'PAST_X_YEARS',   label: '= ⏳🎂 Past X Years',        hasInput: true  },
+        { val: 'PAST_X_FISCAL',  label: '= ⏳📒 Past X Fiscal years', hasInput: true  }
+    ],
+
+    DATE_MACRO_VALS: new Set([
+        'TODAY',
+        'THIS_WEEK',
+        'LAST_WEEK',
+        'THIS_BIZ_WEEK',
+        'LAST_BIZ_WEEK',
+        'THIS_MONTH',
+        'LAST_MONTH',
+        'THIS_YEAR',
+        'LAST_YEAR',
+        'THIS_FISCAL',
+        'LAST_FISCAL',
+        'THIS_ACADEMIC',
+        'LAST_ACADEMIC',
+        'PAST_X_DAYS',
+        'PAST_X_MONTHS',
+        'PAST_X_YEARS',
+        'PAST_X_FISCAL'
+    ]),
+
+    // types: 'all' = works on any, 'numeric' = numbers only, 'ordered' = numbers+dates
+    QB_AGGS: [
+        { val: '',               label: '— none —',          types: 'all'     },
+        { val: 'COUNT',          label: 'COUNT',              types: 'all'     },
+        { val: 'COUNT_DISTINCT', label: 'COUNT DISTINCT',     types: 'all'     },
+        { val: 'FIRST',          label: 'FIRST',              types: 'all'     },
+        { val: 'LAST',           label: 'LAST',               types: 'all'     },
+        { val: 'MAX',            label: 'MAX  (Maximum)',      types: 'ordered' },
+        { val: 'MIN',            label: 'MIN  (Minimum)',      types: 'ordered' },
+        { val: 'SUM',            label: 'SUM  (Sum)',          types: 'numeric' },
+        { val: 'AVG',            label: 'AVG  (Average)',      types: 'numeric' },
+        { val: 'MEDIAN',         label: 'MEDIAN',             types: 'numeric' },
+        { val: 'VAR',            label: 'VAR  (Variance)',     types: 'numeric' },
+        { val: 'STDEV',          label: 'STDEV  (Std Dev)',    types: 'numeric' }
+    ],
+
+    /* ===== STATE ===== */
+    state: {
+        source: { type: 'sharepoint', url: '', auth: 'current', token: '' },
+        tables: {},        // internalName -> { displayName, alias, fields: [], data: [], loaded: false }
+        queryMode: 'basic',
+        basicQB: { // Basic Query Builder
+            tableName: null,
+            selectedFields: [],
+            fieldAggs: {},
+            conditions: [],
+            sorts: [],
+            groupBy: [],
+            rowLimit: 500
+        },
+        advancedQB: { // Advanced Query Builder
+            nodes: {},
+            joins: [],
+            activeJoinIdx: -1
+        },
+        sql: '',
+        sqlLocked: false,
+        queryResults: null,  // array of row objects
+        queryColumns: [],
+        design: {
+            title: '',
+            widgets: [],     // widget objects
+            filters: []      // { field, label, position }
+        },
+        currentWidgetId: null,
+        previewResults: null,
+        previewFilters: {},  // field -> value
+        activeTab: 'query',
+        qbCollapsed: false,
+        qbSectionHeight: 60,  // percent
+        charts: {}   // widgetId -> echarts instance
+    },
+
+    /* ===== SAFE JSON HELPERS ===== */
+    /*
+     * Safely parse drag-and-drop dataTransfer payload.
+     * Returns null (never throws) if the data is missing, empty,
+     * "[object Object]", or otherwise not valid JSON.
+     */
+    safeDragParse: function(event) {
+        try {
+            const raw = event && event.dataTransfer
+            ? (event.dataTransfer.getData('application/x-datalavista') ||
+                event.dataTransfer.getData('text/plain') || '')
+            : '';
+            if (!raw || raw === '[object Object]' || raw.trim()[0] !== '{') return null;
+            return JSON.parse(raw);
+        } catch (e) {
+            return null;
+        }
+    },
+
+    /*
+     * Safely set drag data on both our custom MIME type and text/plain.
+     * Always call this instead of raw setData so safeDragParse works.
+     */
+    safeDragSet: function(event, obj) {
+        const json = JSON.stringify(obj);
+        try { event.dataTransfer.setData('application/x-datalavista', json); } catch(e) {}
+        try { event.dataTransfer.setData('text/plain', json); } catch(e) {}
+    },
+
+    /*
+     * Parse a JSON string from user input — shows a friendly error instead of throwing.
+     */
+    safeJSONParse: function(str, label) {
+        try {
+            if (!str || typeof str !== 'string' || !str.trim()) throw new Error('Empty input');
+            return JSON.parse(str);
+        } catch (e) {
+            toast((label || 'JSON') + ' parse error: ' + e.message, 'error');
+            return null;
+        }
+    }
+}
+
+
+/* ============================================================
+Cyberdyne Pipeline
+[Come with me if you want to load...]
+=============================================================== */
+const CyberdynePipeline = {
+    /* ===== CONSTANTS ===== */
+    ALASQL_KEYWORDS: [
+        'ATTACH','DETACH','SHOW','TABLES','DATABASES','FROM','SELECT','WHERE',
+        'GROUP','BY','ORDER','HAVING','LIMIT','OFFSET','JOIN','LEFT','RIGHT',
+        'INNER','OUTER','FULL','CROSS','ON','AS','DISTINCT','ALL','UNION',
+        'INTERSECT','EXCEPT','INSERT','INTO','VALUES','UPDATE','SET','DELETE',
+        'CREATE','TABLE','DROP','ALTER','ADD','COLUMN','INDEX','VIEW','IF',
+        'EXISTS','NOT','AND','OR','IN','IS','NULL','LIKE','BETWEEN','CASE',
+        'WHEN','THEN','ELSE','END','CAST','CONVERT','TOP','WITH','ROLLUP',
+        'CUBE','GROUPING','SETS','PIVOT','UNPIVOT','OVER','PARTITION','ROWS',
+        'RANGE','PRECEDING','FOLLOWING','UNBOUNDED','CURRENT','ROW','FILTER',
+        'WITHIN','RECURSIVE','LATERAL','APPLY','TABLESAMPLE','PERCENT',
+        'TIES','FETCH','FIRST','NEXT','ONLY','ROWS','ONLY','SKIP','ARRAY',
+        'MATRIX','OF','STRING','NUMBER','DATE','BOOLEAN','OBJECT','SEARCH',
+        'REPLACE','REMOVE','RENAME','MODIFY','REINDEX','TRUNCATE','BEGIN',
+        'COMMIT','ROLLBACK','TRANSACTION','SAVEPOINT','RELEASE','INCLUDES'
+    ],
+
+    AGG_OPTIONS: [
+        '','COUNT','COUNT(DISTINCT)','SUM','AVG','MEDIAN','MIN','MAX',
+        'FIRST','LAST','STDEV','VAR'
+    ],
+
+    SKIP_FIELDS: new Set([
+        'ItemChildCount','FolderChildCount','Attachments','MetaInfo','DocIcon',
+        'AppAuthor','AppEditor','Edit','ContentType','TemplateUrl','xd_ProgID',
+        'xd_Signature','HTML_x0020_File_x0020_Type','_ModerationStatus',
+        '_ModerationComments','InstanceID','Order','GUID','WorkflowVersion',
+        'WorkflowInstanceID','ParentVersionString','ParentLeafName',
+        'CheckedOutUserId','IsCheckedoutToLocal','UniqueId','SyncClientId',
+        'ProgId','ScopeId','FileRef','FileDirRef','Last_x0020_Modified',
+        'Created_x0020_Date','FSObjType','SortBehavior','FileLeafRef',
+        'OriginatorId','NoExecute','ContentVersion','UIVersionString',
+        'AccessPolicy','_UIVersionString','ParentUniqueId','_Level',
+        'IsCurrentVersion','ItemChildCount','FolderChildCount',
+        'ColorTag','_ColorTag','_IsRecord','_LabelAppliedBy','_LabelSetting',
+        'ComplianceAssetId','_ComplianceFlags','_ComplianceTag','_ComplianceTagWrittenTime',
+        '_ComplianceTagUserId','_IsRecord','_SysVersion','OData__SysVersion'
+    ]),
+	
+	// Conditions
+	QB_OPS: [
+	  { val: '=',       label: '= equals' },
+	  { val: '!=',      label: '≠ not equals' },
+	  { val: '>',       label: '> greater than' },
+	  { val: '<',       label: '< less than' },
+	  { val: '>=',      label: '≥ greater or equal' },
+	  { val: '<=',      label: '≤ less or equal' },
+	  { val: 'LIKE',    label: '~ contains' },
+	  { val: 'NULL',    label: '∅ is blank' },
+	  { val: 'NOTNULL', label: '✓ is not blank' },
+	]
+}
 
 
 // ============================================================
-// STATE
-// ============================================================
+
+
+
+
+
+
+
+
+
+
+
+/* ================= */
+/* ===== STATE ===== */
+/* ================= */
 const state = {
 source: { type: 'sharepoint', url: '', auth: 'current', token: '' },
 tables: {},        // internalName -> { displayName, alias, fields: [], data: [], loaded: false }
@@ -1582,40 +1807,46 @@ function extractEmail(claimsStr) {
 }
 
 function getMappedFieldDefinitions(fields) {
-	const mappedDefs = [];
-	const baseNames = new Set(fields.map(f => f.Title || f.InternalName));
+      const mappedDefs = [];
+      // Support both field formats (Old: Title/InternalName; New: alias/displayName/internalName)
+      const getName = f => f.alias || f.displayName || f.Title || f.InternalName || f.internalName;
+      const getKey = f => f.InternalName || f.internalName;
+      const baseNames = new Set(fields.map(getName));
 
-	fields.forEach(f => {
-		let friendlyName = f.Title || f.InternalName;
-		if (friendlyName === 'Attachments') friendlyName = 'HasAttachments';
-		
-		// Suppress native ghost Id fields if we already know about the base complex field
-		if (friendlyName.endsWith('Id') && baseNames.has(friendlyName.slice(0, -2))) return;
+      fields.forEach(f => {
+        let friendlyName = getName(f);
+        if (friendlyName === 'Attachments') friendlyName = 'HasAttachments';
 
-		// Force UI properties so they appear in the builder
-		const pushField = (name, dType) => {
-			mappedDefs.push({ 
-				InternalName: name, 
-				Title: name, 
-				TypeAsString: dType === 'number' ? 'Number' : (dType === 'date' ? 'DateTime' : 'Text'),
-				alias: name,         
-				displayName: name,   
-				displayType: dType   
-			});
-		};
+        // Suppress native ghost Id fields if we already know about the base complex field
+        if (friendlyName.endsWith('Id') && baseNames.has(friendlyName.slice(0, -2))) return;
 
-		const isUser = f.TypeAsString?.includes('User');
-		const isLookup = f.TypeAsString?.includes('Lookup');
-		const isTax = f.TypeAsString?.includes('Taxonomy') || f.InternalName === 'TaxKeyword';
-		const isChoice = f.TypeAsString?.includes('Choice');
-		const isURL = f.TypeAsString?.includes('URL');
-		const isMulti = f.TypeAsString?.toLowerCase().includes('multi') || f.InternalName === 'TaxKeyword';
+        // Force UI properties so they appear in the builder
+        const pushField = (name, dType) => {
+          mappedDefs.push({
+            InternalName: name,
+            Title: name,
+            TypeAsString: dType === 'number' ? 'Number' : (dType === 'date' ? 'DateTime' : 'Text'),
+            alias: name,
+            displayName: name,
+            displayType: dType
+          });
+        };
 
-		let baseDType = 'text';
-		if (f.TypeAsString?.includes('Number') || f.TypeAsString?.includes('Currency')) baseDType = 'number';
-		if (f.TypeAsString?.includes('DateTime')) baseDType = 'date';
-		if (f.TypeAsString?.includes('Boolean')) baseDType = 'bool';
-		if (isUser || isLookup) baseDType = 'lookup';
+		const ts = (f.TypeAsString || '').toLowerCase();
+        const ft = (f.type || '').toLowerCase();
+        const inm = getKey(f) || '';
+        const isUser = ts.includes('user') || ft === 'user' || ft === 'user-multi';
+        const isLookup = ts.includes('lookup') || ft === 'lookup' || ft === 'lookup-multi';
+        const isTax = ts.includes('taxonomy') || ft === 'taxkeyword' || inm === 'TaxKeyword';
+        const isChoice = ts.includes('choice') || ft === 'choice' || ft === 'choice-multi';
+        const isURL = ts.includes('url');
+        const isMulti = ts.includes('multi') || ft.includes('multi') || ft === 'taxkeyword' || inm === 'TaxKeyword';
+
+        let baseDType = 'text';
+        if (ts.includes('number') || ts.includes('currency') || ft === 'number') baseDType = 'number';
+        if (ts.includes('datetime') || ft === 'date') baseDType = 'date';
+        if (ts.includes('boolean') || ft === 'bool') baseDType = 'bool';
+        if (isUser || isLookup) baseDType = 'lookup';
 		
 		pushField(friendlyName, baseDType);
 
@@ -1661,91 +1892,95 @@ function mapDataRow(row, fieldDefs) {
 	
 	// PASS 1: Rich Objects 
 	for (const f of fieldDefs) {
-		let key = f.InternalName;
-		let friendlyName = f.Title || f.InternalName;
-		if (friendlyName === 'Attachments') friendlyName = 'HasAttachments';
+        // Support both field formats:
+        //   Old (SP API/config): InternalName, Title, TypeAsString
+        //   New (buildFieldMeta): internalName, displayName, alias, type
+        let key = f.InternalName || f.internalName;
+        let friendlyName = f.alias || f.displayName || f.Title || f.InternalName || f.internalName;
+        if (friendlyName === 'Attachments') friendlyName = 'HasAttachments';
+
+        let value = processingRow[key];
+        if (value === null || value === undefined) continue;
 		
-		let value = processingRow[key];
-		if (value === null || value === undefined) continue;
-		
-		const isUser = f.TypeAsString?.includes('User');
-		const isTax = f.TypeAsString?.includes('Taxonomy') || key === 'TaxKeyword';
-		const isLookup = f.TypeAsString?.includes('Lookup');
-		const isURL = f.TypeAsString?.includes('URL');
-		const isMulti = f.TypeAsString?.toLowerCase().includes('multi') || key === 'TaxKeyword';
+		const ts = (f.TypeAsString || '').toLowerCase();
+        const ft = (f.type || '').toLowerCase();
+        const isUser = ts.includes('user') || ft === 'user' || ft === 'user-multi';
+        const isTax = ts.includes('taxonomy') || ft === 'taxkeyword' || key === 'TaxKeyword';
+        const isLookup = ts.includes('lookup') || ft === 'lookup' || ft === 'lookup-multi';
+        const isURL = ts.includes('url');
+        const isMulti = ts.includes('multi') || ft.includes('multi') || ft === 'taxkeyword' || key === 'TaxKeyword';
 
-		if (isLookup && !isMulti && typeof value === 'object' && !Array.isArray(value)) {
-			mapped[friendlyName] = value.Title || value.lookupValue || '';
-			mapped[friendlyName + 'Id'] = value.Id;
-			mapped[friendlyName + 'Data'] = [value];
-			delete processingRow[key]; delete processingRow[key + 'Id'];
-			continue;
-		}
+         if (isLookup && !isMulti && typeof value === 'object' && !Array.isArray(value)) {
+          mapped[friendlyName] = value.Title || value.lookupValue || '';
+          mapped[friendlyName + 'Id'] = value.Id;
+          mapped[friendlyName + 'Data'] = [value];
+          delete processingRow[key]; delete processingRow[key + 'Id'];
+          continue;
+        }
 
-		if (isLookup && isMulti && Array.isArray(value)) {
-			mapped[friendlyName] = value.map(v => v.Title || v.lookupValue).join('; ');
-			mapped[friendlyName + 'Ids'] = value.map(v => v.Id).join('; ');
-			mapped[friendlyName + 'Data'] = value;
-			delete processingRow[key]; delete processingRow[key + 'Id'];
-			continue;
-		}
+        if (isLookup && isMulti && Array.isArray(value)) {
+          mapped[friendlyName] = value.map(v => v.Title || v.lookupValue).join('; ');
+          mapped[friendlyName + 'Ids'] = value.map(v => v.Id).join('; ');
+          mapped[friendlyName + 'Data'] = value;
+          delete processingRow[key]; delete processingRow[key + 'Id'];
+          continue;
+        }
 
-		if (isUser && !isMulti && typeof value === 'object' && !Array.isArray(value)) {
-			mapped[friendlyName] = value.Title || value.Name || JSON.stringify(value);
-			mapped[friendlyName + 'Id'] = value.Id;
-			mapped[friendlyName + 'Claims'] = value.Name || '';
-			mapped[friendlyName + 'Email'] = extractEmail(value.Name);
-																																											
-		const _siteBase = (state.source && state.source.url) ? state.source.url.replace(/\/$/, '') : (t.siteUrl ? t.siteUrl.replace(/\/$/, '') : window.location.origin);
-			mapped[friendlyName + 'PictureUrl'] = value.Name ? `${_siteBase}/_layouts/15/userphoto.aspx?size=M&accountname=${encodeURIComponent(value.Name)}` : '';
-			mapped[friendlyName + 'Data'] = [value];
-			
-			delete processingRow[key]; delete processingRow[key + 'Id'];
-			continue;
-		}
+        if (isUser && !isMulti && typeof value === 'object' && !Array.isArray(value)) {
+          mapped[friendlyName] = value.Title || value.Name || JSON.stringify(value);
+          mapped[friendlyName + 'Id'] = value.Id;
+          mapped[friendlyName + 'Claims'] = value.Name || '';
+          mapped[friendlyName + 'Email'] = extractEmail(value.Name);
 
-		if (isUser && isMulti && Array.isArray(value)) {
-			mapped[friendlyName] = value.map(v => v.Title || v.Name).join('; ');
-			mapped[friendlyName + 'Ids'] = value.map(v => v.Id).join('; ');
-			mapped[friendlyName + 'Emails'] = value.map(v => extractEmail(v.Name)).filter(e => e).join('; ');
-			mapped[friendlyName + 'Data'] = value;
-			delete processingRow[key]; delete processingRow[key + 'Id'];
-			continue;
-		}
+          const _siteBase = (state.source && state.source.url) ? state.source.url.replace(/\/$/, '') : (t.siteUrl ? t.siteUrl.replace(/\/$/, '') : window.location.origin);
+          mapped[friendlyName + 'PictureUrl'] = value.Name ? `${_siteBase}/_layouts/15/userphoto.aspx?size=M&accountname=${encodeURIComponent(value.Name)}` : '';
+          mapped[friendlyName + 'Data'] = [value];
+          delete processingRow[key]; delete processingRow[key + 'Id'];
+          continue;
+        }
 
-		if (isTax && !isMulti && typeof value === 'object' && !Array.isArray(value)) {
-			mapped[friendlyName] = value.Label;
-			mapped[friendlyName + 'Id'] = `${value.Label}|${value.TermGuid}`;
-			mapped[friendlyName + 'Data'] = [value];
-			delete processingRow[key];
-			continue;
-		}
+        if (isUser && isMulti && Array.isArray(value)) {
+          mapped[friendlyName] = value.map(v => v.Title || v.Name).join('; ');
+          mapped[friendlyName + 'Ids'] = value.map(v => v.Id).join('; ');
+          mapped[friendlyName + 'Emails'] = value.map(v => extractEmail(v.Name)).filter(e => e).join('; ');
+          mapped[friendlyName + 'Data'] = value;
+          delete processingRow[key]; delete processingRow[key + 'Id'];
+          continue;
+        }
 
-		if (isTax && isMulti && Array.isArray(value)) {
-			mapped[friendlyName] = value.map(v => v.Label).join('; ');
-			mapped[friendlyName + 'Ids'] = value.map(v => `${v.Label}|${v.TermGuid}`).join('; ');
-			mapped[friendlyName + 'Data'] = value;
-			delete processingRow[key];
-			continue;
-		}
+        if (isTax && !isMulti && typeof value === 'object' && !Array.isArray(value)) {
+          mapped[friendlyName] = value.Label;
+          mapped[friendlyName + 'Id'] = `${value.Label}|${value.TermGuid}`;
+          mapped[friendlyName + 'Data'] = [value];
+          delete processingRow[key];
+          continue;
+        }
 
-		if (isURL && typeof value === 'object' && value.Url) {
-			mapped[friendlyName] = value.Url;
-			mapped[friendlyName + 'Description'] = value.Description || '';
-			mapped[friendlyName + 'Url'] = value.Url;
-			delete processingRow[key];
-			continue;
-		}
-	}
+        if (isTax && isMulti && Array.isArray(value)) {
+          mapped[friendlyName] = value.map(v => v.Label).join('; ');
+          mapped[friendlyName + 'Ids'] = value.map(v => `${v.Label}|${v.TermGuid}`).join('; ');
+          mapped[friendlyName + 'Data'] = value;
+          delete processingRow[key];
+          continue;
+        }
+
+        if (isURL && typeof value === 'object' && value.Url) {
+          mapped[friendlyName] = value.Url;
+          mapped[friendlyName + 'Description'] = value.Description || '';
+          mapped[friendlyName + 'Url'] = value.Url;
+          delete processingRow[key];
+          continue;
+        }
+      }
 
 	// PASS 2: Primitives 
 	for (const [key, value] of Object.entries(processingRow)) {
 		if (value === null || value === undefined) continue;
 		
 		let friendlyName = key;
-		const fieldDef = fieldDefs.find(f => f.InternalName === key);
-		if (fieldDef) friendlyName = fieldDef.Title || fieldDef.InternalName;
-		if (friendlyName === 'Attachments') friendlyName = 'HasAttachments';
+        const fieldDef = fieldDefs.find(f => (f.InternalName || f.internalName) === key);
+        if (fieldDef) friendlyName = fieldDef.alias || fieldDef.displayName || fieldDef.Title || fieldDef.InternalName || key;
+        if (friendlyName === 'Attachments') friendlyName = 'HasAttachments';
 		
 		if (key.endsWith('Id') && mapped[friendlyName.slice(0, -2)] !== undefined) continue;
 
@@ -1787,8 +2022,7 @@ async function spFetch(url) {
 	return res.json();
 }
 
-
-// Add to your state initialization
+    // Add to your state initialization
 state.sourceCount = 0;
 const SOURCE_PREFIXES = ["", "MoreData", "YetMoreData", "FarMoreData", "TerminalData"];
 
@@ -1836,7 +2070,8 @@ const EXCLUDED_FIELDS = [
 ];
 
 async function fetchSPFields(siteUrl, listGuid) {
-	const filter = `(Hidden eq false and TypeAsString ne 'Computed' and startswith(InternalName,'_') eq false) or InternalName eq 'Editor' or InternalName eq 'Author' or InternalName eq 'Created' or InternalName eq 'Modified' or InternalName eq 'ID' or InternalName eq 'Title' or InternalName eq 'TaxKeyword'`;
+    // Excludes Hidden, Internal (Computed), and Projected Lookup Fields
+	const filter = `(Hidden eq false and TypeAsString ne 'Computed' and startswith(InternalName,'_') eq false and (TypeAsString ne 'Lookup' or (TypeAsString eq 'Lookup' and ReadOnlyField eq false))) or InternalName eq 'Editor' or InternalName eq 'Author' or InternalName eq 'Created' or InternalName eq 'Modified' or InternalName eq 'ID' or InternalName eq 'Title' or InternalName eq 'TaxKeyword'`;
 	const select = `Id,InternalName,Title,TypeAsString,Required,MaxLength,Choices,LookupField,LookupList,IsHidden,Hidden,ShowInEditForm,ReadOnlyField`;
 	const url = `${siteUrl}/_api/web/lists(guid'${listGuid}')/fields?$select=${select}&$filter=${filter}`;
 	
@@ -1863,50 +2098,68 @@ async function fetchSPFields(siteUrl, listGuid) {
 	return fields;
 }
 
-
-function showStatus(msg) {
-	const sb = document.getElementById('status-bar');
-	if(sb) sb.innerText = msg;
-}
-
-// Rule 4 (Retrieval): Retry logic for missing columns
+// Rule 4 (Retrieval): Retry logic for missing columns + Pagination
 async function fetchSPItemsWithRetry(siteUrl, listGuid, selectStr, expandStr, top, retries = 10) {
 	let currentSelect = selectStr.split(',').filter(s => s.trim());
 	let currentExpand = expandStr.split(',').filter(s => s.trim());
 	
 	for (let i = 0; i < retries; i++) {
-		let url = `${siteUrl}/_api/web/lists(guid'${listGuid}')/items?$top=${top}&$select=${currentSelect.join(',')}&$expand=${currentExpand.join(',')}`;
-		try {
-			const json = await spFetch(url);
+        let baseUrl = `${siteUrl}/_api/web/lists(guid'${listGuid}')/items?$top=${top}&$select=${currentSelect.join(',')}&$expand=${currentExpand.join(',')}`;
+        
+        try {
+          let allItems = [];
+          let nextUrl = baseUrl;
 
-			// Scrub OData artifacts before passing SP JSON response to alasql
-			let items = extractRows(json);
-			items.forEach(row => {
-				Object.keys(row).forEach(key => {
-					if (key.includes('@odata')) {
-						delete row[key];
-					}
-				});
-			});
+          // PAGINATION LOOP: Keep fetching until SharePoint says we have everything
+          while (nextUrl) {
+            const json = await spFetch(nextUrl);
+            
+            // Scrub OData artifacts
+            let items = extractRows(json);
+            items.forEach(row => {
+              Object.keys(row).forEach(key => {
+                if (key.includes('@odata') || key.includes('odata.')) {
+                  delete row[key];
+                }
+              });
+            });
 
-			return items;
-		} catch (e) {
+            allItems = allItems.concat(items);
+
+            // Check if there is another page of data
+            if (json['@odata.nextLink']) nextUrl = json['@odata.nextLink'];
+            else if (json['odata.nextLink']) nextUrl = json['odata.nextLink'];
+            else if (json.d && json.d.__next) nextUrl = json.d.__next;
+            else nextUrl = null;
+
+            // Stop if we hit our manual limit
+            if (allItems.length >= top) { 
+                allItems = allItems.slice(0, top); 
+                break; 
+            }
+          }
+
+          return allItems; // Return the fully combined, paginated array!
+
+        } catch (e) {
 			const errorStr = e.message || '';
 			const match = errorStr.match(/(?:Column|The field or property) '([^']+)' does not exist/i);
 			
 			if (match && match[1]) {
-				const badCol = match[1];
-				currentSelect = currentSelect.filter(c => c !== badCol && !c.startsWith(badCol + '/'));
-				currentExpand = currentExpand.filter(c => c !== badCol && !c.startsWith(badCol + '/'));
-			} else {
-				throw e; 
-			}
-		}
-	}
-	throw new Error("Exceeded max retries for missing columns.");
-}
+            const badCol = match[1];
+            currentSelect = currentSelect.filter(c => c !== badCol && !c.startsWith(badCol + '/'));
+            currentExpand = currentExpand.filter(c => c !== badCol && !c.startsWith(badCol + '/'));
+            // The loop will now retry (i++) with the bad column removed!
+          } else {
+            throw e;
+          }
+        }
+      }
+      throw new Error("Exceeded max retries for missing columns.");
+    }
 
-async function fetchTableData(tableName, fetchAll = false) {
+
+async function ensureTableData(tableName, allRows = true) {
 	const t = state.tables[tableName];
 	if (!t) return;
 
@@ -2002,7 +2255,7 @@ async function fetchTableData(tableName, fetchAll = false) {
 		
 	
 
-	showStatus(`Loaded ${t.dataCache.length} rows for ${tableName}`);
+	setStatus(`Loaded ${t.dataCache.length} rows for ${tableName}`);
 }
 
 // Rule 4 & 5: Structure guessing fallback (For JSON, CSV, API)
@@ -2372,94 +2625,80 @@ init();
 // DATA SOURCE LOADERS
 // ============================================================
 async function loadSharePointSource(siteUrl) {
-setStatus('🔄 Loading SharePoint lists...');
-const lists = await fetchSPLists(siteUrl);
-if (!lists.length) throw new Error('No accessible lists found. Check permissions and URL.');
+    setStatus('🔄 Loading SharePoint lists...');
+    const lists = await fetchSPLists(siteUrl);
+    if (!lists.length) throw new Error('No accessible lists found. Check permissions and URL.');
 
-setStatus(`Found ${lists.length} lists — loading structures...`);
-state.tables = {};
-					
-					
-
-
-// Resolve field aliases: ensure no duplicate aliases across a table
-for (const list of lists) {
-	const title = list.Title;
-	const guid  = list.Id;   // GUID — used for all subsequent API calls
-	let rawFields;
-	try { rawFields = await fetchSPFields(siteUrl, guid); } catch(e) { console.warn('Failed fields for', title, e); rawFields = []; }
-
-	const fields = [];
-	const seenAliases = new Set();
-	const seenInternal = new Set();
-
-	for (const sf of rawFields) {
-	if (shouldSkipField(sf)) continue;
-	if (seenInternal.has(sf.InternalName)) continue;
-	seenInternal.add(sf.InternalName);
-
-	const meta = buildFieldMeta(sf);
-	// Deduplicate alias
-	let alias = meta.alias;
-	let counter = 1;
-	while (seenAliases.has(alias.toLowerCase())) { alias = meta.alias + counter; counter++; }
-	seenAliases.add(alias.toLowerCase());
-	meta.alias = alias;
-	fields.push(meta);
-
-	// For lookup/user fields, add an ID sibling (if not already)
-	if (['lookup','user','lookup-multi','user-multi','taxkeyword'].includes(meta.type)) {
-		const idAlias = alias + 'Id';
-		if (!seenAliases.has(idAlias.toLowerCase())) {
-		seenAliases.add(idAlias.toLowerCase());
-		fields.push({
-			internalName: sf.InternalName + 'Id',
-			displayName: meta.displayName + ' ID',
-			alias: idAlias,
-			type: 'number',
-			displayType: 'number',
-			isAutoId: true
-		});
-		}
-	}
-	}
-
-	const displayName = list.Title;
-																			
-																
-	const tableAlias = toCamelCase(displayName) || toCamelCase(list.InternalName || title);
-																							
-
-	state.tables[title] = {
-																				
-	displayName, alias: tableAlias, fields,
-			
-	data: [], loaded: false, itemCount: list.ItemCount || 0,
-	internalName: title, guid
-							
-																		
-	};
-}
-
-setStatus(`✅ Loaded ${lists.length} tables from SharePoint`);
-document.getElementById('btn-save-config').disabled = false;
-renderFieldsPanel();
-setupCodeMirror();
-
-																							
-																				
-													
-									
-																				
-		
-															
-				
-																											
+    setStatus(`Found ${lists.length} lists — loading structures...`);
+    state.tables = {};
 	
+    // Resolve field aliases: ensure no duplicate aliases across a table
+    for (const list of lists) {
+        const title = list.Title;
+        const guid  = list.Id;   // GUID — used for all subsequent API calls
+        let rawFields;
+        try {
+            rawFields = await fetchSPFields(siteUrl, guid); // TODO: left off here
+        } catch(e) {
+            console.warn('Failed fields for', title, e); rawFields = [];
+        }
 
+        const fields = [];
+        const seenAliases = new Set();
+        const seenInternal = new Set();
 
-																					
-																
+        for (const sf of rawFields) {
+        if (shouldSkipField(sf)) continue;
+        if (seenInternal.has(sf.InternalName)) continue;
+        seenInternal.add(sf.InternalName);
+
+        const meta = buildFieldMeta(sf);
+        // Deduplicate alias
+        let alias = meta.alias;
+        let counter = 1;
+        while (seenAliases.has(alias.toLowerCase())) { alias = meta.alias + counter; counter++; }
+        seenAliases.add(alias.toLowerCase());
+        meta.alias = alias;
+        fields.push(meta);
+
+        // For lookup/user fields, add an ID sibling (if not already)
+        if (['lookup','user','lookup-multi','user-multi','taxkeyword'].includes(meta.type)) {
+            const idAlias = alias + 'Id';
+            if (!seenAliases.has(idAlias.toLowerCase())) {
+            seenAliases.add(idAlias.toLowerCase());
+            fields.push({
+                internalName: sf.InternalName + 'Id',
+                displayName: meta.displayName + ' ID',
+                alias: idAlias,
+                type: 'number',
+                displayType: 'number',
+                isAutoId: true
+            });
+            }
+        }
+        }
+
+        const displayName = list.Title;
+                                                                                
+                                                                    
+        const tableAlias = toCamelCase(displayName) || toCamelCase(list.InternalName || title);
+                                                                                                
+
+        state.tables[title] = {
+                                                                                    
+        displayName, alias: tableAlias, fields,
+                
+        data: [], loaded: false, itemCount: list.ItemCount || 0,
+        internalName: title, guid
+                                
+                                                                            
+        };
+    }
+
+    setStatus(`✅ Loaded ${lists.length} tables from SharePoint`);
+    document.getElementById('btn-save-config').disabled = false;
+    renderFieldsPanel();
+    setupCodeMirror();
 }
 
 async function loadJSONSource(url, tableName) {
@@ -2536,32 +2775,48 @@ setupCodeMirror();
 toast(`Loaded ${rows.length} rows from CSV`, 'success');
 }
 
+
+
+function loadCSVData(text, tableName) {
+  const { headers, rows } = parseCSV(text);
+  const fields = headers.map(h => ({
+    internalName: h, displayName: h, alias: toCamelCase(h) || h,
+    type: 'text', displayType: 'text'
+  }));
+  const alias = toCamelCase(tableName) || tableName;
+  state.tables[tableName] = { displayName: tableName, alias, fields, data: rows, loaded: true };
+  setStatus(`✅ Loaded ${rows.length} rows from CSV`);
+  renderFieldsPanel();
+  setupCodeMirror();
+  toast(`Loaded ${rows.length} rows from CSV`, 'success');
+}
+
 // Fetch items for a table and cache them
 async function ensureTableData(tableName, allRows = false) {
-const t = state.tables[tableName];
-if (!t) return;
-if (t.loaded && !allRows) return;
-if (t.loaded && allRows && t.data.length >= t.itemCount) return; // already have all
+    const t = state.tables[tableName];
+    if (!t) return;
+    if (t.loaded && !allRows) return;
+    if (t.loaded && allRows && t.data.length >= t.itemCount) return; // already have all
 
-const siteUrl = state.source.url;
-const top = allRows ? 999999 : 5000;
-const selectFields = getSelectFields(t.fields.filter(f => !f.isAutoId));
+    const siteUrl = state.source.url;
+    const top = allRows ? 999999 : 5000;
+    const selectFields = getSelectFields(t.fields.filter(f => !f.isAutoId));
 
-setStatus(`⏳ Loading data for ${tableName}...`);
-const items = await fetchSPItems(siteUrl, t.guid || tableName, selectFields, top);
-const normalFields = t.fields.filter(f => !f.isAutoId);
-t.data = items.map(r => normalizeRow(r, normalFields));
-t.loaded = true;
-setStatus(`✅ Loaded ${t.data.length} rows from ${tableName}`);
+    setStatus(`⏳ Loading data for ${tableName}...`);
+    const items = await fetchSPItems(siteUrl, t.guid || tableName, selectFields, top);
+    const normalFields = t.fields.filter(f => !f.isAutoId);
+    t.data = items.map(r => normalizeRow(r, normalFields));
+    t.loaded = true;
+    setStatus(`✅ Loaded ${t.data.length} rows from ${tableName}`);
 }
 
 // ============================================================
 // CONFIG SAVE / LOAD
 // ============================================================
 function saveConfig() {
-const config = buildConfig();
-const json = JSON.stringify(config, null, 2);
-downloadText(json, 'DataLaVista-config.json', 'application/json');
+    const config = buildConfig();
+    const json = JSON.stringify(config, null, 2);
+    downloadText(json, 'DataLaVista-config.json', 'application/json');
 }
 
 function buildConfig() {
@@ -5291,8 +5546,8 @@ if (tab === 'query' && window._cmEditor) {
 // ============================================================
 // UTILITIES
 // ============================================================
-function setStatus(msg) {
-document.getElementById('status-bar').textContent = msg;
+function setStatus(msg = '') {
+    document.getElementById('status-bar').textContent = msg;
 }
 
 function toast(message, type = 'info') {
