@@ -58,20 +58,30 @@ Most enterprise data is trapped behind bloated frameworks or expensive BI tools.
 
 
 ## Quick Start Guide
-+ In a SharePoint Online site, create a page using a blank template and call it "Report Designer"
-+ Add a single webpart for "Modern Script Editor". If not available, contact your site administrator to [install it](https://github.com/pnp/sp-dev-fx-webparts/tree/main/samples/react-script-editor)
-+ Copy and paste the contents of [ReportDesigner.html](ReportDesigner.html) into this file, then save and publish
-+ Refresh the Report Designer page. Click connect, write your SQL in the 1st tab (available lists and fields will show as suggestions), build your dashboard in the 2nd tab, and copy the generated configuration on the 3rd tab. Paste that code in Notepad for now
-+ Create a second page using a blank template and call it "Report" (you will need a separate page for each report)
-+ Copy the contents of [ReportViewer.html](ReportViewer.html) and past them into notepad. Edit the section that says ***"REPORT CONFIGURATION"*** by replacing that section with the code you generated in report designer
-+ Add a single webpart for "Modern Script Editor" and paste the code, then save and publish
-+ Refresh the page. It should now display your report. Any users with access to the data and the site will be able to run it.
++ If using SharePoint Online:
+  - First ensure you have the "Modern Script Editor" app installed. If not available, contact your site administrator to [install it](https://github.com/pnp/sp-dev-fx-webparts/tree/main/samples/react-script-editor)
+  - Create a page using a blank template or Modern Script Editor template, and call it "DataLaVista Designer"
+  - Add a "Modern Script Editor" webpart.
+  - Copy and the paste the code from [DataLaVista.html](DataLaVista.html) into the script editor. Save, and refresh.
++ If using inside a different web platform, follow the same steps as above with whatever method is available for adding scripts to the page. Alternatively, save [DataLaVista.html](DataLaVista.html) to your web server, and add its URL in an iframe tag.
++ If running stand-alone (e.g. in your laptop), simply download and open [DataLaVista.html](DataLaVista.html)
++ Once the DataLaVista Designer is open, click Connect + Load and enter the location of your data. For SharePoint installations, it should automatically populate the URL for your site in a few seconds. You can also use the different tabs to connect to remote JSON files, CSV, Excel, or to upload a JSON or CSV file.
++ Use the Query Builder and/or SQL Editor to pre-process your data. This will create a flat table, displayed in the preview.
++ Switch to the Design tab to create your dashboard using visuals, tables, or HTML widgets.
++ Switch to the Preview tab to see the final version of your dashboard.
++ Switch to the Generate Report tab. From here, you will see code for either a stand-alone HTML file, or just a JSON config. The easiest way to publish your report is to copy the contents of the stand-aline HTML file, and save them to a new page following the same process you used to create the designer page.
++ Once your report code is on its own page, simply refresh the page and the report will load all the data and visuals. Users will need to be already logged in to your data source, which is typically already done if you are hosting it inside SharePoint or a web app.
 
 
 
 
 ## Documentation
 + The full documentation is not yet available, but it will be coming to: https://michmed.org/efdc-kb
+
+### Background History
+Data La Vista was an idea conceived out of necessity. When our IT department was being too slow to roll out BI tools, the members of the [Automators Anonumous](https://github.com/DepressionCenter/AutomatorsAnonymous) group (a.k.a. Power Automate Lab) at UMich got together and created this tool through many, many iterations of AI prompts! Some of the prompts are included in this project for referene and to give you ideas of what's possible.
+
+Data La Vista does not aim to replace other BI tools completly. This tool is meant to be fast and super easy to use, making it idea for smaller or throw-away reports, for data exploration, and for reporting on SharePoint List data (which is notoriously difficult and messy). The data loading engine makes assumptions about what fields should or should be shown, and adds synthetic fields to make advanced SQL queries easier. Moreover, the focus really is on business and casual users who have lightweight reporting needs.
 
 
 
@@ -106,7 +116,9 @@ If you need assistance identifying a contact person, email the EFDC's Mobile Tec
 #### Contributors:
 + [Eisenberg Family Depression Center](https://depressioncenter.org) [(@DepressionCenter)](https://github.com/DepressionCenter)
 + [Gabriel Mongefranco](https://gabriel.mongefranco.com) [(@gabrielmongefranco)](https://github.com/gabrielmongefranco)
-
++ [Jeremy Gluskin](https://mcommunity.umich.edu/person/jgluskin) [(@jerm-ops)](https://github.com/jerm-ops) - Revenue Lifecycle System Coordinator, Quality - Patient Safety, Michigan Medicine.
++ [Shelley Boa](https://mcommunity.umich.edu/person/sboa) [(@blondilox-ai)](https://github.com/blondilox-ai) - Program Manager, Internal Medicine / Pulmonology & Critical Care, Michigan Medicine.
++ The [Automators Anonumous](https://github.com/DepressionCenter/AutomatorsAnonymous) group.
 
 
 #### This work is based in part on the following projects, libraries and/or studies:
