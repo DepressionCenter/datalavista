@@ -2450,14 +2450,39 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
     =============================================================== */
     const DataLaVista = {
       /* ===== CONSTANTS ===== */
+      // Field type icons for display in field lists, query builder, etc.
       FIELD_TYPE_ICONS: {
-        'text': { icon: 'T', cls: 'type-text' },
-        'number': { icon: '#', cls: 'type-number' },
-        'date': { icon: '📅', cls: 'type-date' },
-        'bool': { icon: '✓', cls: 'type-bool' },
-        'lookup': { icon: '⇒', cls: 'type-lookup' },
-        'array': { icon: '⊞', cls: 'type-array' },
-        'default': { icon: '·', cls: 'type-text' }
+      'text': { icon: 'T', cls: 'type-text' },
+      'number': { icon: '#', cls: 'type-number' },
+      'date': { icon: '📅', cls: 'type-date' },
+      'bool': { icon: '✓', cls: 'type-bool' },
+      'lookup': { icon: '⇒', cls: 'type-lookup' },
+      'array': { icon: '⊞', cls: 'type-array' },
+      'default': { icon: '·', cls: 'type-text' }
+    },
+
+    // Table/source type icons — SharePoint has sub-keys (list vs library); others are flat.
+    TABLE_SOURCE_ICONS: {
+      sharepoint: {
+        list:    { icon: '📋', title: 'SharePoint List' },
+        library: { icon: '📁', title: 'Document Library' }
+      },
+      json:    { icon: '🗂️', title: 'JSON' },
+      csv:     { icon: '📊', title: 'Spreadsheet' },
+      excel:   { icon: '📗', title: 'Excel' },
+      default: { icon: '📋', title: 'Table' }
+    },
+
+      // Table/source type icons — SharePoint has sub-keys (list vs library); others are flat.
+      TABLE_SOURCE_ICONS: {
+        sharepoint: {
+          list:    { icon: '📋', title: 'SharePoint List' },
+          library: { icon: '📁', title: 'Document Library' }
+        },
+        json:    { icon: '🗂️', title: 'JSON' },
+        csv:     { icon: '📊', title: 'Spreadsheet' },
+        excel:   { icon: '📗', title: 'Excel' },
+        default: { icon: '📋', title: 'Table' }
       },
 
       DATE_MACRO_OPS: [
@@ -2727,6 +2752,26 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       'default': { icon: '·', cls: 'type-text' }
     };
 
+    // Table/source type icons — SharePoint has sub-keys (list vs library); others are flat.
+    const TABLE_SOURCE_ICONS = {
+      sharepoint: {
+        list:    { icon: '📋', title: 'SharePoint List' },
+        library: { icon: '📁', title: 'Document Library' }
+      },
+      json:    { icon: '🗂️', title: 'JSON' },
+      csv:     { icon: '📊', title: 'Spreadsheet' },
+      excel:   { icon: '📗', title: 'Excel' },
+      default: { icon: '📋', title: 'Table' }
+    };
+
+    /** Returns the TABLE_SOURCE_ICONS entry for a table object from state.tables. */
+    function getTableIcon(t) {
+      if (t.sourceType === 'sharepoint') {
+        return TABLE_SOURCE_ICONS.sharepoint[t.isDocLib ? 'library' : 'list'];
+      }
+      return TABLE_SOURCE_ICONS[t.sourceType] || TABLE_SOURCE_ICONS.default;
+    }
+
 
 
     const SKIP_FIELDS = new Set([
@@ -2911,91 +2956,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       return match ? match[1] : '';
     }
 
-    // Map raw SharePoint field definitions to our internal format, including friendly names and synthetic fields for lookups/users.
-    // TODO: No longer needed?
-    /*
-    function getMappedFieldDefinitions(fields) {
-      const mappedDefs = [];
-      // Support both field formats (Old: Title/InternalName; New: alias/displayName/internalName)
-      const getName = f => f.alias || f.displayName || f.Title || f.InternalName || f.internalName;
-      const getKey = f => f.InternalName || f.internalName;
-      const baseNames = new Set(fields.map(getName));
-
-      fields.forEach(f => {
-        let friendlyName = getName(f);
-        if (friendlyName === 'Attachments') friendlyName = 'HasAttachments';
-
-        // Suppress native ghost Id fields if we already know about the base complex field
-        if (friendlyName.endsWith('Id') && baseNames.has(friendlyName.slice(0, -2))) return;
-
-        // Force UI properties so they appear in the builder
-        const pushField = (name, dType) => {
-          mappedDefs.push({
-            InternalName: name,
-            Title: name,
-            TypeAsString: dType === 'number' ? 'Number' : (dType === 'date' ? 'DateTime' : 'Text'),
-            alias: name,
-            displayName: name,
-            displayType: dType
-          });
-        };
-
-        const ts = (f.TypeAsString || '').toLowerCase();
-        const ft = (f.type || '').toLowerCase();
-        const inm = getKey(f) || '';
-        const isUser = ts.includes('user') || ft === 'user' || ft === 'user-multi';
-        const isLookup = ts.includes('lookup') || ft === 'lookup' || ft === 'lookup-multi';
-        const isTax = ts.includes('taxonomy') || ft === 'taxkeyword' || inm === 'TaxKeyword';
-        const isChoice = ts.includes('choice') || ft === 'choice' || ft === 'choice-multi';
-        const isURL = ts.includes('url');
-        const isMulti = ts.includes('multi') || ft.includes('multi') || ft === 'taxkeyword' || inm === 'TaxKeyword';
-
-        let baseDType = 'text';
-        if (ts.includes('number') || ts.includes('currency') || ft === 'number') baseDType = 'number';
-        if (ts.includes('datetime') || ft === 'date') baseDType = 'date';
-        if (ts.includes('boolean') || ft === 'bool') baseDType = 'bool';
-        if (isUser || isLookup) baseDType = 'lookup';
-
-        pushField(friendlyName, baseDType);
-
-        if (isUser) {
-          if (isMulti) {
-            pushField(friendlyName + 'Ids', 'text');
-            pushField(friendlyName + 'Emails', 'text');
-            pushField(friendlyName + 'Data', 'array');
-          } else {
-            pushField(friendlyName + 'Id', 'number');
-            pushField(friendlyName + 'Claims', 'text');
-            pushField(friendlyName + 'Email', 'text');
-            pushField(friendlyName + 'PictureUrl', 'text');
-            pushField(friendlyName + 'Data', 'array');
-          }
-        } else if (isLookup || isTax) {
-          if (isMulti) {
-            pushField(friendlyName + 'Ids', 'text');
-            pushField(friendlyName + 'Data', 'array');
-          } else {
-            pushField(friendlyName + 'Id', isTax ? 'text' : 'number');
-            pushField(friendlyName + 'Data', 'array');
-          }
-        } else if (isChoice && isMulti) {
-          pushField(friendlyName + 'Data', 'array');
-        } else if (isURL) {
-          pushField(friendlyName + 'Description', 'text');
-          pushField(friendlyName + 'Url', 'text');
-        }
-      });
-
-      const uniqueDefs = [];
-      const seen = new Set();
-      for (const d of mappedDefs) {
-        if (!seen.has(d.alias)) { seen.add(d.alias); uniqueDefs.push(d); }
-      }
-      return uniqueDefs;
-    }
-    */
-
-
     // Map a raw data row from SharePoint into our internal format, including synthetic fields for lookups/users.
     function mapDataRow(row, fieldDefs) {
       const mapped = {};
@@ -3168,11 +3128,50 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       return [json];
     }
 
+    /**
+ * Strip OData metadata keys from an array of rows.
+ * 
+ * @param {Array} rows - Array of data objects
+ * @param {boolean} [quickCheck=false] - If true, checks only the first row to decide
+ *   whether stripping is needed (efficient for large, uniform item datasets).
+ *   If false (default), strips from every row individually (thorough for 
+ *   structure/field metadata where rows may have varying key shapes).
+ * @returns {Array} The cleaned rows (mutated in place)
+ */
+function stripODataMetadata(rows, quickCheck = false) {
+    if (!rows || !rows.length) return rows;
+
+    const isODataKey = (k) =>
+        k === '__metadata' ||
+        k.includes('odata.') ||
+        k.includes('@odata.') ||
+        (k.charAt(0) === '@' && k !== '@odata.nextLink');
+
+    if (quickCheck) {
+        // Fast path: if the first row has no OData keys, skip entirely
+        const firstRowKeys = Object.keys(rows[0]);
+        const hasOData = firstRowKeys.some(isODataKey);
+        if (!hasOData) return rows;
+    }
+
+    for (let i = 0; i < rows.length; i++) {
+        const keys = Object.keys(rows[i]);
+        for (let j = 0; j < keys.length; j++) {
+            if (isODataKey(keys[j])) {
+                delete rows[i][keys[j]];
+            }
+        }
+    }
+    return rows;
+}
+
     // Rule 2: Fetch only custom lists
     async function fetchSPLists(siteUrl) {
-      const url = `${siteUrl}/_api/web/lists?$filter=BaseType eq 0 and Hidden eq false&$select=Id,InternalName,Title,Description,ItemCount`;
+      const url = `${siteUrl}/_api/web/lists?$select=Id,EntityTypeName,Title,Description,ItemCount,BaseType,Hidden,ImageUrl,IsApplicationList,LastItemModifiedDate&$filter=(Hidden eq false and IsApplicationList eq false and BaseTemplate ne 115 and BaseTemplate ne 121 and BaseTemplate ne 330 and BaseTemplate ne 544 and Title ne 'MicroFeed' and EntityTypeName ne 'AppCatalog' and EntityTypeName ne 'FormServerTemplates' and EntityTypeName ne 'Style_x0020_Library') or (Title eq 'User Information List' or Title eq 'Events')`;
       const json = await spFetch(url);
-      return extractRows(json);
+      let rows = extractRows(json);
+      rows = stripODataMetadata(rows);
+      return rows;
     }
 
     // Rule 3, 6, 7, 8, 9, 10: Fetch and filter structure
@@ -3188,7 +3187,9 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
   const url = `${siteUrl}/_api/web/lists(guid'${listGuid}')/fields?$select=${select}&$filter=${filter}`;
 
   const json = await spFetch(url);
-  let fields = extractRows(json);
+  let rows = extractRows(json);
+  let fields = stripODataMetadata(rows);
+
 
   // EXCLUDE Excluded fields AND Projected Lookups (_x003a_)
   fields = fields.filter(f =>
@@ -3227,14 +3228,8 @@ async function fetchSPItemsWithRetry(siteUrl, listGuid, selectStr, expandStr, to
         const json = await spFetch(nextUrl);
         
         // Scrub OData artifacts
-        let items = extractRows(json);
-        items.forEach(row => {
-          Object.keys(row).forEach(key => {
-            if (key.includes('@odata') || key.includes('odata.')) {
-              delete row[key];
-            }
-          });
-        });
+        let rows = extractRows(json);
+        let items = stripODataMetadata(rows,true);
 
         allItems = allItems.concat(items);
 
@@ -3525,10 +3520,24 @@ async function deriveStructureFromSample(dataArray) {
     // Camel case conversion
     function toCamelCase(str) {
       return str
+        .trim()
         .replace(/[^a-zA-Z0-9 _]/g, '')
         .replace(/\s+/g, '_')
         .replace(/_([a-zA-Z])/g, (_, c) => c.toUpperCase())
-        .replace(/^[^a-zA-Z_$]/, '_');
+        .replace(/^[^a-zA-Z_$]/, '_')
+        .trim();
+    }
+
+    // Pascal case conversion (Upper Camel Case)
+    function toPascalCase(str) {
+      return str
+        .trim()
+        .replace(/[^a-zA-Z0-9 _]/g, '')
+        .replace(/\s+/g, '_')
+        .replace(/_([a-zA-Z])/g, (_, c) => c.toUpperCase())
+        .replace(/^[^a-zA-Z_$]/, '_')
+        .replace(/^[a-z]/, (c) => c.toUpperCase())
+        .trim();
     }
 
     // Should we skip this field?
@@ -3548,8 +3557,8 @@ async function deriveStructureFromSample(dataArray) {
       const displayName = spField.Title || internalName;
       const type = parseFieldType(spField.TypeAsString, internalName);
 
-      // Build alias from display name (camelCase, no spaces)
-      let alias = toCamelCase(displayName);
+      // Build alias from display name (PascalCase, no spaces)
+      let alias = toPascalCase(displayName);
       if (!alias || alias === internalName) alias = internalName;
 
       return {
@@ -3763,13 +3772,14 @@ async function loadSharePointSource(siteUrl) {
     }
 
     const displayName = list.Title;
-    const tableAlias = toCamelCase(displayName) || toCamelCase(list.InternalName || title);
+    const tableAlias = toPascalCase(displayName) || toPascalCase(list.InternalName || title);
 
     state.tables[title] = {
       displayName, alias: tableAlias, fields,
       data: [], loaded: false, itemCount: list.ItemCount || 0,
       internalName: title, guid,
-      sourceType: 'sharepoint'
+      sourceType: 'sharepoint',
+      isDocLib: list.BaseType === 1   // BaseType 1 = document library, 0 = list
     };
   }
 
@@ -3812,7 +3822,7 @@ async function loadJSONSource(url, tableName) {
     if (typeof val === 'number') type = 'number';
     else if (typeof val === 'boolean') type = 'bool';
     else if (typeof val === 'string' && ISO_DATE_RE.test(val)) type = 'date';
-    return { internalName: k, displayName: k, alias: toCamelCase(k) || k, type, displayType: type };
+    return { internalName: k, displayName: k, alias: toPascalCase(k) || k, type, displayType: type };
   });
 
   const normalizedRows = rows.map(r => {
@@ -3826,7 +3836,7 @@ async function loadJSONSource(url, tableName) {
     return out;
   });
 
-  const alias = toCamelCase(tableName) || tableName;
+  const alias = toPascalCase(tableName) || tableName;
   state.tables[tableName] = {
     displayName: tableName,
     alias,
@@ -3842,10 +3852,10 @@ async function loadJSONSource(url, tableName) {
 function loadCSVData(text, tableName) {
   const { headers, rows } = parseCSV(text);
   const fields = headers.map(h => ({
-    internalName: h, displayName: h, alias: toCamelCase(h) || h,
+    internalName: h, displayName: h, alias: toPascalCase(h) || h,
     type: 'text', displayType: 'text'
   }));
-  const alias = toCamelCase(tableName) || tableName;
+  const alias = toPascalCase(tableName) || tableName;
   state.tables[tableName] = { displayName: tableName, alias, fields, data: rows, loaded: true, sourceType: 'csv' };
   setStatus(`✅ Loaded ${rows.length} rows from CSV`);
   renderFieldsPanel();
@@ -4139,10 +4149,11 @@ function getSourceIndex(tableName) {
 
           const node = document.createElement('div');
           node.className = 'table-node';
+          const tIcon = getTableIcon(t);
           node.innerHTML = `
       <div class="table-node-header" draggable="true" data-table="${tname}">
         <span class="toggle-arrow" id="arrow-${CSS.escape(tname)}">▶</span>
-        <span class="table-icon">📋</span>
+        <span class="table-icon" title="${tIcon.title}">${tIcon.icon}</span>
         <span class="table-name" title="${t.displayName}">${t.alias || t.displayName}</span>
         ${srcLabel ? `<span class="table-count${badgeCls}" title="Source: ${srcLabel}" style="font-size:9px;padding:1px 5px">${srcLabel.replace('Data', '')}</span>` : ''}
         <span class="table-count">${t.itemCount || (t.data && t.data.length) || 0}</span>
@@ -4235,39 +4246,69 @@ function getSourceIndex(tableName) {
         });
       }
 
+      
       function dlvSQLHint(cm) {
         const cursor = cm.getCursor();
+        const lineUpToCursor = cm.getLine(cursor.line).slice(0, cursor.ch);
+
+        // ── Dot-context: detect "TableName." or "[TableName]." ──────────────
+        // Captures: optional [ , word chars (table name) , optional ] , literal dot , optional partial field name
+        const dotMatch = lineUpToCursor.match(/\[?(\w+)\]?\.(\w*)$/);
+        if (dotMatch) {
+          const tableRef    = dotMatch[1];
+          const fieldPrefix = dotMatch[2];
+          const completions = [];
+
+          for (const [tname, t] of Object.entries(state.tables)) {
+            const alias = (t.alias || tname);
+            if (alias.toUpperCase() === tableRef.toUpperCase() || tname.toUpperCase() === tableRef.toUpperCase()) {
+              // Include ALL fields (including synthetic/isAutoId) in SQL editor
+              for (const f of t.fields) {
+                if (f.alias.toUpperCase().startsWith(fieldPrefix.toUpperCase())) {
+                  completions.push(alias + '.' + f.alias);
+                }
+              }
+              break;
+            }
+          }
+
+          const replaceFrom = dotMatch.index;
+          return {
+            list: completions.sort(),
+            from: CodeMirror.Pos(cursor.line, replaceFrom),
+            to:   CodeMirror.Pos(cursor.line, cursor.ch)
+          };
+        }
+
+        // ── Normal (non-dot) completion ──────────────────────────────────────
         const token = cm.getTokenAt(cursor);
         const start = token.start;
-        const end = cursor.ch;
-        const word = token.string.trim().toUpperCase();
+        const end   = cursor.ch;
+        const word  = token.string.trim().toUpperCase();
 
-        const completions = [];
-
-        // SQL + AlaSQL keywords
         const allKeywords = [
           'SELECT', 'FROM', 'WHERE', 'JOIN', 'LEFT', 'RIGHT', 'INNER', 'OUTER', 'ON', 'AS',
           'GROUP BY', 'ORDER BY', 'HAVING', 'LIMIT', 'OFFSET', 'DISTINCT', 'COUNT', 'SUM',
-          'AVG', 'MIN', 'MAX', 'MAX', 'MIN', 'MEDIAN', 'STDEV', 'VAR', 'FIRST', 'LAST',
+          'AVG', 'MIN', 'MAX', 'MEDIAN', 'STDEV', 'VAR', 'FIRST', 'LAST',
           'UNION', 'INTERSECT', 'EXCEPT', 'INSERT', 'UPDATE', 'DELETE', 'CREATE', 'DROP',
           'TABLE', 'VIEW', 'INDEX', 'AND', 'OR', 'NOT', 'IN', 'IS', 'NULL', 'LIKE', 'BETWEEN',
           'CASE', 'WHEN', 'THEN', 'ELSE', 'END', 'CAST', 'COALESCE', 'NULLIF', 'IIF',
           ...ALASQL_KEYWORDS
         ];
 
-        // Add table aliases and names
+        // Add table names/aliases, and fully-qualified table.field names.
+        // Bare field names are intentionally excluded to keep the list clean.
         for (const [tname, t] of Object.entries(state.tables)) {
-          allKeywords.push(t.alias || tname);
-          // Add fully qualified field names
+          const alias = t.alias || tname;
+          allKeywords.push(alias);
+          // Include ALL fields (including synthetic/isAutoId) for SQL editor
           for (const f of t.fields) {
-            if (!f.isAutoId) {
-              allKeywords.push((t.alias || tname) + '.' + f.alias);
-              allKeywords.push(f.alias);
-            }
+            allKeywords.push(alias + '.' + f.alias);
           }
         }
 
         const seen = new Set();
+        const completions = [];
         for (const kw of allKeywords) {
           if (kw.toUpperCase().startsWith(word) && !seen.has(kw)) {
             seen.add(kw);
@@ -4278,10 +4319,12 @@ function getSourceIndex(tableName) {
         return {
           list: completions.sort(),
           from: CodeMirror.Pos(cursor.line, start),
-          to: CodeMirror.Pos(cursor.line, end)
+          to:   CodeMirror.Pos(cursor.line, end)
         };
       }
 
+
+      // Call this to refresh hints when tables/fields change, e.g. after loading new data or switching query builder modes
       function updateCMHints() {
         // Just trigger a no-op — hints auto-update from state.tables
       }
@@ -5556,23 +5599,46 @@ function getSourceIndex(tableName) {
       // DESIGN FIELDS PANEL
       // ============================================================
       function renderDesignFieldsPanel() {
-        const body = document.getElementById('design-fields-body');
-        if (!state.queryColumns.length) {
-          body.innerHTML = '<div class="text-muted text-sm" style="padding:12px 10px">Run a query first</div>';
-          return;
-        }
-        body.innerHTML = '';
-        for (const col of state.queryColumns) {
-          const item = document.createElement('div');
-          item.className = 'field-item';
-          item.draggable = true;
-          item.innerHTML = `<span class="field-type-icon type-text">·</span><span class="field-label">${col}</span>`;
-          item.addEventListener('dragstart', e => {
-            safeDragSet(e, { type: 'result-field', field: col });
-          });
-          body.appendChild(item);
-        }
-      }
+  const body = document.getElementById('design-fields-body');
+  if (!state.queryColumns.length) {
+    body.innerHTML = '<div class="text-muted text-sm" style="padding:12px 10px">Run a query first</div>';
+    return;
+  }
+
+  // Build alias→displayType map from all loaded tables
+  const typeMap = {};
+  for (const t of Object.values(state.tables)) {
+    for (const f of (t.fields || [])) {
+      if (f.alias && f.displayType) typeMap[f.alias] = f.displayType;
+    }
+  }
+
+  // Fallback: sniff type from first result row value
+  const firstRow = (state.queryResults && state.queryResults[0]) || null;
+  function sniffType(col) {
+  if (typeMap[col]) return typeMap[col];
+  if (!firstRow) return 'default';
+  const v = firstRow[col];
+  if (Array.isArray(v)) return 'array';
+  if (typeof v === 'number') return 'number';
+  if (typeof v === 'boolean') return 'bool';
+  if (typeof v === 'string' && ISO_DATE_RE.test(v)) return 'date';
+  return 'text';
+}
+
+  body.innerHTML = '';
+  for (const col of state.queryColumns) {
+    const ti = FIELD_TYPE_ICONS[sniffType(col)] || FIELD_TYPE_ICONS.default;
+    const item = document.createElement('div');
+    item.className = 'field-item';
+    item.draggable = true;
+    item.innerHTML = `<span class="field-type-icon ${ti.cls}">${ti.icon}</span><span class="field-label">${col}</span>`;
+    item.addEventListener('dragstart', e => {
+      safeDragSet(e, { type: 'result-field', field: col });
+    });
+    body.appendChild(item);
+  }
+}
 
       // ============================================================
       // WIDGET TYPES
@@ -7021,6 +7087,7 @@ loadAllData();
         preprocessSQL,
         spFetch,
         extractRows,
+        stripODataMetadata,
         fetchSPLists,
         fetchSPFields,
         normalizeDate,
@@ -7029,6 +7096,7 @@ loadAllData();
         parseFieldType,
         fieldDisplayType,
         toCamelCase,
+        toPascalCase,
         shouldSkipField,
         buildFieldMeta,
         getSelectFields,
@@ -7043,7 +7111,6 @@ loadAllData();
         ensureTableData,
         fetchTableData,
         mapDataRow,
-        getMappedFieldDefinitions,
         extractEmail,
         saveConfig,
         buildConfig,
@@ -7051,6 +7118,7 @@ loadAllData();
         loadConfig,
         getSourceIndex,
         renderFieldsPanel,
+        getTableIcon,
         toggleTableExpand,
         expandAllTables,
         collapseAllTables,
