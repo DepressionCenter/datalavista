@@ -1,4 +1,46 @@
+<!--
+This file is part of DataLaVista
+AI Prompts for Standardizing SharePoint Fields
+Author(s): Gabriel Mongefranco, Jeremy Gluskin, Shelley Boa.
+Created: 2026-03-10
+Last Modified: 2026-03-20
+Summary: DataLaVista is a ightweight, client-side reporting and dashboard toolkit.
+Notes: See README file for documentation and full license information.
 
+Copyright © 2026 The Regents of the University of Michigan
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU General Public License for more details.
+You should have received a copy of the GNU General Public License along
+with this program. If not, see <https://www.gnu.org/licenses/>.
+
+-->
+![Eisenberg Family Depression Center](https://github.com/DepressionCenter/.github/blob/main/images/EFDCLogo_375w.png "depressioncenter.org")
+
+```text
+
+       /|____________|\
+      ||  /--------\  ||    ___       _          _            _    _ _     _
+      ||_|__________| ||   |   \ __ _| |_ __ _  | |   __ _  | \  / (_) ___| |_ __  
+      ||              ||   | |) / _` |  _/ _` | | |__/ _` |  \ \/ /| (_-<  _/ _` |
+      | \____________/ |   |___/\__,_|\__\__,_| |____\__,_|   \__/ |_/__/\__\__,_|
+       \  |_|_|_|_|  / 
+        \___________/         🕶️ "The BI Terminator" 🕶️
+```
+
+# 🕶️ Data La Vista
+***🕶️ Tell your expensive BI tools: "Data la vista, baby!"***
+
+## Description
+This is a generative AI prompt that was fine-tuned after many tries to produce an enhancement to the proof-of-concept version of DataLaVista. It changed the architecture and main UI to evolve into the first alpha version. It was ran through multiple AI tools including Gemini, Claude, ChatGPT and others, then the code was merged.
+
+## AI Prompts
+<code>
 I want to fine-tune field processing in the latest version of the working code.
 
 You need to ensure that the field structure is queried first whenever possible, and if not, derive the field structure from the first 2 rows of data. Then, you will create a mapping according to certain rules (specified below). Then, you will retrieve the first 2 rows of data for every list/table/file/API/URL, and run the data through the mapping. The resulting data after being mapped will be the source for the query builder and SQL editor (that is, the source for alasql), and will also form the initial cache of the data. Then, when the user clicks Run Query, all data for the tables used in the alasql query will be retrieved and cached (replacing the two-row cache), and the flat-table returned by the Run Query will become the source for the design tab (where visuals are created), with both table structure structure and the data. The dashboard designer will allow the user to apply filters, grouping, aggregates, etc. which will generate individual alasql queries for each visual (from the flat table returned by Run Query). The preview tab and the stand-alone versions will both execute the whole process, except they will not need to run the field structure queries as they will already have taken place, and instead they will simply retrieve all the data needed by the tables used in the Run Query alasql query, transform the data according to the mapping rules, run the Run Query alasql query, then fill the data for each visual by executing their individual alasql queries. 
@@ -130,3 +172,4 @@ For example, a TaxKeyword field that retrieves two terms, like [{"Label": "Adole
 3) Once a data source is loaded, change the label of the "⚡ Connect & Load" button to on the toolbar to "➕ Get More Data". After this changes, and the user connects to a different data source in the popup, load the data following all the same rules but pre-fix every table name with "MoreData". If a third data source is added, use the prefix "YetMoreData" for the tables. If the a fourth data source is added, use the prefix "FarMoreData" for the tables. If a fifth data source is added, use the prefix "TerminalData". Do not allow adding more than 5 data sources, so disable the "Get More Data" button after that. Ensure every set of prefixes in the field selection toolbar of the query builder show a slightly different color scheme, but keep it ADA and vision impaired appropriate.
 
 
+</code>

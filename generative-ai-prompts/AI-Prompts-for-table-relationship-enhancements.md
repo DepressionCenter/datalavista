@@ -1,3 +1,46 @@
+<!--
+This file is part of DataLaVista
+AI Prompts for Standardizing SharePoint Fields
+Author(s): Gabriel Mongefranco, Jeremy Gluskin, Shelley Boa.
+Created: 2026-03-10
+Last Modified: 2026-03-20
+Summary: DataLaVista is a ightweight, client-side reporting and dashboard toolkit.
+Notes: See README file for documentation and full license information.
+
+Copyright © 2026 The Regents of the University of Michigan
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU General Public License for more details.
+You should have received a copy of the GNU General Public License along
+with this program. If not, see <https://www.gnu.org/licenses/>.
+
+-->
+![Eisenberg Family Depression Center](https://github.com/DepressionCenter/.github/blob/main/images/EFDCLogo_375w.png "depressioncenter.org")
+
+```text
+
+       /|____________|\
+      ||  /--------\  ||    ___       _          _            _    _ _     _
+      ||_|__________| ||   |   \ __ _| |_ __ _  | |   __ _  | \  / (_) ___| |_ __  
+      ||              ||   | |) / _` |  _/ _` | | |__/ _` |  \ \/ /| (_-<  _/ _` |
+      | \____________/ |   |___/\__,_|\__\__,_| |____\__,_|   \__/ |_/__/\__\__,_|
+       \  |_|_|_|_|  / 
+        \___________/         🕶️ "The BI Terminator" 🕶️
+```
+
+# 🕶️ Data La Vista
+***🕶️ Tell your expensive BI tools: "Data la vista, baby!"***
+
+## Description
+This is a generative AI prompt that was fine-tuned after many tries to produce an enhancement to the alpha version of DataLaVista. It served as the basis for making SharePoint Lists much easier to query. It was ran through multiple AI tools including Gemini, Claude, ChatGPT and others, then the code was merged.
+
+## AI Prompts
+<code>
 Here is my latest DataLaVista file. Let's make some enhancements.
 
 

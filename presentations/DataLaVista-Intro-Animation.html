@@ -1,4 +1,27 @@
+<!--
+This file is part of DataLaVista
+DataLaVista Introduction Animation
+Author(s): Gabriel Mongefranco.
+Created: 2026-03-10
+Last Modified: 2026-03-20
+Summary: DataLaVista is a ightweight, client-side reporting and dashboard toolkit.
+Notes: See README file for documentation and full license information.
 
+Copyright © 2026 The Regents of the University of Michigan
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU General Public License for more details.
+You should have received a copy of the GNU General Public License along
+with this program. If not, see <https://www.gnu.org/licenses/>.
+
+-->
+<html>
+<head>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Share+Tech+Mono&family=Bebas+Neue&display=swap');
 *{margin:0;padding:0;box-sizing:border-box;}
@@ -92,7 +115,8 @@
 #copy{position:absolute;bottom:8px;right:12px;z-index:210;font-family:'Share Tech Mono',monospace;font-size:clamp(7px,0.9vw,10px);color:rgba(255,255,255,0.28);letter-spacing:1.5px;pointer-events:none;}
 
 </style>
-
+</head>
+<body style="background:#000;">
 <div id="stage">
   <div id="scanlines"></div>
   <div id="vignette"></div>
@@ -331,3 +355,5 @@ $('startBtn').addEventListener('click',()=>{
 });
 $('rep').addEventListener('click',()=>{resetAll();setTimeout(runS1,420);});
 </script>
+</body>
+</html>

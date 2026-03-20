@@ -1,3 +1,46 @@
+<!--
+This file is part of DataLaVista
+AI Code Generation Prompts
+Author(s): Gabriel Mongefranco, Jeremy Gluskin, Shelley Boa.
+Created: 2026-03-10
+Last Modified: 2026-03-20
+Summary: DataLaVista is a ightweight, client-side reporting and dashboard toolkit.
+Notes: See README file for documentation and full license information.
+
+Copyright © 2026 The Regents of the University of Michigan
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU General Public License for more details.
+You should have received a copy of the GNU General Public License along
+with this program. If not, see <https://www.gnu.org/licenses/>.
+
+-->
+![Eisenberg Family Depression Center](https://github.com/DepressionCenter/.github/blob/main/images/EFDCLogo_375w.png "depressioncenter.org")
+
+```text
+
+       /|____________|\
+      ||  /--------\  ||    ___       _          _            _    _ _     _
+      ||_|__________| ||   |   \ __ _| |_ __ _  | |   __ _  | \  / (_) ___| |_ __  
+      ||              ||   | |) / _` |  _/ _` | | |__/ _` |  \ \/ /| (_-<  _/ _` |
+      | \____________/ |   |___/\__,_|\__\__,_| |____\__,_|   \__/ |_/__/\__\__,_|
+       \  |_|_|_|_|  / 
+        \___________/         🕶️ "The BI Terminator" 🕶️
+```
+
+# 🕶️ Data La Vista
+***🕶️ Tell your expensive BI tools: "Data la vista, baby!"***
+
+## Description
+This is a generative AI prompt that was fine-tuned after many tries to produce the initial proof-of-concept version of DataLaVista. It was ran through multiple AI tools including Gemini, Claude, ChatGPT and others, then the code was merged.
+
+## AI Prompts
+<code>
 Act as an Expert and Creative Frontend Architect and SharePoint Data Engineer.
  
 Your task is to generate a single-file web application that can be embedded into other javascript/html applications (like in iframes), and in particular inside a "Modern Script Editor" webpart in SharePoint Online Pages. This web application is a lightweight, fast, and especially clean and easy to use dashboard and report designer, that can be used instead of power bi and tableau.
@@ -132,3 +175,4 @@ You must implement the following specific workarounds and logic engines in BOTH 
  
 
 Output the full, complete code for this web app in a file called `DataLaVista.html`. Do not omit any CSS or JS sections.
+</code>
