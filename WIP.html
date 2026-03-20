@@ -2286,10 +2286,249 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       overflow-y: auto;
       flex: 1;
     }
+
+    /* ============================================================
+   DATA SOURCE GROUP IN FIELDS PANEL
+   ============================================================ */
+    .ds-group { margin-bottom: 2px; }
+
+    .ds-group-header {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      padding: 5px 8px 4px 6px;
+      background: var(--surface2);
+      border-bottom: 1px solid var(--border);
+      cursor: default;
+      user-select: none;
+      position: sticky;
+      top: 0;
+      z-index: 2;
+    }
+
+    .ds-group-toggle {
+      width: 14px;
+      height: 14px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 8px;
+      color: var(--text-secondary);
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: transform var(--transition);
+    }
+
+    .ds-group-toggle.open { transform: rotate(90deg); }
+
+    .ds-group-name {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--primary-dark);
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      cursor: text;
+    }
+
+    .ds-group-name-input {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--primary-dark);
+      flex: 1;
+      border: 1px solid var(--primary);
+      border-radius: 2px;
+      padding: 0 3px;
+      outline: none;
+      background: var(--surface);
+      max-width: 80px;
+    }
+
+    .ds-group-tables { }
+
+    /* Right-click context menu */
+    #dlv-ctx-menu {
+      position: fixed;
+      z-index: 9999;
+      background: var(--surface);
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-lg);
+      min-width: 160px;
+      padding: 4px 0;
+      display: none;
+    }
+
+    #dlv-ctx-menu.visible { display: block; }
+
+    .ctx-menu-item {
+      padding: 7px 14px;
+      font-size: 12px;
+      cursor: pointer;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      white-space: nowrap;
+      transition: background var(--transition);
+    }
+
+    .ctx-menu-item:hover { background: var(--primary-ultralight); color: var(--primary); }
+    .ctx-menu-item.danger { color: var(--error); }
+    .ctx-menu-item.danger:hover { background: var(--error-bg); }
+    .ctx-menu-sep { border-top: 1px solid var(--border); margin: 3px 0; }
+
+    /* Inline rename input for table-node-header and field-item */
+    .dlv-rename-input {
+      font-size: 12px;
+      font-weight: 600;
+      border: 1px solid var(--primary);
+      border-radius: 2px;
+      padding: 0 3px;
+      outline: none;
+      background: var(--surface);
+      flex: 1;
+      min-width: 0;
+      max-width: 120px;
+    }
+
+    /* ============================================================
+   SP FILE PICKER MODAL
+   ============================================================ */
+    #sp-picker-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.45);
+      z-index: 10100;
+      display: none;
+      align-items: center;
+      justify-content: center;
+    }
+    #sp-picker-overlay.active { display: flex; }
+
+    #sp-picker-dialog {
+      background: var(--surface);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-lg);
+      width: 540px;
+      max-width: calc(100vw - 32px);
+      max-height: calc(100vh - 80px);
+      display: flex;
+      flex-direction: column;
+      animation: popIn 180ms ease;
+    }
+
+    #sp-picker-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 14px 16px 12px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    #sp-picker-header h3 { font-size: 14px; font-weight: 600; flex: 1; }
+
+    #sp-picker-breadcrumb {
+      padding: 6px 16px;
+      font-size: 11px;
+      color: var(--text-secondary);
+      background: var(--surface2);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 2px;
+      flex-shrink: 0;
+      min-height: 30px;
+    }
+    .sp-crumb {
+      cursor: pointer;
+      color: var(--primary);
+      padding: 1px 3px;
+      border-radius: 2px;
+    }
+    .sp-crumb:hover { background: var(--primary-light); }
+    .sp-crumb-sep { color: var(--text-disabled); }
+
+    #sp-picker-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 4px 0;
+      min-height: 160px;
+    }
+
+    .sp-picker-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 16px;
+      cursor: pointer;
+      font-size: 12px;
+      transition: background var(--transition);
+      user-select: none;
+    }
+    .sp-picker-item:hover { background: var(--primary-ultralight); }
+    .sp-picker-item.sp-selected { background: var(--primary-light); font-weight: 600; }
+    .sp-picker-item .sp-item-icon { font-size: 15px; flex-shrink: 0; }
+    .sp-picker-item .sp-item-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .sp-picker-item .sp-item-size { font-size: 11px; color: var(--text-disabled); flex-shrink: 0; }
+
+    #sp-picker-footer {
+      padding: 10px 16px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+    #sp-picker-selected-label {
+      flex: 1;
+      font-size: 11px;
+      color: var(--text-secondary);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    #sp-picker-spinner {
+      display: none;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: var(--text-secondary);
+      padding: 12px 16px;
+    }
+    #sp-picker-spinner.active { display: flex; }
   </style>
 </head>
 
 <body>
+  <!-- Right-click context menu (shared, positioned dynamically) -->
+  <div id="dlv-ctx-menu">
+    <div class="ctx-menu-item" id="ctx-copy-url" onclick="dlvCtxCopyUrl()">🔗 Copy URL</div>
+    <div class="ctx-menu-sep" id="ctx-sep-url"></div>
+    <div class="ctx-menu-item" id="ctx-rename" onclick="dlvCtxRename()">✏️ Rename</div>
+    <div class="ctx-menu-item danger" id="ctx-delete" onclick="dlvCtxDelete()">🗑 Delete</div>
+  </div>
+
+  <!-- SharePoint File Picker Modal -->
+  <div id="sp-picker-overlay" onclick="if(event.target===this)spPickerClose()">
+    <div id="sp-picker-dialog">
+      <div id="sp-picker-header">
+        <h3>📂 Browse SharePoint Files</h3>
+        <button class="btn btn-ghost btn-icon btn-sm" onclick="spPickerClose()" title="Close">✕</button>
+      </div>
+      <div id="sp-picker-breadcrumb"></div>
+      <div id="sp-picker-spinner"><div class="spinner" style="width:16px;height:16px;border-width:2px"></div><span>Loading...</span></div>
+      <div id="sp-picker-body"></div>
+      <div id="sp-picker-footer">
+        <span id="sp-picker-selected-label">No file selected</span>
+        <button class="btn btn-default btn-sm" onclick="spPickerClose()">Cancel</button>
+        <button class="btn btn-primary btn-sm" id="sp-picker-select-btn" disabled onclick="spPickerConfirm()">Select</button>
+      </div>
+    </div>
+  </div>
+
   <div id="app">
 
     <!-- TOP TOOLBAR -->
@@ -2342,6 +2581,10 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
               <span class="text-xs text-muted">The base URL of the SharePoint site containing your lists</span>
             </div>
             <div class="form-group">
+              <label>Data Source Name <span style="font-weight:400;color:var(--text-disabled)">(up to 6 alphanumeric chars, default: SP)</span></label>
+              <input type="text" class="form-input" id="sp-ds-name" placeholder="SP" maxlength="6" />
+            </div>
+            <div class="form-group">
               <label>Authentication</label>
               <select class="form-input" id="sp-auth">
                 <option value="current">Current SharePoint session (default)</option>
@@ -2362,8 +2605,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
               <span class="text-xs text-muted">URL must return a JSON array or SharePoint REST format</span>
             </div>
             <div class="form-group">
-              <label>Table Name</label>
-              <input type="text" class="form-input" id="json-table-name" placeholder="Data" />
+              <label>Data Source Name <span style="font-weight:400;color:var(--text-disabled)">(up to 6 alphanumeric chars, default: JSON)</span></label>
+              <input type="text" class="form-input" id="json-ds-name" placeholder="JSON" maxlength="6" />
             </div>
           </div>
 
@@ -2371,12 +2614,18 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           <div class="source-pane" id="src-csv">
             <div class="form-group">
               <label>CSV URL (SharePoint library or direct link)</label>
-              <input type="text" class="form-input" id="csv-url"
-                placeholder="https://tenant.sharepoint.com/sites/.../Shared Documents/data.csv" />
+              <div style="display:flex;gap:6px;align-items:center">
+                <input type="text" class="form-input" id="csv-url"
+                  placeholder="https://tenant.sharepoint.com/sites/.../Shared Documents/data.csv"
+                  style="flex:1" />
+                <button class="btn btn-default btn-sm" id="btn-sp-browse" onclick="spPickerOpen()"
+                  title="Browse document libraries on this SharePoint site"
+                  style="display:none;white-space:nowrap;flex-shrink:0">📂 Browse SP</button>
+              </div>
             </div>
             <div class="form-group">
-              <label>Table Name</label>
-              <input type="text" class="form-input" id="csv-table-name" placeholder="CSVData" />
+              <label>Data Source Name <span style="font-weight:400;color:var(--text-disabled)">(up to 6 alphanumeric chars, default: CSV)</span></label>
+              <input type="text" class="form-input" id="csv-ds-name" placeholder="CSV" maxlength="6" />
             </div>
             <div class="form-group">
               <label>Or upload a local CSV file</label>
@@ -2939,7 +3188,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
     /* ================= */
     const state = {
       source: { type: 'sharepoint', url: '', auth: 'current', token: '' },
-      tables: {},        // internalName -> { displayName, alias, fields: [], data: [], loaded: false }
+      dataSources: {},   // dsName -> { type, url, auth, token, fileName, alias, tables: [internalTableKeys] }
+      tables: {},        // internalName (DSName_Table) -> { displayName, alias, fields: [], data: [], loaded: false, dataSource: 'DSName' }
       queryMode: 'basic',
       basicQB: { tableName: null, selectedFields: [], fieldAggs: {}, conditions: [], sorts: [], groupBy: [], rowLimit: 500 },
       advancedQB: { nodes: {}, joins: [], activeJoinIdx: -1 }, // for advanced mode
@@ -3255,119 +3505,119 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       return match ? match[1] : '';
     }
 
-    // Map a raw data row from SharePoint into our internal format, including synthetic fields for lookups/users.
+    // Map a raw data row into our internal format.
+    // OUTPUT KEYS ARE ALWAYS internalName (so SQL "SELECT [table].[InternalName]" works).
+    // The SQL query builder adds "AS [fieldAlias]" to give result columns friendly names.
     function mapDataRow(row, fieldDefs) {
       const mapped = {};
       const processingRow = { ...row };
 
-      // PASS 1: Rich Objects 
+      // PASS 1: Rich Objects (lookups, users, taxonomy, hyperlinks)
       for (const f of fieldDefs) {
-        // Support both field formats:
-        //   Old (SP API/config): InternalName, Title, TypeAsString
-        //   New (buildFieldMeta): internalName, displayName, alias, type
-        let key = f.InternalName || f.internalName;
-        let friendlyName = f.alias || f.displayName || f.Title || f.InternalName || f.internalName;
-        if (friendlyName === 'Attachments') friendlyName = 'HasAttachments';
+        const key = f.InternalName || f.internalName;
+        if (!key) continue;
+        // Output key is ALWAYS the internalName — SQL references internalName
+        const outKey = key === 'Attachments' ? 'HasAttachments' : key;
 
         let value = processingRow[key];
         if (value === null || value === undefined) continue;
 
         const ts = (f.TypeAsString || '').toLowerCase();
         const ft = (f.type || '').toLowerCase();
-        const isUser = ts.includes('user') || ft === 'user' || ft === 'user-multi';
-        const isTax = ts.includes('taxonomy') || ft === 'taxkeyword' || key === 'TaxKeyword';
-        const isLookup = ts.includes('lookup') || ft === 'lookup' || ft === 'lookup-multi';
-        const isURL = ts.includes('url');
-        const isMulti = ts.includes('multi') || ft.includes('multi') || ft === 'taxkeyword' || key === 'TaxKeyword';
+        const isUser   = ts.includes('user')     || ft === 'user'       || ft === 'user-multi';
+        const isTax    = ts.includes('taxonomy') || ft === 'taxkeyword' || key === 'TaxKeyword';
+        const isLookup = ts.includes('lookup')   || ft === 'lookup'     || ft === 'lookup-multi';
+        const isURL    = ts.includes('url');
+        const isMulti  = ts.includes('multi') || ft.includes('multi') || ft === 'taxkeyword' || key === 'TaxKeyword';
 
         if (isLookup && !isMulti && typeof value === 'object' && !Array.isArray(value)) {
-          mapped[friendlyName] = value.Title || value.lookupValue || '';
-          mapped[friendlyName + 'Id'] = value.Id;
-          mapped[friendlyName + 'Data'] = [value];
+          mapped[outKey]          = value.Title || value.lookupValue || '';
+          mapped[outKey + 'Id']   = value.Id;
+          mapped[outKey + 'Data'] = [value];
           delete processingRow[key]; delete processingRow[key + 'Id'];
           continue;
         }
 
         if (isLookup && isMulti && Array.isArray(value)) {
-          mapped[friendlyName] = value.map(v => v.Title || v.lookupValue).join('; ');
-          mapped[friendlyName + 'Ids'] = value.map(v => v.Id).join('; ');
-          mapped[friendlyName + 'Data'] = value;
+          mapped[outKey]           = value.map(v => v.Title || v.lookupValue).join('; ');
+          mapped[outKey + 'Ids']   = value.map(v => v.Id).join('; ');
+          mapped[outKey + 'Data']  = value;
           delete processingRow[key]; delete processingRow[key + 'Id'];
           continue;
         }
 
         if (isUser && !isMulti && typeof value === 'object' && !Array.isArray(value)) {
-          mapped[friendlyName] = value.Title || value.Name || JSON.stringify(value);
-          mapped[friendlyName + 'Id'] = value.Id;
-          mapped[friendlyName + 'Claims'] = value.Name || '';
-          mapped[friendlyName + 'Email'] = extractEmail(value.Name);
-
-          const _siteBase = (state.source && state.source.url) ? state.source.url.replace(/\/$/, '') : (t.siteUrl ? t.siteUrl.replace(/\/$/, '') : window.location.origin);
-          mapped[friendlyName + 'PictureUrl'] = value.Name ? `${_siteBase}/_layouts/15/userphoto.aspx?size=M&accountname=${encodeURIComponent(value.Name)}` : '';
-          mapped[friendlyName + 'Data'] = [value];
+          const _siteBase = (state.source && state.source.url)
+            ? state.source.url.replace(/\/$/, '')
+            : window.location.origin;
+          mapped[outKey]              = value.Title || value.Name || JSON.stringify(value);
+          mapped[outKey + 'Id']       = value.Id;
+          mapped[outKey + 'Claims']   = value.Name || '';
+          mapped[outKey + 'Email']    = extractEmail(value.Name);
+          mapped[outKey + 'PictureUrl'] = value.Name
+            ? `${_siteBase}/_layouts/15/userphoto.aspx?size=M&accountname=${encodeURIComponent(value.Name)}`
+            : '';
+          mapped[outKey + 'Data']     = [value];
           delete processingRow[key]; delete processingRow[key + 'Id'];
           continue;
         }
 
         if (isUser && isMulti && Array.isArray(value)) {
-          mapped[friendlyName] = value.map(v => v.Title || v.Name).join('; ');
-          mapped[friendlyName + 'Ids'] = value.map(v => v.Id).join('; ');
-          mapped[friendlyName + 'Emails'] = value.map(v => extractEmail(v.Name)).filter(e => e).join('; ');
-          mapped[friendlyName + 'Data'] = value;
+          mapped[outKey]          = value.map(v => v.Title || v.Name).join('; ');
+          mapped[outKey + 'Ids']  = value.map(v => v.Id).join('; ');
+          mapped[outKey + 'Emails'] = value.map(v => extractEmail(v.Name)).filter(e => e).join('; ');
+          mapped[outKey + 'Data'] = value;
           delete processingRow[key]; delete processingRow[key + 'Id'];
           continue;
         }
 
         if (isTax && !isMulti && typeof value === 'object' && !Array.isArray(value)) {
-          mapped[friendlyName] = value.Label;
-          mapped[friendlyName + 'Id'] = `${value.Label}|${value.TermGuid}`;
-          mapped[friendlyName + 'Data'] = [value];
+          mapped[outKey]          = value.Label;
+          mapped[outKey + 'Id']   = `${value.Label}|${value.TermGuid}`;
+          mapped[outKey + 'Data'] = [value];
           delete processingRow[key];
           continue;
         }
 
         if (isTax && isMulti && Array.isArray(value)) {
-          mapped[friendlyName] = value.map(v => v.Label).join('; ');
-          mapped[friendlyName + 'Ids'] = value.map(v => `${v.Label}|${v.TermGuid}`).join('; ');
-          mapped[friendlyName + 'Data'] = value;
+          mapped[outKey]          = value.map(v => v.Label).join('; ');
+          mapped[outKey + 'Ids']  = value.map(v => `${v.Label}|${v.TermGuid}`).join('; ');
+          mapped[outKey + 'Data'] = value;
           delete processingRow[key];
           continue;
         }
 
         if (isURL && typeof value === 'object' && value.Url) {
-          mapped[friendlyName] = value.Url;
-          mapped[friendlyName + 'Description'] = value.Description || '';
-          mapped[friendlyName + 'Url'] = value.Url;
+          mapped[outKey]                  = value.Url;
+          mapped[outKey + 'Description']  = value.Description || '';
+          mapped[outKey + 'Url']          = value.Url;
           delete processingRow[key];
           continue;
         }
       }
 
-      // PASS 2: Primitives 
+      // PASS 2: Primitives — output key is the raw SP internalName
       for (const [key, value] of Object.entries(processingRow)) {
         if (value === null || value === undefined) continue;
+        const outKey = key === 'Attachments' ? 'HasAttachments' : key;
 
-        let friendlyName = key;
-        const fieldDef = fieldDefs.find(f => (f.InternalName || f.internalName) === key);
-        if (fieldDef) friendlyName = fieldDef.alias || fieldDef.displayName || fieldDef.Title || fieldDef.InternalName || key;
-        if (friendlyName === 'Attachments') friendlyName = 'HasAttachments';
-
-        if (key.endsWith('Id') && mapped[friendlyName.slice(0, -2)] !== undefined) continue;
+        // Skip if already handled (e.g. lookup Id already written)
+        if (key.endsWith('Id') && mapped[key.slice(0, -2)] !== undefined) continue;
 
         let finalVal = value;
         if (typeof finalVal === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z?$/.test(finalVal)) {
           finalVal = finalVal.replace('T', ' ').replace('Z', '');
-          if (/(Date|Fecha)$/i.test(friendlyName)) finalVal = finalVal.replace(/ 00:00:00$/, '');
+          if (/(Date|Fecha)$/i.test(outKey)) finalVal = finalVal.replace(/ 00:00:00$/, '');
         }
 
         if (Array.isArray(finalVal)) {
-          mapped[friendlyName] = finalVal.join('; ');
-          mapped[friendlyName + 'Data'] = finalVal;
+          mapped[outKey]          = finalVal.join('; ');
+          mapped[outKey + 'Data'] = finalVal;
         } else if (typeof finalVal === 'object') {
-          mapped[friendlyName] = JSON.stringify(finalVal);
-          mapped[friendlyName + 'Data'] = finalVal;
+          mapped[outKey]          = JSON.stringify(finalVal);
+          mapped[outKey + 'Data'] = finalVal;
         } else {
-          mapped[friendlyName] = finalVal;
+          mapped[outKey] = finalVal;
         }
       }
 
@@ -3392,26 +3642,78 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       return res.json();
     }
 
-    // Add to your state initialization
-    state.sourceCount = 0;
-    const SOURCE_PREFIXES = ["", "MoreData", "YetMoreData", "FarMoreData", "TerminalData"];
+    // ── Data Source Name Helpers ─────────────────────────────────────────────────
 
-    // Call this function when a load successfully completes
-    function updateConnectButtonState() {
-      state.sourceCount++;
-      const btn = document.getElementById('btn-connect');
-      if (state.sourceCount > 0) {
-        btn.innerHTML = "➕ Get More Data";
-      }
-      if (state.sourceCount >= 5) {
-        btn.disabled = true;
-        btn.innerHTML = "⛔ Max Sources Reached";
-      }
+    /** Normalize a user-supplied data source name: alphanumeric only, max 6 chars. */
+    function normalizeDataSourceName(raw) {
+      return (raw || '').replace(/[^A-Za-z0-9]/g, '').slice(0, 6);
     }
 
-    // Helper to prefix table names during load
-    function getTablePrefix() {
-      return SOURCE_PREFIXES[state.sourceCount] || "";
+    /**
+     * Generate a unique data source name for a given type.
+     * Defaults: sharepoint→SP, json→JSON, csv→CSV, others→Table.
+     * If the base name is taken, appends 1, 2, 3... until unique.
+     */
+    function generateDataSourceName(type, preferredBase) {
+      const bases = { sharepoint: 'SP', json: 'JSON', csv: 'CSV' };
+      const base = normalizeDataSourceName(preferredBase) || bases[type] || 'Table';
+      const existing = Object.keys(state.dataSources);
+      if (!existing.includes(base)) return base;
+      for (let i = 1; i < 100; i++) {
+        const candidate = (base + i).slice(0, 6);
+        if (!existing.includes(candidate)) return candidate;
+      }
+      return base + Date.now().toString().slice(-4);
+    }
+
+    /** Update the connect button (no max limit — always allow more data). */
+    function updateConnectButton() {
+      const btn = document.getElementById('btn-connect');
+      if (!btn) return;
+      const count = Object.keys(state.dataSources).length;
+      btn.innerHTML = count > 0 ? '➕ Get More Data' : '⚡ Connect &nbsp; Load';
+      btn.disabled = false;
+    }
+
+    /** Return the data source internal key for a given table key. */
+    function getDataSourceForTable(tableKey) {
+      for (const [dsName, ds] of Object.entries(state.dataSources)) {
+        if (ds.tables && ds.tables.includes(tableKey)) return dsName;
+      }
+      return null;
+    }
+
+    /**
+     * Returns the LIVE SQL-queryable name for a table: DSAlias_TableAlias.
+     * This changes when the user renames a DS or table — always call this
+     * instead of using the raw tableKey in SQL/AlaSQL.
+     */
+    function getTableQueryName(tableKey) {
+      const t = state.tables[tableKey];
+      if (!t) return tableKey;
+      const ds = state.dataSources[t.dataSource];
+      const dsAlias = (ds && ds.alias) || t.dataSource || '';
+      const tAlias = t.alias || t.internalName || tableKey;
+      return dsAlias ? dsAlias + '_' + tAlias : tAlias;
+    }
+
+    /** Register a table in AlaSQL under its immutable tableKey only.
+     *  SQL always uses the tableKey in FROM (e.g. FROM [SP_PeopleList]).
+     *  The alias (e.g. SP_Contacts) is used as a SQL alias in the FROM clause: FROM [SP_PeopleList] [SP_Contacts]
+     *  — AlaSQL resolves column refs through that alias without a separate table registration.
+     */
+    function registerTableInAlaSQL(tableKey) {
+      const t = state.tables[tableKey];
+      if (!t || !t.data) return;
+      alasql(`DROP TABLE IF EXISTS [${tableKey}]`);
+      alasql(`CREATE TABLE [${tableKey}]`);
+      const actual = Object.keys(alasql.tables).find(k => k.toLowerCase() === tableKey.toLowerCase()) || tableKey;
+      alasql.tables[actual].data = t.data;
+    }
+
+    /** Drop an AlaSQL table by a (possibly old) query name. */
+    function dropTableFromAlaSQL(qname) {
+      try { alasql(`DROP TABLE IF EXISTS [${qname}]`); } catch(e) {}
     }
 
     // Universal JSON extractor
@@ -3479,22 +3781,22 @@ function stripODataMetadata(rows, quickCheck = false) {
     ];
 
 
-    async function fetchSPFields(siteUrl, listGuid) {
-  // Excludes Hidden, Internal (Computed), and Projected Lookup Fields
-  const filter = `(Hidden eq false and TypeAsString ne 'Computed' and startswith(InternalName,'_') eq false and (TypeAsString ne 'LookupMulti' or (TypeAsString eq 'LookupMulti' and ReadOnlyField eq false))) or InternalName eq 'Editor' or InternalName eq 'Author' or InternalName eq 'Created' or InternalName eq 'Modified' or InternalName eq 'ID' or InternalName eq 'Title' or InternalName eq 'TaxKeyword'`;
-  const select = `Id,InternalName,Title,TypeAsString,Description,Required,MaxLength,Choices,LookupField,LookupList,IsHidden,Hidden,ReadOnlyField,ContentType,FileRef,FileLeafRef`;
+    async function fetchSPFields(siteUrl, listGuid, isDocLib = false) {
+  // Excludes Hidden, Computed, underscore-prefixed, and dependent lookup fields
+  const filter = `(Hidden eq false and TypeAsString ne 'Computed' and startswith(InternalName,'_') eq false and (TypeAsString ne 'LookupMulti' or (TypeAsString eq 'LookupMulti' and ReadOnlyField eq false and IsDependentLookup eq false))) or InternalName eq 'Editor' or InternalName eq 'Author' or InternalName eq 'Created' or InternalName eq 'Modified' or InternalName eq 'ID' or InternalName eq 'Title' or InternalName eq 'TaxKeyword'`;
+  const select = `Id,InternalName,Title,TypeAsString,Description,Required,MaxLength,Choices,LookupField,LookupList,IsHidden,Hidden,ReadOnlyField,IsDependentLookup`;
   const url = `${siteUrl}/_api/web/lists(guid'${listGuid}')/fields?$select=${select}&$filter=${filter}`;
 
   const json = await spFetch(url);
   let rows = extractRows(json);
   let fields = stripODataMetadata(rows);
 
-
-  // EXCLUDE Excluded fields AND Projected Lookups (_x003a_)
+  // EXCLUDE system/metadata fields AND projected lookups (_x003a_)
   fields = fields.filter(f =>
     !EXCLUDED_FIELDS.includes(f.InternalName) &&
     !EXCLUDED_FIELDS.includes(f.Title) &&
-    !f.InternalName.includes('_x003a_')
+    !f.InternalName.includes('_x003a_') &&
+    !f.IsDependentLookup
   );
 
   const mandatory = ['ID', 'Title', 'Created', 'Modified', 'Author', 'Editor'];
@@ -3507,6 +3809,16 @@ function stripODataMetadata(rows, quickCheck = false) {
       fields.push({ InternalName: mand, Title: mand, TypeAsString: forcedType });
     }
   });
+
+  // For document libraries, always include FileRef and FileLeafRef (not list items)
+  if (isDocLib) {
+    ['FileRef', 'FileLeafRef'].forEach(fn => {
+      if (!fields.some(f => f.InternalName === fn)) {
+        fields.push({ InternalName: fn, Title: fn, TypeAsString: 'Text' });
+      }
+    });
+  }
+
   return fields;
 }
 
@@ -3839,6 +4151,18 @@ async function deriveStructureFromSample(dataArray) {
         .trim();
     }
 
+    /**
+     * Strip the trailing "List" or "ListItem" suffix that SharePoint appends
+     * to EntityTypeName values, e.g. "PeopleList" → "People".
+     * Also strips the _x0020_ encoding: "My_x0020_List" → "My_x0020_"... 
+     * (we leave _x0020_ in place since it is the InternalName standard).
+     */
+    function stripEntityTypeNameSuffix(name) {
+      if (!name) return name;
+      // Remove trailing "ListItem" first (longer match), then "List"
+      return name.replace(/ListItem$/, '').replace(/List$/, '') || name;
+    }
+
     // Should we skip this field?
     function shouldSkipField(f) {
       const name = f.InternalName || '';
@@ -3852,8 +4176,15 @@ async function deriveStructureFromSample(dataArray) {
 
     // Build field meta from SharePoint field definition
     function buildFieldMeta(spField) {
-      const internalName = spField.InternalName;
+      // Use InternalName if available; fall back to Title then EntityTypeName
+      const rawInternal = spField.InternalName || spField.EntityTypeName || spField.Title || '';
+      // Strip "ListItem"/"List" suffix only when internal name was derived from EntityTypeName
+      const internalName = spField.InternalName
+        ? spField.InternalName
+        : stripEntityTypeNameSuffix(rawInternal);
+
       const displayName = spField.Title || internalName;
+      const description = spField.Description || '';
       const type = parseFieldType(spField.TypeAsString, internalName);
 
       // Build alias from display name (PascalCase, no spaces)
@@ -3863,6 +4194,7 @@ async function deriveStructureFromSample(dataArray) {
       return {
         internalName,
         displayName,
+        description,
         alias,
         type,
         displayType: fieldDisplayType(type),
@@ -3895,7 +4227,9 @@ async function deriveStructureFromSample(dataArray) {
     // CSV PARSING
     // ============================================================
     function parseCSV(text) {
+      console.debug('[DLV CSV] parseCSV called | text type:', typeof text, '| length:', text?.length);
       const lines = text.split('\n').filter(l => l.trim());
+      console.debug('[DLV CSV] parseCSV | non-empty lines:', lines.length, '| first line:', lines[0]?.slice(0, 100));
       if (!lines.length) return { headers: [], rows: [] };
       const parse = line => {
         const result = []; let cur = ''; let inQ = false;
@@ -3932,20 +4266,37 @@ async function deriveStructureFromSample(dataArray) {
       document.querySelectorAll('.source-pane').forEach(p => p.classList.remove('active'));
       el.classList.add('active');
       document.getElementById('src-' + src).classList.add('active');
+      if (src === 'csv') spPickerCheckVisibility();
     }
-    document.getElementById('sp-auth').addEventListener('change', function () {
-      document.getElementById('sp-token-group').classList.toggle('hidden', this.value !== 'token');
+    document.getElementById('sp-auth')?.addEventListener('change', function () {
+      document.getElementById('sp-token-group')?.classList.toggle('hidden', this.value !== 'token');
     });
-    document.getElementById('config-file').addEventListener('change', async function () {
+    document.getElementById('config-file')?.addEventListener('change', async function () {
       const f = this.files[0]; if (!f) return;
       const text = await f.text();
-      document.getElementById('config-json-input').value = text;
+      const el = document.getElementById('config-json-input');
+      if (el) el.value = text;
     });
-    document.getElementById('csv-file').addEventListener('change', async function () {
-      const f = this.files[0]; if (!f) return;
-      const text = await f.text();
-      const tableName = document.getElementById('csv-table-name').value || f.name.replace(/\.csv$/i, '') || 'CSVData';
-      loadCSVData(text, tableName);
+    document.getElementById('csv-file')?.addEventListener('change', async function () {
+      const f = this.files[0];
+      console.debug('[DLV CSV] file upload change event, file:', f ? f.name : 'none');
+      if (!f) return;
+      let text;
+      try {
+        text = await f.text();
+        console.debug('[DLV CSV] file text length:', text.length, '| first 200 chars:', text.slice(0, 200));
+      } catch (e) {
+        console.error('[DLV CSV] f.text() threw:', e);
+        toast('Error reading file: ' + e.message, 'error');
+        return;
+      }
+      const dsNameEl = document.getElementById('csv-ds-name');
+      console.debug('[DLV CSV] csv-ds-name element:', dsNameEl);
+      const tableName = (dsNameEl?.value || '').trim();
+      console.debug('[DLV CSV] tableName from input:', tableName);
+      const dsName = generateDataSourceName('csv', tableName);
+      console.debug('[DLV CSV] dsName:', dsName, '| fileName:', f.name);
+      loadCSVData(text, dsName, f.name);
       hidePopup();
     });
 
@@ -3957,58 +4308,89 @@ async function deriveStructureFromSample(dataArray) {
         const m = window.location.href.match(/(https?:\/\/[^/]+(?:\/sites\/[^/]+)?)/);
         if (m) url = m[1];
       }
-      if (url) document.getElementById('sp-url').value = url;
+      if (url) { const el = document.getElementById('sp-url'); if (el) el.value = url; }
     })();
 
 
 
     async function doConnect() {
+  console.debug('[DLV] doConnect called');
   const activeTab = document.querySelector('.source-tab.active')?.dataset?.src || 'sharepoint';
+  console.debug('[DLV] activeTab:', activeTab);
   const btn = document.getElementById('btn-do-connect');
   const prog = document.getElementById('popup-progress');
   const progText = document.getElementById('popup-progress-text');
+  console.debug('[DLV] btn:', !!btn, '| prog:', !!prog, '| progText:', !!progText);
   btn.disabled = true;
   prog.classList.remove('hidden');
 
   try {
     if (activeTab === 'sharepoint') {
-      const url = document.getElementById('sp-url').value.trim().replace(/\/$/, '');
+      const url = (document.getElementById('sp-url')?.value || '').trim().replace(/\/$/, '');
       if (!url) { toast('Please enter a SharePoint site URL', 'error'); return; }
-      state.source = { type: 'sharepoint', url, auth: document.getElementById('sp-auth').value, token: document.getElementById('sp-token').value };
+      const rawDsName = (document.getElementById('sp-ds-name')?.value || '').trim();
+      const dsName = generateDataSourceName('sharepoint', rawDsName);
+      state.source = {
+        type: 'sharepoint',
+        url,
+        auth: document.getElementById('sp-auth')?.value || 'current',
+        token: document.getElementById('sp-token')?.value || ''
+      };
       progText.textContent = 'Fetching list inventory...';
-      const tablePrefix = SOURCE_PREFIXES[state.sourceCount || 0] || '';
-      await loadSharePointSource(url, tablePrefix);
-      state.sourceCount = (state.sourceCount || 0) + 1;
+      await loadSharePointSource(url, dsName);
     } else if (activeTab === 'json') {
-      const url = document.getElementById('json-url').value.trim();
-      const name = document.getElementById('json-table-name').value.trim() || 'Data';
+      const url = (document.getElementById('json-url')?.value || '').trim();
       if (!url) { toast('Please enter a URL', 'error'); return; }
+      const rawDsName = (document.getElementById('json-ds-name')?.value || '').trim();
+      const dsName = generateDataSourceName('json', rawDsName);
       progText.textContent = 'Loading JSON...';
-      await loadJSONSource(url, name);
-      state.sourceCount = (state.sourceCount || 0) + 1;
+      await loadJSONSource(url, dsName);
     } else if (activeTab === 'csv') {
-      const url = document.getElementById('csv-url').value.trim();
-      const name = document.getElementById('csv-table-name').value.trim() || 'CSVData';
-      if (!url) { toast('Please select a CSV file', 'error'); return; }
+      console.debug('[DLV CSV] doConnect: activeTab=csv');
+      const urlEl = document.getElementById('csv-url');
+      const dsEl  = document.getElementById('csv-ds-name');
+      console.debug('[DLV CSV] csv-url element:', urlEl);
+      console.debug('[DLV CSV] csv-ds-name element:', dsEl);
+      const url = (urlEl?.value || '').trim();
+      console.debug('[DLV CSV] url value:', url);
+      if (!url) { toast('Please enter a CSV URL or upload a file', 'error'); return; }
+      const rawDsName = (dsEl?.value || '').trim();
+      console.debug('[DLV CSV] rawDsName:', rawDsName);
+      const dsName = generateDataSourceName('csv', rawDsName);
+      console.debug('[DLV CSV] dsName:', dsName);
       progText.textContent = 'Loading CSV...';
-      const res = await fetch(url, { credentials: 'include' });
-      const text = await res.text();
-      loadCSVData(text, name);
-      state.sourceCount = (state.sourceCount || 0) + 1;
+      console.debug('[DLV CSV] Fetching URL...');
+      let res;
+      try {
+        res = await fetch(url, { credentials: 'include' });
+        console.debug('[DLV CSV] fetch response:', res.status, res.statusText, res.ok);
+      } catch (fetchErr) {
+        console.error('[DLV CSV] fetch threw:', fetchErr);
+        throw fetchErr;
+      }
+      if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+      let text;
+      try {
+        text = await res.text();
+        console.debug('[DLV CSV] text length:', text.length, '| first 200 chars:', text.slice(0, 200));
+      } catch (textErr) {
+        console.error('[DLV CSV] res.text() threw:', textErr);
+        throw textErr;
+      }
+      if (!text.trim()) throw new Error('CSV file appears to be empty');
+      const fileName = url.split('/').pop();
+      console.debug('[DLV CSV] calling loadCSVData with dsName:', dsName, 'fileName:', fileName);
+      loadCSVData(text, dsName, fileName);
     } else if (activeTab === 'loadconfig') {
-      const jsonText = document.getElementById('config-json-input').value.trim();
+      const jsonText = (document.getElementById('config-json-input')?.value || '').trim();
       if (!jsonText) { toast('Please paste or load a config', 'error'); return; }
       const parsed = safeJSONParse(jsonText, 'Config');
       if (!parsed) return;
       await loadConfig(parsed);
     }
 
-    const connectBtn = document.getElementById('btn-connect');
-    if (connectBtn) {
-      connectBtn.innerHTML = state.sourceCount >= 5 ? '⛔ Max Sources' : '➕ Get More Data';
-      connectBtn.disabled = state.sourceCount >= 5;
-    }
-
+    updateConnectButton();
+    document.getElementById('btn-save-config').disabled = false;
     hidePopup();
     init();
   } catch (err) {
@@ -4204,11 +4586,84 @@ function tryJSONP(url) {
 }
 
 // ============================================================
+// SHAREPOINT SOURCE LOADER
+// ============================================================
+async function loadSharePointSource(siteUrl, dsName) {
+  setStatus('⏳ Loading SharePoint lists from ' + siteUrl + '...');
+
+  // dsName is the immutable internal key; alias = user-entered name from connect popup
+  if (!state.dataSources[dsName]) {
+    state.dataSources[dsName] = {
+      type: 'sharepoint',
+      url: siteUrl,
+      auth: state.source.auth || 'current',
+      token: state.source.token || '',
+      internalName: dsName,
+      alias: dsName,          // user can rename this; it's the DS prefix in SQL
+      description: '',
+      tables: []
+    };
+  }
+
+  const lists = await fetchSPLists(siteUrl);
+  let loadedCount = 0;
+
+  for (const list of lists) {
+    try {
+      const isDocLib = list.BaseType === 1;
+      const fields = await fetchSPFields(siteUrl, list.Id, isDocLib);
+      const fieldMetas = fields
+        .filter(f => !shouldSkipField(f))
+        .map(f => buildFieldMeta(f));
+
+      // Strip SharePoint's "List" / "ListItem" suffix from EntityTypeName for cleaner keys
+      const rawEntityType = list.EntityTypeName || (list.Title || 'List').replace(/[^A-Za-z0-9_]/g, '');
+      const entityTypeName = stripEntityTypeNameSuffix(rawEntityType);
+
+      // tableKey = DSInternalName_EntityTypeName — immutable forever
+      const tableKey = dsName + '_' + entityTypeName;
+      // User-facing alias: PascalCase of Title (no "List" suffix)
+      const tableAlias = toPascalCase(list.Title || entityTypeName);
+
+      state.tables[tableKey] = {
+        internalName: entityTypeName,
+        displayName: list.Title || entityTypeName,
+        description: list.Description || '',
+        alias: tableAlias,
+        dsAlias: dsName,
+        fields: fieldMetas,
+        originalFields: fields,
+        data: [],
+        loaded: false,
+        sourceType: 'sharepoint',
+        isDocLib,
+        guid: list.Id,
+        siteUrl,
+        itemCount: list.ItemCount || 0,
+        dataSource: dsName
+      };
+
+      if (!state.dataSources[dsName].tables.includes(tableKey)) {
+        state.dataSources[dsName].tables.push(tableKey);
+      }
+      loadedCount++;
+    } catch (e) {
+      console.warn('[loadSharePointSource] Skipped list:', list.Title, e.message);
+    }
+  }
+
+  setStatus(`✅ Loaded ${loadedCount} lists from SharePoint (${dsName})`);
+  renderFieldsPanel();
+  setupCodeMirror();
+  toast(`Connected to SharePoint as "${dsName}" — ${loadedCount} lists`, 'success');
+}
+
+// ============================================================
 // DATA SOURCE LOADER
 // ============================================================
 
 // Load JSON from URL with multiple strategies and robust error handling
-async function loadJSONSource(url, tableName) {
+async function loadJSONSource(url, dsName) {
   // Validate before any network activity
   validateURL(url);
 
@@ -4267,13 +4722,13 @@ async function loadJSONSource(url, tableName) {
       json      = await strategy.fn();
       succeeded = true;
       console.info(
-        `[loadJSONSource] ✅ "${tableName}" loaded via: ${strategy.name}`
+        `[loadJSONSource] ✅ "${dsName}" loaded via: ${strategy.name}`
       );
       break;
     } catch (err) {
       errors[strategy.name] = err.message;
       console.warn(
-        `[loadJSONSource] ${strategy.name} failed for "${tableName}":`,
+        `[loadJSONSource] ${strategy.name} failed for "${dsName}":`,
         err.message
       );
     }
@@ -4285,7 +4740,7 @@ async function loadJSONSource(url, tableName) {
       .map(([method, msg]) => `  [${method}] ${msg}`)
       .join("\n");
     throw new Error(
-      `Could not load JSON from "${url}" (table: "${tableName}").\n` +
+      `Could not load JSON from "${url}" (source: "${dsName}").\n` +
       `All methods failed:\n${summary}`
     );
   }
@@ -4327,16 +4782,27 @@ async function loadJSONSource(url, tableName) {
     return out;
   });
 
-  const alias = toPascalCase(tableName) || tableName;
+  const tableKey = dsName + '_Data';
 
-  state.tables[tableName] = {
-    displayName: tableName,
-    alias,
+  // Register data source
+  if (!state.dataSources[dsName]) {
+    state.dataSources[dsName] = { type: 'json', url, alias: dsName, tables: [] };
+  }
+
+  state.tables[tableKey] = {
+    displayName: 'Data',
+    alias: 'Data',
+    dsAlias: dsName,
     fields,
-    data:        normalizedRows,
-    loaded:      true,
-    sourceType:  "json",
+    data: normalizedRows,
+    loaded: true,
+    sourceType: 'json',
+    dataSource: dsName
   };
+
+  if (!state.dataSources[dsName].tables.includes(tableKey)) {
+    state.dataSources[dsName].tables.push(tableKey);
+  }
 
   setStatus(`✅ Loaded ${normalizedRows.length} rows from JSON`);
   renderFieldsPanel();
@@ -4345,18 +4811,59 @@ async function loadJSONSource(url, tableName) {
 
 
 // Simple CSV parser and loader
-function loadCSVData(text, tableName) {
-  const { headers, rows } = parseCSV(text);
+function loadCSVData(text, dsName, fileName) {
+  console.debug('[DLV CSV] loadCSVData called | dsName:', dsName, '| fileName:', fileName, '| text length:', text?.length);
+  let parsed;
+  try {
+    parsed = parseCSV(text);
+    console.debug('[DLV CSV] parseCSV result | headers:', parsed.headers, '| row count:', parsed.rows.length, '| first row:', parsed.rows[0]);
+  } catch (e) {
+    console.error('[DLV CSV] parseCSV threw:', e);
+    toast('CSV parse error: ' + e.message, 'error');
+    return;
+  }
+  const { headers, rows } = parsed;
+  if (!headers.length) {
+    console.warn('[DLV CSV] No headers found in CSV');
+    toast('CSV appears to have no header row', 'error');
+    return;
+  }
   const fields = headers.map(h => ({
     internalName: h, displayName: h, alias: toPascalCase(h) || h,
     type: 'text', displayType: 'text'
   }));
-  const alias = toPascalCase(tableName) || tableName;
-  state.tables[tableName] = { displayName: tableName, alias, fields, data: rows, loaded: true, sourceType: 'csv' };
+  console.debug('[DLV CSV] fields:', fields.map(f => f.internalName));
+  const tableKey = dsName + '_Data';
+  console.debug('[DLV CSV] tableKey:', tableKey);
+
+  // Register data source
+  if (!state.dataSources[dsName]) {
+    state.dataSources[dsName] = { type: 'csv', fileName: fileName || dsName + '.csv', alias: dsName, tables: [] };
+  }
+
+  state.tables[tableKey] = {
+    displayName: 'Data',
+    alias: 'Data',
+    dsAlias: dsName,
+    fields,
+    data: rows,
+    loaded: true,
+    sourceType: 'csv',
+    dataSource: dsName
+  };
+  console.debug('[DLV CSV] state.tables[' + tableKey + '] registered with', rows.length, 'rows');
+
+  if (!state.dataSources[dsName].tables.includes(tableKey)) {
+    state.dataSources[dsName].tables.push(tableKey);
+  }
+
   setStatus(`✅ Loaded ${rows.length} rows from CSV`);
+  console.debug('[DLV CSV] calling renderFieldsPanel...');
   renderFieldsPanel();
+  console.debug('[DLV CSV] calling setupCodeMirror...');
   setupCodeMirror();
-  toast(`Loaded ${rows.length} rows from CSV`, 'success');
+  console.debug('[DLV CSV] done');
+  toast(`Loaded ${rows.length} rows from CSV as "${dsName}"`, 'success');
 }
 
 // Fetch items for a table and cache them
@@ -4453,31 +4960,37 @@ function buildConfig() {
 
   const tablesMeta = {};
   for (const [name, t] of Object.entries(state.tables)) {
+    const ds = t.dataSource ? state.dataSources[t.dataSource] : null;
     tablesMeta[name] = {
+      internalName: t.internalName || name,
       displayName: t.displayName || name,
+      description: t.description || '',
       alias: t.alias || name,
+      dsAlias: t.dsAlias || '',
+      dataSource: t.dataSource || '',
       fields: cleanFields(t.fields),
       originalFields: cleanFields(t.originalFields || t.fields),
       guid: t.guid || '',
       sourceType: t.sourceType || 'sharepoint',
-      siteUrl: t.siteUrl || state.source.url || '',
+      siteUrl: t.siteUrl || '',
+      url: ds ? (ds.url || '') : '',          // for CSV/JSON standalone fetching
       itemCount: t.itemCount || 0
     };
   }
 
-  const seenUrls = new Map();
-  const dataSources = [];
-  for (const [tname, t] of Object.entries(state.tables)) {
-    const url = t.siteUrl || state.source.url;
-    if (!url) continue;
-    if (!seenUrls.has(url)) {
-      const prefix = SOURCE_PREFIXES.find(p => p && tname.startsWith(p)) || '';
-      seenUrls.set(url, prefix);
-      dataSources.push({ url, prefix, auth: state.source.auth || 'current' });
-    }
-  }
-  if (!dataSources.length && state.source.url) {
-    dataSources.push({ url: state.source.url, prefix: '', auth: state.source.auth || 'current' });
+  // Save dataSources (without raw data)
+  const dataSourcesMeta = {};
+  for (const [dsName, ds] of Object.entries(state.dataSources)) {
+    dataSourcesMeta[dsName] = {
+      type: ds.type || 'sharepoint',
+      url: ds.url || '',
+      auth: ds.auth || 'current',
+      token: ds.token || '',
+      fileName: ds.fileName || '',
+      internalName: ds.internalName || dsName,
+      alias: ds.alias || dsName,
+      tables: ds.tables || []
+    };
   }
 
   const cleanWidgets = (state.design.widgets || []).map(w => ({
@@ -4519,7 +5032,7 @@ function buildConfig() {
   return {
     _license: 'This file is part of DataLaVista. This is a configuration script for a report designed in DataLaVista. Copyright © 2026 The Regents of the University of Michigan. This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version. This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details. You should have received a copy of the GNU General Public License along with this program. If not, see <https://www.gnu.org/licenses/>.',
     dataSource: { type: state.source.type || 'sharepoint', url: state.source.url || '', auth: state.source.auth || 'current' },
-    dataSources,
+    dataSources: dataSourcesMeta,
     tables: tablesMeta,
     sql: state.sql || '',
     design: cleanDesign,
@@ -4532,22 +5045,59 @@ async function loadConfig(cfg) {
   state.source = { ...cfg.dataSource };
   state.sql = cfg.sql || '';
   state.queryColumns = cfg.queryColumns || [];
+  state.dataSources = {};
 
-  const sources = cfg.dataSources && cfg.dataSources.length
-    ? cfg.dataSources
-    : [{ url: state.source.url, prefix: '', auth: state.source.auth || 'current' }];
-
-  state.sourceCount = 0; 
-  for (const src of sources) {
-    if (!src.url) continue;
-    state.source = { type: 'sharepoint', url: src.url, auth: src.auth || 'current', token: src.token || '' };
-    await loadSharePointSource(src.url, src.prefix || '');
-    state.sourceCount++;
+  // Support new dataSources map
+  if (cfg.dataSources && typeof cfg.dataSources === 'object' && !Array.isArray(cfg.dataSources)) {
+    // New format: keyed object
+    for (const [dsName, dsMeta] of Object.entries(cfg.dataSources)) {
+      if (dsMeta.type === 'sharepoint' && dsMeta.url) {
+        state.source = { type: 'sharepoint', url: dsMeta.url, auth: dsMeta.auth || 'current', token: dsMeta.token || '' };
+        await loadSharePointSource(dsMeta.url, dsName);
+      } else if (dsMeta.type === 'json' || dsMeta.type === 'csv') {
+        // Non-SP sources: restore from tables metadata (data will need re-fetch for SP, but CSV/JSON preserve structure)
+        if (!state.dataSources[dsName]) {
+          state.dataSources[dsName] = {
+            type: dsMeta.type,
+            url: dsMeta.url || '',
+            fileName: dsMeta.fileName || '',
+            alias: dsMeta.alias || dsName,
+            tables: dsMeta.tables || []
+          };
+        }
+      }
+    }
+  } else if (cfg.dataSources && Array.isArray(cfg.dataSources)) {
+    // Legacy array format
+    for (const src of cfg.dataSources) {
+      if (!src.url) continue;
+      const dsName = src.prefix || generateDataSourceName('sharepoint', '');
+      state.source = { type: 'sharepoint', url: src.url, auth: src.auth || 'current', token: src.token || '' };
+      await loadSharePointSource(src.url, dsName);
+    }
+  } else if (state.source.url) {
+    // Very legacy: single source
+    await loadSharePointSource(state.source.url, 'SP');
   }
 
+  // Restore table metadata overrides (aliases, internalNames, fields etc.) from config
   for (const [tname, tmeta] of Object.entries(cfg.tables || {})) {
-    if (state.tables[tname] && tmeta.originalFields) {
-      state.tables[tname].originalFields = state.tables[tname].originalFields || tmeta.originalFields;
+    if (state.tables[tname]) {
+      if (tmeta.internalName) state.tables[tname].internalName = tmeta.internalName;
+      if (tmeta.alias)        state.tables[tname].alias = tmeta.alias;
+      if (tmeta.originalFields) {
+        state.tables[tname].originalFields = state.tables[tname].originalFields || tmeta.originalFields;
+      }
+      if (tmeta.dataSource) state.tables[tname].dataSource = tmeta.dataSource;
+      if (tmeta.dsAlias)    state.tables[tname].dsAlias    = tmeta.dsAlias;
+    }
+  }
+
+  // Restore saved DS aliases (the user may have renamed DSes before saving)
+  for (const [dsName, dsMeta] of Object.entries(cfg.dataSources || {})) {
+    if (state.dataSources[dsName]) {
+      if (dsMeta.alias)        state.dataSources[dsName].alias        = dsMeta.alias;
+      if (dsMeta.internalName) state.dataSources[dsName].internalName = dsMeta.internalName;
     }
   }
 
@@ -4593,19 +5143,18 @@ async function loadConfig(cfg) {
     window._cmEditor.setValue(state.sql);
   }
 
-  const btn = document.getElementById('btn-connect');
-  if (btn) {
-    btn.innerHTML = state.sourceCount >= 5 ? '⛔ Max Sources' : (state.sourceCount > 0 ? '➕ Get More Data' : '⚡ Connect & Load');
-    btn.disabled = state.sourceCount >= 5;
-  }
+  updateConnectButton();
+  document.getElementById('btn-save-config').disabled = false;
 
-  document.getElementById('title-input').value = state.design.title || '';
+  const titleInput = document.getElementById('title-input');
+  if (titleInput) titleInput.value = state.design.title || '';
   renderDesignCanvas();
   renderFilterBar();
+  renderFieldsPanel();
   setStatus('✅ Config loaded');
   toast('Config loaded successfully', 'success');
 
-  // --- NEW BACKGROUND FETCH LOGIC ---
+  // Background fetch for referenced tables
   if (state.sql) {
     const referencedTables = findReferencedTables(state.sql);
     referencedTables.forEach(tname => {
@@ -4616,88 +5165,502 @@ async function loadConfig(cfg) {
   }
 }
 
-// ============================================================
-// SOURCE INDEX HELPER (for multi-source prefix badges)
-// ============================================================
-function getSourceIndex(tableName) {
-  for (let i = SOURCE_PREFIXES.length - 1; i >= 0; i--) {
-    const pfx = SOURCE_PREFIXES[i];
-    if (pfx && tableName.startsWith(pfx)) return i;
-  }
-  return 0; // no prefix = first source
-}
-
 
       // ============================================================
-      // FIELDS PANEL RENDERING
+      // FIELDS PANEL RENDERING — grouped by data source
       // ============================================================
       function renderFieldsPanel() {
         const body = document.getElementById('fields-panel-body');
         body.innerHTML = '';
-        const tableNames = Object.keys(state.tables);
-        if (!tableNames.length) { body.innerHTML = '<div class="text-muted text-sm" style="padding:12px 10px">No tables loaded</div>'; return; }
+        const dsNames = Object.keys(state.dataSources).sort((a, b) => a.localeCompare(b));
+        if (!dsNames.length) {
+          body.innerHTML = '<div class="text-muted text-sm" style="padding:12px 10px">No tables loaded</div>';
+          renderDesignFieldsPanel();
+          return;
+        }
 
-        for (const tname of tableNames) {
-          const t = state.tables[tname];
-          const srcIdx = getSourceIndex(tname);
-          const badgeCls = srcIdx > 0 ? ` prefix-badge-${srcIdx + 1}` : '';
-          const srcLabel = srcIdx > 0 ? SOURCE_PREFIXES[srcIdx] : '';
+        for (const dsName of dsNames) {
+          const ds = state.dataSources[dsName];
+          const dsAlias = ds.alias || dsName;
 
-          const node = document.createElement('div');
-          node.className = 'table-node';
-          const tIcon = getTableIcon(t);
-          node.innerHTML = `
-      <div class="table-node-header" draggable="true" data-table="${tname}">
-        <span class="toggle-arrow" id="arrow-${CSS.escape(tname)}">▶</span>
-        <span class="table-icon" title="${tIcon.title}">${tIcon.icon}</span>
-        <span class="table-name" title="${t.displayName}">${t.alias || t.displayName}</span>
-        ${srcLabel ? `<span class="table-count${badgeCls}" title="Source: ${srcLabel}" style="font-size:9px;padding:1px 5px">${srcLabel.replace('Data', '')}</span>` : ''}
-        <span class="table-count">${t.itemCount || (t.data && t.data.length) || 0}</span>
-      </div>
-      <div class="fields-list hidden" id="fields-${CSS.escape(tname)}"></div>
-    `;
-          const header = node.querySelector('.table-node-header');
-          header.addEventListener('click', () => toggleTableExpand(tname));
-          header.addEventListener('dragstart', e => {
-            safeDragSet(e, { type: 'table', table: tname });
+          // Determine tooltip for DS header
+          let dsTitle = dsName;
+          if (ds.type === 'sharepoint' || ds.type === 'json') dsTitle = ds.url || dsName;
+          else if (ds.type === 'csv') dsTitle = ds.fileName || dsName;
+
+          // Sort tables alphabetically
+          const tableKeys = (ds.tables || [])
+            .filter(k => state.tables[k])
+            .sort((a, b) => {
+              const da = state.tables[a].alias || state.tables[a].displayName || a;
+              const db = state.tables[b].alias || state.tables[b].displayName || b;
+              return da.localeCompare(db);
+            });
+
+          const dsGroup = document.createElement('div');
+          dsGroup.className = 'ds-group';
+          dsGroup.dataset.dsName = dsName;
+
+          // DS header row
+          const dsHeader = document.createElement('div');
+          dsHeader.className = 'ds-group-header';
+          dsHeader.title = dsTitle;
+          dsHeader.innerHTML = `
+            <span class="ds-group-toggle open" id="ds-toggle-${CSS.escape(dsName)}">▶</span>
+            <span class="ds-group-name" id="ds-label-${CSS.escape(dsName)}">${dsAlias}</span>
+            <span style="font-size:10px;color:var(--text-disabled);margin-left:2px">${tableKeys.length}</span>
+          `;
+          // Click toggle
+          dsHeader.querySelector('.ds-group-toggle').addEventListener('click', (e) => {
+            e.stopPropagation();
+            toggleDsGroupExpand(dsName);
+          });
+          // Right-click
+          dsHeader.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            showCtxMenu(e, { level: 'ds', dsName, isFileUpload: ds.type === 'csv' });
           });
 
-          // Build fields list — apply per-source badge color on each field item for ADA-safe differentiation
-          const flist = node.querySelector('.fields-list');
-          for (const f of t.fields) {
-            if (f.isAutoId) continue;
-            const ti = FIELD_TYPE_ICONS[f.displayType] || FIELD_TYPE_ICONS.default;
-            const fitem = document.createElement('div');
-            fitem.className = 'field-item';
-            fitem.draggable = true;
-            // Prefix badge on the type icon so color is visible without relying on text alone
-            fitem.innerHTML = `<span class="field-type-icon ${ti.cls}${badgeCls}" title="${srcLabel || 'Source 1'}">${ti.icon}</span><span class="field-label" title="${f.displayName || f.alias}">${f.alias}</span>`;
-            fitem.addEventListener('dragstart', e => {
-              safeDragSet(e, { type: 'field', table: tname, field: f.alias, internalName: f.internalName });
-              e.stopPropagation();
+          dsGroup.appendChild(dsHeader);
+
+          // Tables container
+          const tablesWrap = document.createElement('div');
+          tablesWrap.className = 'ds-group-tables';
+          tablesWrap.id = 'ds-tables-' + CSS.escape(dsName);
+
+          for (const tkey of tableKeys) {
+            const t = state.tables[tkey];
+            // Strip the DS prefix for display (users already see it in the group header)
+            const tAlias = t.alias || t.displayName || tkey;
+            const tIcon = getTableIcon(t);
+
+            const node = document.createElement('div');
+            node.className = 'table-node';
+
+            node.innerHTML = `
+              <div class="table-node-header" draggable="true" data-table="${tkey}" style="padding-left:6px">
+                <span class="toggle-arrow" id="arrow-${CSS.escape(tkey)}">▶</span>
+                <span class="table-icon" title="${tIcon.title}" style="font-size:12px">${tIcon.icon}</span>
+                <span class="table-name" id="tlabel-${CSS.escape(tkey)}" title="${tkey}" style="font-size:11px;font-weight:700">${tAlias}</span>
+                <span class="table-count">${t.itemCount || (t.data && t.data.length) || 0}</span>
+              </div>
+              <div class="fields-list hidden" id="fields-${CSS.escape(tkey)}"></div>
+            `;
+
+            const header = node.querySelector('.table-node-header');
+            header.addEventListener('click', () => toggleTableExpand(tkey));
+            header.addEventListener('dragstart', e => {
+              safeDragSet(e, { type: 'table', table: tkey });
             });
-            flist.appendChild(fitem);
+            // Right-click on table header
+            header.addEventListener('contextmenu', (e) => {
+              e.preventDefault();
+              showCtxMenu(e, { level: 'table', tableKey: tkey, dsName, isFileUpload: ds.type === 'csv' });
+            });
+
+            // Build fields list, sorted alphabetically
+            const flist = node.querySelector('.fields-list');
+            const sortedFields = [...t.fields]
+              .filter(f => !f.isAutoId)
+              .sort((a, b) => (a.alias || a.displayName || '').localeCompare(b.alias || b.displayName || ''));
+
+            for (const f of sortedFields) {
+              const ti = FIELD_TYPE_ICONS[f.displayType] || FIELD_TYPE_ICONS.default;
+              const fitem = document.createElement('div');
+              fitem.className = 'field-item';
+              fitem.draggable = true;
+              fitem.style.paddingLeft = '14px';
+              fitem.innerHTML = `
+                <span class="field-type-icon ${ti.cls}" title="${f.displayName || f.alias}">${ti.icon}</span>
+                <span class="field-label" id="flabel-${CSS.escape(tkey)}-${CSS.escape(f.alias)}" title="${f.displayName || f.alias}">${f.alias}</span>
+              `;
+              fitem.addEventListener('dragstart', e => {
+                safeDragSet(e, { type: 'field', table: tkey, field: f.alias, internalName: f.internalName });
+                e.stopPropagation();
+              });
+              // Right-click on field: only "Rename"
+              fitem.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
+                showCtxMenu(e, { level: 'field', tableKey: tkey, fieldAlias: f.alias });
+              });
+              flist.appendChild(fitem);
+            }
+
+            // Auto-expand tables by default
+            flist.classList.remove('hidden');
+            const arrow = node.querySelector('.toggle-arrow');
+            if (arrow) arrow.classList.add('open');
+
+            tablesWrap.appendChild(node);
           }
-          body.appendChild(node);
+
+          dsGroup.appendChild(tablesWrap);
+          body.appendChild(dsGroup);
         }
+
         renderDesignFieldsPanel();
       }
 
-      function toggleTableExpand(tname) {
-        const flist = document.getElementById('fields-' + CSS.escape(tname));
-        const arrow = document.getElementById('arrow-' + CSS.escape(tname));
+      function toggleDsGroupExpand(dsName) {
+        const wrap = document.getElementById('ds-tables-' + CSS.escape(dsName));
+        const toggle = document.getElementById('ds-toggle-' + CSS.escape(dsName));
+        if (!wrap) return;
+        const isOpen = toggle && toggle.classList.contains('open');
+        if (wrap) wrap.style.display = isOpen ? 'none' : '';
+        if (toggle) toggle.classList.toggle('open', !isOpen);
+      }
+
+      function toggleTableExpand(tkey) {
+        const flist = document.getElementById('fields-' + CSS.escape(tkey));
+        const arrow = document.getElementById('arrow-' + CSS.escape(tkey));
         if (!flist) return;
         const isOpen = !flist.classList.contains('hidden');
         flist.classList.toggle('hidden', isOpen);
         if (arrow) { arrow.classList.toggle('open', !isOpen); }
       }
 
-      function expandAllTables() { Object.keys(state.tables).forEach(t => { document.getElementById('fields-' + CSS.escape(t))?.classList.remove('hidden'); document.getElementById('arrow-' + CSS.escape(t))?.classList.add('open'); }); }
-      function collapseAllTables() { Object.keys(state.tables).forEach(t => { document.getElementById('fields-' + CSS.escape(t))?.classList.add('hidden'); document.getElementById('arrow-' + CSS.escape(t))?.classList.remove('open'); }); }
+      function expandAllTables() {
+        Object.keys(state.tables).forEach(t => {
+          document.getElementById('fields-' + CSS.escape(t))?.classList.remove('hidden');
+          document.getElementById('arrow-' + CSS.escape(t))?.classList.add('open');
+        });
+        Object.keys(state.dataSources).forEach(ds => {
+          const wrap = document.getElementById('ds-tables-' + CSS.escape(ds));
+          const toggle = document.getElementById('ds-toggle-' + CSS.escape(ds));
+          if (wrap) wrap.style.display = '';
+          if (toggle) toggle.classList.add('open');
+        });
+      }
+      function collapseAllTables() {
+        Object.keys(state.tables).forEach(t => {
+          document.getElementById('fields-' + CSS.escape(t))?.classList.add('hidden');
+          document.getElementById('arrow-' + CSS.escape(t))?.classList.remove('open');
+        });
+      }
 
       // ============================================================
-      // CODEMIRROR SETUP
+      // RIGHT-CLICK CONTEXT MENU
       // ============================================================
+      let _ctxTarget = null; // { level, dsName, tableKey, fieldAlias, isFileUpload }
+
+      function showCtxMenu(e, target) {
+        _ctxTarget = target;
+        const menu = document.getElementById('dlv-ctx-menu');
+        const copyUrlItem = document.getElementById('ctx-copy-url');
+        const sepUrl = document.getElementById('ctx-sep-url');
+        const deleteItem = document.getElementById('ctx-delete');
+
+        // "Copy URL" only for DS/Table that are NOT file uploads
+        const showCopyUrl = (target.level === 'ds' || target.level === 'table') && !target.isFileUpload;
+        copyUrlItem.style.display = showCopyUrl ? '' : 'none';
+        sepUrl.style.display = showCopyUrl ? '' : 'none';
+
+        // "Delete" not available for fields
+        deleteItem.style.display = target.level === 'field' ? 'none' : '';
+
+        // Position
+        menu.classList.add('visible');
+        const mw = menu.offsetWidth || 170, mh = menu.offsetHeight || 90;
+        let x = e.clientX, y = e.clientY;
+        if (x + mw > window.innerWidth) x = window.innerWidth - mw - 4;
+        if (y + mh > window.innerHeight) y = window.innerHeight - mh - 4;
+        menu.style.left = x + 'px';
+        menu.style.top = y + 'px';
+      }
+
+      document.addEventListener('click', () => {
+        document.getElementById('dlv-ctx-menu')?.classList.remove('visible');
+      });
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') document.getElementById('dlv-ctx-menu')?.classList.remove('visible');
+      });
+
+      function dlvCtxCopyUrl() {
+        document.getElementById('dlv-ctx-menu').classList.remove('visible');
+        if (!_ctxTarget) return;
+        let url = '';
+        if (_ctxTarget.level === 'ds') {
+          const ds = state.dataSources[_ctxTarget.dsName];
+          url = ds ? (ds.url || '') : '';
+        } else if (_ctxTarget.level === 'table') {
+          const t = state.tables[_ctxTarget.tableKey];
+          const ds = t ? state.dataSources[t.dataSource] : null;
+          url = ds ? (ds.url || '') : '';
+        }
+        if (url) {
+          navigator.clipboard.writeText(url).then(() => toast('URL copied to clipboard', 'success'), () => {
+            prompt('Copy this URL:', url);
+          });
+        } else {
+          toast('No URL available for this source', 'warning');
+        }
+      }
+
+      function dlvCtxRename() {
+        document.getElementById('dlv-ctx-menu').classList.remove('visible');
+        if (!_ctxTarget) return;
+        const { level, dsName, tableKey, fieldAlias } = _ctxTarget;
+
+        if (level === 'ds') {
+          const labelEl = document.getElementById('ds-label-' + CSS.escape(dsName));
+          if (!labelEl) return;
+          const currentVal = state.dataSources[dsName].alias || dsName;
+          const inp = document.createElement('input');
+          inp.className = 'ds-group-name-input';
+          inp.value = currentVal;
+          inp.maxLength = 6;
+          inp.oninput = () => { inp.value = inp.value.replace(/[^A-Za-z0-9]/g, ''); };
+          labelEl.replaceWith(inp);
+          inp.focus(); inp.select();
+          const commit = () => {
+            const newName = inp.value.replace(/[^A-Za-z0-9]/g, '').slice(0, 6) || currentVal;
+            renameDatasource(dsName, newName);
+          };
+          inp.addEventListener('blur', commit);
+          inp.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') { inp.blur(); }
+            if (e.key === 'Escape') { inp.value = currentVal; inp.blur(); }
+          });
+
+        } else if (level === 'table') {
+          const labelEl = document.getElementById('tlabel-' + CSS.escape(tableKey));
+          if (!labelEl) return;
+          const t = state.tables[tableKey];
+          const currentVal = t.alias || t.displayName || tableKey;
+          const inp = document.createElement('input');
+          inp.className = 'dlv-rename-input';
+          inp.value = currentVal;
+          inp.maxLength = 50;
+          labelEl.replaceWith(inp);
+          inp.focus(); inp.select();
+          const commit = () => {
+            const newAlias = inp.value.trim() || currentVal;
+            renameTable(tableKey, newAlias);
+          };
+          inp.addEventListener('blur', commit);
+          inp.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') { inp.blur(); }
+            if (e.key === 'Escape') { inp.value = currentVal; inp.blur(); }
+          });
+
+        } else if (level === 'field') {
+          const labelEl = document.getElementById('flabel-' + CSS.escape(tableKey) + '-' + CSS.escape(fieldAlias));
+          if (!labelEl) return;
+          const t = state.tables[tableKey];
+          const f = t && t.fields.find(x => x.alias === fieldAlias);
+          if (!f) return;
+          const currentVal = f.alias;
+          const inp = document.createElement('input');
+          inp.className = 'dlv-rename-input';
+          inp.value = currentVal;
+          inp.maxLength = 50;
+          labelEl.replaceWith(inp);
+          inp.focus(); inp.select();
+          const commit = () => {
+            const newAlias = inp.value.trim() || currentVal;
+            renameField(tableKey, fieldAlias, newAlias);
+          };
+          inp.addEventListener('blur', commit);
+          inp.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') { inp.blur(); }
+            if (e.key === 'Escape') { inp.value = currentVal; inp.blur(); }
+          });
+        }
+      }
+
+      function dlvCtxDelete() {
+        document.getElementById('dlv-ctx-menu').classList.remove('visible');
+        if (!_ctxTarget) return;
+        const { level, dsName, tableKey } = _ctxTarget;
+
+        if (level === 'ds') {
+          const ds = state.dataSources[dsName];
+          const label = ds ? (ds.alias || dsName) : dsName;
+          if (!confirm(`Delete data source "${label}" and all its tables? This cannot be undone.`)) return;
+          deleteDatasource(dsName);
+        } else if (level === 'table') {
+          const t = state.tables[tableKey];
+          const label = t ? (t.alias || t.displayName || tableKey) : tableKey;
+          if (!confirm(`Delete table "${label}"? This cannot be undone.`)) return;
+          deleteTable(tableKey);
+        }
+      }
+
+      // ── Rename / Delete helpers ─────────────────────────────────────────────
+
+      /**
+       * Replace all occurrences of oldQName with newQName in the SQL editor,
+       * using word-boundary matching to avoid partial replacements.
+       */
+      function updateSQLEditorName(oldQName, newQName) {
+        if (!window._cmEditor || !oldQName || oldQName === newQName) return;
+        const cur = window._cmEditor.getValue();
+        const escaped = oldQName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const re = new RegExp('(\\[)' + escaped + '(\\])|\\b' + escaped + '\\b', 'gi');
+        const updated = cur.replace(re, (m, lb, rb) => lb ? '[' + newQName + ']' : newQName);
+        if (updated !== cur) window._cmEditor.setValue(updated);
+        state.sql = window._cmEditor.getValue();
+      }
+
+      function renameDatasource(dsName, newAlias) {
+        newAlias = (newAlias || '').replace(/[^A-Za-z0-9]/g, '').slice(0, 6);
+        if (!newAlias) { renderFieldsPanel(); return; }
+        const ds = state.dataSources[dsName];
+        if (!ds) return;
+        const oldDsAlias = ds.alias;
+        if (newAlias === oldDsAlias) { renderFieldsPanel(); return; }
+
+        // For each table: update SQL editor (alias appears in FROM [key] [oldAlias_TableAlias])
+        (ds.tables || []).forEach(tableKey => {
+          const t = state.tables[tableKey];
+          if (!t) return;
+          const oldQName = oldDsAlias + '_' + t.alias;
+          const newQName = newAlias + '_' + t.alias;
+          updateSQLEditorName(oldQName, newQName);
+        });
+
+        // Commit alias change and propagate to child tables
+        ds.alias = newAlias;
+        (ds.tables || []).forEach(tableKey => {
+          const t = state.tables[tableKey];
+          if (t) t.dsAlias = newAlias;
+        });
+
+        // Rebuild QB SQL so FROM clauses use the new alias
+        if (state.basicQB.tableName) {
+          const t = state.tables[state.basicQB.tableName];
+          if (t && t.dataSource === dsName) rebuildBasicSQL();
+        }
+        if (Object.keys(state.advancedQB.nodes || {}).length) {
+          const anyFromDs = Object.values(state.advancedQB.nodes).some(nd => {
+            const t = state.tables[nd.tableName];
+            return t && t.dataSource === dsName;
+          });
+          if (anyFromDs) rebuildAdvancedSQL();
+        }
+
+        renderFieldsPanel();
+        setupCodeMirror();
+        toast(`Data source renamed to "${newAlias}"`, 'success');
+      }
+
+      function renameTable(tableKey, newAlias) {
+        const t = state.tables[tableKey];
+        if (!t) return;
+        const oldQName = getTableQueryName(tableKey);
+        t.alias = newAlias;
+        const newQName = getTableQueryName(tableKey);
+
+        // Update SQL editor: FROM alias and SELECT alias references
+        updateSQLEditorName(oldQName, newQName);
+
+        // Update advanced QB node alias if present
+        for (const nd of Object.values(state.advancedQB.nodes || {})) {
+          if (nd.tableName === tableKey) { nd.alias = newAlias; }
+        }
+
+        // Rebuild QB SQL to use new alias in FROM clause
+        if (state.basicQB.tableName === tableKey) rebuildBasicSQL();
+        if (Object.keys(state.advancedQB.nodes || {}).length) rebuildAdvancedSQL();
+
+        renderFieldsPanel();
+        setupCodeMirror();
+        toast(`Table renamed to "${newAlias}"`, 'success');
+      }
+
+      function renameField(tableKey, oldAlias, newAlias) {
+        const t = state.tables[tableKey];
+        if (!t) return;
+        const f = t.fields.find(x => x.alias === oldAlias);
+        if (!f) return;
+        f.alias = newAlias;
+        // NOTE: data rows are keyed by internalName, not alias — no row migration needed.
+        // The AS alias in generated SQL is what produces the output column name.
+
+        // Update basicQB selectedFields (which track aliases)
+        const sfIdx = state.basicQB.selectedFields.indexOf(oldAlias);
+        if (sfIdx !== -1) { state.basicQB.selectedFields[sfIdx] = newAlias; rebuildBasicSQL(); }
+
+        // Update advanced QB selectedFields in nodes
+        for (const nd of Object.values(state.advancedQB.nodes || {})) {
+          if (nd.tableName === tableKey) {
+            const fi = nd.selectedFields.indexOf(oldAlias);
+            if (fi !== -1) nd.selectedFields[fi] = newAlias;
+          }
+        }
+        if (Object.keys(state.advancedQB.nodes || {}).length) rebuildAdvancedSQL();
+
+        // Update design widgets
+        (state.design.widgets || []).forEach(w => {
+          if (Array.isArray(w.fields)) {
+            const fi = w.fields.indexOf(oldAlias);
+            if (fi !== -1) w.fields[fi] = newAlias;
+          }
+          if (w.xField === oldAlias) w.xField = newAlias;
+          if (w.yField === oldAlias) w.yField = newAlias;
+          (w.filters || []).forEach(wf => { if (wf.field === oldAlias) wf.field = newAlias; });
+        });
+
+        renderFieldsPanel();
+        setupCodeMirror();
+        toast(`Field renamed to "${newAlias}"`, 'success');
+      }
+
+      function deleteDatasource(dsName) {
+        const ds = state.dataSources[dsName];
+        if (!ds) return;
+        // Remove all tables
+        (ds.tables || []).forEach(tk => deleteTable(tk, true));
+        delete state.dataSources[dsName];
+        renderFieldsPanel();
+        setupCodeMirror();
+        updateConnectButton();
+        toast(`Data source "${dsName}" deleted.`, 'success');
+      }
+
+      function deleteTable(tableKey, silent = false) {
+        const t = state.tables[tableKey];
+        if (!t) return;
+
+        // Remove from data source table list
+        const ds = t.dataSource ? state.dataSources[t.dataSource] : null;
+        if (ds && ds.tables) {
+          ds.tables = ds.tables.filter(k => k !== tableKey);
+        }
+        // Drop from AlaSQL by table key
+        dropTableFromAlaSQL(tableKey);
+        // Remove from basicQB if active
+        if (state.basicQB.tableName === tableKey) {
+          state.basicQB = { tableName: null, selectedFields: [], fieldAggs: {}, conditions: [], sorts: [], groupBy: [], rowLimit: 500 };
+          renderBasicQB();
+        }
+        // Remove from advanced QB nodes
+        for (const [id, nd] of Object.entries(state.advancedQB.nodes || {})) {
+          if (nd.tableName === tableKey) {
+            delete state.advancedQB.nodes[id];
+          }
+        }
+        state.advancedQB.joins = (state.advancedQB.joins || []).filter(j => {
+          const fromNd = state.advancedQB.nodes[j.from];
+          const toNd = state.advancedQB.nodes[j.to];
+          return fromNd && toNd;
+        });
+        // Remove from design widgets
+        state.design.widgets = (state.design.widgets || []).filter(w => {
+          if (w.sqlTable === tableKey) return false;
+          return true;
+        });
+        // Remove from design filters
+        state.design.filters = (state.design.filters || []);
+
+        delete state.tables[tableKey];
+
+        if (!silent) {
+          renderFieldsPanel();
+          setupCodeMirror();
+          renderDesignCanvas();
+        }
+      }
       function setupCodeMirror() {
         const sqlEditorTextArea = document.getElementById('sql-editor');
         if (window._cmEditor) {
@@ -4745,21 +5708,22 @@ function getSourceIndex(tableName) {
         const cursor = cm.getCursor();
         const lineUpToCursor = cm.getLine(cursor.line).slice(0, cursor.ch);
 
-        // ── Dot-context: detect "TableName." or "[TableName]." ──────────────
-        // Captures: optional [ , word chars (table name) , optional ] , literal dot , optional partial field name
-        const dotMatch = lineUpToCursor.match(/\[?(\w+)\]?\.(\w*)$/);
+        // ── Dot-context: detect "SP_PeopleList." or "SP_Contacts." ──────────────
+        const dotMatch = lineUpToCursor.match(/\[?([\w]+)\]?\.(\w*)$/);
         if (dotMatch) {
           const tableRef    = dotMatch[1];
           const fieldPrefix = dotMatch[2];
           const completions = [];
 
-          for (const [tname, t] of Object.entries(state.tables)) {
-            const alias = (t.alias || tname);
-            if (alias.toUpperCase() === tableRef.toUpperCase() || tname.toUpperCase() === tableRef.toUpperCase()) {
-              // Include ALL fields (including synthetic/isAutoId) in SQL editor
+          for (const [tkey, t] of Object.entries(state.tables)) {
+            const qname = getTableQueryName(tkey);
+            // Match against either the tableKey or the live alias form
+            if (tkey.toUpperCase() === tableRef.toUpperCase() ||
+                qname.toUpperCase() === tableRef.toUpperCase()) {
+              // Suggest internalName.field (that's what SQL column refs use)
               for (const f of t.fields) {
-                if (f.alias.toUpperCase().startsWith(fieldPrefix.toUpperCase())) {
-                  completions.push(alias + '.' + f.alias);
+                if ((f.internalName || '').toUpperCase().startsWith(fieldPrefix.toUpperCase())) {
+                  completions.push(tableRef + '.' + f.internalName);
                 }
               }
               break;
@@ -4768,7 +5732,7 @@ function getSourceIndex(tableName) {
 
           const replaceFrom = dotMatch.index;
           return {
-            list: completions.sort(),
+            list: [...new Set(completions)].sort(),
             from: CodeMirror.Pos(cursor.line, replaceFrom),
             to:   CodeMirror.Pos(cursor.line, cursor.ch)
           };
@@ -4790,14 +5754,18 @@ function getSourceIndex(tableName) {
           ...ALASQL_KEYWORDS
         ];
 
-        // Add table names/aliases, and fully-qualified table.field names.
-        // Bare field names are intentionally excluded to keep the list clean.
-        for (const [tname, t] of Object.entries(state.tables)) {
-          const alias = t.alias || tname;
-          allKeywords.push(alias);
-          // Include ALL fields (including synthetic/isAutoId) for SQL editor
+        // Add table keys (immutable, always queryable) and their fully-qualified field names.
+        // Also add the live alias-based name so the user sees what the QB generates.
+        for (const [tkey, t] of Object.entries(state.tables)) {
+          const qname = getTableQueryName(tkey);   // DSAlias_TableAlias (used in FROM clause)
+          // Primary suggestion: the tableKey (what goes in FROM [tableKey])
+          allKeywords.push(tkey);
+          // Also suggest the SQL alias form for awareness (what QB puts after FROM [key])
+          if (qname !== tkey) allKeywords.push(qname);
+          // Include ALL fields by internalName for SQL column references
           for (const f of t.fields) {
-            allKeywords.push(alias + '.' + f.alias);
+            allKeywords.push(tkey + '.' + f.internalName);
+            allKeywords.push(qname + '.' + f.internalName);
           }
         }
 
@@ -5130,44 +6098,51 @@ function getSourceIndex(tableName) {
         });
       }
 
-      // ── QB: build SQL from state (compact or formatted) ──────────────────────────
+      // ── QB: build SQL from state ──────────────────────────────────────────────
+      // Rule: FROM always uses the immutable tableKey (registered in AlaSQL).
+      //       Column refs use [tableKey].[internalName].
+      //       AS clause adds the user-facing field alias as the result column name.
       function buildBasicSQL(formatted = false) {
-        const tname = state.basicQB.tableName;
-        const t = tname ? state.tables[tname] : null;
+        const tkey = state.basicQB.tableName;
+        const t = tkey ? state.tables[tkey] : null;
         if (!t) return '';
 
-        const alias = t.alias || tname;
-        const fields = state.basicQB.selectedFields;
-        const aggs = state.basicQB.fieldAggs || {};
-        const conds = state.basicQB.conditions.filter(c => c.field);
-        const sorts = state.basicQB.sorts.filter(s => s.field);
-        const limit = state.basicQB.rowLimit || 500;
+        // Helper: resolve a field alias → internalName for SQL column references
+        const getInternal = (alias) => {
+          const f = t.fields.find(f => f.alias === alias);
+          return f ? (f.internalName || alias) : alias;
+        };
 
-        // Determine if any field has an aggregate
-        const anyAgg = fields.some(f => aggs[f]);
+        const selectedAliases = state.basicQB.selectedFields;
+        const aggs   = state.basicQB.fieldAggs || {};
+        const conds  = state.basicQB.conditions.filter(c => c.field);
+        const sorts  = state.basicQB.sorts.filter(s => s.field);
+        const limit  = state.basicQB.rowLimit || 500;
+        const anyAgg = selectedAliases.some(a => aggs[a]);
 
-        // SELECT clause — wrap aggregated fields, leave others bare
-        const selCols = fields.length ? fields.map(f => {
-          const agg = aggs[f];
-          const col = `[${alias}].[${f}]`;
-          if (!agg) return col;
-          if (agg === 'COUNT_DISTINCT') return `COUNT(DISTINCT ${col}) AS [CountDistinct_${f}]`;
-          return `${agg}(${col}) AS [${agg}_${f}]`;
-        }) : [`[${alias}].*`];
+        // SELECT [tkey].[internalName] AS [fieldAlias]
+        const selCols = selectedAliases.length ? selectedAliases.map(fa => {
+          const agg   = aggs[fa];
+          const iname = getInternal(fa);
+          const col   = `[${tkey}].[${iname}]`;
+          if (!agg) return `${col} AS [${fa}]`;
+          if (agg === 'COUNT_DISTINCT') return `COUNT(DISTINCT ${col}) AS [CountDistinct_${fa}]`;
+          return `${agg}(${col}) AS [${agg}_${fa}]`;
+        }) : [`[${tkey}].*`];
 
-        // Auto GROUP BY: all selected fields that have NO aggregate
-        const autoGroups = anyAgg ? fields.filter(f => !aggs[f]).map(g => `[${alias}].[${g}]`) : [];
-        // Manual GROUP BY (from the section) only used when no auto-agg
-        const manualGroups = !anyAgg ? (state.basicQB.groupBy || []).filter(g => g).map(g => `[${alias}].[${g}]`) : [];
+        const autoGroups   = anyAgg
+          ? selectedAliases.filter(a => !aggs[a]).map(a => `[${tkey}].[${getInternal(a)}]`)
+          : [];
+        const manualGroups = !anyAgg
+          ? (state.basicQB.groupBy || []).filter(g => g).map(g => `[${tkey}].[${getInternal(g)}]`)
+          : [];
         const groupParts = anyAgg ? autoGroups : manualGroups;
 
-        // WHERE clause fragments
         const whereParts = conds.map((c, i) => {
           const conj = i === 0 ? '' : (c.conj || 'AND') + ' ';
-          const col = `[${alias}].[${c.field}]`;
-          if (c.op === 'NULL') return conj + `${col} IS NULL`;
+          const col  = `[${tkey}].[${getInternal(c.field)}]`;
+          if (c.op === 'NULL')    return conj + `${col} IS NULL`;
           if (c.op === 'NOTNULL') return conj + `${col} IS NOT NULL`;
-          // Date macros
           if (DATE_MACRO_VALS.has(c.op)) {
             const expr = dateMacroToSQL(c.op, c.value, col);
             return expr ? conj + expr : conj + `${col} IS NOT NULL`;
@@ -5179,19 +6154,17 @@ function getSourceIndex(tableName) {
           return conj + `${col} ${c.op} ${val}`;
         });
 
-        // ORDER BY fragments
-        const orderParts = sorts.map(s => `[${alias}].[${s.field}] ${s.dir || 'ASC'}`);
-
+        const orderParts = sorts.map(s => `[${tkey}].[${getInternal(s.field)}] ${s.dir || 'ASC'}`);
 
         if (!formatted) {
-          let sql = `SELECT ${selCols.join(', ')} FROM [${alias}]`;
+          let sql = `SELECT ${selCols.join(', ')} FROM [${tkey}]`;
           if (whereParts.length) sql += ` WHERE ${whereParts.join(' ')}`;
           if (groupParts.length) sql += ` GROUP BY ${groupParts.join(', ')}`;
           if (orderParts.length) sql += ` ORDER BY ${orderParts.join(', ')}`;
           sql += ` LIMIT ${limit}`;
           return sql;
         } else {
-          let sql = `SELECT\n  ${selCols.join(',\n  ')}\nFROM [${alias}]`;
+          let sql = `SELECT\n  ${selCols.join(',\n  ')}\nFROM [${tkey}]`;
           if (whereParts.length) sql += `\nWHERE\n  ${whereParts.join('\n  ')}`;
           if (groupParts.length) sql += `\nGROUP BY\n  ${groupParts.join(',\n  ')}`;
           if (orderParts.length) sql += `\nORDER BY\n  ${orderParts.join(',\n  ')}`;
@@ -6226,124 +7199,117 @@ function getSourceIndex(tableName) {
         renderAdvOptionsPanel(null, null);
       }
 
+      // ── Advanced QB: build SQL ────────────────────────────────────────────
+      // Rule: FROM/JOIN use the immutable tableKey (what AlaSQL has registered).
+      //       Column refs: [tableKey].[internalName] AS [fieldAlias]
       function rebuildAdvancedSQL() {
         if (state.sqlLocked) return;
         const nodes = Object.entries(state.advancedQB.nodes);
         if (!nodes.length) { if (window._cmEditor) window._cmEditor.setValue(''); return; }
 
-        const [mainId, mainNd] = nodes[0];
-        const mainAlias = mainNd.alias || mainNd.tableName;
-        const selects = [];
+        // Helper: field alias → internalName for SQL column refs
+        const getInternal = (tableName, fieldAlias) => {
+          const t = state.tables[tableName];
+          if (!t) return fieldAlias;
+          const f = t.fields.find(f => f.alias === fieldAlias);
+          return f ? (f.internalName || fieldAlias) : fieldAlias;
+        };
 
-        // Collect all (alias, fieldName) pairs so we can detect duplicates
+        const [mainId, mainNd] = nodes[0];
+        const mainKey = mainNd.tableName;
+
+        // Collect SELECT fields, detect duplicate output aliases
         const allFields = [];
         for (const [id, nd] of nodes) {
-          const alias = nd.alias || nd.tableName;
-          for (const f of nd.selectedFields) allFields.push({ alias, f });
-        }
-        // Find field names that appear in more than one table
-        const fieldCount = {};
-        for (const { f } of allFields) fieldCount[f.toLowerCase()] = (fieldCount[f.toLowerCase()] || 0) + 1;
-
-        for (const { alias, f } of allFields) {
-          if (fieldCount[f.toLowerCase()] > 1) {
-            // Disambiguate: Citations.Title AS Citations_Title
-            selects.push(`  ${alias}.${f} AS [${alias}_${f}]`);
-          } else {
-            selects.push(`  ${alias}.${f}`);
+          for (const fa of nd.selectedFields) {
+            allFields.push({ tkey: nd.tableName, fa, iname: getInternal(nd.tableName, fa) });
           }
         }
-        if (!selects.length) selects.push('  *');
+        const seenAliases = {};
+        const selects = allFields.length ? allFields.map(({ tkey, fa, iname }) => {
+          const count = seenAliases[fa] = (seenAliases[fa] || 0) + 1;
+          const outAlias = count === 1 ? fa : fa + (count - 1);
+          return `  [${tkey}].[${iname}] AS [${outAlias}]`;
+        }) : ['  *'];
 
-        // Check if any join is a UNION or UNION ALL
         const hasUnion = state.advancedQB.joins.some(j => j.type === 'UNION' || j.type === 'UNION ALL');
 
         if (hasUnion) {
-          // For UNION queries, build separate SELECT per node
           const parts = [];
           for (const [id, nd] of nodes) {
-            const alias = nd.alias || nd.tableName;
+            const nodeKey = nd.tableName;
             const nodeSelects = nd.selectedFields.length
-              ? nd.selectedFields.map(f => `  ${alias}.${f}`).join(',\n')
+              ? nd.selectedFields.map(fa => `  [${nodeKey}].[${getInternal(nodeKey, fa)}] AS [${fa}]`).join(',\n')
               : '  *';
-            let part = `SELECT\n${nodeSelects}\nFROM [${alias}] AS ${alias}`;
-            // per-node WHERE
-            const where = buildNodeWhere(nd);
+            let part = `SELECT\n${nodeSelects}\nFROM [${nodeKey}]`;
+            const where = buildNodeWhere(nd, nodeKey);
             if (where) part += `\nWHERE ${where}`;
-            parts.push({ sql: part, nd, id });
+            parts.push({ sql: part });
           }
           let sql = '';
           for (let i = 0; i < parts.length; i++) {
             if (i === 0) { sql = parts[0].sql; continue; }
             const j = state.advancedQB.joins.find(j => j.toNode === Object.keys(state.advancedQB.nodes)[i]);
-            const joinType = j ? j.type : 'UNION';
-            sql += `\n${joinType}\n` + parts[i].sql;
+            sql += `\n${j ? j.type : 'UNION'}\n` + parts[i].sql;
           }
-          const limit = state.advancedQB.rowLimit || 500;
-          sql += `\nLIMIT ${limit}`;
-          state.sql = sql;
-          if (window._cmEditor) window._cmEditor.setValue(sql);
-          return;
+          sql += `\nLIMIT ${state.advancedQB.rowLimit || 500}`;
+          state.sql = sql; if (window._cmEditor) window._cmEditor.setValue(sql); return;
         }
 
-        let sql = `SELECT\n${selects.join(',\n')}\nFROM [${mainAlias}] AS ${mainAlias}`;
+        let sql = `SELECT\n${selects.join(',\n')}\nFROM [${mainKey}]`;
 
-        // Add JOINs
         for (const j of state.advancedQB.joins) {
           const fromNd = state.advancedQB.nodes[j.fromNode];
-          const toNd = state.advancedQB.nodes[j.toNode];
+          const toNd   = state.advancedQB.nodes[j.toNode];
           if (!fromNd || !toNd) continue;
-          const fromAlias = fromNd.alias || fromNd.tableName;
-          const toAlias = toNd.alias || toNd.tableName;
-          sql += `\n${j.type} JOIN [${toAlias}] AS ${toAlias} ON ${fromAlias}.${j.fromKey} = ${toAlias}.${j.toKey}`;
+          const fromKey   = fromNd.tableName;
+          const toKey     = toNd.tableName;
+          const fromIname = getInternal(fromKey, j.fromKey);
+          const toIname   = getInternal(toKey,   j.toKey);
+          sql += `\n${j.type} JOIN [${toKey}] ON [${fromKey}].[${fromIname}] = [${toKey}].[${toIname}]`;
         }
 
-        // Aggregate per-node WHERE clauses (prefix with alias)
         const allWhere = [];
         for (const [id, nd] of nodes) {
-          const alias = nd.alias || nd.tableName;
           if (nd.conditions && nd.conditions.length) {
-            const w = buildNodeWhere(nd, alias);
+            const w = buildNodeWhere(nd, nd.tableName);
             if (w) allWhere.push(`(${w})`);
           }
         }
         if (allWhere.length) sql += `\nWHERE ${allWhere.join(' AND ')}`;
 
-        // GROUP BY (from first node that has one, or merge all)
         const allGB = [];
         for (const [id, nd] of nodes) {
-          const alias = nd.alias || nd.tableName;
-          if (nd.groupBy && nd.groupBy.length) {
-            nd.groupBy.forEach(g => allGB.push(`${alias}.${g}`));
-          }
+          if (nd.groupBy && nd.groupBy.length)
+            nd.groupBy.forEach(g => allGB.push(`[${nd.tableName}].[${getInternal(nd.tableName, g)}]`));
         }
         if (allGB.length) sql += `\nGROUP BY ${allGB.join(', ')}`;
 
-        // ORDER BY (from all nodes)
         const allOrder = [];
         for (const [id, nd] of nodes) {
-          const alias = nd.alias || nd.tableName;
-          if (nd.sorts && nd.sorts.length) {
-            nd.sorts.forEach(s => allOrder.push(`${alias}.${s.field} ${s.dir || 'ASC'}`));
-          }
+          if (nd.sorts && nd.sorts.length)
+            nd.sorts.forEach(s => allOrder.push(`[${nd.tableName}].[${getInternal(nd.tableName, s.field)}] ${s.dir || 'ASC'}`));
         }
         if (allOrder.length) sql += `\nORDER BY ${allOrder.join(', ')}`;
 
-        const limit = state.advancedQB.rowLimit || 500;
-        sql += `\nLIMIT ${limit}`;
-
-        state.sql = sql;
-        if (window._cmEditor) window._cmEditor.setValue(sql);
-        hideUseInDesign();
+        sql += `\nLIMIT ${state.advancedQB.rowLimit || 500}`;
+        state.sql = sql; if (window._cmEditor) window._cmEditor.setValue(sql); hideUseInDesign();
       }
 
-      function buildNodeWhere(nd, alias) {
+      // buildNodeWhere: tableKey is passed as the table prefix; resolves field alias → internalName
+      function buildNodeWhere(nd, tableKey) {
         if (!nd.conditions || !nd.conditions.length) return '';
-        const prefix = alias ? `${alias}.` : '';
+        const t = tableKey ? state.tables[tableKey] : null;
+        const getInternal = (alias) => {
+          if (!t) return alias;
+          const f = t.fields.find(f => f.alias === alias);
+          return f ? (f.internalName || alias) : alias;
+        };
+        const prefix = tableKey ? `[${tableKey}].` : '';
         return nd.conditions.map((c, i) => {
           const conj = i === 0 ? '' : (c.conj + ' ');
-          const col = `${prefix}[${c.field}]`;
-          if (c.op === 'NULL') return conj + `${col} IS NULL`;
+          const col = `${prefix}[${getInternal(c.field)}]`;
+          if (c.op === 'NULL')    return conj + `${col} IS NULL`;
           if (c.op === 'NOTNULL') return conj + `${col} IS NOT NULL`;
           if (DATE_MACRO_VALS.has(c.op)) return conj + dateMacroToSQL(c.op, c.value, col);
           if (c.op === 'LIKE') return conj + `${col} LIKE '%${c.value}%'`;
@@ -6352,7 +7318,6 @@ function getSourceIndex(tableName) {
           return conj + `${col} ${c.op} ${val}`;
         }).join(' ');
       }
-
       function clearQueryBuilder() {
         state.basicQB = { tableName: null, selectedFields: [], filters: [] };
         state.advancedQB = { nodes: {}, joins: [], activeJoinIdx: -1 };
@@ -6381,33 +7346,11 @@ function getSourceIndex(tableName) {
             await ensureTableData(tname,true);
           }
 
-          // Create AlaSQL tables — register by alias and internal name
+          // Register each referenced table in AlaSQL under its live query name (DSAlias_TableAlias)
           for (const tname of referencedTables) {
             const t = state.tables[tname];
             if (!t || !t.data) continue;
-            const pascalName = toPascalCase(tname);
-
-            // 1. Register by internal name
-            alasql(`DROP TABLE IF EXISTS [${tname}]`);
-            alasql(`CREATE TABLE [${tname}]`);
-            const actualKey = Object.keys(alasql.tables).find(k => k.toLowerCase() === tname.toLowerCase()) || tname;
-            alasql.tables[actualKey].data = t.data;
-
-            // 2. Also register by PascalCase version (so lowercase input works)
-            if (pascalName && pascalName.toLowerCase() !== tname.toLowerCase()) {
-              alasql(`DROP TABLE IF EXISTS [${pascalName}]`);
-              alasql(`CREATE TABLE [${pascalName}]`);
-              const actualPascalKey = Object.keys(alasql.tables).find(k => k.toLowerCase() === pascalName.toLowerCase()) || pascalName;
-              alasql.tables[actualPascalKey].data = t.data;
-            }
-
-            // 3. Also register by alias so QB-generated SQL (FROM alias) works
-            if (t.alias && t.alias !== tname) {
-              alasql(`DROP TABLE IF EXISTS [${t.alias}]`);
-              alasql(`CREATE TABLE [${t.alias}]`);
-              const actualAliasKey = Object.keys(alasql.tables).find(k => k.toLowerCase() === t.alias.toLowerCase()) || t.alias;
-              alasql.tables[actualAliasKey].data = t.data;
-            }
+            registerTableInAlaSQL(tname);
           }
 
           // Execute SQL with preprocessing
@@ -6433,13 +7376,12 @@ function getSourceIndex(tableName) {
 
       function findReferencedTables(sql) {
         const found = [];
-        for (const [tname, t] of Object.entries(state.tables)) {
-          // Match by internal name (bracketed or bare) or by alias
-          const esc1 = tname.replace(/[.*+?^\${}()|[\]\\]/g, '\\$&');
-          const esc2 = (t.alias || '').replace(/[.*+?^\${}()|[\]\\]/g, '\\$&');
-          const re1 = new RegExp(`\\[${esc1}\\]|\\b${esc1}\\b`, 'i');
-          const re2 = esc2 ? new RegExp(`\\[${esc2}\\]|\\b${esc2}\\b`, 'i') : null;
-          if (re1.test(sql) || (re2 && re2.test(sql))) found.push(tname);
+        for (const [tkey] of Object.entries(state.tables)) {
+          // Match by the immutable table key only (e.g. SP_EngagementHistory)
+          // The alias form (SP_Contacts) appears in SQL as a FROM alias, not a table name
+          const esc = tkey.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          const re = new RegExp(`\\[${esc}\\]|\\b${esc}\\b`, 'i');
+          if (re.test(sql)) found.push(tkey);
         }
         return found;
       }
@@ -7461,10 +8403,12 @@ function getSourceIndex(tableName) {
       function generateReport() {
         const config = buildConfig();
         const jsonStr = JSON.stringify(config, null, 2);
-        document.getElementById('gen-json-area').value = jsonStr;
+        const genJsonArea = document.getElementById('gen-json-area');
+        if (genJsonArea) genJsonArea.value = jsonStr;
 
         const html = buildStandaloneHTML(config);
-        document.getElementById('gen-code-area').value = html;
+        const genCodeArea = document.getElementById('gen-code-area');
+        if (genCodeArea) genCodeArea.value = html;
 
         document.getElementById('btn-copy-html').disabled = false;
         document.getElementById('btn-dl-html').disabled = false;
@@ -7487,359 +8431,393 @@ function getSourceIndex(tableName) {
 
       function buildStandaloneHTML(config) {
         const configJSON = JSON.stringify(config);
-        return `
-<!--
-This file is part of DataLaVista.
-Generated by DataLaVista Report Designer.
-Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
-Created: 2026-03-10
-Summary: This is a report configuration file to run a standalone report created in DataLaVista.
-Notes: See README file for documentation and full license information.
-Website: https://github.com/DepressionCenter/datalavista
 
-Copyright © 2026 The Regents of the University of Michigan
+        // ── Standalone report inline script ──────────────────────────────
+        // Built as a JS string (not a template literal) so the browser's HTML
+        // parser never sees <html>, <head>, <body>, <script> etc. as real tags.
+        const standaloneScript = [
+'const CONFIG = ' + configJSON + ';',
+'(function(){',
+'  const mkMax=function(v,acc,s){if(s===1)return v;if(s===2){if(!acc)return v;if(!v)return acc;return String(v)>String(acc)?v:acc;}return acc;};',
+'  const mkMin=function(v,acc,s){if(s===1)return v;if(s===2){if(!acc)return v;if(!v)return acc;return String(v)<String(acc)?v:acc;}return acc;};',
+'  alasql.aggr.MAXDATE=alasql.aggr.MAX=mkMax;',
+'  alasql.fn.MAXDATE=alasql.fn.MAX=function(a,b){if(b===undefined)return a;return String(a)>String(b)?a:b;};',
+'  alasql.aggr.MINDATE=alasql.aggr.MIN=mkMin;',
+'  alasql.fn.MINDATE=alasql.fn.MIN=function(a,b){if(b===undefined)return a;return String(a)<String(b)?a:b;};',
+'  alasql.aggr.SUM=function(v,acc,s){var n=parseFloat(v)||0;if(s===1)return n;if(s===2)return(acc||0)+n;return acc;};',
+'  if(!alasql.aggr.LAST)alasql.aggr.LAST=function(v,acc,s){if(s===1)return v;if(s===2)return v;return acc;};',
+'  alasql.fn.INCLUDES=function(arr,k){if(!arr||!Array.isArray(arr)||k==null)return false;var s=k.toString();return arr.some(function(m){return(m&&m.Id&&m.Id.toString()===s)||(m&&m.ID&&m.ID.toString()===s)||(m&&m.id&&m.id.toString()===s);});};',
+'})();',
 
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-GNU General Public License for more details.
-You should have received a copy of the GNU General Public License along
-with this program. If not, see <https://www.gnu.org/licenses/>.
+'var ISO_RE=/^\\d{4}-\\d{2}-\\d{2}T/;',
+'function normDate(v){if(typeof v!=="string")return v;if(ISO_RE.test(v)){var d=v.replace("T"," ").replace("Z","").replace(/\\.\\d+$/,"");if(d.endsWith(" 00:00:00"))d=d.replace(" 00:00:00","");return d;}return v;}',
+'function extractEmail(s){if(!s)return"";var m=s.match(/([a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,})/i);return m?m[1]:"";}',
+'function escH(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}',
 
--->
-<html lang="en">
-<head>
-<meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>${config.design.title || 'DataLaVista Report'}</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/alasql/4.1.3/alasql.min.js"><\/script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.5.0/echarts.min.js"><\/script>
-<style>
-*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-:root{--primary:#0078d4;--bg:#faf9f8;--surface:#fff;--surface2:#f3f2f1;--border:#edebe9;--text:#323130;--text-secondary:#605e5c;--radius:4px;--shadow:0 2px 8px rgba(0,0,0,.15);--font:'Segoe UI',system-ui,sans-serif}
-body{font-family:var(--font);font-size:13px;color:var(--text);background:var(--bg);min-height:100vh}
-#report-header{background:var(--primary);padding:14px 20px;display:flex;align-items:center;justify-content:space-between;box-shadow:var(--shadow)}
-#report-title{font-size:20px;font-weight:700;color:white}
-#filter-bar{padding:8px 16px;background:var(--surface2);border-bottom:1px solid var(--border);display:flex;flex-wrap:wrap;gap:8px;align-items:center;min-height:44px}
-#canvas{display:flex;flex-wrap:wrap;gap:8px;padding:12px;align-content:flex-start}
-.widget{background:var(--surface);border:1px solid var(--border);border-radius:6px;box-shadow:0 1px 3px rgba(0,0,0,.1);overflow:hidden;display:flex;flex-direction:column}
-.widget-header{padding:8px 12px;background:var(--surface2);border-bottom:1px solid var(--border);font-weight:600;font-size:13px}
-.widget-content{flex:1;overflow:auto;position:relative}
-.kpi-card{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;padding:16px;text-align:center}
-.kpi-value{font-size:36px;font-weight:700;color:var(--primary);line-height:1}
-.kpi-label{font-size:13px;color:var(--text-secondary);margin-top:6px}
-.widget-table{border-collapse:collapse;width:100%;font-size:12px}
-.widget-table th{background:var(--surface2);border-bottom:2px solid var(--border);padding:5px 10px;font-weight:600;position:sticky;top:0;text-align:left}
-.widget-table td{border-bottom:1px solid var(--border);padding:4px 10px}
-.text-widget{padding:12px;font-size:14px;line-height:1.5}
-.filter-chip{display:inline-flex;align-items:center;gap:6px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:3px 10px;font-size:12px}
-.filter-chip select{border:none;background:transparent;font-size:12px;cursor:pointer;outline:none}
-::-webkit-scrollbar{width:6px;height:6px}::-webkit-scrollbar-track{background:var(--surface2)}::-webkit-scrollbar-thumb{background:#c8c6c4;border-radius:3px}
-.dl-btn{background:var(--primary);color:white;border:none;border-radius:4px;padding:6px 14px;font-size:12px;cursor:pointer;font-family:var(--font)}
-.dl-btn:hover{background:#106ebe}
-#loading{position:fixed;inset:0;background:rgba(255,255,255,.9);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;z-index:999;font-size:14px;color:var(--text-secondary);pointer-events:none}
-.spinner{width:32px;height:32px;border:3px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:spin .7s linear infinite}
-@keyframes spin{to{transform:rotate(360deg)}}
-</style>
-</head>
-<body>
-<div id="loading"><div class="spinner"></div><div id="loading-text">Loading report data...</div></div>
-<div id="report-header">
-  <span id="report-title">${config.design.title || 'Report'}</span>
-  <button class="dl-btn" onclick="downloadCSV()">⬇ Download CSV</button>
-</div>
-<div id="filter-bar"></div>
-<div id="canvas"></div>
-<script>
-  /* ============================================================
-This file is part of DataLaVista
-Generated by DataLaVista report designer.
-Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
-Created: 2026-03-10
-Last Modified: 2026-03-19
-Summary: Main script for standalone DataLaVista report file.
-Notes: See README file for documentation and full license information.
-Website: https://github.com/DepressionCenter/datalavista
+'function getTableQueryName(tkey){',
+'  var t=(CONFIG.tables||{})[tkey];if(!t)return tkey;',
+'  var ds=(CONFIG.dataSources||{})[t.dataSource];',
+'  var dsa=(ds&&ds.alias)||t.dataSource||"";',
+'  var ta=t.alias||t.internalName||tkey;',
+'  return dsa?dsa+"_"+ta:ta;',
+'}',
 
-Copyright © 2026 The Regents of the University of Michigan
+'function splitCols(s){var r=[],d=0,c="";for(var i=0;i<s.length;i++){var ch=s[i];if(ch==="(")d++;else if(ch===")")d--;else if(ch===","&&d===0){r.push(c.trim());c="";continue;}c+=ch;}if(c.trim())r.push(c.trim());return r;}',
+'function getBare(col){var a=col.match(/\\bAS\\s+\\[?([\\w]+)\\]?\\s*$/i);if(a)return a[1];var d=col.match(/\\.[\\["\\x27]?([\\w]+)[\\]"\\x27]?\\s*$/);if(d)return d[1];return col.replace(/[\\[\\]"]/g,"").trim();}',
+'function autoAlias(col){var m=col.match(/[\\["\\x27]?([\\w]+)[\\]"\\x27]?\\.[\\["\\x27]?([\\w]+)[\\]"\\x27]?/);if(m)return m[1]+"_"+m[2];return getBare(col);}',
+'function preprocessSQL(sql){',
+'  var re=/^(\\s*SELECT\\s+)([\\s\\S]+?)(\\s+FROM\\b)/i,m=sql.match(re);if(!m)return sql;',
+'  var cols=splitCols(m[2]),bares=cols.map(getBare),counts={};',
+'  bares.forEach(function(n){counts[n.toLowerCase()]=(counts[n.toLowerCase()]||0)+1;});',
+'  var chg=false,nc=cols.map(function(col,i){',
+'    var b=bares[i];if(counts[b.toLowerCase()]<=1)return col;',
+'    if(/\\bAS\\s+\\[?[\\w]+\\]?\\s*$/i.test(col))return col;',
+'    chg=true;return col+" AS ["+autoAlias(col)+"]";',
+'  });',
+'  if(!chg)return sql;',
+'  return m[1]+nc.join(", ")+sql.slice(m[1].length+m[2].length);',
+'}',
 
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-GNU General Public License for more details.
-You should have received a copy of the GNU General Public License along
-with this program. If not, see <https://www.gnu.org/licenses/>.
+'function mapDataRow(row,fieldDefs){',
+'  var mapped={},pr=Object.assign({},row);',
+'  for(var i=0;i<fieldDefs.length;i++){',
+'    var f=fieldDefs[i],key=f.InternalName||f.internalName;',
+'    var fn=f.alias||f.displayName||f.Title||key;',
+'    if(fn==="Attachments")fn="HasAttachments";',
+'    var val=pr[key];if(val===null||val===undefined)continue;',
+'    var ts=(f.TypeAsString||"").toLowerCase(),ft=(f.type||"").toLowerCase();',
+'    var isUser=ts.includes("user")||ft==="user"||ft==="user-multi";',
+'    var isTax=ts.includes("tax")||ft==="taxkeyword"||key==="TaxKeyword";',
+'    var isLookup=ts.includes("lookup")||ft==="lookup"||ft==="lookup-multi";',
+'    var isURL=ts.includes("url");',
+'    var isMulti=ts.includes("multi")||ft.includes("multi")||ft==="taxkeyword"||key==="TaxKeyword";',
+'    if(isLookup&&!isMulti&&typeof val==="object"&&!Array.isArray(val)){mapped[fn]=val.Title||val.lookupValue||"";mapped[fn+"Id"]=val.Id;mapped[fn+"Data"]=[val];delete pr[key];delete pr[key+"Id"];continue;}',
+'    if(isLookup&&isMulti&&Array.isArray(val)){mapped[fn]=val.map(function(v){return v.Title||v.lookupValue||"";}).join("; ");mapped[fn+"Ids"]=val.map(function(v){return v.Id;}).join("; ");mapped[fn+"Data"]=val;delete pr[key];delete pr[key+"Id"];continue;}',
+'    if(isUser&&!isMulti&&typeof val==="object"&&!Array.isArray(val)){',
+'      var dsList=Object.values(CONFIG.dataSources||{});',
+'      var siteBase=(dsList.find(function(d){return d.url;})||{}).url||window.location.origin;',
+'      siteBase=siteBase.replace(/\\/$/,"");',
+'      mapped[fn]=val.Title||val.Name||JSON.stringify(val);mapped[fn+"Id"]=val.Id;',
+'      mapped[fn+"Claims"]=val.Name||"";mapped[fn+"Email"]=extractEmail(val.Name);',
+'      mapped[fn+"PictureUrl"]=val.Name?siteBase+"/_layouts/15/userphoto.aspx?size=M&accountname="+encodeURIComponent(val.Name):"";',
+'      mapped[fn+"Data"]=[val];delete pr[key];delete pr[key+"Id"];continue;',
+'    }',
+'    if(isUser&&isMulti&&Array.isArray(val)){mapped[fn]=val.map(function(v){return v.Title||v.Name||"";}).join("; ");mapped[fn+"Ids"]=val.map(function(v){return v.Id;}).join("; ");mapped[fn+"Emails"]=val.map(function(v){return extractEmail(v.Name);}).filter(Boolean).join("; ");mapped[fn+"Data"]=val;delete pr[key];delete pr[key+"Id"];continue;}',
+'    if(isTax&&!isMulti&&typeof val==="object"&&!Array.isArray(val)){mapped[fn]=val.Label;mapped[fn+"Id"]=val.Label+"|"+val.TermGuid;mapped[fn+"Data"]=[val];delete pr[key];continue;}',
+'    if(isTax&&isMulti&&Array.isArray(val)){mapped[fn]=val.map(function(v){return v.Label;}).join("; ");mapped[fn+"Ids"]=val.map(function(v){return v.Label+"|"+v.TermGuid;}).join("; ");mapped[fn+"Data"]=val;delete pr[key];continue;}',
+'    if(isURL&&typeof val==="object"&&val.Url){mapped[fn]=val.Url;mapped[fn+"Description"]=val.Description||"";mapped[fn+"Url"]=val.Url;delete pr[key];continue;}',
+'  }',
+'  var keys=Object.keys(pr);',
+'  for(var j=0;j<keys.length;j++){',
+'    var k=keys[j],v=pr[k];if(v===null||v===undefined)continue;',
+'    var fname=k,fd=fieldDefs.find(function(f){return(f.InternalName||f.internalName)===k;});',
+'    if(fd)fname=fd.alias||fd.displayName||fd.Title||fd.InternalName||k;',
+'    if(fname==="Attachments")fname="HasAttachments";',
+'    if(k.endsWith("Id")&&mapped[fname.slice(0,-2)]!==undefined)continue;',
+'    if(typeof v==="string"&&/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z?$/.test(v)){v=v.replace("T"," ").replace("Z","");if(/(Date|Fecha)$/i.test(fname))v=v.replace(/ 00:00:00$/,"");}',
+'    if(Array.isArray(v)){mapped[fname]=v.join("; ");mapped[fname+"Data"]=v;}',
+'    else if(typeof v==="object"){mapped[fname]=JSON.stringify(v);mapped[fname+"Data"]=v;}',
+'    else mapped[fname]=v;',
+'  }',
+'  return mapped;',
+'}',
 
-   ============================================================ */
-const CONFIG = ${configJSON};
+'function getAuthHeaders(dsKey){',
+'  var ds=(CONFIG.dataSources||{})[dsKey]||(CONFIG.dataSource||{});',
+'  var h={"Accept":"application/json"};',
+'  if(ds.auth==="token"&&ds.token)h["Authorization"]="Bearer "+ds.token;',
+'  return h;',
+'}',
+'async function spFetch(url,dsKey){',
+'  var r=await fetch(url,{headers:getAuthHeaders(dsKey),credentials:"include"});',
+'  if(!r.ok)throw new Error("HTTP "+r.status+" — "+url);',
+'  return r.json();',
+'}',
+'function extractRows(j){if(!j)return[];if(Array.isArray(j))return j;if(j.value&&Array.isArray(j.value))return j.value;if(j.d){if(Array.isArray(j.d))return j.d;if(j.d.results)return j.d.results;return[j.d];}return[j];}',
 
-// AlaSQL setup
-// ── MAXDATE: string-safe MAX for dates and text ──────────────────────────
-  const maxDateAggr = function(v, acc, stage) {
-    if (stage === 1) return v;
-    if (stage === 2) { if (!acc) return v; if (!v) return acc; return String(v) > String(acc) ? v : acc; }
-    return acc;
-  };
-  const maxDateFunc = function(a, b) { if (b === undefined) return a; return String(a) > String(b) ? a : b; };
-  alasql.aggr.MAXDATE = maxDateAggr;
-  alasql.aggr.MAX = maxDateAggr;
-  alasql.fn.MAXDATE = maxDateFunc;
-  alasql.fn.MAX = maxDateFunc;
+'function buildSelectExpand(originalFields){',
+'  var sel=new Set(["ID","Title","Created","Modified","Author/Id","Author/Title","Author/Name","Editor/Id","Editor/Title","Editor/Name"]);',
+'  var exp=new Set(["Author","Editor"]);',
+'  (originalFields||[]).forEach(function(f){',
+'    var ts=(f.TypeAsString||f.type||"").toLowerCase(),nm=f.InternalName||f.internalName;',
+'    if(!nm||f.isAutoId||f.IsDependentLookup)return;',
+'    if(ts.includes("user")){sel.add(nm+"/Id");sel.add(nm+"/Title");sel.add(nm+"/Name");exp.add(nm);}',
+'    else if(ts.includes("lookup")){sel.add(nm+"/Id");sel.add(nm+"/Title");exp.add(nm);}',
+'    else sel.add(nm);',
+'  });',
+'  return{select:[...sel],expand:[...exp]};',
+'}',
 
-  // ── MINDATE: string-safe MIN for dates and text ──────────────────────────
-  const minDateAggr = function(v, acc, stage) {
-    if (stage === 1) return v;
-    if (stage === 2) { if (!acc) return v; if (!v) return acc; return String(v) < String(acc) ? v : acc; }
-    return acc;
-  };
-  const minDateFunc = function(a, b) { if (b === undefined) return a; return String(a) < String(b) ? a : b; };
-  alasql.aggr.MINDATE = minDateAggr;
-  alasql.aggr.MIN = minDateAggr;
-  alasql.fn.MINDATE = minDateFunc;
-  alasql.fn.MIN = minDateFunc;
-  
+'async function fetchSPItems(siteUrl,listGuid,originalFields,dsKey,top){',
+'  top=top||999999;',
+'  var spec=buildSelectExpand(originalFields),curSel=[...spec.select],curExp=[...spec.expand];',
+'  for(var attempt=0;attempt<10;attempt++){',
+'    var baseUrl=siteUrl+"/_api/web/lists(guid\'"+listGuid+"\')/items?$top="+top+"&$select="+curSel.join(",")+"&$expand="+curExp.join(",");',
+'    try{',
+'      var all=[],next=baseUrl;',
+'      while(next){',
+'        var j=await spFetch(next,dsKey);',
+'        all=all.concat(extractRows(j));',
+'        next=j["@odata.nextLink"]||j["odata.nextLink"]||(j.d&&j.d.__next)||null;',
+'        if(all.length>=top){all=all.slice(0,top);break;}',
+'      }',
+'      return all;',
+'    }catch(e){',
+'      var bad=(e.message||"").match(/(?:Column|field or property) \'([^\']+)\' does not exist/i);',
+'      if(bad&&bad[1]){var bc=bad[1];curSel=curSel.filter(function(s){return s!==bc&&!s.startsWith(bc+"/");});curExp=curExp.filter(function(s){return s!==bc&&!s.startsWith(bc+"/");});}',
+'      else throw e;',
+'    }',
+'  }',
+'  throw new Error("Exceeded retries fetching "+listGuid);',
+'}',
 
-  // ── SUM: coerce strings to numbers ──────────────────────────────────────
-  alasql.aggr.SUM = function(v, acc, stage) {
-    const num = parseFloat(v) || 0;
-    if (stage === 1) return num;
-    if (stage === 2) return (acc || 0) + num;
-    return acc;
-  };
+'function findReferencedTables(sql){',
+'  var found=[];',
+'  Object.keys(CONFIG.tables||{}).forEach(function(tkey){',
+'    var esc1=tkey.replace(/[.*+?^${}()|[\\]\\\\]/g,"\\\\$&");',
+'    var re1=new RegExp("\\\\["+esc1+"\\\\]|\\\\b"+esc1+"\\\\b","i");',
+'    var qname=getTableQueryName(tkey);',
+'    var esc2=qname.replace(/[.*+?^${}()|[\\]\\\\]/g,"\\\\$&");',
+'    var re2=qname!==tkey?new RegExp("\\\\["+esc2+"\\\\]|\\\\b"+esc2+"\\\\b","i"):null;',
+'    if(re1.test(sql)||(re2&&re2.test(sql)))found.push(tkey);',
+'  });',
+'  return found;',
+'}',
 
-  // ── LAST: not in AlaSQL natively (FIRST is, so we leave that alone) ────────
-  if (!alasql.aggr.LAST) {
-    alasql.aggr.LAST = function(v, acc, stage) {
-      if (stage === 1) return v;
-      if (stage === 2) return v;   // always overwrite with latest value
-      return acc;
-    };
-  }
+'function parseCSVSimple(text){',
+'  var lines=text.split("\\n").filter(function(l){return l.trim();});',
+'  if(!lines.length)return{headers:[],rows:[]};',
+'  function parseLine(line){var r=[],cur="",inQ=false;for(var i=0;i<line.length;i++){var c=line[i];if(c===\'"\'){if(inQ&&line[i+1]===\'"\'){cur+=\'"\';i++;}else inQ=!inQ;}else if(c===","&&!inQ){r.push(cur.trim());cur="";}else cur+=c;}r.push(cur.trim());return r;}',
+'  var headers=parseLine(lines[0]);',
+'  var rows=lines.slice(1).map(function(l){var vals=parseLine(l),row={};headers.forEach(function(h,i){row[h]=vals[i]!==undefined?vals[i]:null;});return row;});',
+'  return{headers:headers,rows:rows};',
+'}',
 
-  console.log('AlaSQL aggregators registered: MIN/MAX/MINDATE/MAXDATE/SUM/LAST');
-  
-  alasql.fn.INCLUDES = function(lookupArray, itemKey) {
-    // Return false if the array is invalid or the itemKey is missing
-    if (!lookupArray || !Array.isArray(lookupArray) || itemKey == null) return false;
-    
-    const keyStr = itemKey.toString();
+'function registerInAlaSQL(tkey,data){',
+'  var kname=tkey;',
+'  alasql("DROP TABLE IF EXISTS ["+kname+"]");alasql("CREATE TABLE ["+kname+"]");',
+'  var k1=Object.keys(alasql.tables).find(function(k){return k.toLowerCase()===kname.toLowerCase();})||kname;',
+'  alasql.tables[k1].data=data;',
+'  var qname=getTableQueryName(tkey);',
+'  if(qname!==kname){',
+'    alasql("DROP TABLE IF EXISTS ["+qname+"]");alasql("CREATE TABLE ["+qname+"]");',
+'    var k2=Object.keys(alasql.tables).find(function(k){return k.toLowerCase()===qname.toLowerCase();})||qname;',
+'    alasql.tables[k2].data=data;',
+'  }',
+'}',
 
-    // Safely check for Id, ID, or id using optional chaining (?.)
-    return lookupArray.some(member => 
-        member?.Id?.toString() === keyStr || 
-        member?.ID?.toString() === keyStr || 
-        member?.id?.toString() === keyStr
-    );
-};
-  
-  console.log('AlaSQL custom functions registered: INCLUDES');
-const ISO_RE=/^\\d{4}-\\d{2}-\\d{2}T/;
-function normDate(v){if(typeof v!=='string')return v;if(ISO_RE.test(v)){let d=v.replace('T',' ').replace('Z','').replace(/\\.\\d+$/,'');if(d.endsWith(' 00:00:00'))d=d.replace(' 00:00:00','');return d;}return v;}
+'var allData={},queryResults=[],previewFilters={},charts={};',
 
-function extractEmail(claimsStr){if(!claimsStr)return'';const m=claimsStr.match(/([a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,})/i);return m?m[1]:'';}  
+'async function loadAllData(){',
+'  var loader=document.getElementById("loading"),lt=document.getElementById("loading-text");',
+'  try{',
+'    var tablesInSQL=findReferencedTables(CONFIG.sql);',
+'    for(var i=0;i<tablesInSQL.length;i++){',
+'      var tkey=tablesInSQL[i],tmeta=(CONFIG.tables||{})[tkey];',
+'      if(!tmeta)continue;',
+'      var qname=getTableQueryName(tkey);',
+'      lt.textContent="Loading "+qname+"...";',
+'      var dsKey=tmeta.dataSource||"";',
+'      var ds=(CONFIG.dataSources||{})[dsKey]||(CONFIG.dataSource||{});',
+'      var srcType=tmeta.sourceType||"sharepoint";',
+'      if(srcType==="csv"||srcType==="json"){',
+'        // For CSV/JSON sources: fetch from URL, do not query as SP list',
+'        var fileUrl=tmeta.url||ds.url||"";',
+'        if(!fileUrl){console.warn("No URL for",tkey);continue;}',
+'        try{',
+'          var res=await fetch(fileUrl,{credentials:"include"});',
+'          if(!res.ok)throw new Error("HTTP "+res.status);',
+'          if(srcType==="csv"){',
+'            var csvText=await res.text();',
+'            var parsed=parseCSVSimple(csvText);',
+'            allData[tkey]=parsed.rows;',
+'            registerInAlaSQL(tkey,parsed.rows);',
+'          } else {',
+'            var jsonData=await res.json();',
+'            var rows=Array.isArray(jsonData)?jsonData:(jsonData.value||jsonData.d?.results||[jsonData]);',
+'            allData[tkey]=rows;',
+'            registerInAlaSQL(tkey,rows);',
+'          }',
+'        }catch(fe){console.warn("Failed to load",tkey,"from URL:",fe.message);}',
+'        continue;',
+'      }',
+'      if(srcType!=="sharepoint"||!tmeta.guid)continue;',
+'      var siteUrl=tmeta.siteUrl||ds.url||"";',
+'      if(!siteUrl){console.warn("No siteUrl for",tkey);continue;}',
+'      var origFields=(tmeta.originalFields||tmeta.fields||[]).filter(function(f){return!f.isAutoId;});',
+'      var rawItems=await fetchSPItems(siteUrl,tmeta.guid,origFields,dsKey);',
+'      var mapped=rawItems.map(function(r){return mapDataRow(r,origFields);});',
+'      allData[tkey]=mapped;',
+'      registerInAlaSQL(tkey,mapped);',
+'    }',
+'    lt.textContent="Running main query...";',
+'    queryResults=alasql(preprocessSQL(CONFIG.sql));',
+'    if(!Array.isArray(queryResults))queryResults=[];',
+'    alasql("DROP TABLE IF EXISTS [_results]");alasql("CREATE TABLE [_results]");',
+'    alasql.tables["_results"].data=queryResults;',
+'    loader.style.display="none";',
+'    renderReport();',
+'  }catch(e){lt.textContent="Error: "+e.message;console.error("[DataLaVista standalone]",e);}',
+'}',
 
-// Full field-mapping pipeline — mirrors mapDataRow in the DataLaVista designer
-function mapDataRow(row,fieldDefs){
-  const mapped={};const processingRow=Object.assign({},row);
-  for(const f of fieldDefs){
-    const key=f.InternalName||f.internalName;
-    let fn=f.alias||f.displayName||f.Title||f.InternalName||f.internalName||key;
-    if(fn==='Attachments')fn='HasAttachments';
-    let value=processingRow[key];if(value===null||value===undefined)continue;
-    const ts=(f.TypeAsString||'').toLowerCase();const ft=(f.type||'').toLowerCase();
-    const isUser=ts.includes('user')||ft==='user'||ft==='user-multi';
-    const isTax=ts.includes('tax')||ft==='taxkeyword'||key==='TaxKeyword';
-    const isLookup=ts.includes('lookup')||ft==='lookup'||ft==='lookup-multi';
-    const isURL=ts.includes('url');
-    const isMulti=ts.includes('multi')||ft.includes('multi')||ft==='taxkeyword'||key==='TaxKeyword';
-    if(isLookup&&!isMulti&&typeof value==='object'&&!Array.isArray(value)){mapped[fn]=value.Title||value.lookupValue||'';mapped[fn+'Id']=value.Id;mapped[fn+'Data']=[value];delete processingRow[key];delete processingRow[key+'Id'];continue;}
-    if(isLookup&&isMulti&&Array.isArray(value)){mapped[fn]=value.map(v=>v.Title||v.lookupValue).join('; ');mapped[fn+'Ids']=value.map(v=>v.Id).join('; ');mapped[fn+'Data']=value;delete processingRow[key];delete processingRow[key+'Id'];continue;}
-    if(isUser&&!isMulti&&typeof value==='object'&&!Array.isArray(value)){
-      const sb=(CONFIG.dataSource&&CONFIG.dataSource.url)?(CONFIG.dataSource.url.endsWith('/')?CONFIG.dataSource.url.slice(0,-1):CONFIG.dataSource.url):window.location.origin;
-      mapped[fn]=value.Title||value.Name||JSON.stringify(value);mapped[fn+'Id']=value.Id;mapped[fn+'Claims']=value.Name||'';mapped[fn+'Email']=extractEmail(value.Name);mapped[fn+'PictureUrl']=value.Name?sb+'/_layouts/15/userphoto.aspx?size=M&accountname='+encodeURIComponent(value.Name):'';mapped[fn+'Data']=[value];delete processingRow[key];delete processingRow[key+'Id'];continue;}
-    if(isUser&&isMulti&&Array.isArray(value)){mapped[fn]=value.map(v=>v.Title||v.Name).join('; ');mapped[fn+'Ids']=value.map(v=>v.Id).join('; ');mapped[fn+'Emails']=value.map(v=>extractEmail(v.Name)).filter(e=>e).join('; ');mapped[fn+'Data']=value;delete processingRow[key];delete processingRow[key+'Id'];continue;}
-    if(isTax&&!isMulti&&typeof value==='object'&&!Array.isArray(value)){mapped[fn]=value.Label;mapped[fn+'Id']=value.Label+'|'+value.TermGuid;mapped[fn+'Data']=[value];delete processingRow[key];continue;}
-    if(isTax&&isMulti&&Array.isArray(value)){mapped[fn]=value.map(v=>v.Label).join('; ');mapped[fn+'Ids']=value.map(v=>v.Label+'|'+v.TermGuid).join('; ');mapped[fn+'Data']=value;delete processingRow[key];continue;}
-    if(isURL&&typeof value==='object'&&value.Url){mapped[fn]=value.Url;mapped[fn+'Description']=value.Description||'';mapped[fn+'Url']=value.Url;delete processingRow[key];continue;}
-  }
-  for(const[key,value]of Object.entries(processingRow)){
-    if(value===null||value===undefined)continue;
-    let fn=key;const fd=fieldDefs.find(f=>(f.InternalName||f.internalName)===key);
-    if(fd)fn=fd.alias||fd.displayName||fd.Title||fd.InternalName||key;if(fn==='Attachments')fn='HasAttachments';
-    if(key.endsWith('Id')&&mapped[fn.slice(0,-2)]!==undefined)continue;
-    let v=value;
-    if(typeof v==='string'&&/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z?$/.test(v)){v=v.replace('T',' ').replace('Z','');if(/(Date|Fecha)$/i.test(fn))v=v.replace(/ 00:00:00$/,'');}
-    if(Array.isArray(v)){mapped[fn]=v.join('; ');mapped[fn+'Data']=v;}
-    else if(typeof v==='object'){mapped[fn]=JSON.stringify(v);mapped[fn+'Data']=v;}
-    else{mapped[fn]=v;}
-  }
-  return mapped;
-}
+'function renderReport(){',
+'  document.getElementById("report-title").textContent=CONFIG.design.title||"Report";',
+'  renderFilterBar();renderCanvas();',
+'  window.addEventListener("resize",function(){Object.values(charts).forEach(function(c){try{c.resize();}catch(e){}});});',
+'}',
 
-async function spFetch(url){const h={'Accept':'application/json'};if(CONFIG.dataSource.auth==='token'&&CONFIG.dataSource.token)h['Authorization']='Bearer '+CONFIG.dataSource.token;const r=await fetch(url,{headers:h,credentials:'include'});if(!r.ok)throw new Error('HTTP '+r.status+' '+url);return r.json();}
-function extractRows(j){if(!j)return[];if(Array.isArray(j))return j;if(j.value&&Array.isArray(j.value))return j.value;if(j.d){if(Array.isArray(j.d))return j.d;if(j.d.results)return j.d.results;return[j.d];}return[j];}
+'function renderFilterBar(){',
+'  var bar=document.getElementById("filter-bar");bar.innerHTML="";',
+'  var filters=(CONFIG.design.filters||[]).filter(function(f){return f.position==="bar"||!f.position;});',
+'  if(!filters.length){bar.style.display="none";return;}bar.style.display="";',
+'  filters.forEach(function(f){',
+'    var vals=["(All)"].concat([...new Set(queryResults.map(function(r){return r[f.field];}).filter(function(v){return v!=null&&v!=="";}))).sort()];',
+'    var chip=document.createElement("div");chip.className="filter-chip";',
+'    chip.innerHTML=\'<span style="font-weight:600;margin-right:4px">\'+escH(f.label||f.field)+\':</span>\'',
+'      +\'<select onchange="applyFilter(\\\'"+escH(f.field)+"\\\',this.value)">\'+vals.map(function(v){return\'<option value="\'+escH(String(v))+\'">\'+escH(String(v))+"</option>";}).join("")+"</select>";',
+'    bar.appendChild(chip);',
+'  });',
+'}',
 
-// Build $select/$expand from originalFields (physical SP field definitions)
-function getSelect(originalFields){
-  const sel=new Set(['ID','Title','Created','Modified','Author/Id','Author/Title','Author/Name','Editor/Id','Editor/Title','Editor/Name']);const exp=new Set(['Author','Editor']);
-  for(const f of originalFields){
-    const ts=(f.TypeAsString||f.type||'').toLowerCase();const name=f.InternalName||f.internalName;
-    if(ts.includes('user')){sel.add(name+'/Id');sel.add(name+'/Title');sel.add(name+'/Name');exp.add(name);}
-    else if(ts.includes('lookup')){sel.add(name+'/Id');sel.add(name+'/Title');exp.add(name);}
-    else if(ts.includes('tax')||name==='TaxKeyword'){sel.add(name);}
-    else{sel.add(name);}
-  }
-  return{select:[...sel],expand:[...exp]};
-}
-async function fetchItems(siteUrl,listGuid,originalFields,top=999999){const spec=getSelect(originalFields);const selStr=spec.select.join(',');const expStr=spec.expand.join(',');let url=siteUrl+'/_api/web/lists(guid\\''+listGuid+'\\')/items?$top='+top+'&$select='+selStr+'&$expand='+expStr;let all=[];let next=url;while(next){const j=await spFetch(next);all=all.concat(extractRows(j));if(j['odata.nextLink'])next=j['odata.nextLink'];else if(j.d&&j.d.__next)next=j.d.__next;else next=null;}return all;}
+'function applyFilter(field,value){',
+'  if(value==="(All)")delete previewFilters[field];else previewFilters[field]=value;',
+'  var filtered=queryResults;',
+'  Object.keys(previewFilters).forEach(function(fld){var val=previewFilters[fld];filtered=filtered.filter(function(r){return String(r[fld])===String(val);});});',
+'  alasql.tables["_results"].data=filtered;',
+'  renderCanvas();',
+'}',
 
-let allData={};let queryResults=[];let previewFilters={};let charts={};
+'function runWidgetSQL(w){',
+'  var base=(alasql.tables["_results"]&&alasql.tables["_results"].data)||queryResults;',
+'  if(!w.widgetSql)return base;',
+'  try{return alasql(w.widgetSql)||[];}catch(e){console.warn("Widget SQL:",w.id,e.message);return base;}',
+'}',
 
-async function loadAllData(){
-  const loader=document.getElementById('loading');const lt=document.getElementById('loading-text');
-  try{
-    if(CONFIG.dataSource.type==='sharepoint'){
-      const tablesInSQL=findTables(CONFIG.sql);
-      for(const tname of tablesInSQL){
-        const tmeta=CONFIG.tables[tname];if(!tmeta)continue;
-        lt.textContent='Loading '+tname+'...';
-        const originalFields=(tmeta.originalFields||tmeta.fields||[]).filter(f=>!f.isAutoId);
-        const siteUrl=tmeta.siteUrl||CONFIG.dataSource.url;
-        const items=await fetchItems(siteUrl,tmeta.guid||tname,originalFields);
-        allData[tname]=items.map(r=>mapDataRow(r,originalFields));
-        alasql('DROP TABLE IF EXISTS ['+tname+']');alasql('CREATE TABLE ['+tname+']');alasql.tables[tname].data=allData[tname];
-        if(tmeta.alias&&tmeta.alias!==tname){alasql('DROP TABLE IF EXISTS ['+tmeta.alias+']');alasql('CREATE TABLE ['+tmeta.alias+']');alasql.tables[tmeta.alias].data=allData[tname];}
+'function renderCanvas(){',
+'  var canvas=document.getElementById("canvas");canvas.innerHTML="";',
+'  Object.entries(charts).forEach(function(e){try{e[1].dispose();}catch(ex){}});',
+'  Object.keys(charts).forEach(function(k){delete charts[k];});',
+'  (CONFIG.design.widgets||[]).forEach(function(w){',
+'    if(w.type==="placeholder")return;',
+'    var el=document.createElement("div");el.className="widget";',
+'    el.style.cssText="width:"+w.widthPct+"%;height:"+w.heightVh+"vh;min-height:120px;border-color:"+(w.borderColor||"#edebe9")+";border-width:"+(w.borderSize!=null?w.borderSize:1)+"px";',
+'    var wData=runWidgetSQL(w);',
+'    el.innerHTML=\'<div class="widget-header">\'+escH(w.title||"")+\'</div><div class="widget-content" id="wcontent-\'+w.id+\'">\'+getWContent(w,wData)+"</div>";',
+'    canvas.appendChild(el);',
+'  });',
+'  requestAnimationFrame(function(){',
+'    (CONFIG.design.widgets||[]).forEach(function(w){',
+'      if(["bar","line","pie","scatter"].includes(w.type))renderChart(w,runWidgetSQL(w));',
+'    });',
+'  });',
+'}',
+
+'function getWContent(w,results){',
+'  if(w.type==="text")return\'<div class="text-widget" style="font-size:\'+(w.fontSize||13)+\'px;color:\'+(w.fontColor||"#323130")+\'">\'+w.textContent+"</div>";',
+'  if(w.type==="kpi"){',
+'    if(!results||!results.length)return\'<div class="kpi-card"><div class="kpi-value" style="color:\'+(w.fillColor||"#0078d4")+\'">—</div><div class="kpi-label">\'+(w.fields&&w.fields[0]||"")+"</div></div>";',
+'    var row=results[0],label=(w.fields&&w.fields[0])||"";',
+'    var value=row._value!==undefined?row._value:(row[label]!==undefined?row[label]:"—");',
+'    var fmt=typeof value==="number"?value.toLocaleString():String(value!=null?value:"—");',
+'    return\'<div class="kpi-card"><div class="kpi-value" style="color:\'+(w.fillColor||"#0078d4")+"\">"',
+'      +escH(fmt)+\'</div><div class="kpi-label">\'+escH(label)+"</div></div>";',
+'  }',
+'  if(w.type==="table"){',
+'    if(!results||!results.length)return\'<div style="padding:12px;color:#605e5c">No data</div>\';',
+'    var cols=Object.keys(results[0]);if(!cols.length)return"";',
+'    var h=\'<div style="overflow:auto;max-height:100%"><table class="widget-table"><thead><tr>\'+cols.map(function(c){return"<th>"+escH(c)+"</th>";}).join("")+"</tr></thead><tbody>";',
+'    results.forEach(function(row){h+="<tr>"+cols.map(function(c){return"<td>"+escH(String(row[c]!=null?row[c]:""))+"</td>";}).join("")+"</tr>";});',
+'    return h+"</tbody></table></div>";',
+'  }',
+'  if(["bar","line","pie","scatter"].includes(w.type))return\'<div id="chart-\'+w.id+\'" style="width:100%;height:100%;min-height:200px"></div>\';',
+'  return"";',
+'}',
+
+'function renderChart(w,results){',
+'  var el=document.getElementById("chart-"+w.id);if(!el)return;',
+'  if(charts[w.id]){try{charts[w.id].dispose();}catch(e){}}',
+'  var c=echarts.init(el);charts[w.id]=c;',
+'  if(!results||!results.length){c.setOption({title:{text:"No data",left:"center",top:"middle",textStyle:{color:"#a19f9d"}}});return;}',
+'  var cols=Object.keys(results[0]);',
+'  var xF=(w.xField&&results[0][w.xField]!==undefined)?w.xField:cols[0];',
+'  var yF=(w.yField&&results[0][w.yField]!==undefined)?w.yField:(cols[1]||cols[0]);',
+'  var fill=w.fillColor||"#0078d4",opt={};',
+'  if(w.type==="bar")opt={tooltip:{trigger:"axis"},xAxis:{type:"category",data:results.map(function(r){return String(r[xF]!=null?r[xF]:"");}),axisLabel:{rotate:30,fontSize:11}},yAxis:{type:"value"},series:[{type:"bar",data:results.map(function(r){return parseFloat(r[yF])||0;}),itemStyle:{color:fill}}],grid:{left:40,right:20,top:20,bottom:60}};',
+'  else if(w.type==="line")opt={tooltip:{trigger:"axis"},xAxis:{type:"category",data:results.map(function(r){return String(r[xF]!=null?r[xF]:"");}),axisLabel:{rotate:30,fontSize:11}},yAxis:{type:"value"},series:[{type:"line",data:results.map(function(r){return parseFloat(r[yF])||0;}),itemStyle:{color:fill},smooth:true}],grid:{left:40,right:20,top:20,bottom:60}};',
+'  else if(w.type==="pie")opt={tooltip:{trigger:"item",formatter:"{b}: {c} ({d}%)"},series:[{type:"pie",data:results.map(function(r){return{name:String(r[xF]!=null?r[xF]:""),value:parseFloat(r[yF])||0};}),radius:["30%","65%"],label:{fontSize:11}}]};',
+'  else if(w.type==="scatter")opt={tooltip:{trigger:"item"},xAxis:{type:"value"},yAxis:{type:"value"},series:[{type:"scatter",data:results.map(function(r){return[parseFloat(r[xF])||0,parseFloat(r[yF])||0];}),itemStyle:{color:fill}}],grid:{left:40,right:20,top:20,bottom:40}};',
+'  c.setOption(opt);',
+'}',
+
+'async function downloadCSV(){',
+'  var data=(alasql.tables["_results"]&&alasql.tables["_results"].data)||queryResults;',
+'  var cols=data.length?Object.keys(data[0]):[];',
+'  function csvEsc(v){var s=String(v!=null?v:"");if(s.indexOf(",")>=0||s.indexOf("\"")>=0||s.indexOf("\n")>=0){return "\""+s.replace(/\"/g,"\"\"")+"\""}return s;}',
+'  var csv=[cols.join(",")].concat(data.map(function(r){return cols.map(function(c){return csvEsc(r[c]);}).join(",");})).join("\n");',
+'  var a=document.createElement("a");a.href="data:text/csv;charset=utf-8,"+encodeURIComponent(csv);a.download="report-data.csv";a.click();',
+'}',
+'loadAllData();'
+        ].join('\n');
+
+        // ── Compose the standalone report HTML ────────────────────────────
+        const now = new Date().toISOString().slice(0,10);
+        const parts = [];
+        parts.push('<!--');
+        parts.push('This file is part of DataLaVista.');
+        parts.push('Generated by DataLaVista Report Designer.');
+        parts.push('Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.');
+        parts.push('Created: ' + now);
+        parts.push('Summary: Standalone DataLaVista report.');
+        parts.push('Website: https://github.com/DepressionCenter/datalavista');
+        parts.push('Copyright © 2026 The Regents of the University of Michigan');
+        parts.push('Licensed under GPLv3 or later. See <https://www.gnu.org/licenses/>.');
+        parts.push('-->');
+        parts.push('<html lang="en">');
+        parts.push('<head>');
+        parts.push('<meta charset="UTF-8"/>');
+        parts.push('<meta name="viewport" content="width=device-width, initial-scale=1.0"/>');
+        parts.push('<title>' + (config.design.title || 'DataLaVista Report').replace(/</g,'&lt;') + '</title>');
+        parts.push('<script src="https://cdnjs.cloudflare.com/ajax/libs/alasql/4.1.3/alasql.min.js"><' + '/script>');
+        parts.push('<script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.5.0/echarts.min.js"><' + '/script>');
+        parts.push('<style>');
+        parts.push('*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}');
+        parts.push(':root{--primary:#0078d4;--bg:#faf9f8;--surface:#fff;--surface2:#f3f2f1;--border:#edebe9;--text:#323130;--text-secondary:#605e5c;--radius:4px;--shadow:0 2px 8px rgba(0,0,0,.15);--font:\'Segoe UI\',system-ui,sans-serif}');
+        parts.push('body{font-family:var(--font);font-size:13px;color:var(--text);background:var(--bg);min-height:100vh}');
+        parts.push('#report-header{background:var(--primary);padding:14px 20px;display:flex;align-items:center;justify-content:space-between;box-shadow:var(--shadow)}');
+        parts.push('#report-title{font-size:20px;font-weight:700;color:white}');
+        parts.push('#filter-bar{padding:8px 16px;background:var(--surface2);border-bottom:1px solid var(--border);display:flex;flex-wrap:wrap;gap:8px;align-items:center;min-height:44px}');
+        parts.push('#canvas{display:flex;flex-wrap:wrap;gap:8px;padding:12px;align-content:flex-start}');
+        parts.push('.widget{background:var(--surface);border:1px solid var(--border);border-radius:6px;box-shadow:0 1px 3px rgba(0,0,0,.1);overflow:hidden;display:flex;flex-direction:column}');
+        parts.push('.widget-header{padding:8px 12px;background:var(--surface2);border-bottom:1px solid var(--border);font-weight:600;font-size:13px}');
+        parts.push('.widget-content{flex:1;overflow:auto;position:relative}');
+        parts.push('.kpi-card{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;padding:16px;text-align:center}');
+        parts.push('.kpi-value{font-size:36px;font-weight:700;color:var(--primary);line-height:1}');
+        parts.push('.kpi-label{font-size:13px;color:var(--text-secondary);margin-top:6px}');
+        parts.push('.widget-table{border-collapse:collapse;width:100%;font-size:12px}');
+        parts.push('.widget-table th{background:var(--surface2);border-bottom:2px solid var(--border);padding:5px 10px;font-weight:600;position:sticky;top:0;text-align:left}');
+        parts.push('.widget-table td{border-bottom:1px solid var(--border);padding:4px 10px}');
+        parts.push('.text-widget{padding:12px;font-size:14px;line-height:1.5}');
+        parts.push('.filter-chip{display:inline-flex;align-items:center;gap:6px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:3px 10px;font-size:12px}');
+        parts.push('.filter-chip select{border:none;background:transparent;font-size:12px;cursor:pointer;outline:none}');
+        parts.push('::-webkit-scrollbar{width:6px;height:6px}::-webkit-scrollbar-track{background:var(--surface2)}::-webkit-scrollbar-thumb{background:#c8c6c4;border-radius:3px}');
+        parts.push('.dl-btn{background:var(--primary);color:white;border:none;border-radius:4px;padding:6px 14px;font-size:12px;cursor:pointer;font-family:var(--font)}.dl-btn:hover{background:#106ebe}');
+        parts.push('#loading{position:fixed;inset:0;background:rgba(255,255,255,.9);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;z-index:999;font-size:14px;color:var(--text-secondary)}');
+        parts.push('.spinner{width:32px;height:32px;border:3px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:spin .7s linear infinite}');
+        parts.push('@keyframes spin{to{transform:rotate(360deg)}}');
+        parts.push('<' + '/style>');
+        parts.push('<' + '/head>');
+        parts.push('<' + 'body>');
+        parts.push('<div id="loading"><div class="spinner"></div><div id="loading-text">Loading report data...</div></div>');
+        parts.push('<div id="report-header"><span id="report-title"></span><button class="dl-btn" onclick="downloadCSV()">⬇ Download CSV</button></div>');
+        parts.push('<div id="filter-bar"></div>');
+        parts.push('<div id="canvas"></div>');
+        parts.push('<' + 'script>');
+        parts.push(standaloneScript);
+        parts.push('<' + '/script>');
+        parts.push('<' + '/body>');
+        parts.push('<' + '/html>');
+        return parts.join('\n');
       }
-    }
-    lt.textContent='Running main query...';
-    queryResults=alasql(preprocessSQL(CONFIG.sql));
-
-    // Register flat results as [_results] so per-widget SQL can query it
-    alasql('DROP TABLE IF EXISTS [_results]');
-    alasql('CREATE TABLE [_results]');
-    alasql.tables['_results'].data=queryResults;
-
-    loader.style.display='none';
-    renderReport();
-  }catch(e){lt.textContent='Error: '+e.message;console.error(e);}
-}
-
-function findTables(sql){const found=[];const sqlL=sql.toLowerCase();for(const name of Object.keys(CONFIG.tables||{})){const tmeta=CONFIG.tables[name];const alias=(tmeta&&tmeta.alias)||'';const nL=name.toLowerCase();const aL=alias.toLowerCase();if(sqlL.includes('['+nL+']')||sqlL.includes(' '+nL+' ')||sqlL.includes('\t'+nL+'\t')||(aL&&(sqlL.includes('['+aL+']')||sqlL.includes(' '+aL+' ')||sqlL.includes('\t'+aL+'\t'))))found.push(name);}return found;}
-function preprocessSQL(sql){return sql;}
-
-function renderReport(){
-  renderFilterBar();
-  renderCanvas();
-  window.addEventListener('resize',()=>{for(const c of Object.values(charts)){try{c.resize();}catch(e){}}});
-}
-
-function renderFilterBar(){
-  const bar=document.getElementById('filter-bar');bar.innerHTML='';
-  const filters=(CONFIG.design.filters||[]).filter(f=>f.position==='bar'||!f.position);
-  if(!filters.length){bar.style.display='none';return;}
-  for(const f of filters){
-    const vals=['(All)',...[...new Set(queryResults.map(r=>r[f.field]).filter(v=>v!=null))].sort()];
-    const chip=document.createElement('div');chip.className='filter-chip';
-    chip.innerHTML='<span style="font-weight:600">'+f.label+':</span><select onchange="applyFilter(\\''+f.field+'\\',this.value)">'+vals.map(v=>'<option>'+v+'</option>').join('')+'</select>';
-    bar.appendChild(chip);
-  }
-}
-
-function applyFilter(field,value){
-  if(value==='(All)')delete previewFilters[field];else previewFilters[field]=value;
-  // Apply global filters to [_results] and re-render each widget
-  let filtered=queryResults;
-  for(const[fld,val]of Object.entries(previewFilters))filtered=filtered.filter(r=>String(r[fld])===String(val));
-  alasql.tables['_results'].data=filtered;
-  renderCanvas();
-}
-
-// Run a widget's saved SQL against [_results]; fall back to full results on error
-function runWidgetSQL(w){
-  if(!w.widgetSql)return queryResults;
-  try{return alasql(w.widgetSql)||[];}catch(e){console.warn('Widget SQL error for',w.id,e.message);return queryResults;}
-}
-
-function renderCanvas(){
-  const canvas=document.getElementById('canvas');canvas.innerHTML='';
-  for(const[id,c] of Object.entries(charts)){try{c.dispose();}catch(e){}}
-  Object.keys(charts).forEach(k=>delete charts[k]);
-
-  for(const w of CONFIG.design.widgets){
-    const wData=runWidgetSQL(w);
-    const el=document.createElement('div');el.className='widget';
-    el.style.cssText='width:'+w.widthPct+'%;height:'+w.heightVh+'vh;min-height:120px;border-color:'+w.borderColor+';border-width:'+w.borderSize+'px';
-    el.innerHTML='<div class="widget-header">'+w.title+'</div><div class="widget-content" id="wcontent-'+w.id+'">'+getWContent(w,wData)+'</div>';
-    canvas.appendChild(el);
-  }
-  requestAnimationFrame(()=>{
-    for(const w of CONFIG.design.widgets){
-      if(['bar','line','pie','scatter'].includes(w.type)){
-        const wData=runWidgetSQL(w);
-        renderChart(w,wData);
-      }
-    }
-  });
-}
-
-function getWContent(w,results){
-  if(w.type==='text')return'<div class="text-widget" style="font-size:'+w.fontSize+'px;color:'+w.fontColor+'">'+w.textContent+'</div>';
-  if(w.type==='placeholder')return'';
-  if(w.type==='kpi'){
-    if(!results||!results.length)return'<div class="kpi-card"><div class="kpi-value" style="color:'+w.fillColor+'">—</div><div class="kpi-label">'+(w.fields[0]||'')+'</div></div>';
-    // widgetSql already aggregated — just read _value if present, else first value
-    const row=results[0];const label=w.fields[0]||'';
-    const value=row._value!==undefined?row._value:(row[label]!==undefined?row[label]:'—');
-    const fmt=typeof value==='number'?value.toLocaleString():value;
-    return'<div class="kpi-card"><div class="kpi-value" style="color:'+w.fillColor+'">'+fmt+'</div><div class="kpi-label">'+label+'</div></div>';
-  }
-  if(w.type==='table'){
-    if(!results||!results.length)return'<div style="padding:12px;color:#605e5c">No data</div>';
-    const cols=Object.keys(results[0]);
-    if(!cols.length)return'';
-    let h='<div style="overflow:auto;max-height:100%"><table class="widget-table"><thead><tr>'+cols.map(c=>'<th>'+c+'</th>').join('')+'</tr></thead><tbody>';
-    for(const row of results)h+='<tr>'+cols.map(c=>'<td>'+(row[c]??'')+'</td>').join('')+'</tr>';
-    return h+'</tbody></table></div>';
-  }
-  if(['bar','line','pie','scatter'].includes(w.type))return'<div id="chart-'+w.id+'" style="width:100%;height:100%;min-height:200px"></div>';
-  return'';
-}
-
-function renderChart(w,results){
-  const el=document.getElementById('chart-'+w.id);if(!el)return;
-  if(charts[w.id]){try{charts[w.id].dispose();}catch(e){}}
-  const c=echarts.init(el);charts[w.id]=c;
-  if(!results||!results.length){c.setOption({title:{text:'No data',left:'center',top:'middle',textStyle:{color:'#a19f9d'}}});return;}
-  // widgetSql already grouped/aggregated — use first two columns as x/y
-  const cols=Object.keys(results[0]);
-  const xF=w.xField&&results[0].hasOwnProperty(w.xField)?w.xField:cols[0];
-  const yF=w.yField&&results[0].hasOwnProperty(w.yField)?w.yField:(cols[1]||cols[0]);
-  let opt={};
-  if(w.type==='bar')opt={tooltip:{trigger:'axis'},xAxis:{type:'category',data:results.map(r=>r[xF]),axisLabel:{rotate:30,fontSize:11}},yAxis:{type:'value'},series:[{type:'bar',data:results.map(r=>parseFloat(r[yF])||0),itemStyle:{color:w.fillColor}}],grid:{left:40,right:20,top:20,bottom:60}};
-  else if(w.type==='line')opt={tooltip:{trigger:'axis'},xAxis:{type:'category',data:results.map(r=>r[xF]),axisLabel:{rotate:30,fontSize:11}},yAxis:{type:'value'},series:[{type:'line',data:results.map(r=>parseFloat(r[yF])||0),itemStyle:{color:w.fillColor},smooth:true}],grid:{left:40,right:20,top:20,bottom:60}};
-  else if(w.type==='pie')opt={tooltip:{trigger:'item',formatter:'{b}: {c} ({d}%)'},series:[{type:'pie',data:results.map(r=>({name:String(r[xF]||''),value:parseFloat(r[yF])||0})),radius:['30%','65%'],label:{fontSize:11}}]};
-  else if(w.type==='scatter')opt={tooltip:{trigger:'item'},xAxis:{type:'value'},yAxis:{type:'value'},series:[{type:'scatter',data:results.map(r=>[parseFloat(r[xF])||0,parseFloat(r[yF])||0]),itemStyle:{color:w.fillColor}}],grid:{left:40,right:20,top:20,bottom:40}};
-  c.setOption(opt);
-}
-
-async function downloadCSV(){
-  const cols=queryResults.length?Object.keys(queryResults[0]):[];
-  const csv=[cols.join(','),...queryResults.map(r=>cols.map(c=>{const v=r[c];return typeof v==='string'&&(v.includes(',')||v.includes('"')||v.includes('\\n'))?'"'+v.replace(/"/g,'""')+'"':(v??'');}).join(','))].join('\\n');
-  const a=document.createElement('a');a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);a.download='report-data.csv';a.click();
-}
-
-loadAllData();
-<\/script>
-</body>
-</html>`;
-      }
-
       // ============================================================
       // RESIZABLE PANELS
       // ============================================================
@@ -7982,11 +8960,12 @@ loadAllData();
         setQBMode('basic');
         switchQMTab('qb');
         switchTab('query');
+        spPickerCheckVisibility();
 
         // Default SQL hint
         if (document.getElementById('sql-editor')) {
           setupCodeMirror();
-          if (window._cmEditor) window._cmEditor.setValue('-- Connect to a data source and drag a table into the query builder\n-- or write your SQL here directly\nSELECT * FROM [YourList] LIMIT 20');
+          if (window._cmEditor) window._cmEditor.setValue('-- Connect to a data source, then drag a table here to start\n-- Tables are queried as DSName_TableName (e.g. SP_People)\n-- Renaming a data source or table updates the query name live\nSELECT SP_People.* FROM SP_People LIMIT 20');
         }
 
         // Wire options panel left-edge resizer
@@ -8027,6 +9006,204 @@ loadAllData();
         });
       }
 
+
+      // ============================================================
+      // SHAREPOINT FILE PICKER
+      // ============================================================
+
+      // SP file picker state
+      const _spPicker = {
+        siteUrl: '',
+        stack: [],       // breadcrumb stack: [{label, serverRelUrl}]
+        selected: null,  // { name, serverRelUrl, absoluteUrl }
+      };
+
+      /** Detect if running inside a SharePoint site and return the site URL, or null. */
+      function getSpSiteUrl() {
+        try {
+          if (typeof _spPageContextInfo !== 'undefined' && _spPageContextInfo.webAbsoluteUrl) {
+            return _spPageContextInfo.webAbsoluteUrl.replace(/\/$/, '');
+          }
+        } catch(e) {}
+        // Fallback: check if current URL looks like SharePoint
+        const m = window.location.href.match(/^(https?:\/\/[^/]+(?:\/sites\/[^/]+|\/teams\/[^/]+)?)/);
+        if (m && (window.location.hostname.includes('sharepoint.com') ||
+                  window.location.hostname.includes('.sharepoint.') ||
+                  window.location.pathname.startsWith('/sites/') ||
+                  window.location.pathname.startsWith('/teams/'))) {
+          return m[1];
+        }
+        return null;
+      }
+
+      /** Show or hide the Browse SP button depending on whether we're in SP. */
+      function spPickerCheckVisibility() {
+        const btn = document.getElementById('btn-sp-browse');
+        if (!btn) return;
+        const url = getSpSiteUrl();
+        btn.style.display = url ? '' : 'none';
+      }
+
+      /** Open the file picker modal. */
+      async function spPickerOpen() {
+        const siteUrl = getSpSiteUrl();
+        if (!siteUrl) { toast('SharePoint site URL not detected', 'warning'); return; }
+        _spPicker.siteUrl = siteUrl;
+        _spPicker.stack = [{ label: 'Document Libraries', serverRelUrl: null }];
+        _spPicker.selected = null;
+        document.getElementById('sp-picker-select-btn').disabled = true;
+        document.getElementById('sp-picker-selected-label').textContent = 'No file selected';
+        document.getElementById('sp-picker-overlay').classList.add('active');
+        await spPickerLoad();
+      }
+
+      function spPickerClose() {
+        document.getElementById('sp-picker-overlay').classList.remove('active');
+      }
+
+      /** Confirm selection — set csv-url to the selected file's absolute URL. */
+      function spPickerConfirm() {
+        if (!_spPicker.selected) return;
+        const urlEl = document.getElementById('csv-url');
+        if (urlEl) urlEl.value = _spPicker.selected.absoluteUrl;
+        spPickerClose();
+        toast(`Selected: ${_spPicker.selected.name}`, 'success');
+      }
+
+      /** Load the current level (root = libraries, else folder contents). */
+      async function spPickerLoad() {
+        const spinner = document.getElementById('sp-picker-spinner');
+        const body = document.getElementById('sp-picker-body');
+        spinner.classList.add('active');
+        body.innerHTML = '';
+        spPickerRenderBreadcrumb();
+
+        const current = _spPicker.stack[_spPicker.stack.length - 1];
+        try {
+          if (current.serverRelUrl === null) {
+            // Root level — list document libraries (BaseTemplate = 101)
+            await spPickerLoadLibraries();
+          } else {
+            // Inside a library/folder — list subfolders + CSV/Excel files
+            await spPickerLoadFolder(current.serverRelUrl);
+          }
+        } catch(e) {
+          console.error('[DLV SP Picker]', e);
+          body.innerHTML = `<div style="padding:16px;color:var(--error);font-size:12px">Error: ${e.message}</div>`;
+        }
+        spinner.classList.remove('active');
+      }
+
+      async function spPickerLoadLibraries() {
+        const url = `${_spPicker.siteUrl}/_api/web/lists?$select=Title,RootFolder/ServerRelativeUrl&$expand=RootFolder&$filter=BaseTemplate eq 101 and Hidden eq false`;
+        const json = await spFetch(url);
+        const libs = extractRows(json).filter(l => l.RootFolder);
+        libs.sort((a, b) => (a.Title || '').localeCompare(b.Title || ''));
+
+        const body = document.getElementById('sp-picker-body');
+        if (!libs.length) {
+          body.innerHTML = '<div style="padding:16px;font-size:12px;color:var(--text-secondary)">No document libraries found.</div>';
+          return;
+        }
+        libs.forEach(lib => {
+          const serverRelUrl = lib.RootFolder.ServerRelativeUrl;
+          body.appendChild(spPickerMakeItem('📁', lib.Title, null, false, () => {
+            _spPicker.stack.push({ label: lib.Title, serverRelUrl });
+            spPickerLoad();
+          }));
+        });
+      }
+
+      async function spPickerLoadFolder(serverRelUrl) {
+        const encodedUrl = encodeURIComponent(serverRelUrl);
+        // Fetch subfolders
+        const foldersUrl = `${_spPicker.siteUrl}/_api/web/GetFolderByServerRelativeUrl('${encodedUrl}')/Folders?$select=Name,ServerRelativeUrl&$filter=Name ne 'Forms'`;
+        // Fetch files — CSV and Excel only
+        const filesUrl = `${_spPicker.siteUrl}/_api/web/GetFolderByServerRelativeUrl('${encodedUrl}')/Files?$select=Name,ServerRelativeUrl,Length&$filter=(substringof('.csv',Name) or substringof('.CSV',Name) or substringof('.xlsx',Name) or substringof('.xls',Name))`;
+
+        const [foldersJson, filesJson] = await Promise.all([
+          spFetch(foldersUrl).catch(() => ({ value: [] })),
+          spFetch(filesUrl).catch(() => ({ value: [] }))
+        ]);
+
+        const folders = extractRows(foldersJson).sort((a,b) => (a.Name||'').localeCompare(b.Name||''));
+        const files   = extractRows(filesJson).sort((a,b) => (a.Name||'').localeCompare(b.Name||''));
+
+        const body = document.getElementById('sp-picker-body');
+        if (!folders.length && !files.length) {
+          body.innerHTML = '<div style="padding:16px;font-size:12px;color:var(--text-secondary)">No CSV or Excel files found in this folder.</div>';
+          return;
+        }
+
+        folders.forEach(f => {
+          body.appendChild(spPickerMakeItem('📁', f.Name, null, false, () => {
+            _spPicker.stack.push({ label: f.Name, serverRelUrl: f.ServerRelativeUrl });
+            spPickerLoad();
+          }));
+        });
+
+        files.forEach(f => {
+          const sizeLabel = f.Length ? spPickerFormatSize(+f.Length) : '';
+          const absUrl = _spPicker.siteUrl.replace(/^(https?:\/\/[^/]+).*$/, '$1') + f.ServerRelativeUrl;
+          const isCSV = f.Name.toLowerCase().endsWith('.csv');
+          const icon = isCSV ? '📄' : '📗';
+          body.appendChild(spPickerMakeItem(icon, f.Name, sizeLabel, true, () => {
+            // Toggle selection
+            body.querySelectorAll('.sp-picker-item').forEach(el => el.classList.remove('sp-selected'));
+            const el = body.querySelector(`[data-sp-name="${CSS.escape(f.Name)}"]`);
+            if (el) el.classList.add('sp-selected');
+            _spPicker.selected = { name: f.Name, serverRelUrl: f.ServerRelativeUrl, absoluteUrl: absUrl };
+            document.getElementById('sp-picker-selected-label').textContent = f.Name;
+            document.getElementById('sp-picker-select-btn').disabled = false;
+          }, f.Name));
+        });
+      }
+
+      function spPickerMakeItem(icon, name, size, isFile, onClick, dataName) {
+        const el = document.createElement('div');
+        el.className = 'sp-picker-item';
+        if (dataName) el.dataset.spName = dataName;
+        el.innerHTML = `<span class="sp-item-icon">${icon}</span><span class="sp-item-name" title="${name}">${name}</span>${size ? `<span class="sp-item-size">${size}</span>` : ''}`;
+        if (!isFile) el.innerHTML += `<span style="font-size:10px;color:var(--text-disabled);margin-left:auto">▶</span>`;
+        el.addEventListener('click', onClick);
+        return el;
+      }
+
+      function spPickerRenderBreadcrumb() {
+        const bc = document.getElementById('sp-picker-breadcrumb');
+        bc.innerHTML = '';
+        _spPicker.stack.forEach((crumb, i) => {
+          if (i > 0) {
+            const sep = document.createElement('span');
+            sep.className = 'sp-crumb-sep';
+            sep.textContent = ' › ';
+            bc.appendChild(sep);
+          }
+          const span = document.createElement('span');
+          span.className = 'sp-crumb';
+          span.textContent = crumb.label;
+          if (i < _spPicker.stack.length - 1) {
+            span.addEventListener('click', () => {
+              _spPicker.stack = _spPicker.stack.slice(0, i + 1);
+              _spPicker.selected = null;
+              document.getElementById('sp-picker-select-btn').disabled = true;
+              document.getElementById('sp-picker-selected-label').textContent = 'No file selected';
+              spPickerLoad();
+            });
+          } else {
+            span.style.fontWeight = '600';
+            span.style.color = 'var(--text)';
+            span.style.cursor = 'default';
+          }
+          bc.appendChild(span);
+        });
+      }
+
+      function spPickerFormatSize(bytes) {
+        if (bytes < 1024) return bytes + ' B';
+        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+        return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+      }
 
       // ── Expose all functions on window so onclick="foo()" works in SharePoint ──
       window.dlv = {
@@ -8069,12 +9246,34 @@ loadAllData();
         buildConfig,
         generateWidgetSQL,
         loadConfig,
-        getSourceIndex,
         renderFieldsPanel,
         getTableIcon,
+        toggleDsGroupExpand,
         toggleTableExpand,
         expandAllTables,
         collapseAllTables,
+        showCtxMenu,
+        dlvCtxCopyUrl,
+        dlvCtxRename,
+        dlvCtxDelete,
+        renameDatasource,
+        renameTable,
+        renameField,
+        deleteDatasource,
+        deleteTable,
+        normalizeDataSourceName,
+        generateDataSourceName,
+        updateConnectButton,
+        getDataSourceForTable,
+        getTableQueryName,
+        registerTableInAlaSQL,
+        dropTableFromAlaSQL,
+        updateSQLEditorName,
+        spPickerOpen,
+        spPickerClose,
+        spPickerConfirm,
+        spPickerCheckVisibility,
+        loadSharePointSource,
         setupCodeMirror,
         dlvSQLHint,
         updateCMHints,

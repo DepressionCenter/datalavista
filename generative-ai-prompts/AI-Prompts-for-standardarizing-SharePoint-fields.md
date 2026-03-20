@@ -173,3 +173,107 @@ For example, a TaxKeyword field that retrieves two terms, like [{"Label": "Adole
 
 
 </code>
+
+### Follow up enhancement ###
+<code>
+This is good, but it looks like autosuggestions and alasql aren't picking up changes I make to dataset or table names. For example, if I load a list with data source name SP, I can do "select * from People" and "select * from SP_People". Both work. Then I rename the "SP" data source to "List". The previous queries still run, but I cannot do "select * from List_People" as it won't find it. So:
+
+I need to make sure that data sources, tables and fields all have an internal name (as set by the initial data source name, the internal names retrieved from sharepoint, or if not sharepoint then the names used in the original json/csv/excel/etc). They should also all have a universal alias which is the Pascal-case version. Tables/lists would be prefixed by the data source. Keep the "guid" property for tables that are SP lists. 
+
+
+
+In the case of sharepoint lists, use the EntityTypeName as the internal name. Use the Title to generate the alias (or EntityTypeName if Title is empty).
+
+In the case of SharePoint list items, use the InternalName to generate the Internal Name (or EntityTypeName if there is no InternalName or is blank, or Title as a last resource). Use the Title to generate the alias (or InternalName or EntityTypeName if no Title is available or is blank). You will need to also modify fetchSPFields to use const filter = `(Hidden eq false and TypeAsString ne 'Computed' and startswith(InternalName,'_') eq false and (TypeAsString ne 'LookupMulti' or (TypeAsString eq 'LookupMulti' and ReadOnlyField eq false and IsDependentLookup eq false))) or InternalName eq 'Editor' or InternalName eq 'Author' or InternalName eq 'Created' or InternalName eq 'Modified' or InternalName eq 'ID' or InternalName eq 'Title' or InternalName eq 'TaxKeyword'` and const select = `Id,InternalName,Title,TypeAsString,Description,Required,MaxLength,Choices,LookupField,LookupList,IsHidden,Hidden,ReadOnlyField,IsDependentLookup`; In addition, make any changes necessary in fetchSPFields or elsewhere to ensure FileRef and FileLeafRef are always requested for SP document library items (but not for list items).
+
+
+If a data source does not have a display name or similar field, then the alias will be the Pascal-case version of the internal field's name. I think some objects in state have both alias and displayname, and I don't know if that's due to previous iterations or if we really do need to have two different ones. 
+
+
+
+When the user renames objects (data source, table, column), the app should be changing the alias not the internal name, and it should be instantly reflected everywhere - query builders, alasql, code editor (both current text and auto suggestions), state, designer fields lists, designer widgets. (In addition to the old display name being removed from selected fields in visual query builders).
+
+There is no longer a need to query by table name only without data source prefix. However, the "Tables & Fields" pnael in query builder should continue to strip the prefix from table names (for UI display purposes only) since they are already inside a data source in the tree. Also in the UI, under "Tables & Fields" panel, the table names and fields have too much empty space on the left - shift them left a little. Also, make the table names's font a little smaller (but keep them in bold) so they fit better.
+
+
+------
+*** TODO: LEFT OFF HERE! ***
+Much better! 
+
+I want to make sure that all data source names/keys/internal names have the word "List" removed, when it came from an EntityTypeName from SharePoint. All field names/keys/internal names should not include the "ListItem" text from the EntityTypeName either (if they were generated using EntityTypeName instead of InternalName  because InternalName was blank). All data sources should have an alias, which is initially the data source alias the user entered in the connect popup.
+
+I also want to make sure that I can query every table two ways: 
+1) by key (which should equal the internalname prefixed by data source name); 
+2) by the table's alias prefixed by its data source alias.
+
+For example, a list with entitytypename "Engagement_x0020_HistoryList" and Title "Consultations Provided", from a sharepoint list data source called "SP", would have a key="Engagement_x0020_History", internal name="Engagement_x0020_History", alias="ConsultationsProvided", and display name of "Consultations Provided". Thus, both of these SQL queries should work: "select * from SP_Engagement_x0020_History" and "select * from SP_ConsultationsProvided". I should also be able to use either field internal names or field aliases when querying data.
+
+Both the basic and advanced query builders should use table aliases prefixed by data source alias, but they should always generate sql using only table keys but with aliases equal to table alias prefixed by data source alias. They both should display field aliases instead of field internal names everywhere (fields list for each table, filters, group by, etc.), but the SQL code they generate should always use field internal names (and in the SELECT, add " AS " followed by the field alias). The codemirror sql editor however should have auto-suggestions for both table keys and table alias prefixed by data source alias.
+
+When generating SQL code from either basic or advanced query builders, in the select statement, use the tabale alias prefixed with data source alias dot field alias. For example, when a query builder has a data source named "SP" with alias "MyList", a list/table with key="SP_People", InternalName="People" and alias="Contacts", and with field internalname="Title" and field alias="FullName", it should generate sql similar to "select MyList_Contacts.Title AS FullName from SP_People MyList_Contacts".
+
+If there is code to detect name collisions from fields with the same alias, simply add a number 1, 2, 3 etc. to each duplicated field alias. For example, if I am doing "select SP_List1.Title AS Name, SP_List2.Title AS Name, CSV.Name AS Name", then change the 2nd alias to end with a number like this: "select SP_List1.Title AS Name, SP_List2.Title AS Name1, CSV.Name AS Name2". Do this transparently without modifying the sql code in the sql editor.
+
+This will ensure that the Designer only has non-duplicate fields.
+
+I also want to make sure that all data sources, tables and fields from sharepoint lists include a Description, which should come from the Description field from sharepoint (or blank if the description field was blank or does not exist). 
+
+When a data source is renamed, it shold be its alias that gets renamed, and that alias should be updated everywhere that keeps track of it.
+
+-----------
+
+This isn't working. When I use the query builder and it generates the following code, I get the correct number of rows but all columns are empty. "SELECT
+  [SP_Consultations].[Title] AS [TitleOptional]
+FROM [SP_Engagement_x0020_History] [SP_Consultations]
+LIMIT 500"
+
+If I remove all the fields and I just use "select *", it works, and I can see all the data. If I use "select [SP_Engagement_x0020_History].*" it also works.  It's the individual field selection that stopped working.
+
+Let's make sure that mapDataRow() registers fields by internal names, not by aliases. 
+
+Also, if it helps, remove support for querying by table aliases. That was only meant to help in the sql code editor, but it's not worth it if it's making the code and logic more confusing. Instead, maybe the auto-suggest stuff can simply add table aliases to the table internal names when the users select (or drag and drop) a table?
+
+-------
+
+Something is wrong. I used the basic query builder and it generated SQL that uses the table alias without the table internal name. It did "SELECT
+  [SP_Consultations].[TitleOptional]
+FROM [SP_Consultations]
+LIMIT 500" instead of "FROM [SP_Engagement_x0020_History] [SP_Consultations]". 
+
+Check if basic and advanced both have this bug and fix it.
+
+-------
+Fix this error you introduced (copy and paste from JavaScript Console in the browser):
+
+Uncaught SyntaxError: Failed to execute 'insertBefore' on 'Node': Unexpected token ')'
+    at t.evalScript (script-editor-bundle_bff8b23c35c805ac0d91a5ae2d240885.js:1:8271)
+    at t.<anonymous> (script-editor-bundle_bff8b23c35c805ac0d91a5ae2d240885.js:1:9842)
+    at script-editor-bundle_bff8b23c35c805ac0d91a5ae2d240885.js:1:5023
+    at Object.next (script-editor-bundle_bff8b23c35c805ac0d91a5ae2d240885.js:1:5128)
+    at a (script-editor-bundle_bff8b23c35c805ac0d91a5ae2d240885.js:1:3898)
+
+
+</code>
+
+### More follow up enhancements
+
+<code>
+The code that generates stand-alone reports has a bug - stand-alone reports that use CSVs/Excel stored in SharePoint sites are trying to load those files as if they were SP list items. That is causing the API call to fail. Fix it.
+
+Ensure the code that generates stand-alone reports is updated with the latest javascript. Ensure regex expressions, especially those inside the stand-alone generator, aren't going to break the page.
+
+-------------------
+
+The "Copy URL" menu option should also be available for SP lists table names. It should be the siteURL + "/Lists/" + the EntityTypeName of the list (but strip out the word "List" at the end, and replace _x0020_ with %20).
+
+In the Basic Query Builder only, let's select all fields by default when you drop a table/list.
+
+In the Design tab, where you see widget properties, make sure that every column/field added to the widget has aggregate options for each column/field, same as those you find in the basic query builder. Also ensure the filters have the same filter options available in the basic query builder for each column/list that was added as a filter to the widget. 
+
+In the filter bar of the design tab, when selecting a filter, ensure the filters for dates are displayed as a date range with each date having a mini calendar to select a date. Also in the filter bar, the filters for numeric fields should also have a range instead of a dropdown. Moreover, filters for text should have drop-downs with the values from that field, but should also include an option at the top for (empty) to filter for empty or null items (and do not display a menu entry that is just an empty string in the dropdown). Also, if possible, include a filter in text fields to filter by wildcards, making sure you translate * to % and ? to _ so they run in alasql.
+
+Finally, in the Connect popup, add a Browse button to the right of the URL text box but disable it by default. If we are currently inside a SharePoint site (and the SharePoint site URL has resolved successfully), enable the button and show a file section (similar to the Windows file dialog) that allows the user to navigate to a document library and folder, and select the file to load. Selecting the file will then simply enter the URL for the file into the URL text box.
+
+Ensure the code that generates stand-alone reports is updated with the latest javascript. Ensure regex expressions, especially those inside the stand-alone generator, aren't going to break the page.
+
+</code>
