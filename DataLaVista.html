@@ -3,7 +3,7 @@ This file is part of DataLaVista
 DataLaVista.html: Report and dashboard designer main file.
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 Created: 2026-03-10
-Last Modified: 2026-03-14
+Last Modified: 2026-03-19
 Summary: Main window in DataLaVista for loading data and designing reports and dashboards.
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
@@ -206,35 +206,102 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       flex: 1;
     }
 
-    /* Tab bar */
-    #tab-bar {
-      display: flex;
-      background: var(--surface);
-      border-bottom: 1px solid var(--border);
-      flex-shrink: 0;
-      height: var(--tab-h);
-    }
+    /* Old tab bar — hidden, replaced by toolbar nav */
+    #tab-bar { display: none; }
 
-    .tab-btn {
-      height: 100%;
-      padding: 0 20px;
-      font-size: 13px;
-      font-weight: 500;
-      color: var(--text-secondary);
-      border-bottom: 2px solid transparent;
+    /* ── Main toolbar tab navigation ── */
+    #toolbar-tab-nav {
+      display: flex;
+      align-items: center;
+      gap: 0;
+      margin-right: 4px;
+    }
+    .tb-tab-sep {
+      color: rgba(255,255,255,.4);
+      font-size: 11px;
+      padding: 0 2px;
+      user-select: none;
+    }
+    .tb-tab-btn {
+      background: none;
+      border: none;
+      color: rgba(255,255,255,.7);
+      font-size: 12px;
+      font-weight: 400;
+      padding: 4px 10px;
+      cursor: pointer;
+      border-radius: var(--radius);
       transition: all var(--transition);
       white-space: nowrap;
-      position: relative;
+    }
+    .tb-tab-btn:hover { color: white; background: rgba(255,255,255,.12); }
+    .tb-tab-btn.active {
+      color: white;
+      font-weight: 700;
+      font-size: 13px;
+      background: rgba(255,255,255,.18);
     }
 
-    .tab-btn:hover {
-      color: var(--text);
-      background: var(--surface2);
+    /* ── Query-main panel tabs toolbar ── */
+    #qm-tabs {
+      display: flex;
+      align-items: center;
+      height: 36px;
+      background: var(--surface);
+      border-bottom: 2px solid var(--border);
+      flex-shrink: 0;
+      padding: 0 8px;
+      gap: 2px;
     }
+    .qm-tab {
+      height: 100%;
+      padding: 0 14px;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      border-bottom: 3px solid transparent;
+      cursor: pointer;
+      transition: all var(--transition);
+      white-space: nowrap;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      margin-bottom: -2px; /* overlap the border-bottom */
+    }
+    .qm-tab:hover { color: var(--text); background: var(--surface2); }
+    .qm-tab.active { color: var(--primary); border-bottom-color: var(--primary); font-weight: 600; }
 
-    .tab-btn.active {
-      color: var(--primary);
-      border-bottom-color: var(--primary);
+    /* Basic/Advanced sub-tabs inside QB tab */
+    .qm-subtabs {
+      display: flex;
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius);
+      overflow: hidden;
+      margin-left: 4px;
+    }
+    .qm-sub {
+      padding: 2px 10px;
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: all var(--transition);
+    }
+    .qm-sub:hover { background: var(--surface2); }
+    .qm-sub.active { background: var(--primary); color: white; }
+
+    .qm-spacer { flex: 1; }
+    .qm-actions { display: flex; align-items: center; gap: 6px; }
+
+    /* ── Query-main panels ── */
+    #qm-panel-qb, #qm-panel-sql, #qm-panel-preview {
+      display: none;
+      flex: 1;
+      overflow: hidden;
+      flex-direction: column;
+    }
+    #qm-panel-qb.active, #qm-panel-sql.active, #qm-panel-preview.active {
+      display: flex;
     }
 
     /* Content area */
@@ -739,9 +806,32 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       display: flex;
       flex-direction: column;
       overflow: hidden;
-      transition: height 200ms ease;
+      flex: 1;
       background: var(--surface);
-      border-bottom: 1px solid var(--border);
+    }
+
+    /* resizer between QB and SQL not needed anymore */
+    #qb-resizer { display: none; }
+
+    /* ============================================================
+   SQL EDITOR SECTION
+   ============================================================ */
+    #sql-section {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      overflow: hidden;
+      background: var(--surface);
+    }
+
+    #sql-editor-wrap {
+      flex: 1;
+      overflow: hidden;
+      min-height: 0;
+    }
+    #sql-editor-wrap textarea {
+      min-height: 0;
+      height: 0;
     }
 
     .qb-toolbar {
@@ -968,7 +1058,14 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
     #qb-advanced {
       flex: 1;
       overflow: hidden;
+      display: flex;
+      flex-direction: row;
+    }
+
+    #qb-canvas-wrap {
+      flex: 1;
       position: relative;
+      overflow: hidden;
       background: #f8f9fa;
       background-image: radial-gradient(circle, #d1d5db 1px, transparent 1px);
       background-size: 20px 20px;
@@ -982,14 +1079,144 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       height: 100%;
     }
 
+    /* Advanced QB right options panel */
+    #adv-options-panel {
+      width: 33%;
+      min-width: 220px;
+      max-width: 600px;
+      flex-shrink: 0;
+      border-left: 1px solid var(--border);
+      background: var(--surface);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      transition: width 180ms ease, min-width 180ms ease;
+    }
+
+    #adv-options-panel.collapsed {
+      width: 28px !important;
+      min-width: 28px !important;
+    }
+
+    #adv-options-panel .adv-opts-header {
+      padding: 0 6px;
+      height: 32px;
+      border-bottom: 1px solid var(--border);
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-disabled);
+      text-transform: uppercase;
+      letter-spacing: .4px;
+      flex-shrink: 0;
+      background: var(--surface2);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 4px;
+      white-space: nowrap;
+      overflow: hidden;
+    }
+
+    #adv-options-panel .adv-opts-title {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    #adv-options-panel.collapsed .adv-opts-title {
+      display: none;
+    }
+
+    #adv-opts-toggle {
+      flex-shrink: 0;
+      font-size: 13px;
+      line-height: 1;
+      padding: 2px 4px;
+      cursor: pointer;
+      color: var(--text-secondary);
+      background: none;
+      border: none;
+      border-radius: 2px;
+    }
+    #adv-opts-toggle:hover { background: var(--surface3); }
+
+    #adv-options-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 10px 12px;
+    }
+
+    #adv-options-panel.collapsed #adv-options-body {
+      display: none;
+    }
+
+    /* Resizer for adv options panel */
+    #adv-opts-resizer {
+      width: 4px;
+      background: var(--border);
+      cursor: col-resize;
+      flex-shrink: 0;
+      transition: background var(--transition);
+    }
+    #adv-opts-resizer:hover, #adv-opts-resizer.dragging { background: var(--primary); }
+
+    .adv-join-grid {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      gap: 8px;
+      align-items: start;
+    }
+
+    .adv-join-col {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .adv-join-mid {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      padding-top: 18px;
+    }
+
+    .adv-join-col-label {
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--text-disabled);
+      text-transform: uppercase;
+      letter-spacing: .4px;
+      margin-bottom: 2px;
+    }
+
+    .adv-node-section {
+      margin-bottom: 10px;
+    }
+
+    .adv-node-section-hdr {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-disabled);
+      text-transform: uppercase;
+      letter-spacing: .4px;
+      margin-bottom: 6px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
     #qb-svg {
       position: absolute;
       top: 0;
       left: 0;
       width: 100%;
       height: 100%;
-      pointer-events: none;
+      pointer-events: none; /* SVG bg transparent; individual paths override below */
       overflow: visible;
+    }
+    #qb-svg path.join-line {
+      pointer-events: stroke; /* only the drawn stroke is clickable */
     }
 
     .qb-table-node {
@@ -1123,16 +1350,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       overflow-y: auto;
     }
 
-    /* ============================================================
-   SQL EDITOR SECTION
-   ============================================================ */
-    #sql-section {
-      display: flex;
-      flex-direction: column;
-      background: var(--surface);
-      flex-shrink: 0;
-    }
-
     .sql-toolbar {
       display: flex;
       align-items: center;
@@ -1161,23 +1378,19 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       padding-bottom: 4px;
     }
 
-    #sql-editor-wrap {
+    /* Preview table panel — now lives inside #qm-panel-preview which manages display */
+    #preview-panel {
+      display: flex;
+      flex-direction: column;
       flex: 1;
       overflow: hidden;
-      min-height: 80px;
-    }
-
-    /* Preview table panel */
-    #preview-panel {
-      display: none;
-      flex-direction: column;
       background: var(--surface);
-      border-top: 1px solid var(--border);
-      flex-shrink: 0;
     }
 
     #preview-panel.visible {
       display: flex;
+      flex: 1;
+      overflow: hidden;
     }
 
     .preview-toolbar {
@@ -1199,8 +1412,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
     }
 
     #preview-table-wrap {
+      flex: 1;
       overflow: auto;
-      max-height: 200px;
     }
 
     #preview-table-wrap table {
@@ -2090,6 +2303,17 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       <div class="toolbar-sep"></div>
       <div id="status-bar">Not connected — click Connect / Load to begin</div>
       <div class="toolbar-spacer"></div>
+      <!-- Main section tabs in toolbar -->
+      <div id="toolbar-tab-nav">
+        <button class="tb-tab-btn active" data-tab="query" onclick="switchTab('query')">Query</button>
+        <span class="tb-tab-sep">›</span>
+        <button class="tb-tab-btn" data-tab="design" onclick="switchTab('design')">Design</button>
+        <span class="tb-tab-sep">›</span>
+        <button class="tb-tab-btn" data-tab="preview" onclick="switchTab('preview')">Preview</button>
+        <span class="tb-tab-sep">›</span>
+        <button class="tb-tab-btn" data-tab="generate" onclick="switchTab('generate')">Generate Report</button>
+      </div>
+      <div class="toolbar-sep"></div>
       <button class="btn btn-ghost btn-sm" onclick="showHelp()" title="Help">❓</button>
     </div>
 
@@ -2218,77 +2442,92 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         <!-- Main area -->
         <div id="query-main">
 
-          <!-- Query Builder section (2/3 height by default) -->
-          <div id="qb-section" style="height:60%">
-            <div class="qb-toolbar">
-              <span class="section-label">Query Builder</span>
-              <div class="toggle-group">
-                <div class="toggle-opt active" id="qb-basic-btn" onclick="setQBMode('basic')">Basic</div>
-                <div class="toggle-opt" id="qb-adv-btn" onclick="setQBMode('advanced')">Advanced</div>
-              </div>
-              <div style="flex:1"></div>
-              <button class="btn btn-ghost btn-sm" id="btn-collapse-qb" onclick="toggleQBCollapse()"
-                title="Collapse/expand query builder">⊟</button>
-              <button class="btn btn-ghost btn-sm" onclick="clearQueryBuilder()" title="Clear">🗑 Clear</button>
+          <!-- Query-main tab toolbar -->
+          <div id="qm-tabs">
+            <div class="qm-tab active" id="qmt-qb" onclick="switchQMTab('qb')">
+              🔧 Query Builder
+              <span class="qm-subtabs" id="qb-subtabs">
+                <span class="qm-sub active" id="qb-basic-btn" onclick="event.stopPropagation();setQBMode('basic')">Basic</span>
+                <span class="qm-sub" id="qb-adv-btn" onclick="event.stopPropagation();setQBMode('advanced')">Advanced</span>
+              </span>
             </div>
-
-            <!-- Basic QB -->
-            <div id="qb-basic">
-              <div id="qb-basic-drop" class="drop-zone"
-                ondragover="event.preventDefault(); this.classList.add('drag-over')"
-                ondragleave="this.classList.remove('drag-over')" ondrop="onDropToBasicQB(event)">
-                <div>
-                  <div style="font-size:24px;margin-bottom:4px">📋</div>
-                  <div>Drag a table or field here to start building your query</div>
-                </div>
-              </div>
-              <div id="qb-basic-content"></div>
-            </div>
-
-            <!-- Advanced QB -->
-            <div id="qb-advanced" style="display:none">
-              <div id="qb-canvas" ondragover="event.preventDefault()" ondrop="onDropToAdvancedQB(event)">
-                <svg id="qb-svg"></svg>
-                <!-- table nodes injected here -->
-              </div>
-              <div id="node-props">
-                <div class="node-props-header">
-                  <span id="node-props-title">Properties</span>
-                  <button class="btn btn-ghost btn-icon btn-sm" onclick="closeNodeProps()">✕</button>
-                </div>
-                <div class="node-props-body" id="node-props-body"></div>
-              </div>
-            </div>
-          </div>
-
-          <div class="resizer-h" id="qb-resizer"></div>
-
-          <!-- SQL Editor section (1/3 height) -->
-          <div id="sql-section" style="flex:1;display:flex;flex-direction:column;min-height:90px">
-            <div class="sql-toolbar">
-              <span class="section-label">SQL Query</span>
-              <div style="flex:1"></div>
+            <div class="qm-tab" id="qmt-sql" onclick="switchQMTab('sql')">🗃 SQL Editor</div>
+            <div class="qm-tab" id="qmt-preview" onclick="switchQMTab('preview')">📊 Results</div>
+            <div class="qm-spacer"></div>
+            <div class="qm-actions">
               <button class="btn btn-ghost btn-sm" id="btn-sql-locked" onclick="unlockSQL()"
-                title="SQL is locked (query builder changes won't update it). Click to unlock." style="display:none">🔒
-                Locked</button>
-              <button class="btn btn-ghost btn-sm" onclick="formatSQL()" title="Format SQL">⊞ Format</button>
+                title="SQL is locked. Click to unlock." style="display:none">🔒 Locked</button>
+              <button class="btn btn-default btn-sm" onclick="clearQueryBuilder()" title="Clear query builder">🗑 Clear</button>
               <button class="btn btn-primary btn-sm" onclick="runQuery()">▶ Run Query</button>
-            </div>
-            <div id="sql-editor-wrap">
-              <textarea id="sql-editor"></textarea>
+              <button class="btn btn-default btn-sm" id="btn-use-in-design" onclick="useResultsInDesign()" style="display:none">→ Use in Design</button>
             </div>
           </div>
 
-          <!-- Preview results panel (appears after Run Query) -->
-          <div id="preview-panel">
-            <div class="preview-toolbar">
-              <span class="section-label">Results</span>
-              <span id="preview-row-count" class="text-sm text-muted"></span>
-              <div style="flex:1"></div>
-              <button class="btn btn-default btn-sm" onclick="useResultsInDesign()">→ Use in Design</button>
-              <button class="btn btn-ghost btn-sm" onclick="closePreviewPanel()">✕</button>
+          <!-- Panel: Query Builder -->
+          <div id="qm-panel-qb" class="active">
+            <div id="qb-section">
+              <!-- Basic QB -->
+              <div id="qb-basic">
+                <div id="qb-basic-drop" class="drop-zone"
+                  ondragover="event.preventDefault(); this.classList.add('drag-over')"
+                  ondragleave="this.classList.remove('drag-over')" ondrop="onDropToBasicQB(event)">
+                  <div>
+                    <div style="font-size:24px;margin-bottom:4px">📋</div>
+                    <div>Drag a table or field here to start building your query</div>
+                  </div>
+                </div>
+                <div id="qb-basic-content"></div>
+              </div>
+
+              <!-- Advanced QB -->
+              <div id="qb-advanced" style="display:none">
+                <div id="qb-canvas-wrap">
+                  <div id="qb-canvas" ondragover="event.preventDefault()" ondrop="onDropToAdvancedQB(event)">
+                    <svg id="qb-svg"></svg>
+                  </div>
+                </div>
+                <div id="adv-opts-resizer"></div>
+                <div id="adv-options-panel">
+                  <div class="adv-opts-header">
+                    <span class="adv-opts-title" id="adv-opts-title-text">Options</span>
+                    <button id="adv-opts-toggle" onclick="toggleAdvOptionsPanel()" title="Collapse panel">◀</button>
+                  </div>
+                  <div id="adv-options-body">
+                    <div class="text-muted text-sm">Drop a table onto the canvas, then click a node or join line to see options.</div>
+                  </div>
+                </div>
+                <div id="node-props" style="display:none!important">
+                  <div class="node-props-header">
+                    <span id="node-props-title">Properties</span>
+                    <button class="btn btn-ghost btn-icon btn-sm" onclick="closeNodeProps()">✕</button>
+                  </div>
+                  <div class="node-props-body" id="node-props-body"></div>
+                </div>
+              </div>
             </div>
-            <div id="preview-table-wrap"></div>
+          </div>
+
+          <!-- Panel: SQL Editor -->
+          <div id="qm-panel-sql">
+            <div id="sql-section">
+              <div class="sql-toolbar">
+                <button class="btn btn-ghost btn-sm" onclick="formatSQL()" title="Format SQL">⊞ Format SQL</button>
+              </div>
+              <div id="sql-editor-wrap">
+                <textarea id="sql-editor"></textarea>
+              </div>
+            </div>
+          </div>
+
+          <!-- Panel: Results Preview -->
+          <div id="qm-panel-preview">
+            <div id="preview-panel">
+              <div class="preview-toolbar">
+                <span class="section-label">Results</span>
+                <span id="preview-row-count" class="text-sm text-muted"></span>
+              </div>
+              <div id="preview-table-wrap"></div>
+            </div>
           </div>
 
         </div>
@@ -2425,7 +2664,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
     DataLaVista.js: Report and dashboard designer main script file.
     Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
     Created: 2026-03-10
-    Last Modified: 2026-03-14
+    Last Modified: 2026-03-19
     Summary: Main window in DataLaVista for loading data and designing reports and dashboards.
     Notes: See README file for documentation and full license information.
     Website: https://github.com/DepressionCenter/datalavista
@@ -2558,7 +2797,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         advancedQB: { // Advanced Query Builder
           nodes: {},
           joins: [],
-          activeJoinIdx: -1
+          activeJoinIdx: -1,
+          rowLimit: 500
         },
         sql: '',
         sqlLocked: false,
@@ -2942,13 +3182,72 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       console.log('AlaSQL custom functions registered: INCLUDES');
     }
 
-    // Preprocess SQL: replace MIN( and MAX( with MINDATE( and MAXDATE(
-    //function preprocessSQL(sql) {
-    //  return sql
-    //    .replace(/\bMIN\s*\(/gi, 'MINDATE(')
-    //    .replace(/\bMAX\s*\(/gi, 'MAXDATE(');
-    //}
-    function preprocessSQL(sql) { return sql; }
+    // ── SELECT column helpers ────────────────────────────────────────────────────
+    // Split a SELECT column list by commas, respecting parentheses (for functions)
+    function splitSelectCols(str) {
+      const cols = [];
+      let depth = 0, cur = '';
+      for (const ch of str) {
+        if (ch === '(') depth++;
+        else if (ch === ')') depth--;
+        else if (ch === ',' && depth === 0) { cols.push(cur.trim()); cur = ''; continue; }
+        cur += ch;
+      }
+      if (cur.trim()) cols.push(cur.trim());
+      return cols;
+    }
+
+    // Extract the bare result-column name: AS alias > last .field > whole token
+    function getBareColName(col) {
+      const asMatch = col.match(/\bAS\s+\[?([\w]+)\]?\s*$/i);
+      if (asMatch) return asMatch[1];
+      const dotMatch = col.match(/\.[\["]?([\w]+)[\]"]?\s*$/);
+      if (dotMatch) return dotMatch[1];
+      return col.replace(/[\[\]"]/g, '').trim();
+    }
+
+    // Build a safe AS alias from a table.field expression
+    function getAutoAlias(col) {
+      const m = col.match(/[\["]?([\w]+)[\]"]?\.[\["]?([\w]+)[\]"]?/);
+      if (m) return m[1] + '_' + m[2];
+      return getBareColName(col);
+    }
+
+    /**
+     * preprocessSQL — rewrites the SELECT clause so that duplicate bare column
+     * names each get a unique AS alias (e.g. Citations_Title, AutomationsList_Title).
+     * This prevents AlaSQL from silently overwriting one column with another when
+     * two joined tables share a field name like "Title".
+     */
+    function preprocessSQL(sql) {
+      // Only process plain SELECT statements
+      const selectRe = /^(\s*SELECT\s+)([\s\S]+?)(\s+FROM\b)/i;
+      const m = sql.match(selectRe);
+      if (!m) return sql;
+
+      const cols = splitSelectCols(m[2]);
+      const bareNames = cols.map(getBareColName);
+
+      // Count occurrences of each bare name (case-insensitive)
+      const counts = {};
+      for (const n of bareNames) counts[n.toLowerCase()] = (counts[n.toLowerCase()] || 0) + 1;
+
+      // Rewrite only duplicates that don't already have an explicit AS alias
+      let changed = false;
+      const newCols = cols.map((col, i) => {
+        const bare = bareNames[i];
+        if (counts[bare.toLowerCase()] <= 1) return col;              // unique — leave alone
+        if (/\bAS\s+\[?[\w]+\]?\s*$/i.test(col)) return col;         // already aliased
+        changed = true;
+        return col + ' AS [' + getAutoAlias(col) + ']';
+      });
+
+      if (!changed) return sql;
+      // Re-assemble: keep everything before the SELECT col list and after it intact
+      const selectKeyword = m[1];
+      const rest = sql.slice(m[1].length + m[2].length);
+      return selectKeyword + newCols.join(', ') + rest;
+    }
 
     function extractEmail(claimsStr) {
       if (!claimsStr) return '';
@@ -4231,9 +4530,7 @@ function getSourceIndex(tableName) {
 
         cm.on('change', (inst) => {
           state.sql = inst.getValue();
-          if (!state.sqlLocked) {
-            // If manually changed, lock the query builder
-          }
+          hideUseInDesign();
         });
         window._cmEditor = cm;
         updateCMHints();
@@ -4389,7 +4686,7 @@ function getSourceIndex(tableName) {
         document.getElementById('qb-advanced').style.display = mode === 'advanced' ? 'flex' : 'none';
         document.getElementById('qb-basic-btn').classList.toggle('active', mode === 'basic');
         document.getElementById('qb-adv-btn').classList.toggle('active', mode === 'advanced');
-        if (mode === 'advanced') renderAdvancedQB();
+        if (mode === 'advanced') { renderAdvancedQB(); renderAdvOptionsPanel(); }
       }
 
       // ============================================================
@@ -4997,6 +5294,7 @@ function getSourceIndex(tableName) {
         const formatted = buildBasicSQL(true);
         state.sql = compact;
         if (window._cmEditor && formatted) window._cmEditor.setValue(formatted);
+        hideUseInDesign();
       }
 
       // ── Group By ─────────────────────────────────────────────────────────────────
@@ -5068,6 +5366,18 @@ function getSourceIndex(tableName) {
           createAdvNode(id, nd);
         }
         redrawJoins();
+
+        // Click on empty canvas background → deselect everything
+        canvas._dlvClickHandler && canvas.removeEventListener('click', canvas._dlvClickHandler);
+        canvas._dlvClickHandler = (e) => {
+          if (e.target === canvas || e.target === document.getElementById('qb-svg')) {
+            document.querySelectorAll('.qb-table-node').forEach(n => n.classList.remove('selected'));
+            selectedNode = null;
+            state.advancedQB.activeJoinIdx = -1;
+            renderAdvOptionsPanel(null, null);
+          }
+        };
+        canvas.addEventListener('click', canvas._dlvClickHandler);
       }
 
       function onDropToAdvancedQB(event) {
@@ -5087,10 +5397,36 @@ function getSourceIndex(tableName) {
         const id = 'node_' + (++advNodeCounter);
         const t = state.tables[tableName];
         if (!t) return;
-        state.advancedQB.nodes[id] = { tableName, x, y, selectedFields: getAllFieldAliases(tableName), alias: t.alias || tableName };
+
+        // Auto-select Title/Name fields only — same logic as basic QB
+        const defaultFields = [];
+        for (const f of t.fields) {
+          if (f.isAutoId) continue;
+          if (f.internalName === 'Title' ||
+              (f.alias || '').toLowerCase() === 'name' ||
+              (f.alias || '').toLowerCase().includes('fullname') ||
+              (f.alias || '').toLowerCase() === 'uniqname') {
+            defaultFields.push(f.alias);
+          }
+        }
+        // Fallback: if nothing matched, select the first non-auto field
+        if (!defaultFields.length) {
+          const first = t.fields.find(f => !f.isAutoId);
+          if (first) defaultFields.push(first.alias);
+        }
+
+        state.advancedQB.nodes[id] = {
+          tableName, x, y,
+          selectedFields: defaultFields,
+          alias: t.alias || tableName,
+          conditions: [],
+          sorts: [],
+          groupBy: []
+        };
         createAdvNode(id, state.advancedQB.nodes[id]);
         ensureTableData(tableName);
         rebuildAdvancedSQL();
+        selectAdvNode(id);
       }
 
       function getAllFieldAliases(tableName) {
@@ -5184,14 +5520,16 @@ function getSourceIndex(tableName) {
         document.getElementById('adv-' + id)?.remove();
         redrawJoins();
         rebuildAdvancedSQL();
-        closeNodeProps();
+        renderAdvOptionsPanel(null, null);
       }
 
       function selectAdvNode(id) {
         document.querySelectorAll('.qb-table-node').forEach(n => n.classList.remove('selected'));
         document.getElementById('adv-' + id)?.classList.add('selected');
         selectedNode = id;
+        state.advancedQB.activeJoinIdx = -1;
         showNodeProps(id);
+        renderAdvOptionsPanel('node', id);
       }
 
       function showNodeProps(nodeId) {
@@ -5244,7 +5582,283 @@ function getSourceIndex(tableName) {
         rebuildAdvancedSQL();
       }
 
-      function closeNodeProps() { document.getElementById('node-props').classList.remove('visible'); selectedNode = null; }
+      function closeNodeProps() { selectedNode = null; }
+
+      // ============================================================
+      // ADVANCED QB — RIGHT OPTIONS PANEL
+      // ============================================================
+      function renderAdvOptionsPanel(mode, id) {
+        const body = document.getElementById('adv-options-body');
+        const titleEl = document.getElementById('adv-opts-title-text');
+        if (!body) return;
+
+        const setTitle = t => { if (titleEl) titleEl.textContent = t; };
+
+        // ── NO SELECTION: show row-count ──────────────────────────
+        if (!mode || (!id && id !== 0)) {
+          setTitle('Options');
+          body.innerHTML = `
+            <div class="adv-node-section">
+              <div class="adv-node-section-hdr">ROW COUNT (LIMIT)</div>
+              <input type="number" class="form-input" style="height:28px;width:100%"
+                min="1" max="100000" value="${state.advancedQB.rowLimit || 500}"
+                oninput="state.advancedQB.rowLimit=parseInt(this.value)||500; rebuildAdvancedSQL()"/>
+              <div style="font-size:11px;color:var(--text-disabled);margin-top:4px">Applies LIMIT to the full query.</div>
+            </div>`;
+          return;
+        }
+
+        // ── JOIN SELECTION ────────────────────────────────────────
+        if (mode === 'join') {
+          const j = state.advancedQB.joins[id];
+          if (!j) return;
+          const fromND = state.advancedQB.nodes[j.fromNode];
+          const toND   = state.advancedQB.nodes[j.toNode];
+          const fromT  = state.tables[fromND?.tableName];
+          const toT    = state.tables[toND?.tableName];
+          const fromAlias = fromND?.alias || fromND?.tableName || '';
+          const toAlias   = toND?.alias   || toND?.tableName   || '';
+
+          const JOIN_TYPES = [
+            { val: 'INNER', label: 'Inner Join',    desc: 'Matching rows in both sides' },
+            { val: 'LEFT',  label: 'Left Join',     desc: 'Everything on the left, only matching rows on the right' },
+            { val: 'RIGHT', label: 'Right Join',    desc: 'Everything on the right, only matching rows on the left' },
+            { val: 'CROSS', label: 'Cross Join',    desc: 'Matrix multiplication' },
+            { val: 'UNION', label: 'Union',         desc: 'Combine tables, removing duplicate rows' },
+            { val: 'UNION ALL', label: 'Union All', desc: 'Combine tables, keeping duplicate rows' }
+          ];
+
+          const fromFieldOpts = (fromT?.fields || []).filter(f => !f.isAutoId)
+            .map(f => `<option value="${f.alias}" ${f.alias === j.fromKey ? 'selected' : ''}>${f.alias}</option>`).join('');
+          const toFieldOpts = (toT?.fields || []).filter(f => !f.isAutoId)
+            .map(f => `<option value="${f.alias}" ${f.alias === j.toKey ? 'selected' : ''}>${f.alias}</option>`).join('');
+
+          setTitle('Join Options');
+          body.innerHTML = `
+            <div class="adv-join-grid">
+              <div class="adv-join-col">
+                <div class="adv-join-col-label">LEFT: ${fromAlias}</div>
+                <div class="form-group">
+                  <label>Alias</label>
+                  <input type="text" class="form-input" style="height:26px" value="${fromAlias}"
+                    oninput="if(state.advancedQB.nodes['${j.fromNode}']) { state.advancedQB.nodes['${j.fromNode}'].alias=this.value; rebuildAdvancedSQL(); }"/>
+                </div>
+                <div class="form-group">
+                  <label>Key Field</label>
+                  <select class="form-input" style="height:26px" onchange="setActiveJoinProp('fromKey',this.value)">
+                    ${fromFieldOpts}
+                  </select>
+                </div>
+              </div>
+              <div class="adv-join-mid">
+                <div style="font-size:18px;color:var(--text-disabled)">⇔</div>
+              </div>
+              <div class="adv-join-col">
+                <div class="adv-join-col-label">RIGHT: ${toAlias}</div>
+                <div class="form-group">
+                  <label>Alias</label>
+                  <input type="text" class="form-input" style="height:26px" value="${toAlias}"
+                    oninput="if(state.advancedQB.nodes['${j.toNode}']) { state.advancedQB.nodes['${j.toNode}'].alias=this.value; rebuildAdvancedSQL(); }"/>
+                </div>
+                <div class="form-group">
+                  <label>Key Field</label>
+                  <select class="form-input" style="height:26px" onchange="setActiveJoinProp('toKey',this.value)">
+                    ${toFieldOpts}
+                  </select>
+                </div>
+              </div>
+            </div>
+            <div class="form-group" style="margin-top:10px">
+              <label>Join Type</label>
+              <select class="form-input" style="height:28px" id="adv-join-type-sel"
+                onchange="setActiveJoinProp('type',this.value); renderAdvOptionsPanel('join',${id})">
+                ${JOIN_TYPES.map(jt => `<option value="${jt.val}" ${jt.val === j.type ? 'selected' : ''}>${jt.label}</option>`).join('')}
+              </select>
+              <div style="font-size:11px;color:var(--text-disabled);margin-top:2px" id="join-type-desc">
+                ${JOIN_TYPES.find(jt => jt.val === j.type)?.desc || ''}
+              </div>
+            </div>
+            <button class="btn btn-danger btn-sm" style="margin-top:8px;width:100%" onclick="removeActiveJoin()">✕ Remove Join</button>`;
+          return;
+        }
+
+        // ── NODE (TABLE) SELECTION ────────────────────────────────
+        if (mode === 'node') {
+          const nd = state.advancedQB.nodes[id];
+          if (!nd) return;
+          const t = state.tables[nd.tableName];
+          if (!t) return;
+          const fields = t.fields.filter(f => !f.isAutoId);
+
+          // Ensure arrays exist on older nodes
+          if (!nd.conditions) nd.conditions = [];
+          if (!nd.sorts)      nd.sorts = [];
+          if (!nd.groupBy)    nd.groupBy = [];
+
+          const fieldOpts = fields.map(f => `<option value="${f.alias}">${f.alias}</option>`).join('');
+
+          // Build conditions HTML
+          const renderNodeConditions = () => {
+            if (!nd.conditions.length)
+              return '<div style="font-size:11px;color:var(--text-disabled);padding:2px 0">No filters — click + Add</div>';
+            return nd.conditions.map((c, ci) => {
+              const fieldMeta = fields.find(f => f.alias === c.field);
+              const isDate = fieldMeta?.displayType === 'date';
+              const ops = isDate ? [...QB_OPS, ...DATE_MACRO_OPS] : QB_OPS;
+              const isMacro = DATE_MACRO_VALS.has(c.op);
+              const macroMeta = DATE_MACRO_OPS.find(o => o.val === c.op);
+              const needsValue = c.op !== 'NULL' && c.op !== 'NOTNULL' && !(isMacro && !macroMeta?.hasInput);
+              return `<div class="qb-condition-row">
+                ${ci === 0
+                  ? `<span class="qb-where-badge">WHERE</span>`
+                  : `<select class="form-input qb-conj-select" onchange="advNodeCond('${id}',${ci},'conj',this.value)">
+                      <option ${c.conj==='AND'?'selected':''}>AND</option>
+                      <option ${c.conj==='OR'?'selected':''}>OR</option></select>`}
+                <select class="form-input qb-field-select" onchange="advNodeCond('${id}',${ci},'field',this.value)">
+                  ${fields.map(f=>`<option value="${f.alias}" ${f.alias===c.field?'selected':''}>${f.alias}</option>`).join('')}
+                </select>
+                <select class="form-input qb-op-select" style="width:${isDate?'150px':'112px'}!important"
+                  onchange="advNodeCond('${id}',${ci},'op',this.value)">
+                  ${ops.map(o=>`<option value="${o.val}" ${o.val===c.op?'selected':''}>${o.label}</option>`).join('')}
+                </select>
+                ${needsValue
+                  ? `<input type="${isMacro?'number':'text'}" class="form-input qb-val-input" value="${(c.value||'').replace(/"/g,'&quot;')}"
+                       oninput="advNodeCond('${id}',${ci},'value',this.value)"/>`
+                  : `<span class="qb-val-blank"></span>`}
+                <button class="btn btn-ghost btn-sm btn-icon qb-remove-btn" onclick="advNodeRemoveCond('${id}',${ci})">✕</button>
+              </div>`;
+            }).join('');
+          };
+
+          // Build sorts HTML
+          const renderNodeSorts = () => {
+            if (!nd.sorts.length)
+              return '<div style="font-size:11px;color:var(--text-disabled);padding:2px 0">No sorts — click + Add</div>';
+            return nd.sorts.map((s, si) => `
+              <div class="qb-sort-row">
+                <select class="form-input qb-field-select" onchange="advNodeSort('${id}',${si},'field',this.value)">
+                  ${fields.map(f=>`<option value="${f.alias}" ${f.alias===s.field?'selected':''}>${f.alias}</option>`).join('')}
+                </select>
+                <select class="form-input qb-dir-select" onchange="advNodeSort('${id}',${si},'dir',this.value)">
+                  <option ${s.dir==='ASC'?'selected':''}>ASC</option>
+                  <option ${s.dir==='DESC'?'selected':''}>DESC</option>
+                </select>
+                <button class="btn btn-ghost btn-sm btn-icon" onclick="advNodeRemoveSort('${id}',${si})">✕</button>
+              </div>`).join('');
+          };
+
+          // Build group-by HTML
+          const renderNodeGroupBy = () => {
+            if (!nd.groupBy.length)
+              return '<div style="font-size:11px;color:var(--text-disabled);padding:2px 0">No grouping — click + Add</div>';
+            return nd.groupBy.map((g, gi) => `
+              <div class="qb-sort-row">
+                <select class="form-input qb-field-select" onchange="advNodeGB('${id}',${gi},this.value)">
+                  ${fields.map(f=>`<option value="${f.alias}" ${f.alias===g?'selected':''}>${f.alias}</option>`).join('')}
+                </select>
+                <button class="btn btn-ghost btn-sm btn-icon" onclick="advNodeRemoveGB('${id}',${gi})">✕</button>
+              </div>`).join('');
+          };
+
+          setTitle(nd.alias || nd.tableName);
+          body.innerHTML = `
+            <div class="adv-node-section">
+              <div class="adv-node-section-hdr">
+                <span>FILTER CONDITIONS</span>
+                <button class="btn btn-ghost btn-sm" onclick="advNodeAddCond('${id}')">+ Add</button>
+              </div>
+              <div id="adv-node-conds">${renderNodeConditions()}</div>
+            </div>
+            <div class="adv-node-section">
+              <div class="adv-node-section-hdr">
+                <span>SORT ORDER</span>
+                <button class="btn btn-ghost btn-sm" onclick="advNodeAddSort('${id}')">+ Add</button>
+              </div>
+              <div id="adv-node-sorts">${renderNodeSorts()}</div>
+            </div>
+            <div class="adv-node-section">
+              <div class="adv-node-section-hdr">
+                <span>GROUP BY</span>
+                <button class="btn btn-ghost btn-sm" onclick="advNodeAddGB('${id}')">+ Add</button>
+              </div>
+              <div id="adv-node-groupby">${renderNodeGroupBy()}</div>
+            </div>`;
+        }
+      }
+
+      // ── Helpers for per-node conditions / sorts / groupby ─────────────────────────
+      function advNodeCond(nodeId, idx, prop, val) {
+        const nd = state.advancedQB.nodes[nodeId];
+        if (!nd || !nd.conditions[idx]) return;
+        nd.conditions[idx][prop] = val;
+        rebuildAdvancedSQL();
+        renderAdvOptionsPanel('node', nodeId);
+      }
+      function advNodeAddCond(nodeId) {
+        const nd = state.advancedQB.nodes[nodeId];
+        if (!nd) return;
+        const t = state.tables[nd.tableName];
+        const fields = t ? t.fields.filter(f => !f.isAutoId) : [];
+        if (!nd.conditions) nd.conditions = [];
+        nd.conditions.push({ conj: 'AND', field: fields[0]?.alias || '', op: '=', value: '' });
+        rebuildAdvancedSQL();
+        renderAdvOptionsPanel('node', nodeId);
+      }
+      function advNodeRemoveCond(nodeId, idx) {
+        const nd = state.advancedQB.nodes[nodeId];
+        if (!nd) return;
+        nd.conditions.splice(idx, 1);
+        rebuildAdvancedSQL();
+        renderAdvOptionsPanel('node', nodeId);
+      }
+      function advNodeSort(nodeId, idx, prop, val) {
+        const nd = state.advancedQB.nodes[nodeId];
+        if (!nd || !nd.sorts[idx]) return;
+        nd.sorts[idx][prop] = val;
+        rebuildAdvancedSQL();
+        renderAdvOptionsPanel('node', nodeId);
+      }
+      function advNodeAddSort(nodeId) {
+        const nd = state.advancedQB.nodes[nodeId];
+        if (!nd) return;
+        const t = state.tables[nd.tableName];
+        const fields = t ? t.fields.filter(f => !f.isAutoId) : [];
+        if (!nd.sorts) nd.sorts = [];
+        nd.sorts.push({ field: fields[0]?.alias || '', dir: 'ASC' });
+        rebuildAdvancedSQL();
+        renderAdvOptionsPanel('node', nodeId);
+      }
+      function advNodeRemoveSort(nodeId, idx) {
+        const nd = state.advancedQB.nodes[nodeId];
+        if (!nd) return;
+        nd.sorts.splice(idx, 1);
+        rebuildAdvancedSQL();
+        renderAdvOptionsPanel('node', nodeId);
+      }
+      function advNodeGB(nodeId, idx, val) {
+        const nd = state.advancedQB.nodes[nodeId];
+        if (!nd) return;
+        nd.groupBy[idx] = val;
+        rebuildAdvancedSQL();
+        renderAdvOptionsPanel('node', nodeId);
+      }
+      function advNodeAddGB(nodeId) {
+        const nd = state.advancedQB.nodes[nodeId];
+        if (!nd) return;
+        const t = state.tables[nd.tableName];
+        const fields = t ? t.fields.filter(f => !f.isAutoId) : [];
+        if (!nd.groupBy) nd.groupBy = [];
+        nd.groupBy.push(fields[0]?.alias || '');
+        rebuildAdvancedSQL();
+        renderAdvOptionsPanel('node', nodeId);
+      }
+      function advNodeRemoveGB(nodeId, idx) {
+        const nd = state.advancedQB.nodes[nodeId];
+        if (!nd) return;
+        nd.groupBy.splice(idx, 1);
+        rebuildAdvancedSQL();
+        renderAdvOptionsPanel('node', nodeId);
+      }
 
       // Draw join line
       function startDrawJoin(e, nodeId, side) {
@@ -5308,6 +5922,12 @@ function getSourceIndex(tableName) {
         state.advancedQB.joins.push({ fromNode, fromSide, toNode, toSide, fromKey, toKey, type: 'LEFT' });
         redrawJoins();
         rebuildAdvancedSQL();
+        // Auto-select the new join to show its options panel
+        const newIdx = state.advancedQB.joins.length - 1;
+        state.advancedQB.activeJoinIdx = newIdx;
+        selectedNode = null;
+        document.querySelectorAll('.qb-table-node').forEach(n => n.classList.remove('selected'));
+        renderAdvOptionsPanel('join', newIdx);
       }
 
       function getSnapPoint(nodeId, side) {
@@ -5329,15 +5949,31 @@ function getSourceIndex(tableName) {
           const from = getSnapPoint(j.fromNode, j.fromSide);
           const to = getSnapPoint(j.toNode, j.toSide);
           const dx = (to.x - from.x) * 0.5;
+          const d = `M${from.x},${from.y} C${from.x + dx},${from.y} ${to.x - dx},${to.y} ${to.x},${to.y}`;
+
+          // Invisible wide path for a larger click target
+          const hitPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+          hitPath.setAttribute('d', d);
+          hitPath.setAttribute('stroke', 'transparent');
+          hitPath.setAttribute('stroke-width', '12');
+          hitPath.setAttribute('fill', 'none');
+          hitPath.style.cursor = 'pointer';
+          hitPath.style.pointerEvents = 'stroke';
+          const joinObj = j;
+          hitPath.addEventListener('click', (e) => { e.stopPropagation(); selectJoin(joinObj, from, to); });
+          svg.appendChild(hitPath);
+
+          // Visible path
           const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-          path.setAttribute('d', `M${from.x},${from.y} C${from.x + dx},${from.y} ${to.x - dx},${to.y} ${to.x},${to.y}`);
+          path.setAttribute('d', d);
           path.setAttribute('stroke', '#0078d4');
           path.setAttribute('stroke-width', '2');
           path.setAttribute('fill', 'none');
           path.setAttribute('marker-end', 'url(#arrowhead)');
+          path.classList.add('join-line');
           path.style.cursor = 'pointer';
-          const joinObj = j; // capture for closure
-          path.addEventListener('click', () => selectJoin(joinObj, from, to));
+          path.style.pointerEvents = 'stroke';
+          path.addEventListener('click', (e) => { e.stopPropagation(); selectJoin(joinObj, from, to); });
           svg.appendChild(path);
 
           // Join type label
@@ -5347,7 +5983,8 @@ function getSourceIndex(tableName) {
           label.setAttribute('text-anchor', 'middle');
           label.setAttribute('font-size', '10');
           label.setAttribute('fill', '#0078d4');
-          label.textContent = j.type + ' JOIN';
+          label.style.pointerEvents = 'none';
+          label.textContent = j.type;
           svg.appendChild(label);
         }
 
@@ -5364,42 +6001,9 @@ function getSourceIndex(tableName) {
         const joinIdx = state.advancedQB.joins.indexOf(joinObj);
         if (joinIdx < 0) return;
         state.advancedQB.activeJoinIdx = joinIdx;
-
-        const props = document.getElementById('node-props');
-        const canvas = document.getElementById('qb-canvas');
-        const crect = canvas.getBoundingClientRect();
-        props.style.left = ((from.x + to.x) / 2 - crect.left + 20) + 'px';
-        props.style.top = ((from.y + to.y) / 2 - crect.top) + 'px';
-        document.getElementById('node-props-title').textContent = 'Join Properties';
-
-        const fromND = state.advancedQB.nodes[joinObj.fromNode];
-        const toND = state.advancedQB.nodes[joinObj.toNode];
-        const fromT = state.tables[fromND?.tableName];
-        const toT = state.tables[toND?.tableName];
-
-        const body = document.getElementById('node-props-body');
-        body.innerHTML = `
-    <div class="form-group">
-      <label>Join Type</label>
-      <select class="form-input" style="height:28px" onchange="setActiveJoinProp('type',this.value)">
-        ${['LEFT', 'RIGHT', 'INNER', 'FULL'].map(t => `<option ${t === joinObj.type ? 'selected' : ''}>${t}</option>`).join('')}
-      </select>
-    </div>
-    <div class="form-group">
-      <label>${fromND?.alias || ''} field</label>
-      <select class="form-input" style="height:28px" onchange="setActiveJoinProp('fromKey',this.value)">
-        ${(fromT?.fields || []).filter(f => !f.isAutoId).map(f => `<option ${f.alias === joinObj.fromKey ? 'selected' : ''}>${f.alias}</option>`).join('')}
-      </select>
-    </div>
-    <div class="form-group">
-      <label>${toND?.alias || ''} field</label>
-      <select class="form-input" style="height:28px" onchange="setActiveJoinProp('toKey',this.value)">
-        ${(toT?.fields || []).filter(f => !f.isAutoId).map(f => `<option ${f.alias === joinObj.toKey ? 'selected' : ''}>${f.alias}</option>`).join('')}
-      </select>
-    </div>
-    <button class="btn btn-danger btn-sm" onclick="removeActiveJoin()">Remove Join</button>
-  `;
-        props.classList.add('visible');
+        selectedNode = null;
+        document.querySelectorAll('.qb-table-node').forEach(n => n.classList.remove('selected'));
+        renderAdvOptionsPanel('join', joinIdx);
       }
 
       /** Called by inline onchange handlers inside the join props popup */
@@ -5411,6 +6015,7 @@ function getSourceIndex(tableName) {
         j[prop] = value;
         redrawJoins();
         rebuildAdvancedSQL();
+        renderAdvOptionsPanel('join', idx);
       }
 
       /** Called by the Remove Join button inside the join props popup */
@@ -5421,7 +6026,7 @@ function getSourceIndex(tableName) {
         state.advancedQB.activeJoinIdx = -1;
         redrawJoins();
         rebuildAdvancedSQL();
-        closeNodeProps();
+        renderAdvOptionsPanel(null, null);
       }
 
       function rebuildAdvancedSQL() {
@@ -5433,28 +6038,122 @@ function getSourceIndex(tableName) {
         const mainAlias = mainNd.alias || mainNd.tableName;
         const selects = [];
 
+        // Collect all (alias, fieldName) pairs so we can detect duplicates
+        const allFields = [];
         for (const [id, nd] of nodes) {
           const alias = nd.alias || nd.tableName;
-          for (const f of nd.selectedFields) {
+          for (const f of nd.selectedFields) allFields.push({ alias, f });
+        }
+        // Find field names that appear in more than one table
+        const fieldCount = {};
+        for (const { f } of allFields) fieldCount[f.toLowerCase()] = (fieldCount[f.toLowerCase()] || 0) + 1;
+
+        for (const { alias, f } of allFields) {
+          if (fieldCount[f.toLowerCase()] > 1) {
+            // Disambiguate: Citations.Title AS Citations_Title
+            selects.push(`  ${alias}.${f} AS [${alias}_${f}]`);
+          } else {
             selects.push(`  ${alias}.${f}`);
           }
         }
         if (!selects.length) selects.push('  *');
 
-        let sql = `SELECT\n${selects.join(',\n')}\nFROM [${mainNd.tableName}] AS ${mainAlias}`;
+        // Check if any join is a UNION or UNION ALL
+        const hasUnion = state.advancedQB.joins.some(j => j.type === 'UNION' || j.type === 'UNION ALL');
 
-        // Add joins
+        if (hasUnion) {
+          // For UNION queries, build separate SELECT per node
+          const parts = [];
+          for (const [id, nd] of nodes) {
+            const alias = nd.alias || nd.tableName;
+            const nodeSelects = nd.selectedFields.length
+              ? nd.selectedFields.map(f => `  ${alias}.${f}`).join(',\n')
+              : '  *';
+            let part = `SELECT\n${nodeSelects}\nFROM [${alias}] AS ${alias}`;
+            // per-node WHERE
+            const where = buildNodeWhere(nd);
+            if (where) part += `\nWHERE ${where}`;
+            parts.push({ sql: part, nd, id });
+          }
+          let sql = '';
+          for (let i = 0; i < parts.length; i++) {
+            if (i === 0) { sql = parts[0].sql; continue; }
+            const j = state.advancedQB.joins.find(j => j.toNode === Object.keys(state.advancedQB.nodes)[i]);
+            const joinType = j ? j.type : 'UNION';
+            sql += `\n${joinType}\n` + parts[i].sql;
+          }
+          const limit = state.advancedQB.rowLimit || 500;
+          sql += `\nLIMIT ${limit}`;
+          state.sql = sql;
+          if (window._cmEditor) window._cmEditor.setValue(sql);
+          return;
+        }
+
+        let sql = `SELECT\n${selects.join(',\n')}\nFROM [${mainAlias}] AS ${mainAlias}`;
+
+        // Add JOINs
         for (const j of state.advancedQB.joins) {
           const fromNd = state.advancedQB.nodes[j.fromNode];
           const toNd = state.advancedQB.nodes[j.toNode];
           if (!fromNd || !toNd) continue;
           const fromAlias = fromNd.alias || fromNd.tableName;
           const toAlias = toNd.alias || toNd.tableName;
-          sql += `\n${j.type} JOIN [${toNd.tableName}] AS ${toAlias} ON ${fromAlias}.${j.fromKey} = ${toAlias}.${j.toKey}`;
+          sql += `\n${j.type} JOIN [${toAlias}] AS ${toAlias} ON ${fromAlias}.${j.fromKey} = ${toAlias}.${j.toKey}`;
         }
+
+        // Aggregate per-node WHERE clauses (prefix with alias)
+        const allWhere = [];
+        for (const [id, nd] of nodes) {
+          const alias = nd.alias || nd.tableName;
+          if (nd.conditions && nd.conditions.length) {
+            const w = buildNodeWhere(nd, alias);
+            if (w) allWhere.push(`(${w})`);
+          }
+        }
+        if (allWhere.length) sql += `\nWHERE ${allWhere.join(' AND ')}`;
+
+        // GROUP BY (from first node that has one, or merge all)
+        const allGB = [];
+        for (const [id, nd] of nodes) {
+          const alias = nd.alias || nd.tableName;
+          if (nd.groupBy && nd.groupBy.length) {
+            nd.groupBy.forEach(g => allGB.push(`${alias}.${g}`));
+          }
+        }
+        if (allGB.length) sql += `\nGROUP BY ${allGB.join(', ')}`;
+
+        // ORDER BY (from all nodes)
+        const allOrder = [];
+        for (const [id, nd] of nodes) {
+          const alias = nd.alias || nd.tableName;
+          if (nd.sorts && nd.sorts.length) {
+            nd.sorts.forEach(s => allOrder.push(`${alias}.${s.field} ${s.dir || 'ASC'}`));
+          }
+        }
+        if (allOrder.length) sql += `\nORDER BY ${allOrder.join(', ')}`;
+
+        const limit = state.advancedQB.rowLimit || 500;
+        sql += `\nLIMIT ${limit}`;
 
         state.sql = sql;
         if (window._cmEditor) window._cmEditor.setValue(sql);
+        hideUseInDesign();
+      }
+
+      function buildNodeWhere(nd, alias) {
+        if (!nd.conditions || !nd.conditions.length) return '';
+        const prefix = alias ? `${alias}.` : '';
+        return nd.conditions.map((c, i) => {
+          const conj = i === 0 ? '' : (c.conj + ' ');
+          const col = `${prefix}[${c.field}]`;
+          if (c.op === 'NULL') return conj + `${col} IS NULL`;
+          if (c.op === 'NOTNULL') return conj + `${col} IS NOT NULL`;
+          if (DATE_MACRO_VALS.has(c.op)) return conj + dateMacroToSQL(c.op, c.value, col);
+          if (c.op === 'LIKE') return conj + `${col} LIKE '%${c.value}%'`;
+          const raw = c.value || '';
+          const val = (raw !== '' && !isNaN(raw)) ? raw : `'${raw.replace(/'/g, "''")}'`;
+          return conj + `${col} ${c.op} ${val}`;
+        }).join(' ');
       }
 
       function clearQueryBuilder() {
@@ -5488,22 +6187,27 @@ function getSourceIndex(tableName) {
           // Create AlaSQL tables — register by alias and internal name
           for (const tname of referencedTables) {
             const t = state.tables[tname];
-            if (!t || !t.data) continue; 
+            if (!t || !t.data) continue;
+            const pascalName = toPascalCase(tname);
 
             // 1. Register by internal name
             alasql(`DROP TABLE IF EXISTS [${tname}]`);
             alasql(`CREATE TABLE [${tname}]`);
-            
-            // Find exactly how AlaSQL saved the table internally
             const actualKey = Object.keys(alasql.tables).find(k => k.toLowerCase() === tname.toLowerCase()) || tname;
-            alasql.tables[actualKey].data = t.data; 
+            alasql.tables[actualKey].data = t.data;
 
-            // 2. Also register by alias so QB-generated SQL (FROM alias) works
+            // 2. Also register by PascalCase version (so lowercase input works)
+            if (pascalName && pascalName.toLowerCase() !== tname.toLowerCase()) {
+              alasql(`DROP TABLE IF EXISTS [${pascalName}]`);
+              alasql(`CREATE TABLE [${pascalName}]`);
+              const actualPascalKey = Object.keys(alasql.tables).find(k => k.toLowerCase() === pascalName.toLowerCase()) || pascalName;
+              alasql.tables[actualPascalKey].data = t.data;
+            }
+
+            // 3. Also register by alias so QB-generated SQL (FROM alias) works
             if (t.alias && t.alias !== tname) {
               alasql(`DROP TABLE IF EXISTS [${t.alias}]`);
               alasql(`CREATE TABLE [${t.alias}]`);
-              
-              // Find exactly how AlaSQL saved the alias internally
               const actualAliasKey = Object.keys(alasql.tables).find(k => k.toLowerCase() === t.alias.toLowerCase()) || t.alias;
               alasql.tables[actualAliasKey].data = t.data;
             }
@@ -5526,6 +6230,7 @@ function getSourceIndex(tableName) {
           console.error(err);
           toast('Query error: ' + err.message, 'error');
           setStatus('❌ Query error: ' + err.message);
+          hideUseInDesign();
         }
       }
 
@@ -5543,16 +6248,17 @@ function getSourceIndex(tableName) {
       }
 
       function showQueryPreview(results) {
-        const panel = document.getElementById('preview-panel');
-        const wrap = document.getElementById('preview-table-wrap');
+        const wrap  = document.getElementById('preview-table-wrap');
         const count = document.getElementById('preview-row-count');
-
-        panel.classList.add('visible');
         count.textContent = `${results.length} rows (showing top 20)`;
 
-        if (!results.length) { wrap.innerHTML = '<div class="text-muted text-sm" style="padding:12px">No results</div>'; return; }
+        if (!results.length) {
+          wrap.innerHTML = '<div class="text-muted text-sm" style="padding:12px">No results</div>';
+          hideUseInDesign();
+          return;
+        }
 
-        const cols = Object.keys(results[0]);
+        const cols  = Object.keys(results[0]);
         const top20 = results.slice(0, 20);
         let html = '<table><thead><tr>' + cols.map(c => `<th>${c}</th>`).join('') + '</tr></thead><tbody>';
         for (const row of top20) {
@@ -5561,33 +6267,33 @@ function getSourceIndex(tableName) {
         html += '</tbody></table>';
         wrap.innerHTML = html;
 
-        // Resize sections: qb to 1/3
-        const qbSec = document.getElementById('qb-section');
-        qbSec.style.height = state.qbCollapsed ? '36px' : '30%';
+        switchQMTab('preview');
+        showUseInDesign();
       }
 
-      function closePreviewPanel() {
-        document.getElementById('preview-panel').classList.remove('visible');
-        const qbSec = document.getElementById('qb-section');
-        qbSec.style.height = state.qbCollapsed ? '36px' : '60%';
+      function showUseInDesign() {
+        const btn = document.getElementById('btn-use-in-design');
+        if (btn) btn.style.display = '';
+        state.queryResultsReady = true;
+      }
+      function hideUseInDesign() {
+        const btn = document.getElementById('btn-use-in-design');
+        if (btn) btn.style.display = 'none';
+        state.queryResultsReady = false;
       }
 
-      function toggleQBCollapse() {
-        state.qbCollapsed = !state.qbCollapsed;
-        const qbSec = document.getElementById('qb-section');
-        const btn = document.getElementById('btn-collapse-qb');
-        if (state.qbCollapsed) {
-          qbSec.style.height = '36px';
-          qbSec.querySelector('#qb-basic').style.display = 'none';
-          qbSec.querySelector('#qb-advanced').style.display = 'none';
-          btn.textContent = '⊞';
-          btn.title = 'Expand query builder';
-        } else {
-          setQBMode(state.queryMode);
-          qbSec.style.height = document.getElementById('preview-panel').classList.contains('visible') ? '30%' : '60%';
-          btn.textContent = '⊟';
-          btn.title = 'Collapse query builder';
-        }
+      function closePreviewPanel() { /* no-op — panel switching handles visibility */ }
+
+      // Kept for backward-compat; no longer does collapse logic
+      function toggleQBCollapse() {}
+      function toggleSQLEditor() {}
+
+      function toggleAdvOptionsPanel() {
+        const panel = document.getElementById('adv-options-panel');
+        const btn   = document.getElementById('adv-opts-toggle');
+        const collapsed = panel.classList.toggle('collapsed');
+        btn.textContent = collapsed ? '▶' : '◀';
+        btn.title       = collapsed ? 'Expand panel' : 'Collapse panel';
       }
 
       function useResultsInDesign() {
@@ -6656,7 +7362,7 @@ This file is part of DataLaVista
 Generated by DataLaVista report designer.
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 Created: 2026-03-10
-Last Modified: 2026-03-14
+Last Modified: 2026-03-19
 Summary: Main script for standalone DataLaVista report file.
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
@@ -6975,24 +7681,37 @@ loadAllData();
 
       function makeRowResizer(resizerId, topId, containerId, minH, maxPct) {
         const resizer = document.getElementById(resizerId);
-        const topEl = document.getElementById(topId);
+        const topEl   = document.getElementById(topId);
         if (!resizer || !topEl) return;
+        const sqlSec  = document.getElementById('sql-section');
 
         resizer.addEventListener('mousedown', e => {
           e.preventDefault();
           resizer.classList.add('dragging');
-          const container = document.getElementById(containerId);
-          const startY = e.clientY;
-          const startH = topEl.offsetHeight;
+          const container  = document.getElementById(containerId);
           const containerH = container ? container.offsetHeight : window.innerHeight;
+          const startY     = e.clientY;
+          const startSqlH  = sqlSec ? sqlSec.offsetHeight : 220;
+
           const onMove = mv => {
-            const dy = mv.clientY - startY;
-            const newH = Math.max(minH, Math.min(containerH * maxPct / 100, startH + dy));
-            const pct = (newH / containerH) * 100;
-            state.qbSectionHeight = pct;
-            topEl.style.height = pct + '%';
+            // Dragging up increases sql-section height
+            const dy     = startY - mv.clientY;
+            const newH   = Math.max(minH, Math.min(containerH * maxPct / 100, startSqlH + dy));
+            if (sqlSec) {
+              sqlSec.style.height = newH + 'px';
+              // Ensure editor-open class is present so min-height applies
+              sqlSec.classList.add('editor-open');
+              if (!state.sqlEditorCollapsed) {
+                const wrap = document.getElementById('sql-editor-wrap');
+                if (wrap) wrap.classList.remove('collapsed');
+              }
+            }
           };
-          const onUp = () => { resizer.classList.remove('dragging'); document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp); };
+          const onUp = () => {
+            resizer.classList.remove('dragging');
+            document.removeEventListener('mousemove', onMove);
+            document.removeEventListener('mouseup', onUp);
+          };
           document.addEventListener('mousemove', onMove);
           document.addEventListener('mouseup', onUp);
         });
@@ -7003,22 +7722,28 @@ loadAllData();
       // ============================================================
       function switchTab(tab) {
         state.activeTab = tab;
-        document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+        document.querySelectorAll('.tb-tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
         document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === 'tab-' + tab));
 
-        if (tab === 'preview') {
-          refreshPreview();
-        }
+        if (tab === 'preview') { refreshPreview(); }
         if (tab === 'design') {
-          renderDesignCanvas();
-          renderFilterBar();
-          renderDesignFieldsPanel();
-          // Resize charts
+          renderDesignCanvas(); renderFilterBar(); renderDesignFieldsPanel();
           requestAnimationFrame(() => { for (const c of Object.values(state.charts)) { try { c.resize(); } catch (e) { } } });
         }
-        if (tab === 'query' && window._cmEditor) {
-          setTimeout(() => window._cmEditor.refresh(), 50);
-        }
+        if (tab === 'query' && window._cmEditor) { setTimeout(() => window._cmEditor.refresh(), 50); }
+      }
+
+      // ── Query-main panel tab switcher ─────────────────────────────────────────────
+      function switchQMTab(tab) {
+        state.qmTab = tab;
+        ['qb','sql','preview'].forEach(t => {
+          document.getElementById('qmt-' + t)?.classList.toggle('active', t === tab);
+          document.getElementById('qm-panel-' + t)?.classList.toggle('active', t === tab);
+        });
+        // Show subtabs only when QB is active
+        const subtabs = document.getElementById('qb-subtabs');
+        if (subtabs) subtabs.style.display = tab === 'qb' ? '' : 'none';
+        if (tab === 'sql' && window._cmEditor) setTimeout(() => window._cmEditor.refresh(), 50);
       }
 
       // ============================================================
@@ -7058,6 +7783,8 @@ loadAllData();
         initToolbox();
         initResizers();
         setQBMode('basic');
+        switchQMTab('qb');
+        switchTab('query');
 
         // Default SQL hint
         if (document.getElementById('sql-editor')) {
@@ -7065,16 +7792,42 @@ loadAllData();
           if (window._cmEditor) window._cmEditor.setValue('-- Connect to a data source and drag a table into the query builder\n-- or write your SQL here directly\nSELECT * FROM [YourList] LIMIT 20');
         }
 
+        // Wire options panel left-edge resizer
+        initAdvOptsResizer();
+
         // Don't show popup when in SharePoint edit mode (Mode=Edit) — it blocks page editing
         let url = '';
         try { if (typeof _spPageContextInfo !== 'undefined' && _spPageContextInfo.webAbsoluteUrl) { url = _spPageContextInfo.webAbsoluteUrl; } } catch (e) { }
         if (!url) { url = window.location.href; }
         const spMode = new URLSearchParams(url).get('Mode') || '';
-        if (spMode.toLowerCase().includes('edit')) {
-          hidePopup();
-        }
+        if (spMode.toLowerCase().includes('edit')) { hidePopup(); }
 
         console.log("*** DataLaVista visual component loading complete. ***");
+      }
+
+      function initAdvOptsResizer() {
+        const resizer = document.getElementById('adv-opts-resizer');
+        const panel   = document.getElementById('adv-options-panel');
+        if (!resizer || !panel) return;
+        resizer.addEventListener('mousedown', e => {
+          e.preventDefault();
+          resizer.classList.add('dragging');
+          const startX = e.clientX;
+          const startW = panel.offsetWidth;
+          const onMove = mv => {
+            // dragging left increases width
+            const delta = startX - mv.clientX;
+            const newW = Math.max(180, Math.min(700, startW + delta));
+            panel.style.width = newW + 'px';
+          };
+          const onUp = () => {
+            resizer.classList.remove('dragging');
+            document.removeEventListener('mousemove', onMove);
+            document.removeEventListener('mouseup', onUp);
+          };
+          document.addEventListener('mousemove', onMove);
+          document.addEventListener('mouseup', onUp);
+        });
       }
 
 
@@ -7085,6 +7838,9 @@ loadAllData();
         safeJSONParse,
         setupAlaSQL,
         preprocessSQL,
+        splitSelectCols,
+        getBareColName,
+        getAutoAlias,
         spFetch,
         extractRows,
         stripODataMetadata,
@@ -7175,6 +7931,17 @@ loadAllData();
         selectJoin,
         setActiveJoinProp,
         removeActiveJoin,
+        renderAdvOptionsPanel,
+        advNodeCond,
+        advNodeAddCond,
+        advNodeRemoveCond,
+        advNodeSort,
+        advNodeAddSort,
+        advNodeRemoveSort,
+        advNodeGB,
+        advNodeAddGB,
+        advNodeRemoveGB,
+        buildNodeWhere,
         rebuildAdvancedSQL,
         clearQueryBuilder,
         runQuery,
@@ -7182,6 +7949,9 @@ loadAllData();
         showQueryPreview,
         closePreviewPanel,
         toggleQBCollapse,
+        toggleSQLEditor,
+        toggleAdvOptionsPanel,
+        initAdvOptsResizer,
         useResultsInDesign,
         renderDesignFieldsPanel,
         initToolbox,
@@ -7238,6 +8008,9 @@ loadAllData();
         makeColResizer,
         makeRowResizer,
         switchTab,
+        switchQMTab,
+        showUseInDesign,
+        hideUseInDesign,
         setStatus,
         toast,
         downloadText,
