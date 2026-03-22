@@ -22,7 +22,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 
 -->
 <html lang="en">
-
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -216,6 +215,12 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       gap: 0;
       margin-right: 4px;
     }
+     #toolbar-tab-reportMode {
+      display: flex;
+      align-items: center;
+      gap: 0;
+      margin-right: 4px;
+    }
     .tb-tab-sep {
       color: rgba(255,255,255,.4);
       font-size: 11px;
@@ -308,7 +313,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
     #content {
       flex: 1;
       overflow: hidden;
-      display: flex;
+      display: none; /* hidden until data is loaded, then flex */
       flex-direction: column;
     }
 
@@ -327,23 +332,23 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
    POPUP / DIALOG
    ============================================================ */
     #popup-overlay {
-      position: fixed;
+      display: none;
+      position: absolute;
       top: var(--toolbar-h);
       left: 0;
       right: 0;
       bottom: 0;
-      background: rgba(0, 0, 0, .35);
+      background: rgba(0, 0, 0, .40);
+      color: var(--primary-light);
       z-index: 100;
-      display: flex;
       align-items: flex-start;
       justify-content: center;
-      padding-top: 40px;
-      pointer-events: none;
-      /* allow clicks through overlay */
+      padding-top: 60px;
     }
 
-    #popup-overlay.active {
+    #popup-overlay .active {
       pointer-events: none;
+      display: flex;
     }
 
     #popup-dialog {
@@ -2094,20 +2099,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       }
     }
 
-    .loading-overlay {
-      position: absolute;
-      inset: 0;
-      background: rgba(255, 255, 255, .8);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 10px;
-      font-size: 13px;
-      color: var(--text-secondary);
-      z-index: 20;
-      border-radius: inherit;
-    }
-
     /* ============================================================
    TOAST NOTIFICATIONS
    ============================================================ */
@@ -2286,6 +2277,13 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       overflow-y: auto;
       flex: 1;
     }
+
+    @media print {
+    /* IDs and classes to hide when printing */
+    .toolbar, .nav-bar,  .dlv-ctx-menu, .preview-filter-bar, .toast-container, .status-bar, #filter-chip, #filter-chip-select {
+        display: none !important;
+    }
+}
 
     /* ============================================================
    DATA SOURCE GROUP IN FIELDS PANEL
@@ -2499,11 +2497,65 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       padding: 12px 16px;
     }
     #sp-picker-spinner.active { display: flex; }
+
+    /* ============================================================
+       REPORT MODE — activated when ?report= URL param is detected.
+       Hides all designer chrome and maximises the preview panel
+       to fill the entire viewport (toolbar + filter bar included).
+       ============================================================ */
+    body.dlv-report-mode #app {
+      height: 100vh !important;
+      min-height: unset !important;
+      border: none !important;
+      border-radius: 0 !important;
+    }
+    
+    body.dlv-report-mode #popup-overlay {
+      display: none !important;
+      pointer-events: none !important;
+    }
+    /* Keep only the preview tab visible; everything else collapses. */
+    body.dlv-report-mode #content > .tab-panel {
+      display: none !important;
+    }
+    body.dlv-report-mode #content > #tab-preview {
+      display: flex !important;
+      flex-direction: column;
+    }
+    /* Loading banner shown while the report config is being fetched */
+    /* (report loading overlay) */
+    #dlv-report-loading-overlay {
+      display: none;
+      position: absolute;
+      top: var(--toolbar-h);
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, .80);
+      color: var(--primary-light);
+      z-index: 100;
+      align-items: flex-start;
+      justify-content: center;
+      padding-top: 200px;
+    }
+
+    #dlv-report-loading-overlay .active {
+      pointer-events: none;
+      display: flex;
+    }
+    #dlv-report-loading-overlay .spinner {
+      width: 36px;
+      height: 36px;
+      border-width: 3px;
+    }
   </style>
 </head>
 
 <body>
-  <!-- Right-click context menu (shared, positioned dynamically) -->
+
+  <div id="app">
+
+      <!-- Right-click context menu (shared, positioned dynamically) -->
   <div id="dlv-ctx-menu">
     <div class="ctx-menu-item" id="ctx-copy-url" onclick="dlvCtxCopyUrl()">🔗 Copy URL</div>
     <div class="ctx-menu-sep" id="ctx-sep-url"></div>
@@ -2529,39 +2581,18 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
     </div>
   </div>
 
-  <div id="app">
+    <!-- Report-mode loading banner (shown while ?report= config is fetched) -->
+  <div id="dlv-report-loading-overlay" style="display:none;">
+    <div class="spinner"></div>
+    <span id="dlv-report-loading-text">DataLaVista Report</span>
+  </div>
 
-    <!-- TOP TOOLBAR -->
-    <div id="toolbar">
-      <div class="logo">DataLa<span>Vista</span></div>
-      <div class="toolbar-sep"></div>
-      <button class="btn btn-default btn-sm" id="btn-connect" title="Come with me if you want to load... more data."
-        onclick="showPopup()">⚡ Connect &nbsp; Load</button>
-      <button class="btn btn-default btn-sm" id="btn-save-config" title="Come with me if you want your report to live."
-        onclick="saveConfig()" disabled>💾 Save Config</button>
-      <div class="toolbar-sep"></div>
-      <div id="status-bar">Not connected — click Connect / Load to begin</div>
-      <div class="toolbar-spacer"></div>
-      <!-- Main section tabs in toolbar -->
-      <div id="toolbar-tab-nav">
-        <button class="tb-tab-btn active" data-tab="query" onclick="switchTab('query')">Query</button>
-        <span class="tb-tab-sep">›</span>
-        <button class="tb-tab-btn" data-tab="design" onclick="switchTab('design')">Design</button>
-        <span class="tb-tab-sep">›</span>
-        <button class="tb-tab-btn" data-tab="preview" onclick="switchTab('preview')">Preview</button>
-        <span class="tb-tab-sep">›</span>
-        <button class="tb-tab-btn" data-tab="generate" onclick="switchTab('generate')">Generate Report</button>
-      </div>
-      <div class="toolbar-sep"></div>
-      <button class="btn btn-ghost btn-sm" onclick="showHelp()" title="Help">❓</button>
-    </div>
-
-    <!-- POPUP OVERLAY -->
-    <div id="popup-overlay" class="active">
+  <!-- POPUP OVERLAY -->
+    <div id="popup-overlay" style="display: none;">
       <div id="popup-dialog">
         <div class="popup-header">
           <h2>⚡ Connect to Data Source</h2>
-          <button class="btn btn-ghost btn-icon" onclick="hidePopup()" title="Close">✕</button>
+          <button class="btn btn-ghost btn-icon" onclick="hideConnectPopup()" title="Close">✕</button>
         </div>
         <div class="popup-body">
           <div class="source-tabs">
@@ -2652,19 +2683,49 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           </div>
         </div>
         <div class="popup-footer">
-          <button class="btn btn-default" onclick="hidePopup()">I'll be back</button>
+          <button class="btn btn-default" onclick="hideConnectPopup()">I'll be back</button>
           <button class="btn btn-primary" id="btn-do-connect" onclick="doConnect()">⚡ Connect &amp; Load</button>
         </div>
       </div>
     </div>
 
-    <!-- TAB BAR -->
-    <div id="tab-bar">
-      <button class="tab-btn active" data-tab="query" onclick="switchTab('query')">1 · Query</button>
-      <button class="tab-btn" data-tab="design" onclick="switchTab('design')">2 · Design</button>
-      <button class="tab-btn" data-tab="preview" onclick="switchTab('preview')">3 · Preview</button>
-      <button class="tab-btn" data-tab="generate" onclick="switchTab('generate')">4 · Generate Report</button>
+    <!-- TOP TOOLBAR -->
+    <div id="toolbar">
+      <div class="logo">Data<span>LaVista</span></div>
+      <div class="toolbar-sep"></div>
+      <button class="btn btn-default btn-sm" id="btn-connect" title="Come with me if you want to load... more data."
+        onclick="showConnectPopup()">⚡ Connect + Load</button>
+      <button class="btn btn-default btn-sm" id="btn-save-config" title="Come with me if you want your report to live."
+        onclick="saveConfig()" disabled>💾 Save Config</button>
+      <div class="toolbar-sep" id="btn-sep-after-save-config"></div>
+      <div id="status-bar">Not connected — click Connect / Load to begin</div>
+      <div class="toolbar-spacer"></div>
+      <!-- Design mode tabs in toolbar -->
+      <div id="toolbar-tab-nav" class="hidden">
+        <button id="toolbar-button-query" class="tb-tab-btn active" data-tab="query" onclick="switchTab('query')">Query</button>
+        <span class="tb-tab-sep">›</span>
+        <button id="toolbar-button-design" class="tb-tab-btn" data-tab="design" onclick="switchTab('design')">Design</button>
+        <span class="tb-tab-sep">›</span>
+        <button id="toolbar-button-preview" class="tb-tab-btn" data-tab="preview" onclick="switchTab('preview')">Preview</button>
+        <span class="tb-tab-sep">›</span>
+        <button id="toolbar-button-generate" class="tb-tab-btn" data-tab="generate" onclick="switchTab('generate')">Generate Report</button>
+      </div>
+      <!-- Report mode toolbar buttons shown instead of design mode tabs-->
+      <div id="toolbar-tab-reportMode" class="hidden">
+        <button id="toolbar-reportMode-button-1" class="btn btn-primary btn-sm" onclick="refreshPreview()" title="Refresh report data">🔄 Refresh</button>
+        <span class="tb-tab-sep">›</span>
+        <button id="toolbar-reportMode-button-2" class="btn btn-primary btn-sm" onclick="downloadCSV()" title="Download as CSV">📄 CSV</button>
+        <span class="tb-tab-sep">›</span>
+        <button id="toolbar-reportMode-button-3" class="btn btn-primary btn-sm" onclick="printReport()" title="Print report or export to PDF">🖨️ Print</button>
+        <span class="tb-tab-sep">›</span>
+        <button id="toolbar-reportMode-button-4" class="btn btn-primary btn-sm" onclick="shareLiveReport()" title="Copy live report link to clipboard">📨 Share</button>
+      </div>
+      <div class="toolbar-sep"></div>
+      <button id="toolbar-button-help" class="btn btn-ghost btn-sm" onclick="showHelp()" title="Help">❓</button>
     </div>
+
+    
+
 
     <!-- CONTENT -->
     <div id="content">
@@ -2849,11 +2910,12 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 
       <!-- ======================== TAB 3: PREVIEW ======================== -->
       <div class="tab-panel" id="tab-preview">
-        <div id="preview-toolbar">
-          <span class="preview-label">Report Preview</span>
-          <button class="btn btn-default btn-sm" onclick="refreshPreview()">🔄 Refresh</button>
-          <button class="btn btn-default btn-sm" onclick="downloadCSV()">⬇ Download CSV</button>
-          <button class="btn btn-primary btn-sm" onclick="switchTab('generate')">→ Generate Report</button>
+        <div id="preview-toolbar" class="hidden">
+          <span id="preview-label"class="preview-label">Report Preview</span>
+          <button id="preview-toolbar-button-refresh" class="btn btn-default btn-sm" onclick="refreshPreview()">🔄 Refresh</button>
+          <button id="preview-toolbar-button-download" class="btn btn-default btn-sm" onclick="downloadCSV()">📄 CSV</button>
+          <button id="preview-toolbar-button-print" class="btn btn-default btn-sm" onclick="printPreview()">⬇🖨️ Print</button>
+          <button id="preview-toolbar-button-generate" class="btn btn-primary btn-sm" onclick="switchTab('generate')">→ Generate &nbsp; Publish</button>
         </div>
         <div id="preview-title-bar" class="hidden"></div>
         <div id="preview-filter-bar" class="hidden"></div>
@@ -3411,9 +3473,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         };
       }
 
-      console.log('AlaSQL aggregators registered: MIN/MAX/MINDATE/MAXDATE/SUM/LAST');
-
-
       alasql.fn.INCLUDES = function (lookupArray, itemKey) {
         // Return false if the array is invalid or the itemKey is missing
         if (!lookupArray || !Array.isArray(lookupArray) || itemKey == null) return false;
@@ -3427,9 +3486,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           member?.id?.toString() === keyStr
         );
       };
-
-
-      console.log('AlaSQL custom functions registered: INCLUDES');
     }
 
     // ── SELECT column helpers ────────────────────────────────────────────────────
@@ -3671,7 +3727,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       const btn = document.getElementById('btn-connect');
       if (!btn) return;
       const count = Object.keys(state.dataSources).length;
-      btn.innerHTML = count > 0 ? '➕ Get More Data' : '⚡ Connect &nbsp; Load';
+      btn.innerHTML = count > 0 ? '➕ Get More Data' : '⚡ Connect + Load';
       btn.disabled = false;
     }
 
@@ -4255,12 +4311,37 @@ async function deriveStructureFromSample(dataArray) {
     // ============================================================
     // POPUP LOGIC
     // ============================================================
-    function showPopup() {
-      document.getElementById('popup-overlay').style.display = 'flex';
+    function showConnectPopup() {
+      const overlayDiv = document.getElementById('popup-overlay');
+      if(overlayDiv) {
+        overlayDiv.classList.add('active');
+        overlayDiv.style.display = 'flex';
+      }
     }
-    function hidePopup() {
-      document.getElementById('popup-overlay').style.display = 'none';
+    function hideConnectPopup() {
+      const overlayDiv = document.getElementById('popup-overlay');
+      overlayDiv.classList.remove('active');
+      overlayDiv.style.display = 'none';
     }
+    function showLoadingPopup(overlayMessage = 'DataLaVista: Loading...') {
+      const overlayDiv = document.getElementById('dlv-report-loading-overlay');
+      const overlayText = document.getElementById('dlv-report-loading-text');
+      if(overlayDiv) {
+        overlayDiv.classList.add('active');
+        overlayDiv.style.display = 'flex';
+        if(overlayText) overlayText.textContent = overlayMessage;
+      }
+    }
+    function hideLoadingPopup() {
+      const overlayDiv = document.getElementById('dlv-report-loading-overlay');
+      const overlayText = document.getElementById('dlv-report-loading-text');
+      if (overlayDiv) {
+        overlayDiv.classList.remove('active');
+        overlayDiv.style.display = 'none';
+        if(overlayText) overlayText.textContent = '';
+      }
+    }
+
     function switchSourceTab(el, src) {
       document.querySelectorAll('.source-tab').forEach(t => t.classList.remove('active'));
       document.querySelectorAll('.source-pane').forEach(p => p.classList.remove('active'));
@@ -4268,61 +4349,20 @@ async function deriveStructureFromSample(dataArray) {
       document.getElementById('src-' + src).classList.add('active');
       if (src === 'csv') spPickerCheckVisibility();
     }
-    document.getElementById('sp-auth')?.addEventListener('change', function () {
-      document.getElementById('sp-token-group')?.classList.toggle('hidden', this.value !== 'token');
-    });
-    document.getElementById('config-file')?.addEventListener('change', async function () {
-      const f = this.files[0]; if (!f) return;
-      const text = await f.text();
-      const el = document.getElementById('config-json-input');
-      if (el) el.value = text;
-    });
-    document.getElementById('csv-file')?.addEventListener('change', async function () {
-      const f = this.files[0];
-      console.debug('[DLV CSV] file upload change event, file:', f ? f.name : 'none');
-      if (!f) return;
-      let text;
-      try {
-        text = await f.text();
-        console.debug('[DLV CSV] file text length:', text.length, '| first 200 chars:', text.slice(0, 200));
-      } catch (e) {
-        console.error('[DLV CSV] f.text() threw:', e);
-        toast('Error reading file: ' + e.message, 'error');
-        return;
-      }
-      const dsNameEl = document.getElementById('csv-ds-name');
-      console.debug('[DLV CSV] csv-ds-name element:', dsNameEl);
-      const tableName = (dsNameEl?.value || '').trim();
-      console.debug('[DLV CSV] tableName from input:', tableName);
-      const dsName = generateDataSourceName('csv', tableName);
-      console.debug('[DLV CSV] dsName:', dsName, '| fileName:', f.name);
-      loadCSVData(text, dsName, f.name);
-      hidePopup();
-    });
+    
 
-    // Detect SharePoint URL from current page
-    (function detectSPUrl() {
-      let url = '';
-      try { if (typeof _spPageContextInfo !== 'undefined' && _spPageContextInfo.webAbsoluteUrl) { url = _spPageContextInfo.webAbsoluteUrl; } } catch (e) { }
-      if (!url) {
-        const m = window.location.href.match(/(https?:\/\/[^/]+(?:\/sites\/[^/]+)?)/);
-        if (m) url = m[1];
-      }
-      if (url) { const el = document.getElementById('sp-url'); if (el) el.value = url; }
-    })();
+    
 
 
-
-    async function doConnect() {
-  console.debug('[DLV] doConnect called');
-  const activeTab = document.querySelector('.source-tab.active')?.dataset?.src || 'sharepoint';
-  console.debug('[DLV] activeTab:', activeTab);
-  const btn = document.getElementById('btn-do-connect');
-  const prog = document.getElementById('popup-progress');
-  const progText = document.getElementById('popup-progress-text');
-  console.debug('[DLV] btn:', !!btn, '| prog:', !!prog, '| progText:', !!progText);
-  btn.disabled = true;
-  prog.classList.remove('hidden');
+async function doConnect() {
+    console.log('Loading data source...');
+    const activeTab = document.querySelector('.source-tab.active')?.dataset?.src || 'sharepoint';
+    const btn = document.getElementById('btn-do-connect');
+    const prog = document.getElementById('popup-progress');
+    const progText = document.getElementById('popup-progress-text');
+    console.debug('[DLV] btn:', !!btn, '| prog:', !!prog, '| progText:', !!progText);
+    btn.disabled = true;
+    prog.classList.remove('hidden');
 
   try {
     if (activeTab === 'sharepoint') {
@@ -4391,8 +4431,7 @@ async function deriveStructureFromSample(dataArray) {
 
     updateConnectButton();
     document.getElementById('btn-save-config').disabled = false;
-    hidePopup();
-    init();
+    hideConnectPopup();
   } catch (err) {
     console.error(err);
     toast('Error: ' + err.message, 'error');
@@ -4651,11 +4690,13 @@ async function loadSharePointSource(siteUrl, dsName) {
       console.warn('[loadSharePointSource] Skipped list:', list.Title, e.message);
     }
   }
-
-  setStatus(`✅ Loaded ${loadedCount} lists from SharePoint (${dsName})`);
   renderFieldsPanel();
-  setupCodeMirror();
-  toast(`Connected to SharePoint as "${dsName}" — ${loadedCount} lists`, 'success');
+
+  if(!state.reportMode) {
+    setStatus(`✅ Loaded ${loadedCount} lists from SharePoint (${dsName})`);
+    setupCodeMirror();
+    toast(`Connected to SharePoint as "${dsName}" — ${loadedCount} lists`, 'success');
+  }
 }
 
 // ============================================================
@@ -5046,7 +5087,7 @@ async function loadConfig(cfg) {
   state.sql = cfg.sql || '';
   state.queryColumns = cfg.queryColumns || [];
   state.dataSources = {};
-
+console.log('DEBUG: inside loadConfig()');
   // Support new dataSources map
   if (cfg.dataSources && typeof cfg.dataSources === 'object' && !Array.isArray(cfg.dataSources)) {
     // New format: keyed object
@@ -5146,20 +5187,23 @@ async function loadConfig(cfg) {
   updateConnectButton();
   document.getElementById('btn-save-config').disabled = false;
 
-  const titleInput = document.getElementById('title-input');
-  if (titleInput) titleInput.value = state.design.title || '';
-  renderDesignCanvas();
   renderFilterBar();
-  renderFieldsPanel();
-  setStatus('✅ Config loaded');
-  toast('Config loaded successfully', 'success');
+  if(!state.reportMode) {
+    const titleInput = document.getElementById('title-input');
+    if (titleInput) titleInput.value = state.design.title || '';
+    renderDesignCanvas();
+    renderFieldsPanel();
+    setStatus('✅ Config loaded');
+    toast('Config loaded successfully', 'success');
+  }
+    
 
   // Background fetch for referenced tables
   if (state.sql) {
     const referencedTables = findReferencedTables(state.sql);
     referencedTables.forEach(tname => {
       ensureTableData(tname, true).catch(err => {
-        console.warn(`[DEBUG] Background fetch failed for ${tname}:`, err);
+        console.warn(`Background fetch failed for ${tname}:`, err);
       });
     });
   }
@@ -8199,7 +8243,7 @@ async function loadConfig(cfg) {
       // ============================================================
       async function refreshPreview() {
         if (!state.sql.trim()) { toast('Please build a query first', 'error'); return; }
-        setStatus('⏳ Loading preview data...');
+        if(!state.reportMode) setStatus('⏳ Loading preview data...');
 
         try {
           const referencedTables = findReferencedTables(state.sql);
@@ -8227,21 +8271,23 @@ async function loadConfig(cfg) {
           state.queryColumns = results.length ? Object.keys(results[0]) : state.queryColumns;
 
           renderPreviewTab();
-          setStatus(`✅ Preview: ${results.length} rows`);
+          
+          if(!state.reportMode) setStatus(`✅ Preview: ${results.length} rows`);
         } catch (err) {
+          if(!state.reportMode) {
           toast('Preview error: ' + err.message, 'error');
           setStatus('❌ Preview error');
+          } else {
+           setStatus('❌ Report error');
+          }
         }
       }
 
       function renderPreviewTab() {
-        // Title
-        const titleBar = document.getElementById('preview-title-bar');
-        if (state.design.title) {
-          titleBar.textContent = state.design.title;
-          titleBar.classList.remove('hidden');
-        } else titleBar.classList.add('hidden');
-
+        console.log('DEBUG: Rendering preview...');
+        if(!state.reportMode) document.getElementById('preview-toolbar').classList.remove('hidden');
+        document.getElementById('preview-title-bar').textContent = state.design.title || 'DataLaVista Report';
+        document.getElementById('preview-title-bar').classList.remove('hidden');
         // Filter bar
         const filterBar = document.getElementById('preview-filter-bar');
         filterBar.innerHTML = '';
@@ -8276,11 +8322,11 @@ async function loadConfig(cfg) {
           el.className = 'widget';
           el.style.cssText = `width:${w.widthPct}%;height:${w.heightVh}vh;min-height:120px;border-color:${w.borderColor};border-width:${w.borderSize}px`;
           el.innerHTML = `
-      <div class="widget-header"><span class="widget-title">${w.title}</span></div>
-      <div class="widget-content" id="prev-wcontent-${w.id}">
-        ${getPrevWidgetContent(w, results)}
-      </div>
-    `;
+            <div class="widget-header"><span class="widget-title">${w.title}</span></div>
+            <div class="widget-content" id="prev-wcontent-${w.id}">
+              ${getPrevWidgetContent(w, results)}
+            </div>
+          `;
           canvas.appendChild(el);
         }
 
@@ -8397,6 +8443,28 @@ async function loadConfig(cfg) {
         toast(`Exported ${results.length} rows`, 'success');
       }
 
+      async function printReport() {
+          if (!state.sql.trim()) { toast('Please build a query first', 'error'); return; }
+        setTimeout(() => {
+          window.print();
+        }, 500);
+      }
+
+      async function shareLiveReport() {
+        try{
+          if(navigator.canShare) {
+            navigator.share({
+              title: state.design.title || 'DataLaVista Report',
+              text: 'Check out this report I created with DataLaVista!',
+              url: window.location.href
+            });
+          };
+        }
+           finally {
+            navigator.clipboard.writeText(window.location.href).then(() => toast('Report URL copied to clipboard', 'success'));
+          }
+      }
+
       // ============================================================
       // GENERATE REPORT
       // ============================================================
@@ -8406,12 +8474,6 @@ async function loadConfig(cfg) {
         const genJsonArea = document.getElementById('gen-json-area');
         if (genJsonArea) genJsonArea.value = jsonStr;
 
-        const html = buildStandaloneHTML(config);
-        const genCodeArea = document.getElementById('gen-code-area');
-        if (genCodeArea) genCodeArea.value = html;
-
-        document.getElementById('btn-copy-html').disabled = false;
-        document.getElementById('btn-dl-html').disabled = false;
         document.getElementById('btn-copy-json').disabled = false;
         document.getElementById('btn-dl-json').disabled = false;
         toast('Report generated!', 'success');
@@ -8429,395 +8491,7 @@ async function loadConfig(cfg) {
         downloadText(area.value, 'DataLaVista-report' + ext, mime);
       }
 
-      function buildStandaloneHTML(config) {
-        const configJSON = JSON.stringify(config);
-
-        // ── Standalone report inline script ──────────────────────────────
-        // Built as a JS string (not a template literal) so the browser's HTML
-        // parser never sees <html>, <head>, <body>, <script> etc. as real tags.
-        const standaloneScript = [
-'const CONFIG = ' + configJSON + ';',
-'(function(){',
-'  const mkMax=function(v,acc,s){if(s===1)return v;if(s===2){if(!acc)return v;if(!v)return acc;return String(v)>String(acc)?v:acc;}return acc;};',
-'  const mkMin=function(v,acc,s){if(s===1)return v;if(s===2){if(!acc)return v;if(!v)return acc;return String(v)<String(acc)?v:acc;}return acc;};',
-'  alasql.aggr.MAXDATE=alasql.aggr.MAX=mkMax;',
-'  alasql.fn.MAXDATE=alasql.fn.MAX=function(a,b){if(b===undefined)return a;return String(a)>String(b)?a:b;};',
-'  alasql.aggr.MINDATE=alasql.aggr.MIN=mkMin;',
-'  alasql.fn.MINDATE=alasql.fn.MIN=function(a,b){if(b===undefined)return a;return String(a)<String(b)?a:b;};',
-'  alasql.aggr.SUM=function(v,acc,s){var n=parseFloat(v)||0;if(s===1)return n;if(s===2)return(acc||0)+n;return acc;};',
-'  if(!alasql.aggr.LAST)alasql.aggr.LAST=function(v,acc,s){if(s===1)return v;if(s===2)return v;return acc;};',
-'  alasql.fn.INCLUDES=function(arr,k){if(!arr||!Array.isArray(arr)||k==null)return false;var s=k.toString();return arr.some(function(m){return(m&&m.Id&&m.Id.toString()===s)||(m&&m.ID&&m.ID.toString()===s)||(m&&m.id&&m.id.toString()===s);});};',
-'})();',
-
-'var ISO_RE=/^\\d{4}-\\d{2}-\\d{2}T/;',
-'function normDate(v){if(typeof v!=="string")return v;if(ISO_RE.test(v)){var d=v.replace("T"," ").replace("Z","").replace(/\\.\\d+$/,"");if(d.endsWith(" 00:00:00"))d=d.replace(" 00:00:00","");return d;}return v;}',
-'function extractEmail(s){if(!s)return"";var m=s.match(/([a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,})/i);return m?m[1]:"";}',
-'function escH(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}',
-
-'function getTableQueryName(tkey){',
-'  var t=(CONFIG.tables||{})[tkey];if(!t)return tkey;',
-'  var ds=(CONFIG.dataSources||{})[t.dataSource];',
-'  var dsa=(ds&&ds.alias)||t.dataSource||"";',
-'  var ta=t.alias||t.internalName||tkey;',
-'  return dsa?dsa+"_"+ta:ta;',
-'}',
-
-'function splitCols(s){var r=[],d=0,c="";for(var i=0;i<s.length;i++){var ch=s[i];if(ch==="(")d++;else if(ch===")")d--;else if(ch===","&&d===0){r.push(c.trim());c="";continue;}c+=ch;}if(c.trim())r.push(c.trim());return r;}',
-'function getBare(col){var a=col.match(/\\bAS\\s+\\[?([\\w]+)\\]?\\s*$/i);if(a)return a[1];var d=col.match(/\\.[\\["\\x27]?([\\w]+)[\\]"\\x27]?\\s*$/);if(d)return d[1];return col.replace(/[\\[\\]"]/g,"").trim();}',
-'function autoAlias(col){var m=col.match(/[\\["\\x27]?([\\w]+)[\\]"\\x27]?\\.[\\["\\x27]?([\\w]+)[\\]"\\x27]?/);if(m)return m[1]+"_"+m[2];return getBare(col);}',
-'function preprocessSQL(sql){',
-'  var re=/^(\\s*SELECT\\s+)([\\s\\S]+?)(\\s+FROM\\b)/i,m=sql.match(re);if(!m)return sql;',
-'  var cols=splitCols(m[2]),bares=cols.map(getBare),counts={};',
-'  bares.forEach(function(n){counts[n.toLowerCase()]=(counts[n.toLowerCase()]||0)+1;});',
-'  var chg=false,nc=cols.map(function(col,i){',
-'    var b=bares[i];if(counts[b.toLowerCase()]<=1)return col;',
-'    if(/\\bAS\\s+\\[?[\\w]+\\]?\\s*$/i.test(col))return col;',
-'    chg=true;return col+" AS ["+autoAlias(col)+"]";',
-'  });',
-'  if(!chg)return sql;',
-'  return m[1]+nc.join(", ")+sql.slice(m[1].length+m[2].length);',
-'}',
-
-'function mapDataRow(row,fieldDefs){',
-'  var mapped={},pr=Object.assign({},row);',
-'  for(var i=0;i<fieldDefs.length;i++){',
-'    var f=fieldDefs[i],key=f.InternalName||f.internalName;',
-'    var fn=f.alias||f.displayName||f.Title||key;',
-'    if(fn==="Attachments")fn="HasAttachments";',
-'    var val=pr[key];if(val===null||val===undefined)continue;',
-'    var ts=(f.TypeAsString||"").toLowerCase(),ft=(f.type||"").toLowerCase();',
-'    var isUser=ts.includes("user")||ft==="user"||ft==="user-multi";',
-'    var isTax=ts.includes("tax")||ft==="taxkeyword"||key==="TaxKeyword";',
-'    var isLookup=ts.includes("lookup")||ft==="lookup"||ft==="lookup-multi";',
-'    var isURL=ts.includes("url");',
-'    var isMulti=ts.includes("multi")||ft.includes("multi")||ft==="taxkeyword"||key==="TaxKeyword";',
-'    if(isLookup&&!isMulti&&typeof val==="object"&&!Array.isArray(val)){mapped[fn]=val.Title||val.lookupValue||"";mapped[fn+"Id"]=val.Id;mapped[fn+"Data"]=[val];delete pr[key];delete pr[key+"Id"];continue;}',
-'    if(isLookup&&isMulti&&Array.isArray(val)){mapped[fn]=val.map(function(v){return v.Title||v.lookupValue||"";}).join("; ");mapped[fn+"Ids"]=val.map(function(v){return v.Id;}).join("; ");mapped[fn+"Data"]=val;delete pr[key];delete pr[key+"Id"];continue;}',
-'    if(isUser&&!isMulti&&typeof val==="object"&&!Array.isArray(val)){',
-'      var dsList=Object.values(CONFIG.dataSources||{});',
-'      var siteBase=(dsList.find(function(d){return d.url;})||{}).url||window.location.origin;',
-'      siteBase=siteBase.replace(/\\/$/,"");',
-'      mapped[fn]=val.Title||val.Name||JSON.stringify(val);mapped[fn+"Id"]=val.Id;',
-'      mapped[fn+"Claims"]=val.Name||"";mapped[fn+"Email"]=extractEmail(val.Name);',
-'      mapped[fn+"PictureUrl"]=val.Name?siteBase+"/_layouts/15/userphoto.aspx?size=M&accountname="+encodeURIComponent(val.Name):"";',
-'      mapped[fn+"Data"]=[val];delete pr[key];delete pr[key+"Id"];continue;',
-'    }',
-'    if(isUser&&isMulti&&Array.isArray(val)){mapped[fn]=val.map(function(v){return v.Title||v.Name||"";}).join("; ");mapped[fn+"Ids"]=val.map(function(v){return v.Id;}).join("; ");mapped[fn+"Emails"]=val.map(function(v){return extractEmail(v.Name);}).filter(Boolean).join("; ");mapped[fn+"Data"]=val;delete pr[key];delete pr[key+"Id"];continue;}',
-'    if(isTax&&!isMulti&&typeof val==="object"&&!Array.isArray(val)){mapped[fn]=val.Label;mapped[fn+"Id"]=val.Label+"|"+val.TermGuid;mapped[fn+"Data"]=[val];delete pr[key];continue;}',
-'    if(isTax&&isMulti&&Array.isArray(val)){mapped[fn]=val.map(function(v){return v.Label;}).join("; ");mapped[fn+"Ids"]=val.map(function(v){return v.Label+"|"+v.TermGuid;}).join("; ");mapped[fn+"Data"]=val;delete pr[key];continue;}',
-'    if(isURL&&typeof val==="object"&&val.Url){mapped[fn]=val.Url;mapped[fn+"Description"]=val.Description||"";mapped[fn+"Url"]=val.Url;delete pr[key];continue;}',
-'  }',
-'  var keys=Object.keys(pr);',
-'  for(var j=0;j<keys.length;j++){',
-'    var k=keys[j],v=pr[k];if(v===null||v===undefined)continue;',
-'    var fname=k,fd=fieldDefs.find(function(f){return(f.InternalName||f.internalName)===k;});',
-'    if(fd)fname=fd.alias||fd.displayName||fd.Title||fd.InternalName||k;',
-'    if(fname==="Attachments")fname="HasAttachments";',
-'    if(k.endsWith("Id")&&mapped[fname.slice(0,-2)]!==undefined)continue;',
-'    if(typeof v==="string"&&/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z?$/.test(v)){v=v.replace("T"," ").replace("Z","");if(/(Date|Fecha)$/i.test(fname))v=v.replace(/ 00:00:00$/,"");}',
-'    if(Array.isArray(v)){mapped[fname]=v.join("; ");mapped[fname+"Data"]=v;}',
-'    else if(typeof v==="object"){mapped[fname]=JSON.stringify(v);mapped[fname+"Data"]=v;}',
-'    else mapped[fname]=v;',
-'  }',
-'  return mapped;',
-'}',
-
-'function getAuthHeaders(dsKey){',
-'  var ds=(CONFIG.dataSources||{})[dsKey]||(CONFIG.dataSource||{});',
-'  var h={"Accept":"application/json"};',
-'  if(ds.auth==="token"&&ds.token)h["Authorization"]="Bearer "+ds.token;',
-'  return h;',
-'}',
-'async function spFetch(url,dsKey){',
-'  var r=await fetch(url,{headers:getAuthHeaders(dsKey),credentials:"include"});',
-'  if(!r.ok)throw new Error("HTTP "+r.status+" — "+url);',
-'  return r.json();',
-'}',
-'function extractRows(j){if(!j)return[];if(Array.isArray(j))return j;if(j.value&&Array.isArray(j.value))return j.value;if(j.d){if(Array.isArray(j.d))return j.d;if(j.d.results)return j.d.results;return[j.d];}return[j];}',
-
-'function buildSelectExpand(originalFields){',
-'  var sel=new Set(["ID","Title","Created","Modified","Author/Id","Author/Title","Author/Name","Editor/Id","Editor/Title","Editor/Name"]);',
-'  var exp=new Set(["Author","Editor"]);',
-'  (originalFields||[]).forEach(function(f){',
-'    var ts=(f.TypeAsString||f.type||"").toLowerCase(),nm=f.InternalName||f.internalName;',
-'    if(!nm||f.isAutoId||f.IsDependentLookup)return;',
-'    if(ts.includes("user")){sel.add(nm+"/Id");sel.add(nm+"/Title");sel.add(nm+"/Name");exp.add(nm);}',
-'    else if(ts.includes("lookup")){sel.add(nm+"/Id");sel.add(nm+"/Title");exp.add(nm);}',
-'    else sel.add(nm);',
-'  });',
-'  return{select:[...sel],expand:[...exp]};',
-'}',
-
-'async function fetchSPItems(siteUrl,listGuid,originalFields,dsKey,top){',
-'  top=top||999999;',
-'  var spec=buildSelectExpand(originalFields),curSel=[...spec.select],curExp=[...spec.expand];',
-'  for(var attempt=0;attempt<10;attempt++){',
-'    var baseUrl=siteUrl+"/_api/web/lists(guid\'"+listGuid+"\')/items?$top="+top+"&$select="+curSel.join(",")+"&$expand="+curExp.join(",");',
-'    try{',
-'      var all=[],next=baseUrl;',
-'      while(next){',
-'        var j=await spFetch(next,dsKey);',
-'        all=all.concat(extractRows(j));',
-'        next=j["@odata.nextLink"]||j["odata.nextLink"]||(j.d&&j.d.__next)||null;',
-'        if(all.length>=top){all=all.slice(0,top);break;}',
-'      }',
-'      return all;',
-'    }catch(e){',
-'      var bad=(e.message||"").match(/(?:Column|field or property) \'([^\']+)\' does not exist/i);',
-'      if(bad&&bad[1]){var bc=bad[1];curSel=curSel.filter(function(s){return s!==bc&&!s.startsWith(bc+"/");});curExp=curExp.filter(function(s){return s!==bc&&!s.startsWith(bc+"/");});}',
-'      else throw e;',
-'    }',
-'  }',
-'  throw new Error("Exceeded retries fetching "+listGuid);',
-'}',
-
-'function findReferencedTables(sql){',
-'  var found=[];',
-'  Object.keys(CONFIG.tables||{}).forEach(function(tkey){',
-'    var esc1=tkey.replace(/[.*+?^${}()|[\\]\\\\]/g,"\\\\$&");',
-'    var re1=new RegExp("\\\\["+esc1+"\\\\]|\\\\b"+esc1+"\\\\b","i");',
-'    var qname=getTableQueryName(tkey);',
-'    var esc2=qname.replace(/[.*+?^${}()|[\\]\\\\]/g,"\\\\$&");',
-'    var re2=qname!==tkey?new RegExp("\\\\["+esc2+"\\\\]|\\\\b"+esc2+"\\\\b","i"):null;',
-'    if(re1.test(sql)||(re2&&re2.test(sql)))found.push(tkey);',
-'  });',
-'  return found;',
-'}',
-
-'function parseCSVSimple(text){',
-'  var lines=text.split("\\n").filter(function(l){return l.trim();});',
-'  if(!lines.length)return{headers:[],rows:[]};',
-'  function parseLine(line){var r=[],cur="",inQ=false;for(var i=0;i<line.length;i++){var c=line[i];if(c===\'"\'){if(inQ&&line[i+1]===\'"\'){cur+=\'"\';i++;}else inQ=!inQ;}else if(c===","&&!inQ){r.push(cur.trim());cur="";}else cur+=c;}r.push(cur.trim());return r;}',
-'  var headers=parseLine(lines[0]);',
-'  var rows=lines.slice(1).map(function(l){var vals=parseLine(l),row={};headers.forEach(function(h,i){row[h]=vals[i]!==undefined?vals[i]:null;});return row;});',
-'  return{headers:headers,rows:rows};',
-'}',
-
-'function registerInAlaSQL(tkey,data){',
-'  var kname=tkey;',
-'  alasql("DROP TABLE IF EXISTS ["+kname+"]");alasql("CREATE TABLE ["+kname+"]");',
-'  var k1=Object.keys(alasql.tables).find(function(k){return k.toLowerCase()===kname.toLowerCase();})||kname;',
-'  alasql.tables[k1].data=data;',
-'  var qname=getTableQueryName(tkey);',
-'  if(qname!==kname){',
-'    alasql("DROP TABLE IF EXISTS ["+qname+"]");alasql("CREATE TABLE ["+qname+"]");',
-'    var k2=Object.keys(alasql.tables).find(function(k){return k.toLowerCase()===qname.toLowerCase();})||qname;',
-'    alasql.tables[k2].data=data;',
-'  }',
-'}',
-
-'var allData={},queryResults=[],previewFilters={},charts={};',
-
-'async function loadAllData(){',
-'  var loader=document.getElementById("loading"),lt=document.getElementById("loading-text");',
-'  try{',
-'    var tablesInSQL=findReferencedTables(CONFIG.sql);',
-'    for(var i=0;i<tablesInSQL.length;i++){',
-'      var tkey=tablesInSQL[i],tmeta=(CONFIG.tables||{})[tkey];',
-'      if(!tmeta)continue;',
-'      var qname=getTableQueryName(tkey);',
-'      lt.textContent="Loading "+qname+"...";',
-'      var dsKey=tmeta.dataSource||"";',
-'      var ds=(CONFIG.dataSources||{})[dsKey]||(CONFIG.dataSource||{});',
-'      var srcType=tmeta.sourceType||"sharepoint";',
-'      if(srcType==="csv"||srcType==="json"){',
-'        // For CSV/JSON sources: fetch from URL, do not query as SP list',
-'        var fileUrl=tmeta.url||ds.url||"";',
-'        if(!fileUrl){console.warn("No URL for",tkey);continue;}',
-'        try{',
-'          var res=await fetch(fileUrl,{credentials:"include"});',
-'          if(!res.ok)throw new Error("HTTP "+res.status);',
-'          if(srcType==="csv"){',
-'            var csvText=await res.text();',
-'            var parsed=parseCSVSimple(csvText);',
-'            allData[tkey]=parsed.rows;',
-'            registerInAlaSQL(tkey,parsed.rows);',
-'          } else {',
-'            var jsonData=await res.json();',
-'            var rows=Array.isArray(jsonData)?jsonData:(jsonData.value||jsonData.d?.results||[jsonData]);',
-'            allData[tkey]=rows;',
-'            registerInAlaSQL(tkey,rows);',
-'          }',
-'        }catch(fe){console.warn("Failed to load",tkey,"from URL:",fe.message);}',
-'        continue;',
-'      }',
-'      if(srcType!=="sharepoint"||!tmeta.guid)continue;',
-'      var siteUrl=tmeta.siteUrl||ds.url||"";',
-'      if(!siteUrl){console.warn("No siteUrl for",tkey);continue;}',
-'      var origFields=(tmeta.originalFields||tmeta.fields||[]).filter(function(f){return!f.isAutoId;});',
-'      var rawItems=await fetchSPItems(siteUrl,tmeta.guid,origFields,dsKey);',
-'      var mapped=rawItems.map(function(r){return mapDataRow(r,origFields);});',
-'      allData[tkey]=mapped;',
-'      registerInAlaSQL(tkey,mapped);',
-'    }',
-'    lt.textContent="Running main query...";',
-'    queryResults=alasql(preprocessSQL(CONFIG.sql));',
-'    if(!Array.isArray(queryResults))queryResults=[];',
-'    alasql("DROP TABLE IF EXISTS [_results]");alasql("CREATE TABLE [_results]");',
-'    alasql.tables["_results"].data=queryResults;',
-'    loader.style.display="none";',
-'    renderReport();',
-'  }catch(e){lt.textContent="Error: "+e.message;console.error("[DataLaVista standalone]",e);}',
-'}',
-
-'function renderReport(){',
-'  document.getElementById("report-title").textContent=CONFIG.design.title||"Report";',
-'  renderFilterBar();renderCanvas();',
-'  window.addEventListener("resize",function(){Object.values(charts).forEach(function(c){try{c.resize();}catch(e){}});});',
-'}',
-
-'function renderFilterBar(){',
-'  var bar=document.getElementById("filter-bar");bar.innerHTML="";',
-'  var filters=(CONFIG.design.filters||[]).filter(function(f){return f.position==="bar"||!f.position;});',
-'  if(!filters.length){bar.style.display="none";return;}bar.style.display="";',
-'  filters.forEach(function(f){',
-'    var vals=["(All)"].concat([...new Set(queryResults.map(function(r){return r[f.field];}).filter(function(v){return v!=null&&v!=="";}))).sort()];',
-'    var chip=document.createElement("div");chip.className="filter-chip";',
-'    chip.innerHTML=\'<span style="font-weight:600;margin-right:4px">\'+escH(f.label||f.field)+\':</span>\'',
-'      +\'<select onchange="applyFilter(\\\'"+escH(f.field)+"\\\',this.value)">\'+vals.map(function(v){return\'<option value="\'+escH(String(v))+\'">\'+escH(String(v))+"</option>";}).join("")+"</select>";',
-'    bar.appendChild(chip);',
-'  });',
-'}',
-
-'function applyFilter(field,value){',
-'  if(value==="(All)")delete previewFilters[field];else previewFilters[field]=value;',
-'  var filtered=queryResults;',
-'  Object.keys(previewFilters).forEach(function(fld){var val=previewFilters[fld];filtered=filtered.filter(function(r){return String(r[fld])===String(val);});});',
-'  alasql.tables["_results"].data=filtered;',
-'  renderCanvas();',
-'}',
-
-'function runWidgetSQL(w){',
-'  var base=(alasql.tables["_results"]&&alasql.tables["_results"].data)||queryResults;',
-'  if(!w.widgetSql)return base;',
-'  try{return alasql(w.widgetSql)||[];}catch(e){console.warn("Widget SQL:",w.id,e.message);return base;}',
-'}',
-
-'function renderCanvas(){',
-'  var canvas=document.getElementById("canvas");canvas.innerHTML="";',
-'  Object.entries(charts).forEach(function(e){try{e[1].dispose();}catch(ex){}});',
-'  Object.keys(charts).forEach(function(k){delete charts[k];});',
-'  (CONFIG.design.widgets||[]).forEach(function(w){',
-'    if(w.type==="placeholder")return;',
-'    var el=document.createElement("div");el.className="widget";',
-'    el.style.cssText="width:"+w.widthPct+"%;height:"+w.heightVh+"vh;min-height:120px;border-color:"+(w.borderColor||"#edebe9")+";border-width:"+(w.borderSize!=null?w.borderSize:1)+"px";',
-'    var wData=runWidgetSQL(w);',
-'    el.innerHTML=\'<div class="widget-header">\'+escH(w.title||"")+\'</div><div class="widget-content" id="wcontent-\'+w.id+\'">\'+getWContent(w,wData)+"</div>";',
-'    canvas.appendChild(el);',
-'  });',
-'  requestAnimationFrame(function(){',
-'    (CONFIG.design.widgets||[]).forEach(function(w){',
-'      if(["bar","line","pie","scatter"].includes(w.type))renderChart(w,runWidgetSQL(w));',
-'    });',
-'  });',
-'}',
-
-'function getWContent(w,results){',
-'  if(w.type==="text")return\'<div class="text-widget" style="font-size:\'+(w.fontSize||13)+\'px;color:\'+(w.fontColor||"#323130")+\'">\'+w.textContent+"</div>";',
-'  if(w.type==="kpi"){',
-'    if(!results||!results.length)return\'<div class="kpi-card"><div class="kpi-value" style="color:\'+(w.fillColor||"#0078d4")+\'">—</div><div class="kpi-label">\'+(w.fields&&w.fields[0]||"")+"</div></div>";',
-'    var row=results[0],label=(w.fields&&w.fields[0])||"";',
-'    var value=row._value!==undefined?row._value:(row[label]!==undefined?row[label]:"—");',
-'    var fmt=typeof value==="number"?value.toLocaleString():String(value!=null?value:"—");',
-'    return\'<div class="kpi-card"><div class="kpi-value" style="color:\'+(w.fillColor||"#0078d4")+"\">"',
-'      +escH(fmt)+\'</div><div class="kpi-label">\'+escH(label)+"</div></div>";',
-'  }',
-'  if(w.type==="table"){',
-'    if(!results||!results.length)return\'<div style="padding:12px;color:#605e5c">No data</div>\';',
-'    var cols=Object.keys(results[0]);if(!cols.length)return"";',
-'    var h=\'<div style="overflow:auto;max-height:100%"><table class="widget-table"><thead><tr>\'+cols.map(function(c){return"<th>"+escH(c)+"</th>";}).join("")+"</tr></thead><tbody>";',
-'    results.forEach(function(row){h+="<tr>"+cols.map(function(c){return"<td>"+escH(String(row[c]!=null?row[c]:""))+"</td>";}).join("")+"</tr>";});',
-'    return h+"</tbody></table></div>";',
-'  }',
-'  if(["bar","line","pie","scatter"].includes(w.type))return\'<div id="chart-\'+w.id+\'" style="width:100%;height:100%;min-height:200px"></div>\';',
-'  return"";',
-'}',
-
-'function renderChart(w,results){',
-'  var el=document.getElementById("chart-"+w.id);if(!el)return;',
-'  if(charts[w.id]){try{charts[w.id].dispose();}catch(e){}}',
-'  var c=echarts.init(el);charts[w.id]=c;',
-'  if(!results||!results.length){c.setOption({title:{text:"No data",left:"center",top:"middle",textStyle:{color:"#a19f9d"}}});return;}',
-'  var cols=Object.keys(results[0]);',
-'  var xF=(w.xField&&results[0][w.xField]!==undefined)?w.xField:cols[0];',
-'  var yF=(w.yField&&results[0][w.yField]!==undefined)?w.yField:(cols[1]||cols[0]);',
-'  var fill=w.fillColor||"#0078d4",opt={};',
-'  if(w.type==="bar")opt={tooltip:{trigger:"axis"},xAxis:{type:"category",data:results.map(function(r){return String(r[xF]!=null?r[xF]:"");}),axisLabel:{rotate:30,fontSize:11}},yAxis:{type:"value"},series:[{type:"bar",data:results.map(function(r){return parseFloat(r[yF])||0;}),itemStyle:{color:fill}}],grid:{left:40,right:20,top:20,bottom:60}};',
-'  else if(w.type==="line")opt={tooltip:{trigger:"axis"},xAxis:{type:"category",data:results.map(function(r){return String(r[xF]!=null?r[xF]:"");}),axisLabel:{rotate:30,fontSize:11}},yAxis:{type:"value"},series:[{type:"line",data:results.map(function(r){return parseFloat(r[yF])||0;}),itemStyle:{color:fill},smooth:true}],grid:{left:40,right:20,top:20,bottom:60}};',
-'  else if(w.type==="pie")opt={tooltip:{trigger:"item",formatter:"{b}: {c} ({d}%)"},series:[{type:"pie",data:results.map(function(r){return{name:String(r[xF]!=null?r[xF]:""),value:parseFloat(r[yF])||0};}),radius:["30%","65%"],label:{fontSize:11}}]};',
-'  else if(w.type==="scatter")opt={tooltip:{trigger:"item"},xAxis:{type:"value"},yAxis:{type:"value"},series:[{type:"scatter",data:results.map(function(r){return[parseFloat(r[xF])||0,parseFloat(r[yF])||0];}),itemStyle:{color:fill}}],grid:{left:40,right:20,top:20,bottom:40}};',
-'  c.setOption(opt);',
-'}',
-
-'async function downloadCSV(){',
-'  var data=(alasql.tables["_results"]&&alasql.tables["_results"].data)||queryResults;',
-'  var cols=data.length?Object.keys(data[0]):[];',
-'  function csvEsc(v){var s=String(v!=null?v:"");if(s.indexOf(",")>=0||s.indexOf("\"")>=0||s.indexOf("\n")>=0){return "\""+s.replace(/\"/g,"\"\"")+"\""}return s;}',
-'  var csv=[cols.join(",")].concat(data.map(function(r){return cols.map(function(c){return csvEsc(r[c]);}).join(",");})).join("\n");',
-'  var a=document.createElement("a");a.href="data:text/csv;charset=utf-8,"+encodeURIComponent(csv);a.download="report-data.csv";a.click();',
-'}',
-'loadAllData();'
-        ].join('\n');
-
-        // ── Compose the standalone report HTML ────────────────────────────
-        const now = new Date().toISOString().slice(0,10);
-        const parts = [];
-        parts.push('<!--');
-        parts.push('This file is part of DataLaVista.');
-        parts.push('Generated by DataLaVista Report Designer.');
-        parts.push('Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.');
-        parts.push('Created: ' + now);
-        parts.push('Summary: Standalone DataLaVista report.');
-        parts.push('Website: https://github.com/DepressionCenter/datalavista');
-        parts.push('Copyright © 2026 The Regents of the University of Michigan');
-        parts.push('Licensed under GPLv3 or later. See <https://www.gnu.org/licenses/>.');
-        parts.push('-->');
-        parts.push('<html lang="en">');
-        parts.push('<head>');
-        parts.push('<meta charset="UTF-8"/>');
-        parts.push('<meta name="viewport" content="width=device-width, initial-scale=1.0"/>');
-        parts.push('<title>' + (config.design.title || 'DataLaVista Report').replace(/</g,'&lt;') + '</title>');
-        parts.push('<script src="https://cdnjs.cloudflare.com/ajax/libs/alasql/4.1.3/alasql.min.js"><' + '/script>');
-        parts.push('<script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.5.0/echarts.min.js"><' + '/script>');
-        parts.push('<style>');
-        parts.push('*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}');
-        parts.push(':root{--primary:#0078d4;--bg:#faf9f8;--surface:#fff;--surface2:#f3f2f1;--border:#edebe9;--text:#323130;--text-secondary:#605e5c;--radius:4px;--shadow:0 2px 8px rgba(0,0,0,.15);--font:\'Segoe UI\',system-ui,sans-serif}');
-        parts.push('body{font-family:var(--font);font-size:13px;color:var(--text);background:var(--bg);min-height:100vh}');
-        parts.push('#report-header{background:var(--primary);padding:14px 20px;display:flex;align-items:center;justify-content:space-between;box-shadow:var(--shadow)}');
-        parts.push('#report-title{font-size:20px;font-weight:700;color:white}');
-        parts.push('#filter-bar{padding:8px 16px;background:var(--surface2);border-bottom:1px solid var(--border);display:flex;flex-wrap:wrap;gap:8px;align-items:center;min-height:44px}');
-        parts.push('#canvas{display:flex;flex-wrap:wrap;gap:8px;padding:12px;align-content:flex-start}');
-        parts.push('.widget{background:var(--surface);border:1px solid var(--border);border-radius:6px;box-shadow:0 1px 3px rgba(0,0,0,.1);overflow:hidden;display:flex;flex-direction:column}');
-        parts.push('.widget-header{padding:8px 12px;background:var(--surface2);border-bottom:1px solid var(--border);font-weight:600;font-size:13px}');
-        parts.push('.widget-content{flex:1;overflow:auto;position:relative}');
-        parts.push('.kpi-card{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;padding:16px;text-align:center}');
-        parts.push('.kpi-value{font-size:36px;font-weight:700;color:var(--primary);line-height:1}');
-        parts.push('.kpi-label{font-size:13px;color:var(--text-secondary);margin-top:6px}');
-        parts.push('.widget-table{border-collapse:collapse;width:100%;font-size:12px}');
-        parts.push('.widget-table th{background:var(--surface2);border-bottom:2px solid var(--border);padding:5px 10px;font-weight:600;position:sticky;top:0;text-align:left}');
-        parts.push('.widget-table td{border-bottom:1px solid var(--border);padding:4px 10px}');
-        parts.push('.text-widget{padding:12px;font-size:14px;line-height:1.5}');
-        parts.push('.filter-chip{display:inline-flex;align-items:center;gap:6px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:3px 10px;font-size:12px}');
-        parts.push('.filter-chip select{border:none;background:transparent;font-size:12px;cursor:pointer;outline:none}');
-        parts.push('::-webkit-scrollbar{width:6px;height:6px}::-webkit-scrollbar-track{background:var(--surface2)}::-webkit-scrollbar-thumb{background:#c8c6c4;border-radius:3px}');
-        parts.push('.dl-btn{background:var(--primary);color:white;border:none;border-radius:4px;padding:6px 14px;font-size:12px;cursor:pointer;font-family:var(--font)}.dl-btn:hover{background:#106ebe}');
-        parts.push('#loading{position:fixed;inset:0;background:rgba(255,255,255,.9);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;z-index:999;font-size:14px;color:var(--text-secondary)}');
-        parts.push('.spinner{width:32px;height:32px;border:3px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:spin .7s linear infinite}');
-        parts.push('@keyframes spin{to{transform:rotate(360deg)}}');
-        parts.push('<' + '/style>');
-        parts.push('<' + '/head>');
-        parts.push('<' + 'body>');
-        parts.push('<div id="loading"><div class="spinner"></div><div id="loading-text">Loading report data...</div></div>');
-        parts.push('<div id="report-header"><span id="report-title"></span><button class="dl-btn" onclick="downloadCSV()">⬇ Download CSV</button></div>');
-        parts.push('<div id="filter-bar"></div>');
-        parts.push('<div id="canvas"></div>');
-        parts.push('<' + 'script>');
-        parts.push(standaloneScript);
-        parts.push('<' + '/script>');
-        parts.push('<' + '/body>');
-        parts.push('<' + '/html>');
-        return parts.join('\n');
-      }
+      
       // ============================================================
       // RESIZABLE PANELS
       // ============================================================
@@ -8901,7 +8575,7 @@ async function loadConfig(cfg) {
         document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === 'tab-' + tab));
 
         if (tab === 'preview') { refreshPreview(); }
-        if (tab === 'design') {
+        if (tab === 'design' && !state.reportMode) {
           renderDesignCanvas(); renderFilterBar(); renderDesignFieldsPanel();
           requestAnimationFrame(() => { for (const c of Object.values(state.charts)) { try { c.resize(); } catch (e) { } } });
         }
@@ -8949,63 +8623,26 @@ async function loadConfig(cfg) {
         toast('DataLaVista — Connect a SharePoint site, build queries, design reports, then generate standalone report.', 'info');
       }
 
-      // ============================================================
-      // INIT
-      // ============================================================
-      function init() {
-        console.log("*** Initializing DataLaVista visual components... ***");
-        setupAlaSQL();
-        initToolbox();
-        initResizers();
-        setQBMode('basic');
-        switchQMTab('qb');
-        switchTab('query');
-        spPickerCheckVisibility();
 
-        // Default SQL hint
-        if (document.getElementById('sql-editor')) {
-          setupCodeMirror();
-          if (window._cmEditor) window._cmEditor.setValue('-- Connect to a data source, then drag a table here to start\n-- Tables are queried as DSName_TableName (e.g. SP_People)\n-- Renaming a data source or table updates the query name live\nSELECT SP_People.* FROM SP_People LIMIT 20');
+      
+      /** Detect if running inside a SharePoint site and return the site URL, or null. */
+      function getSpSiteUrl() {
+        let siteUrl = null;
+        try {
+          if (typeof _spPageContextInfo !== 'undefined' && _spPageContextInfo.webAbsoluteUrl) {
+            siteUrl = _spPageContextInfo.webAbsoluteUrl.replace(/\/$/, '');
+          }
+        } catch(e) {}
+        // Fallback: check if current URL looks like SharePoint
+        const m = window.location.href.match(/^(https?:\/\/[^/]+(?:\/sites\/[^/]+|\/teams\/[^/]+)?)/);
+        if (m && (window.location.hostname.toLowerCase().includes('sharepoint.com') ||
+                  window.location.hostname.toLowerCase().includes('.sharepoint.')) &&
+                  window.location.pathname.startsWith('/sites/') ||
+                  window.location.pathname.startsWith('/teams/')) {
+          siteUrl = m[1];
         }
-
-        // Wire options panel left-edge resizer
-        initAdvOptsResizer();
-
-        // Don't show popup when in SharePoint edit mode (Mode=Edit) — it blocks page editing
-        let url = '';
-        try { if (typeof _spPageContextInfo !== 'undefined' && _spPageContextInfo.webAbsoluteUrl) { url = _spPageContextInfo.webAbsoluteUrl; } } catch (e) { }
-        if (!url) { url = window.location.href; }
-        const spMode = new URLSearchParams(url).get('Mode') || '';
-        if (spMode.toLowerCase().includes('edit')) { hidePopup(); }
-
-        console.log("*** DataLaVista visual component loading complete. ***");
+        return siteUrl;
       }
-
-      function initAdvOptsResizer() {
-        const resizer = document.getElementById('adv-opts-resizer');
-        const panel   = document.getElementById('adv-options-panel');
-        if (!resizer || !panel) return;
-        resizer.addEventListener('mousedown', e => {
-          e.preventDefault();
-          resizer.classList.add('dragging');
-          const startX = e.clientX;
-          const startW = panel.offsetWidth;
-          const onMove = mv => {
-            // dragging left increases width
-            const delta = startX - mv.clientX;
-            const newW = Math.max(180, Math.min(700, startW + delta));
-            panel.style.width = newW + 'px';
-          };
-          const onUp = () => {
-            resizer.classList.remove('dragging');
-            document.removeEventListener('mousemove', onMove);
-            document.removeEventListener('mouseup', onUp);
-          };
-          document.addEventListener('mousemove', onMove);
-          document.addEventListener('mouseup', onUp);
-        });
-      }
-
 
       // ============================================================
       // SHAREPOINT FILE PICKER
@@ -9017,24 +8654,6 @@ async function loadConfig(cfg) {
         stack: [],       // breadcrumb stack: [{label, serverRelUrl}]
         selected: null,  // { name, serverRelUrl, absoluteUrl }
       };
-
-      /** Detect if running inside a SharePoint site and return the site URL, or null. */
-      function getSpSiteUrl() {
-        try {
-          if (typeof _spPageContextInfo !== 'undefined' && _spPageContextInfo.webAbsoluteUrl) {
-            return _spPageContextInfo.webAbsoluteUrl.replace(/\/$/, '');
-          }
-        } catch(e) {}
-        // Fallback: check if current URL looks like SharePoint
-        const m = window.location.href.match(/^(https?:\/\/[^/]+(?:\/sites\/[^/]+|\/teams\/[^/]+)?)/);
-        if (m && (window.location.hostname.includes('sharepoint.com') ||
-                  window.location.hostname.includes('.sharepoint.') ||
-                  window.location.pathname.startsWith('/sites/') ||
-                  window.location.pathname.startsWith('/teams/'))) {
-          return m[1];
-        }
-        return null;
-      }
 
       /** Show or hide the Browse SP button depending on whether we're in SP. */
       function spPickerCheckVisibility() {
@@ -9205,6 +8824,244 @@ async function loadConfig(cfg) {
         return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
       }
 
+
+      
+      // ============================================================
+      // INIT
+      // ============================================================
+      function initAdvOptsResizer() {
+        const resizer = document.getElementById('adv-opts-resizer');
+        const panel   = document.getElementById('adv-options-panel');
+        if (!resizer || !panel) return;
+        resizer.addEventListener('mousedown', e => {
+          e.preventDefault();
+          resizer.classList.add('dragging');
+          const startX = e.clientX;
+          const startW = panel.offsetWidth;
+          const onMove = mv => {
+            // dragging left increases width
+            const delta = startX - mv.clientX;
+            const newW = Math.max(180, Math.min(700, startW + delta));
+            panel.style.width = newW + 'px';
+          };
+          const onUp = () => {
+            resizer.classList.remove('dragging');
+            document.removeEventListener('mousemove', onMove);
+            document.removeEventListener('mouseup', onUp);
+          };
+          document.addEventListener('mousemove', onMove);
+          document.addEventListener('mouseup', onUp);
+        });
+      }
+
+
+      // ============================================================
+      // REPORT MODE — ?report=<url> parameter
+      // ============================================================
+      /**
+       * loadReportFromUrl(reportUrl)
+       *
+       * Called automatically at startup when the page URL contains a
+       * "report=" query parameter pointing at a DataLaVista JSON config.
+       *
+       * Steps:
+       *   1. Show a full-screen loading banner.
+       *   2. Fetch the JSON config from the URL.
+       *   3. Call loadConfig() to restore data-sources, tables, SQL, and
+       *      design widgets (this also triggers background SharePoint fetches).
+       *   4. Call refreshPreview() to run the SQL query and render all widgets.
+       *   5. Switch to the Preview tab and apply the .dlv-report-mode CSS class
+       *      so the preview panel fills the entire viewport (toolbar hidden,
+       *      filter bar visible, no designer chrome).
+       *
+       * On any error the loading banner is removed, a toast is shown, and the
+       * normal designer UI is presented so the user can still work.
+       */
+      async function loadReportFromUrl(reportUrl) {
+        // Show full-screen loading overlay immediately
+        showLoadingPopup('⏳ Loading report. Please wait...');
+        hideConnectPopup();
+        setStatus('⏳ Loading report…');
+
+        try {
+          // ── Step 1: Fetch the config JSON ──────────────────────────────
+          const resp = await fetch(reportUrl, { credentials: 'same-origin' });
+          if (!resp.ok) {
+            throw new Error(`HTTP ${resp.status} ${resp.statusText} — could not fetch: ${reportUrl}`);
+          }
+          const cfg = await resp.json();
+
+          // ── Step 2: Load config (restores DS, tables, SQL, design) ─────
+          await loadConfig(cfg);
+
+          // ── Step 3: Run SQL and render all widgets ─────────────────────
+          showLoadingPopup('⏳ Refreshing data…');
+          if (!state.sql || state.sql.trim()==='') {
+            showLoadingPopup('⚠ Unable to load report data.');
+            throw new Error('Report config contains no SQL query.');
+          }
+          await refreshPreview();
+
+          // ── Step 4: Switch to preview and maximise ─────────────────────
+          switchTab('preview');
+          document.body.classList.add('dlv-report-mode');
+          setStatus('✅ Report ready');
+          toast('Report loaded', 'success');
+
+        } catch (err) {
+          showLoadingPopup('⚠ Unable to load report data.');
+          toast('Unable to load report. :(', 'error');
+          console.log('❌ DataLaVista was unable to load the report: \n ' + err.message);
+          setStatus('❌ DataLaVista was unable to load the report. See console for details');
+        } finally {
+          hideLoadingPopup();
+        }
+      }
+
+      function swapDesignReportModes(isReportMode = false) {
+        console.log('DEBUG: Swapping to ' + (isReportMode ? 'REPORT' : 'DESIGN') + ' mode');
+        state.reportMode = isReportMode;
+        if (isReportMode) {
+          console.log('DEBUG: Swapped to REPORT mode: hiding designer UI and maximizing preview');
+          document.body.classList.add('dlv-report-mode');
+          // Hide design mode buttons
+          if(document.getElementById('btn-connect')) document.getElementById('btn-connect').classList.add('hidden');
+          if(document.getElementById('btn-save-config')) document.getElementById('btn-save-config').classList.add('hidden');
+          if(document.getElementById('btn-sep-after-save-config')) document.getElementById('btn-sep-after-save-config').classList.add('hidden');          
+          if(document.getElementById('toolbar-tab-nav')) document.getElementById('toolbar-tab-nav').classList.add('hidden');
+          if(document.getElementById('preview-title-bar')) document.getElementById('preview-title-bar').classList.add('hidden');
+          if(document.getElementById('toolbar-tab-reportMode')) document.getElementById('toolbar-tab-reportMode').classList.remove('hidden');
+          if(document.getElementById('preview-toolbar')) document.getElementById('preview-toolbar').classList.add('hidden');
+        } else {
+          console.log('DEBUG: Swapped to DESIGN mode: showing designer UI and restoring preview size');
+          document.body.classList.remove('dlv-report-mode');
+          // Show design mode buttons
+          if(document.getElementById('btn-connect')) document.getElementById('btn-connect').classList.remove('hidden');
+          if(document.getElementById('btn-save-config')) document.getElementById('btn-save-config').classList.remove('hidden');
+          if(document.getElementById('btn-sep-after-save-config')) document.getElementById('btn-sep-after-save-config').classList.remove('hidden');
+          if(document.getElementById('toolbar-tab-nav')) document.getElementById('toolbar-tab-nav').classList.remove('hidden');
+          if(document.getElementById('toolbar-tab-reportMode')) document.getElementById('toolbar-tab-reportMode').classList.add('hidden');
+        }
+
+      }
+
+      /// Main initialization function to set up event listeners, resizers, and default states.
+      function init() {
+        console.log("*** Initializing DataLaVista. Come with me if you want to report... ***");
+        setupAlaSQL();
+        
+
+        // Get current URL and parameters
+        const siteUrl = window.location.href;
+        const siteUrlParams = new URLSearchParams(window.location.search || siteUrl.split('?')[1] || '');
+
+        // Detect SharePoint URL from current page
+        const spSiteUrl = getSpSiteUrl();
+
+        // If running inside SharePoint, check if the page is in edit mode
+        let spEditMode = false;
+        if (spSiteUrl) {
+          if (window._spPageContextInfo) {
+            spEditMode = window._spPageContextInfo.isPageCheckedOutByCurrentUser || false;
+          } else if (siteUrlParams.get('Mode') || siteUrlParams.get('mode')){
+            // Fallback: check URL parameters for Mode=Edit
+            spEditMode = (siteUrlParams.get('Mode') || siteUrlParams.get('mode') ||'').toLowerCase().includes('edit');
+          } else if (document.body.classList.contains('sp-legacyPageMode')) {
+            // Another fallback: check for legacyPageMode class which is present in classic pages in edit mode
+            spEditMode = true;
+          } else {
+            spEditMode = false;  // Default to false if we can't detect
+          }
+        }
+
+        // Detect whether we're in Report mode (report= parameter) or Designer mode, and show/hide UI accordingly
+        const reportParam = siteUrlParams.get('report');
+        if (reportParam) {
+            /* *** DATALAVISTA REPORT MODE *** */
+            console.log("DEBUG: DataLaVista is entering Report mode. Loading config from: ", reportParam);
+            state.reportMode = true;
+            console.log('DEBUG: calling swapDesignReportModes(true)');
+            swapDesignReportModes(true);
+            console.log('DEBUG: calling loadReportFromUrl');
+            document.getElementById('preview-canvas').innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-secondary);font-size:14px">Your DataLaVista dashboard is loading...</div>';
+            loadReportFromUrl(reportParam);
+            console.log('DEBUG: finished calling loadReportFromUrl');
+          } else {
+            /* *** DATALAVISTA DESIGNER MODE *** */
+            state.reportMode = false;
+            console.log('DEBUG: calling swapDesignReportModes(false)');
+            swapDesignReportModes(false);
+            initToolbox();
+            initResizers();
+            setQBMode('basic');
+            switchQMTab('qb');
+            switchTab('query');
+            spPickerCheckVisibility();
+
+            // Add Event Listeners
+            document.getElementById('sp-auth')?.addEventListener('change', function () {
+              document.getElementById('sp-token-group')?.classList.toggle('hidden', this.value !== 'token');
+            });
+            document.getElementById('config-file')?.addEventListener('change', async function () {
+              const f = this.files[0]; if (!f) return;
+              const text = await f.text();
+              const el = document.getElementById('config-json-input');
+              if (el) el.value = text;
+            });
+            document.getElementById('csv-file')?.addEventListener('change', async function () {
+              const f = this.files[0];
+              if (!f) return;
+              let text;
+              try {
+                text = await f.text();
+              } catch (e) {
+                toast('Error reading file: ' + e.message, 'error');
+                return;
+              }
+              const dsNameEl = document.getElementById('csv-ds-name');
+              const tableName = (dsNameEl?.value || '').trim();
+              const dsName = generateDataSourceName('csv', tableName);
+              loadCSVData(text, dsName, f.name);
+              hideConnectPopup();
+            });
+
+
+            // Default SQL hint
+            if (document.getElementById('sql-editor')) {
+              setupCodeMirror();
+              if (window._cmEditor) window._cmEditor.setValue('-- Connect to a data source and drag a table into the query builder\n-- or write your SQL here directly\nSELECT * FROM [YourList] LIMIT 20');
+            }
+
+            // Wire options panel left-edge resizer
+            initAdvOptsResizer();
+            
+            // Show the connect popup by default to encourage users to connect to their data,
+            // but if we detect we're in SharePoint edit mode, hide it since it can interfere with page editing.
+            if (spSiteUrl) {
+              // We are in SharePoint
+              if (spEditMode) {
+                // If we're in SharePoint edit mode, hide the connect popup since it can interfere with page editing.
+                hideConnectPopup();
+              } else {
+                // We are not in SharePoint edit mode
+                // Prefil connect popup with SharePoint URL if detected, to make it easier for users to connect
+                const el = document.getElementById('sp-url');
+                if (el) el.value = spSiteUrl;
+                showConnectPopup();
+              }
+            } else {
+              // We are not in SharePoint, so show the connect popup by default
+              showConnectPopup();
+            }
+          }
+
+        const contentDiv = document.getElementById('content');
+        if (contentDiv) contentDiv.style.display = 'flex';
+
+        console.log("*** DataLaVista visual component loading complete. ***");
+      }
+
+
       // ── Expose all functions on window so onclick="foo()" works in SharePoint ──
       window.dlv = {
         safeDragParse,
@@ -9231,8 +9088,10 @@ async function loadConfig(cfg) {
         buildFieldMeta,
         getSelectFields,
         parseCSV,
-        showPopup,
-        hidePopup,
+        showConnectPopup,
+        hideConnectPopup,
+        showLoadingPopup,
+        hideLoadingPopup,
         switchSourceTab,
         doConnect,
         loadSharePointSource,
@@ -9245,6 +9104,7 @@ async function loadConfig(cfg) {
         saveConfig,
         buildConfig,
         generateWidgetSQL,
+        swapDesignReportModes,
         loadConfig,
         renderFieldsPanel,
         getTableIcon,
@@ -9391,15 +9251,6 @@ async function loadConfig(cfg) {
         generateReport,
         copyGenCode,
         downloadGenCode,
-        buildStandaloneHTML,
-        fetchItems,
-        getSelect,
-        loadAllData,
-        findTables,
-        renderReport,
-        applyFilter,
-        renderCanvas,
-        getWContent,
         initResizers,
         makeColResizer,
         makeRowResizer,
@@ -9411,29 +9262,22 @@ async function loadConfig(cfg) {
         toast,
         downloadText,
         showHelp,
-        init
+        init,
+        loadReportFromUrl
       };
 
+      
 
-      // Wait a second for the browser to finish reading every single variable in the file
-      setTimeout(function () {
-        try {
-          console.log("Starting DataLaVista...");
-          init();
-
-          // Don't show popup when in SharePoint edit mode (Mode=Edit) — it blocks page editing
-          let url = '';
-          try { if (typeof _spPageContextInfo !== 'undefined' && _spPageContextInfo.webAbsoluteUrl) { url = _spPageContextInfo.webAbsoluteUrl; } } catch (e) { }
-          if (!url) { url = window.location.href; }
-          const spMode = new URLSearchParams(url).get('Mode') || '';
-          if (spMode.toLowerCase().includes('edit')) {
-            hidePopup();
-          } else { showPopup(); }
-          console.log("DataLaVista loaded successfully!");
-        } catch (e) {
-          console.error('DataLaVista init crashed:', e);
-        }
-      }, 1000);
+      // Self-init
+(function startDataLaVista() {
+    console.log("Starting DataLaVista...");
+    try {      
+      init();
+    } catch (e) {
+      console.error('DataLaVista init crashed:', e);
+    }
+  }
+  )();
   </script>
 </body>
 
