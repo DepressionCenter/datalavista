@@ -2662,7 +2662,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
             </div>
             <div class="form-group">
               <label>Or upload a local CSV file</label>
-              <input type="file" class="form-input" id="csv-file" accept=".csv" />
+              <input type="file" class="form-input" id="csv-file" accept=".csv, .CSV, text/csv" />
             </div>
           </div>
 
@@ -2675,7 +2675,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
             </div>
             <div class="form-group">
               <label>Or load from file</label>
-              <input type="file" class="form-input" id="config-file" accept=".json" />
+              <input type="file" class="form-input" id="config-file" accept=".json, .JSON, .json5, .JSON5, text/json, application/json" />
             </div>
           </div>
 
@@ -3566,7 +3566,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
     // Map a raw data row into our internal format.
     // OUTPUT KEYS ARE ALWAYS internalName (so SQL "SELECT [table].[InternalName]" works).
     // The SQL query builder adds "AS [fieldAlias]" to give result columns friendly names.
-    function mapDataRow(row, fieldDefs) {
+    function mapDataRow(tableName, row, fieldDefs) {
       const mapped = {};
       const processingRow = { ...row };
 
@@ -3605,15 +3605,15 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         }
 
         if (isUser && !isMulti && typeof value === 'object' && !Array.isArray(value)) {
-          const _siteBase = (state.source && state.source.url)
-            ? state.source.url.replace(/\/$/, '')
-            : window.location.origin;
+          const _siteBase = (state.tables[tableName] && state.tables[tableName].siteUrl)
+            ? state.tables[tableName].siteUrl.replace(/\/$/, '')
+            : '..';
           mapped[outKey]              = value.Title || value.Name || JSON.stringify(value);
           mapped[outKey + 'Id']       = value.Id;
           mapped[outKey + 'Claims']   = value.Name || '';
           mapped[outKey + 'Email']    = extractEmail(value.Name);
           mapped[outKey + 'PictureUrl'] = value.Name
-            ? `${_siteBase}/_layouts/15/userphoto.aspx?size=M&accountname=${encodeURIComponent(value.Name)}`
+            ? `${_siteBase}/_layouts/15/userphoto.aspx?size=L&accountname=${encodeURIComponent(value.Name)}`
             : '';
           mapped[outKey + 'Data']     = [value];
           delete processingRow[key]; delete processingRow[key + 'Id'];
@@ -3686,10 +3686,10 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
     // SHAREPOINT REST API ADAPTER
     // ============================================================
     // Rule 1: Use application/json instead of verbose
-    async function spFetch(url) {
+    async function spFetch(url, dsName) {
       const headers = { 'Accept': 'application/json' };
-      if (state.source.auth === 'token' && state.source.token) {
-        headers['Authorization'] = 'Bearer ' + state.source.token;
+      if (state.dataSources[dsName] && state.dataSources[dsName].auth === 'token' && state.dataSources[dsName].token) {
+        headers['Authorization'] = 'Bearer ' + state.dataSources[dsName].token;
       }
       const res = await fetch(url, { headers, credentials: 'include' });
       if (!res.ok) {
@@ -3752,7 +3752,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       const ds = state.dataSources[t.dataSource];
       const dsAlias = (ds && ds.alias) || t.dataSource || '';
       const tAlias = t.alias || t.internalName || tableKey;
-      return dsAlias ? dsAlias + '_' + tAlias : tAlias;
+      return dsAlias ? dsAlias + '_' + tAlias : tAlias; // TODO: Check if this works after renaming a data source
     }
 
     /** Register a table in AlaSQL under its immutable tableKey only.
@@ -3764,7 +3764,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       const t = state.tables[tableKey];
       if (!t || !t.data) return;
       alasql(`DROP TABLE IF EXISTS [${tableKey}]`);
-      alasql(`CREATE TABLE [${tableKey}]`);
+      alasql(`CREATE TABLE [${tableKey}]`); // TODO: store table alises in alasql
       const actual = Object.keys(alasql.tables).find(k => k.toLowerCase() === tableKey.toLowerCase()) || tableKey;
       alasql.tables[actual].data = t.data;
     }
@@ -3825,9 +3825,9 @@ function stripODataMetadata(rows, quickCheck = false) {
 }
 
     // Rule 2: Fetch only custom lists
-    async function fetchSPLists(siteUrl) {
+    async function fetchSPLists(siteUrl, dsName) {
       const url = `${siteUrl}/_api/web/lists?$select=Id,EntityTypeName,Title,Description,ItemCount,BaseType,Hidden,ImageUrl,IsApplicationList,LastItemModifiedDate&$filter=(Hidden eq false and IsApplicationList eq false and BaseTemplate ne 115 and BaseTemplate ne 121 and BaseTemplate ne 330 and BaseTemplate ne 544 and Title ne 'MicroFeed' and EntityTypeName ne 'AppCatalog' and EntityTypeName ne 'FormServerTemplates' and EntityTypeName ne 'Style_x0020_Library') or (Title eq 'User Information List' or Title eq 'Events')`;
-      const json = await spFetch(url);
+      const json = await spFetch(url, dsName);
       let rows = extractRows(json);
       rows = stripODataMetadata(rows);
       return rows;
@@ -3936,20 +3936,26 @@ async function fetchSPItemsWithRetry(siteUrl, listGuid, selectStr, expandStr, to
 
 // Fetch Table Data with intelligent retry and pagination logic, plus promise tracking to prevent duplicate fetches
 async function fetchTableData(tableName, fetchAll = false) {
+  console.log('DEBUG: fetchTableData called for', tableName, 'fetchAll:', fetchAll);
   const t = state.tables[tableName];
   if (!t) return;
   const limit = fetchAll ? 50000 : 10;
 
   // Skip if we already have enough data
+  console.log('DEBUG: Current table state upon entering fetchDataTable:', { loaded: t.loaded, dataLength: t.data ? t.data.length : 0 });
   if (fetchAll && t.loaded && t.data && t.data.length > 10) return; 
+  console.log('DEBUG: Data load needed for', tableName, '— proceeding with checks.');
   if (!fetchAll && t.data && t.data.length >= 10) return;          
 
+  console.log('*** DEBUG: Need to fetch data for', tableName, '— proceeding with fetch sequence. ***');
   // *** PROMISE TRACKER: If a fetch is already running, return its promise ***
   if (t.fetchPromise) {
+    console.log('*** DEBUG: Fetch already in progress for', tableName, '— awaiting existing promise. ***');
     return t.fetchPromise; 
   }
 
   // Create the fetch sequence and store it in the table state
+  console.log('*** DEBUG: Initiating new fetch sequence for', tableName, '***');
   t.fetchPromise = (async () => {
     try {
       if (!fetchAll) setStatus(`⏳ Fetching preview for ${tableName}...`);
@@ -3958,11 +3964,13 @@ async function fetchTableData(tableName, fetchAll = false) {
       let rawData = [];
       
       if (t.sourceType === 'sharepoint') {
-        const spSiteUrl = state.source.url || t.siteUrl;
+        console.log('DEBUG: Fetching SharePoint data for', tableName);
+        const spSiteUrl = t.url || t.siteUrl || (state.dataSources[t.dataSource] && state.dataSources[t.dataSource].siteUrl);
         const baseSelect = new Set(['ID', 'Title', 'Created', 'Modified', 'Author/Id', 'Author/Title', 'Author/Name', 'Editor/Id', 'Editor/Title', 'Editor/Name']);
         const baseExpand = new Set(['Author', 'Editor']);
         
         spFields.forEach(f => {
+          console.log('DEBUG: Processing field for select/expand:', f.InternalName || f.internalName, 'Type:', f.TypeAsString || f.type);
           const internalName = f.InternalName || f.internalName;
           if (f.isAutoId || !internalName) return; 
           
@@ -3987,6 +3995,7 @@ async function fetchTableData(tableName, fetchAll = false) {
           }
         });
         
+        console.log('Calling fetchSPItemsWithRetry with select:', Array.from(baseSelect), 'expand:', Array.from(baseExpand));
         rawData = await fetchSPItemsWithRetry(
           spSiteUrl,
           t.guid,
@@ -3994,11 +4003,54 @@ async function fetchTableData(tableName, fetchAll = false) {
           Array.from(baseExpand).join(','),
           limit
         );
+        console.log('DEBUG: Done loading SharePoint list data for', tableName, '— raw data length:', rawData.length);
+      } else if(t.sourceType === 'json') {
+        console.log('DEBUG: Fetching JSON data for', tableName);
+        const jsonUrl = t.url || (state.dataSources[t.dataSource] && state.dataSources[t.dataSource].url);
+        if (!jsonUrl) {
+          console.log('DEBUG: No URL found for JSON source in', tableName, '— skipping fetch.');
+          return;
+        }
+        const res = await fetch(jsonUrl);
+        if (!res.ok) {
+          console.log('DEBUG: Failed to fetch JSON data for', tableName, '— HTTP status:', res.status);
+          return;
+        }
+        const json = await res.json();
+        rawData = extractRows(parseJSONSafe(json));
+      } else if(t.sourceType === 'csv') {
+        console.log('DEBUG: Fetching CSV data for', tableName);
+        const csvUrl = t.url || t.siteUrl || (state.dataSources[t.dataSource] && state.dataSources[t.dataSource].url) || (state.dataSources[t.dataSource] && state.dataSources[t.dataSource].siteUrl) || '';
+        if (!csvUrl) {
+          console.log('DEBUG: No URL found for CSV source in', tableName, '— skipping fetch.');
+          return;
+        }
+        progText.textContent = 'Loading CSV...';
+
+        let text;
+        try{
+          text = await fetchCSVFromURL(url);
+        } catch (e) {
+          console.error('[DLV CSV] res.text() threw:', e);
+          throw e;
+        }
+        if (!text.trim()) throw new Error('CSV file appears to be empty');
+        const fileName = csvUrl.split('/').pop();
+        
+        loadCSVData(t.dataSource||'CSV', fileName, csvUrl, false, text); // Create new DS for this CSV file, with isUploadedFile=false
+
+        rawData = parseCSV(csvText);
+      } else if(t.sourceType === 'api') {
+        const apiUrl = t.url || (state.dataSources[t.dataSource] && state.dataSources[t.dataSource].url);
+        // TODO: Add support for API sources (fetch with headers, auth, etc) — currently just a placeholder
       } else {
-        return; 
-      }
+        console.log('DEBUG: Unsupported source type for', tableName, '— skipping fetch.');
+        return;
       
-      t.data = rawData.map(row => mapDataRow(row, spFields)); 
+      }
+      consol.log('DEBUG: Raw data fetched for', tableName);
+      console.log('DEBUG: Mapping data rows for', tableName);
+      t.data = rawData.map(row => mapDataRow(tableName, row, spFields)); 
       t.loaded = fetchAll;
       
       if (!t.originalFields) {
@@ -4008,6 +4060,7 @@ async function fetchTableData(tableName, fetchAll = false) {
         t.data.forEach(row => Object.keys(row).forEach(k => dataKeys.add(k)));
         
         // Dynamically add any fields generated by mapDataRow (Emails, Claims, Data, etc)
+        console.log('DEBUG: Adding synthetic fields for', tableName, Array.from(dataKeys));
         dataKeys.forEach(k => {
           if (!t.fields.some(f => f.alias === k)) {
             t.fields.push({ 
@@ -4144,7 +4197,7 @@ async function deriveStructureFromSample(dataArray) {
           out[f.alias] = normalizeDate(val);
         }
         // Boolean
-        else if (f.type === 'bool') {
+        else if (f.type.startsWith('bool')) {
           out[f.alias] = val === true || val === 'Yes' || val === 1 ? 'Yes' : 'No';
         }
         // Default
@@ -4166,7 +4219,7 @@ async function deriveStructureFromSample(dataArray) {
       if (t === 'lookupmulti') return 'lookup-multi';
       if (t === 'choice') return 'choice';
       if (t === 'multichoice') return 'choice-multi';
-      if (t === 'boolean' || t === 'yesno') return 'bool';
+      if (t.startsWith('bool') || t === 'yesno' || t === 'yes/no') return 'boolean';
       if (t === 'number' || t === 'currency' || t === 'integer') return 'number';
       if (t === 'datetime') return 'date';
       if (t === 'calculated') return 'text';
@@ -4353,7 +4406,6 @@ async function deriveStructureFromSample(dataArray) {
 
 
 async function doConnect() {
-    console.log('Loading data source...');
     const activeTab = document.querySelector('.source-tab.active')?.dataset?.src || 'sharepoint';
     const btn = document.getElementById('btn-do-connect');
     const prog = document.getElementById('popup-progress');
@@ -4363,26 +4415,43 @@ async function doConnect() {
 
   try {
     if (activeTab === 'sharepoint') {
-      const url = (document.getElementById('sp-url')?.value || '').trim().replace(/\/$/, '');
-      if (!url) { toast('Please enter a SharePoint site URL', 'error'); return; }
+      /* SharePoint Tab */
+      const siteUrl = (document.getElementById('sp-url')?.value || '').trim().replace(/\/$/, '');
+      if (!siteUrl) { toast('Please enter a SharePoint site URL', 'error'); return; }
       const rawDsName = (document.getElementById('sp-ds-name')?.value || '').trim();
       const dsName = generateDataSourceName('sharepoint', rawDsName);
-      state.source = {
-        type: 'sharepoint',
-        url,
-        auth: document.getElementById('sp-auth')?.value || 'current',
-        token: document.getElementById('sp-token')?.value || ''
-      };
+
+      if(!state.dataSources[dsName]) {
+        state.dataSources[dsName] = {
+          type: 'sharepoint',
+          url: siteUrl,
+          siteUrl: siteUrl,
+          auth: document.getElementById('sp-auth')?.value || 'current',
+          token: document.getElementById('sp-token')?.value || '',
+          internalName: dsName,
+          alias: dsName,
+          description: null,
+          tables: [],
+          isFileUpload: false,
+          keepRawData: false
+        };
+      }
+      
       progText.textContent = 'Fetching list inventory...';
-      await loadSharePointSource(url, dsName);
+      await loadSharePointSource(siteUrl, dsName);
+      
     } else if (activeTab === 'json') {
-      const url = (document.getElementById('json-url')?.value || '').trim();
-      if (!url) { toast('Please enter a URL', 'error'); return; }
+      /* JSON Tab */
+      const siteUrl = (document.getElementById('json-url')?.value || '').trim();
+      if (!siteUrl) { toast('Please enter a URL', 'error'); return; }
       const rawDsName = (document.getElementById('json-ds-name')?.value || '').trim();
       const dsName = generateDataSourceName('json', rawDsName);
       progText.textContent = 'Loading JSON...';
-      await loadJSONSource(url, dsName);
+      await loadJSONSource(siteUrl, dsName);
+
     } else if (activeTab === 'csv') {
+      /* CSV Tab */
+      // Handles CSV URLs. File uploads are handled separately in spPickerCheckVisibility() → handleFileUpload().
       const urlEl = document.getElementById('csv-url');
       const dsEl  = document.getElementById('csv-ds-name');
       const url = (urlEl?.value || '').trim();
@@ -4390,25 +4459,21 @@ async function doConnect() {
       const rawDsName = (dsEl?.value || '').trim();
       const dsName = generateDataSourceName('csv', rawDsName);
       progText.textContent = 'Loading CSV...';
-      let res;
-      try {
-        res = await fetch(url, { credentials: 'include' });
-      } catch (fetchErr) {
-        console.error('[DLV CSV] fetch threw:', fetchErr);
-        throw fetchErr;
-      }
-      if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+
       let text;
-      try {
-        text = await res.text();
-      } catch (textErr) {
-        console.error('[DLV CSV] res.text() threw:', textErr);
-        throw textErr;
+      try{
+        text = await fetchCSVFromURL(url);
+      } catch (e) {
+        console.error('[DLV CSV] res.text() threw:', e);
+        throw e;
       }
       if (!text.trim()) throw new Error('CSV file appears to be empty');
       const fileName = url.split('/').pop();
-      loadCSVData(text, dsName, fileName);
+      
+      loadCSVData(dsName, fileName, url, false, text); // Create new DS for this CSV file, with isUploadedFile=false
+
     } else if (activeTab === 'loadconfig') {
+      /* Load Report Config Tab */
       const jsonText = (document.getElementById('config-json-input')?.value || '').trim();
       if (!jsonText) { toast('Please paste or load a config', 'error'); return; }
       const parsed = safeJSONParse(jsonText, 'Config');
@@ -4617,21 +4682,25 @@ function tryJSONP(url) {
 async function loadSharePointSource(siteUrl, dsName) {
   setStatus('⏳ Loading SharePoint lists from ' + siteUrl + '...');
 
+  
   // dsName is the immutable internal key; alias = user-entered name from connect popup
   if (!state.dataSources[dsName]) {
     state.dataSources[dsName] = {
       type: 'sharepoint',
       url: siteUrl,
-      auth: state.source.auth || 'current',
-      token: state.source.token || '',
+      siteUrl: siteUrl,
+      auth: state.dataSources[dsName]?.auth || 'current',
+      token: state.dataSources[dsName]?.token || '',
       internalName: dsName,
-      alias: dsName,          // user can rename this; it's the DS prefix in SQL
-      description: '',
-      tables: []
+      alias: dsName,
+      description: siteUrl,
+      tables: [],
+      isFileUpload: false,
+      keepRawData: false
     };
   }
 
-  const lists = await fetchSPLists(siteUrl);
+  const lists = await fetchSPLists(siteUrl, dsName);
   let loadedCount = 0;
 
   for (const list of lists) {
@@ -4653,7 +4722,7 @@ async function loadSharePointSource(siteUrl, dsName) {
 
       state.tables[tableKey] = {
         internalName: entityTypeName,
-        displayName: list.Title || entityTypeName,
+        displayName: list.Title || tableAlias || entityTypeName,
         description: list.Description || '',
         alias: tableAlias,
         dsAlias: dsName,
@@ -4664,9 +4733,11 @@ async function loadSharePointSource(siteUrl, dsName) {
         sourceType: 'sharepoint',
         isDocLib,
         guid: list.Id,
-        siteUrl,
+        siteUrl: siteUrl,
         itemCount: list.ItemCount || 0,
-        dataSource: dsName
+        dataSource: dsName,
+        isFileUpload: false,
+        keepRawData: false
       };
 
       if (!state.dataSources[dsName].tables.includes(tableKey)) {
@@ -4788,7 +4859,7 @@ async function loadJSONSource(url, dsName) {
     const val = first[k];
     let type  = "text";
     if (typeof val === "number")                               type = "number";
-    else if (typeof val === "boolean")                         type = "bool";
+    else if (typeof val === "boolean")                         type = "boolean";
     else if (typeof val === "string" && ISO_DATE_RE.test(val)) type = "date";
     return {
       internalName: k,
@@ -4810,11 +4881,23 @@ async function loadJSONSource(url, dsName) {
     return out;
   });
 
-  const tableKey = dsName + '_Data';
+  const tableKey = dsName + '_Data'; // TODO: where is ds created for JSON url downloads?
 
   // Register data source
   if (!state.dataSources[dsName]) {
-    state.dataSources[dsName] = { type: 'json', url, alias: dsName, tables: [] };
+    state.dataSources[dsName] = {
+      alias: dsName,
+      auth: null,
+      description: '',
+      internalName: dsName, // TODO: was dsname already generated/processed with alias?
+      type: 'json',
+      tables: [],
+      token: '',
+      url: url,
+      siteUrl: null,
+      isFileUpload: false,
+      keepRawData: false
+    };
   }
 
   state.tables[tableKey] = {
@@ -4825,7 +4908,13 @@ async function loadJSONSource(url, dsName) {
     data: normalizedRows,
     loaded: true,
     sourceType: 'json',
-    dataSource: dsName
+    dataSource: dsName,
+    dsAlias: dsName,
+    isFileUpload: false,
+    keepRawData: false,
+    siteUrl: null,
+    url: url,
+    itemCount: normalizedRows.length || 0
   };
 
   if (!state.dataSources[dsName].tables.includes(tableKey)) {
@@ -4837,9 +4926,22 @@ async function loadJSONSource(url, dsName) {
   setupCodeMirror();
 }
 
+// Fetch CSV text with error handling
+async function fetchCSVFromURL(url) {
+      try {
+        const res = await fetch(url, { credentials: 'include' });
+        if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+        const text = await res.text();
+        if (!text.trim()) throw new Error('CSV file appears to be empty');
+        return text; // Return raw text; parsing is handled separately in loadCSVData()
+      } catch (err) {
+        console.error('Failed to download CSV: ', err);
+        throw new Error('Failed to download CSV: ' + err.message);
+      }
+    }
 
 // Simple CSV parser and loader
-function loadCSVData(text, dsName, fileName) {
+function loadCSVData(dsName, fileName = '', fileUrl = '', isFileUpload = false, text = '') {
   let parsed;
   try {
     parsed = parseCSV(text);
@@ -4850,32 +4952,53 @@ function loadCSVData(text, dsName, fileName) {
   }
   const { headers, rows } = parsed;
   if (!headers.length) {
-    console.warn('[DLV CSV] No headers found in CSV');
+    console.warn('No headers found in CSV');
     toast('CSV appears to have no header row', 'error');
     return;
   }
   const fields = headers.map(h => ({
-    internalName: h, displayName: h, alias: toPascalCase(h) || h,
-    type: 'text', displayType: 'text'
+    internalName: h.replace(/[^A-Za-z0-9_]/g, '_').replace('__','_'),
+    displayName: toPascalCase(h) || h,
+    alias: toPascalCase(h) || h,
+    type: 'text',
+    displayType: 'text'
   }));
 
   const tableKey = dsName + '_Data';
 
-
-  // Register data source
-  if (!state.dataSources[dsName]) {
-    state.dataSources[dsName] = { type: 'csv', fileName: fileName || dsName + '.csv', alias: dsName, tables: [] };
+// Register data source
+  if (!state.dataSources[dsName]) { // TODO: left off here. What about csv-url vs csv-file?
+    state.dataSources[dsName] = {
+      alias: 'Data',
+      auth: null,
+      description: 'This CSV file (' + (fileName || dsName + '.csv') + ') was uploaded manually, and only the dashboard creator can refresh it.',
+      internalName: dsName,
+      tables: [],
+      token: null,
+      type: 'csv',
+      fileName: fileName || '',
+      isFileUpload: isFileUpload, // true if uploaded from local file picker; false if loaded from URL
+      url: fileUrl || fileName || dsName + '.csv',
+      keepRawData: (isFileUpload) ? true : false // if loaded from file, keep raw data
+    };
   }
 
   state.tables[tableKey] = {
+    alias: tableKey,
+    data: rows || [],
+    dataSource: dsName,
+    description: 'This table was created from a CSV file (' + (fileName || dsName + '.csv') + ').',
     displayName: 'Data',
-    alias: 'Data',
     dsAlias: dsName,
-    fields,
-    data: rows,
+    fields: Array.isArray(headers) && headers.length ? fields : [{ internalName: 'Column1', displayName: 'Column1', alias: 'Column1', type: 'text', displayType: 'text' }],
+    internalName: tableKey,
+    itemCount: rows.length || 0,
+    siteUrl: null,
+    url: fileUrl || fileName || dsName + '.csv',
     loaded: true,
     sourceType: 'csv',
-    dataSource: dsName
+    isFileUpload: isFileUpload, // true if uploaded from local file picker; false if loaded from URL
+    keepRawData: (isFileUpload) ? true : false // if loaded from file, keep raw data
   };
 
   if (!state.dataSources[dsName].tables.includes(tableKey)) {
@@ -4964,6 +5087,7 @@ function saveConfig() {
   downloadText(json, 'DataLaVista-config.json', 'application/json');
 }
 
+// Build a clean, minimal config object from the current state, suitable for saving or sharing
 function buildConfig() {
   const cleanFields = (arr) => (arr || []).map(f => ({
     InternalName: f.InternalName || f.internalName || '',
@@ -4980,40 +5104,72 @@ function buildConfig() {
     choices: (Array.isArray(f.choices) && f.choices.length <= 50) ? f.choices : null
   }));
 
+
+  // Save dataSources
+  let dataSourcesMeta = {};
+  let uploadedFilesDsNames = [];
+  for (const [dsName, ds] of Object.entries(state.dataSources)) {
+    dataSourcesMeta[dsName] = {
+      alias: ds.alias || dsName,
+      auth: ds.auth || 'current',
+      fileName: ds.fileName || '',
+      internalName: ds.internalName || dsName,
+      tables: ds.tables || [],
+      token: ds.token || '',
+      type: ds.type || 'sharepoint',
+      url: ds.url || '',
+      siteUrl: ds.siteUrl || '',
+      isFileUpload: ds.isFileUpload || false,
+      keepRawData: ds.keepRawData || false
+    };
+    if(ds.type!=='sharepoint' && ds.keepRawData) {
+      uploadedFilesDsNames.push(dsName);
+    }
+  }
+
+  // Bring over preview/flat table data if the source contains an uploaded file
+  let previewResults = [];
+  // TODO: Do we need to load preview data, or just re-run SQL when report loads?
+//  if(uploadedFilesDsNames && uploadedFilesDsNames.length>0 && state.previewResults && state.previewResults.length>0) {
+    //previewResults = state.previewResults || []; // Since we found files that were uploaded, we preserve the flat table data
+//  }
+
+  // Save tables (and row data if the files were uploaded)
   const tablesMeta = {};
   for (const [name, t] of Object.entries(state.tables)) {
     const ds = t.dataSource ? state.dataSources[t.dataSource] : null;
     tablesMeta[name] = {
-      internalName: t.internalName || name,
-      displayName: t.displayName || name,
-      description: t.description || '',
       alias: t.alias || name,
-      dsAlias: t.dsAlias || '',
       dataSource: t.dataSource || '',
+      description: t.description || '',
+      displayName: t.displayName || name,
+      dsAlias: t.dsAlias || '',
       fields: cleanFields(t.fields),
-      originalFields: cleanFields(t.originalFields || t.fields),
       guid: t.guid || '',
+      internalName: t.internalName || name,
+      itemCount: t.itemCount || 0,   // for SharePoint lists?
+      loaded: false,
+      isFileUpload: t.isFileUpload || false,
+      keepRawData: t.keepRawData || false,
+      originalFields: cleanFields(t.originalFields || t.fields),
+      siteUrl: t.siteUrl || '', // for SharePoint lists
       sourceType: t.sourceType || 'sharepoint',
-      siteUrl: t.siteUrl || '',
-      url: ds ? (ds.url || '') : '',          // for CSV/JSON standalone fetching
-      itemCount: t.itemCount || 0
+      url: ds ? (ds.url || '') : ''  // for CSV/JSON standalone fetching
     };
-  }
 
-
-  // Save dataSources (without raw data)
-  const dataSourcesMeta = {};
-  for (const [dsName, ds] of Object.entries(state.dataSources)) {
-    dataSourcesMeta[dsName] = {
-      type: ds.type || 'sharepoint',
-      url: ds.url || '',
-      auth: ds.auth || 'current',
-      token: ds.token || '',
-      fileName: ds.fileName || '',
-      internalName: ds.internalName || dsName,
-      alias: ds.alias || dsName,
-      tables: ds.tables || []
-    };
+    // Only include row data for tables that were loaded from uploaded files, to keep config lightweight and avoid sharing sensitive data from connected sources
+    try{
+      if(t.loaded && t.keepRawData && t.data && t.data.length>0) {
+        tablesMeta[name].data = t.data; // Only include row data for tables that were loaded from uploaded files
+        tablesMeta[name].loaded = true; // Mark as loaded since we have the data in the config
+      } else {
+        tablesMeta[name].data = []; // For other tables, we don't include row data in the config to keep it lightweight
+        tablesMeta.loaded = false;
+      }
+    } catch(e) {
+      console.warn(`Error including data for uploaded file, table ${name}, in config:`, e);
+      tablesMeta[name].data = []; // On error, don't include data
+    }
   }
 
   const cleanWidgets = (state.design.widgets || []).map(w => ({
@@ -5054,28 +5210,84 @@ function buildConfig() {
 
   return {
     _license: 'This file is part of DataLaVista. This is a configuration script for a report designed in DataLaVista. Copyright © 2026 The Regents of the University of Michigan. This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version. This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details. You should have received a copy of the GNU General Public License along with this program. If not, see https://www.gnu.org/licenses.',
-    dataSource: { type: state.source.type || 'sharepoint', url: state.source.url || '', auth: state.source.auth || 'current' },
+    activeTab: (state.reportMode) ? 'dashboardPreview' : 'design',
+    advancedQB: state.advancedQB || {},
+    basicQB: state.basicQB || {},
+    charts: state.charts || {},
+    currentWidgetId: state.currentWidgetId || null,
     dataSources: dataSourcesMeta,
-    tables: tablesMeta,
-    sql: state.sql || '',
     design: cleanDesign,
-    queryColumns: Array.isArray(state.queryColumns) ? [...state.queryColumns] : []
+    previewFilters: state.previewFilters || {},
+    previewResults: Array.isArray(previewResults) ? [...previewResults] : [],
+    qbCollapsed: state.qbCollapsed || false,
+    qbSectionHeight: state.qbSectionHeight || 60,
+    qmTab: state.qmTab || 'dataPreview',
+    queryColumns: Array.isArray(state.queryColumns) ? [...state.queryColumns] : [],    
+    queryMode: (state.queryMode && state.queryMode != null && state.queryMode != undefined && state.queryMode != '') ? state.queryMode : 'sql',
+    queryResults: Array.isArray(state.queryResults) ? [...state.queryResults] : [],
+    queryResultsReady: state.queryResultsReady || false,
+    sql: state.sql || '',
+    sqlLocked: state.sqlLocked || false,
+    tables: tablesMeta
   };
 }
 
 async function loadConfig(cfg) {
-  if (!cfg._license) throw new Error('Invalid config — missing _license key');
-  state.source = { ...cfg.dataSource };
+  console.log("DEBUG: loadConfig called.");
+  if (!cfg._license) throw new Error('Invalid report config — missing _license key');
+  if (!cfg.dataSources || typeof cfg.dataSources != 'object'|| !cfg.tables || typeof cfg.tables != 'object') throw new Error('Invalid report config — missing data sources or tables.');
+  // If the config provided is a string, try parsing it safely as JSON
+  if (cfg && typeof cfg == 'string')
+    {
+      let cfgString = cfg.trim();
+      if(cfgString.startsWith('{') && cfgString.endsWith('}')) {
+        try{
+          cfg = safeJSONParse(cfgString, 'Config');
+        } catch (e) {
+          throw new Error('Invalid report config — the report JSON is invalid.');
+        }
+      } else {
+        throw new Error('Invalid report config — the report JSON is invalid.');
+      }
+    }
+  
+    // At this point, cfg should be an object. If it's not, throw an error.
+    if (cfg && typeof cfg !== 'object') throw new Error('Invalid report config — no report JSON detected.');
+
+  console.log("DEBUG: Config object validated, proceeding to load state.");
+  // Basic validation passed — now clear the existing state and load the config values
+  //{ ...cfg.dataSource } || { type: 'sharepoint', url: '', auth: 'current' };
+  state.activeTab = (state.reportMode)?'dataPreview':'design';
+  state.advancedQB = cfg.advancedQB || {};
+  state.basicQB = cfg.basicQB || {};
+  state.charts = cfg.charts || {};
+  state.currentWidgetId = null;
+  state.dataSources = cfg.dataSources || {};
+  state.design = cfg.design || { title: 'DataLaVista Report', widgets: [], filters: [] };
+  state.previewFilters = cfg.previewFilters || {};
+  state.previewResults = Array.isArray(cfg.previewResults) ? [...cfg.previewResults] : [];
+  state.qmTab = cfg.qmTab || 'previewData';
+  state.queryColumns = Array.isArray(cfg.queryColumns) ? [...cfg.queryColumns] : [];
+  state.queryMode = (cfg.queryMode && cfg.queryMode != null && cfg.queryMode != undefined && cfg.queryMode != '') ? cfg.queryMode : 'sql';
+  state.queryResults = Array.isArray(cfg.queryResults) ? [...cfg.queryResults] : [];
+  state.queryResultsReady = cfg.queryResultsReady || false;
+  // Don't load reportMode or reportUrl from config - it's handled by init()
   state.sql = cfg.sql || '';
-  state.queryColumns = cfg.queryColumns || [];
-  state.dataSources = {};
+  state.sqlLocked = cfg.sqlLocked || false;
+  state.tables = cfg.tables || {};
+  
+  if(state.reportMode && state.activeTab !== 'dataPreview') {
+    switchTab('dataPreview');
+  } else if(!state.reportMode && state.activeTab !== 'design') {
+    switchTab('design');
+  }
   // Support new dataSources map
-  if (cfg.dataSources && typeof cfg.dataSources === 'object' && !Array.isArray(cfg.dataSources)) {
+  /*if (cfg.dataSources && typeof cfg.dataSources === 'object' && !Array.isArray(cfg.dataSources)) {
     // New format: keyed object
     for (const [dsName, dsMeta] of Object.entries(cfg.dataSources)) {
       if (dsMeta.type === 'sharepoint' && dsMeta.url) {
         state.source = { type: 'sharepoint', url: dsMeta.url, auth: dsMeta.auth || 'current', token: dsMeta.token || '' };
-        await loadSharePointSource(dsMeta.url, dsName);
+        await loadSharePointSource(dsMeta.url, dsName); // TODO: why are we re-loading the data source from scratch?
       } else if (dsMeta.type === 'json' || dsMeta.type === 'csv') {
         // Non-SP sources: restore from tables metadata (data will need re-fetch for SP, but CSV/JSON preserve structure)
         if (!state.dataSources[dsName]) {
@@ -5089,21 +5301,21 @@ async function loadConfig(cfg) {
         }
       }
     }
-  } else if (cfg.dataSources && Array.isArray(cfg.dataSources)) {
+  }*/ //else if (cfg.dataSources && Array.isArray(cfg.dataSources)) {
     // Legacy array format
-    for (const src of cfg.dataSources) {
-      if (!src.url) continue;
-      const dsName = src.prefix || generateDataSourceName('sharepoint', '');
-      state.source = { type: 'sharepoint', url: src.url, auth: src.auth || 'current', token: src.token || '' };
-      await loadSharePointSource(src.url, dsName);
-    }
-  } else if (state.source.url) {
+    //for (const src of cfg.dataSources) {
+    //  if (!src.url) continue;
+    //  const dsName = src.prefix || generateDataSourceName('sharepoint', '');
+    //  state.source = { type: 'sharepoint', url: src.url, auth: src.auth || 'current', token: src.token || '' };
+    //  await loadSharePointSource(src.url, dsName);
+    //}
+  //} // else if (state.source.url) {
     // Very legacy: single source
-    await loadSharePointSource(state.source.url, 'SP');
-  }
+    //await loadSharePointSource(state.source.url, 'SP');
+  //}
 
   // Restore table metadata overrides (aliases, internalNames, fields etc.) from config
-  for (const [tname, tmeta] of Object.entries(cfg.tables || {})) {
+  /*for (const [tname, tmeta] of Object.entries(cfg.tables || {})) {
     if (state.tables[tname]) {
       if (tmeta.internalName) state.tables[tname].internalName = tmeta.internalName;
       if (tmeta.alias)        state.tables[tname].alias = tmeta.alias;
@@ -5113,17 +5325,18 @@ async function loadConfig(cfg) {
       if (tmeta.dataSource) state.tables[tname].dataSource = tmeta.dataSource;
       if (tmeta.dsAlias)    state.tables[tname].dsAlias    = tmeta.dsAlias;
     }
-  }
+  }*/
 
   // Restore saved DS aliases (the user may have renamed DSes before saving)
-  for (const [dsName, dsMeta] of Object.entries(cfg.dataSources || {})) {
+  /*for (const [dsName, dsMeta] of Object.entries(cfg.dataSources || {})) {
     if (state.dataSources[dsName]) {
       if (dsMeta.alias)        state.dataSources[dsName].alias        = dsMeta.alias;
       if (dsMeta.internalName) state.dataSources[dsName].internalName = dsMeta.internalName;
     }
-  }
+  }*/
 
-  const rawDesign = cfg.design || { title: '', widgets: [], filters: [] };
+  /*
+  const rawDesign = state.design;
   state.design = {
     title: rawDesign.title || '',
     filters: (rawDesign.filters || []).map(f => ({
@@ -5159,7 +5372,7 @@ async function loadConfig(cfg) {
       clean.widgetSql = generateWidgetSQL(clean, '_results');
       return clean;
     })
-  };
+  };*/
 
   if (state.sql && window._cmEditor) {
     window._cmEditor.setValue(state.sql);
@@ -5209,9 +5422,7 @@ async function loadConfig(cfg) {
           const dsAlias = ds.alias || dsName;
 
           // Determine tooltip for DS header
-          let dsTitle = dsName;
-          if (ds.type === 'sharepoint' || ds.type === 'json') dsTitle = ds.url || dsName;
-          else if (ds.type === 'csv') dsTitle = ds.fileName || dsName;
+          let dsTitle = (ds.isFileUpload) ? (ds.fileName || ds.url || dsName) : (ds.url || dsName);
 
           // Sort tables alphabetically
           const tableKeys = (ds.tables || [])
@@ -5286,8 +5497,8 @@ async function loadConfig(cfg) {
             // Build fields list, sorted alphabetically
             const flist = node.querySelector('.fields-list');
             const sortedFields = [...t.fields]
-              .filter(f => !f.isAutoId)
               .sort((a, b) => (a.alias || a.displayName || '').localeCompare(b.alias || b.displayName || ''));
+              //TODO: removed this from above .sort:  .filter(f => !f.isAutoId)
 
             for (const f of sortedFields) {
               const ti = FIELD_TYPE_ICONS[f.displayType] || FIELD_TYPE_ICONS.default;
@@ -5686,6 +5897,8 @@ async function loadConfig(cfg) {
           renderDesignCanvas();
         }
       }
+
+
       function setupCodeMirror() {
         const sqlEditorTextArea = document.getElementById('sql-editor');
         if (window._cmEditor) {
@@ -5694,38 +5907,40 @@ async function loadConfig(cfg) {
           return;
         }
 
-        const cm = CodeMirror.fromTextArea(sqlEditorTextArea, {
-          mode: 'text/x-sql',
-          theme: 'default',
-          lineNumbers: true,
-          matchBrackets: true,
-          autoCloseBrackets: true,
-          dragDrop: false,
-          extraKeys: {
-            'Ctrl-Space': 'autocomplete',
-            'Ctrl-Enter': runQuery
-          },
-          hintOptions: { completeSingle: false, hint: dlvSQLHint }
-        });
+        
+          const cm = CodeMirror.fromTextArea(sqlEditorTextArea, {
+            mode: 'text/x-sql',
+            theme: 'default',
+            lineNumbers: true,
+            matchBrackets: true,
+            autoCloseBrackets: true,
+            dragDrop: false,
+            extraKeys: {
+              'Ctrl-Space': 'autocomplete',
+              'Ctrl-Enter': runQuery
+            },
+            hintOptions: { completeSingle: false, hint: dlvSQLHint }
+          });
 
-        // Attach directly to CodeMirror's actual DOM element
-        const cmWrapper = cm.getWrapperElement();
-        cmWrapper.addEventListener('dragover', (e) => e.preventDefault());
-        cmWrapper.addEventListener('drop', onDropToSQLEditor, true); // capture drop
+          // Attach directly to CodeMirror's actual DOM element
+          const cmWrapper = cm.getWrapperElement();
+          cmWrapper.addEventListener('dragover', (e) => e.preventDefault());
+          cmWrapper.addEventListener('drop', onDropToSQLEditor, true); // capture drop
 
-        cm.on('change', (inst) => {
-          state.sql = inst.getValue();
-          hideUseInDesign();
-        });
-        window._cmEditor = cm;
-        updateCMHints();
+          cm.on('change', (inst) => {
+            state.sql = inst.getValue();
+            hideUseInDesign();
+          });
+          window._cmEditor = cm;
+          updateCMHints();
 
-        // Trigger hints on keyup
-        cm.on('keyup', (inst, evt) => {
-          if (!evt.ctrlKey && !evt.altKey && evt.key.length === 1) {
-            CodeMirror.commands.autocomplete(inst, dlvSQLHint, { completeSingle: false });
-          }
-        });
+          // Trigger hints on keyup
+          cm.on('keyup', (inst, evt) => {
+            if (!evt.ctrlKey && !evt.altKey && evt.key.length === 1) {
+              CodeMirror.commands.autocomplete(inst, dlvSQLHint, { completeSingle: false });
+            }
+          });
+        
       }
 
       
@@ -5916,13 +6131,8 @@ async function loadConfig(cfg) {
             setQBMode('basic');
             addTableToBasicQB(data.table);
 
-            // Auto-select Title or Name by default
-            for (const f of t.fields) {
-              if (f.isAutoId) continue;
-              if ((f.internalName === 'Title' || (f.alias || '').toLowerCase() === 'name' ||  (f.alias || '').toLowerCase().includes('fullname') || (f.alias || '').toLowerCase() == 'uniqname') && !state.basicQB.selectedFields.includes(f.alias))
-                state.basicQB.selectedFields.push(f.alias);
-            }
-            
+            // Auto-select all fields by default
+            selectAllBasicFields();
             rebuildBasicSQL();
           } else {
             // Insert alias name at cursor
@@ -5973,13 +6183,8 @@ async function loadConfig(cfg) {
         state.basicQB.groupBy = [];
         state.basicQB.rowLimit = 500;
 
-        // Auto-select Title or Name by default
-        for (const f of t.fields) {
-          if (f.isAutoId) continue;
-          if ((f.internalName === 'Title' || (f.alias || '').toLowerCase() === 'name' ||  (f.alias || '').toLowerCase().includes('fullname') || (f.alias || '').toLowerCase() == 'uniqname') && !state.basicQB.selectedFields.includes(f.alias))
-            state.basicQB.selectedFields.push(f.alias);
-        }
-
+        // Auto-select all fields by default
+        selectAllBasicFields();
         renderBasicQB();
         ensureTableData(tableName);
       }
@@ -6815,12 +7020,12 @@ async function loadConfig(cfg) {
           const toAlias   = toND?.alias   || toND?.tableName   || '';
 
           const JOIN_TYPES = [
-            { val: 'INNER', label: 'Inner Join',    desc: 'Matching rows in both sides' },
-            { val: 'LEFT',  label: 'Left Join',     desc: 'Everything on the left, only matching rows on the right' },
-            { val: 'RIGHT', label: 'Right Join',    desc: 'Everything on the right, only matching rows on the left' },
-            { val: 'CROSS', label: 'Cross Join',    desc: 'Matrix multiplication' },
-            { val: 'UNION', label: 'Union',         desc: 'Combine tables, removing duplicate rows' },
-            { val: 'UNION ALL', label: 'Union All', desc: 'Combine tables, keeping duplicate rows' }
+            { val: 'INNER', label: 'Inner Join',    desc: 'ℹ️ Matching rows in both sides' },
+            { val: 'LEFT',  label: 'Left Join',     desc: 'ℹ️ Everything on the left, only matching rows on the right' },
+            { val: 'RIGHT', label: 'Right Join',    desc: 'ℹ️ Everything on the right, only matching rows on the left' },
+            { val: 'CROSS', label: 'Cross Join',    desc: 'ℹ️ Combine tables, repeating all rows in 2nd table for every row in 1st table' },
+            { val: 'UNION', label: 'Union',         desc: 'ℹ️ Combine tables, removing duplicate rows' },
+            { val: 'UNION ALL', label: 'Union All', desc: 'ℹ️ Combine tables, keeping duplicate rows' }
           ];
 
           const fromFieldOpts = (fromT?.fields || []).filter(f => !f.isAutoId)
@@ -7291,7 +7496,13 @@ async function loadConfig(cfg) {
           const toKey     = toNd.tableName;
           const fromIname = getInternal(fromKey, j.fromKey);
           const toIname   = getInternal(toKey,   j.toKey);
-          sql += `\n${j.type} JOIN [${toKey}] ON [${fromKey}].[${fromIname}] = [${toKey}].[${toIname}]`;
+          if(j.type==='CROSS') {
+            sql += `\nCROSS JOIN [${toKey}]`;
+          } else {
+            // TODO: handle array joins using custom alasql function "INCLUDES" instead of "="
+            // TODO: synthetic fields are only in alasql but do not exist in state.tables.fields
+            sql += `\n${j.type} JOIN [${toKey}] ON [${fromKey}].[${fromIname}] = [${toKey}].[${toIname}]`;
+          }
         }
 
         const allWhere = [];
@@ -7378,6 +7589,7 @@ async function loadConfig(cfg) {
           }
 
           // Register each referenced table in AlaSQL under its live query name (DSAlias_TableAlias)
+          // TODO shouldnt this be internal names? Can we use alasql aliases?
           for (const tname of referencedTables) {
             const t = state.tables[tname];
             if (!t || !t.data) continue;
@@ -7469,50 +7681,54 @@ async function loadConfig(cfg) {
         toast('Switched to Design tab — drag widgets onto the canvas', 'success');
       }
 
-      // ============================================================
-      // DESIGN FIELDS PANEL
-      // ============================================================
-      function renderDesignFieldsPanel() {
-  const body = document.getElementById('design-fields-body');
-  if (!state.queryColumns.length) {
-    body.innerHTML = '<div class="text-muted text-sm" style="padding:12px 10px">Run a query first</div>';
-    return;
-  }
 
   // Build alias→displayType map from all loaded tables
-  const typeMap = {};
-  for (const t of Object.values(state.tables)) {
-    for (const f of (t.fields || [])) {
-      if (f.alias && f.displayType) typeMap[f.alias] = f.displayType;
+  // TODO: Need to keep track of source ds/table/internal field ID/data type
+  // This will probably break if two tables have the a field with the same alias but different types
+  function sniffType(col) {
+    const typeMap = {};
+    for (const t of Object.values(state.tables)) {
+      for (const f of (t.fields || [])) {
+        if (f.alias && f.displayType) typeMap[f.alias] = f.displayType;
+      }
+    }
+    if (typeMap[col]) return typeMap[col];
+    // Fallback: sniff type from first result row value
+    const firstRow = (state.queryResults && state.queryResults[0]) || null;
+    if (!firstRow) return 'default';
+    const v = firstRow[col];
+    if (Array.isArray(v)) return 'array';
+    if (typeof v === 'number') return 'number';
+    if (typeof v === 'boolean') return 'boolean';
+    if (typeof v === 'object') return 'object';
+    if (typeof v === 'string' && ISO_DATE_RE.test(v)) return 'date';
+    return 'text';
+  }
+  
+  // ============================================================
+  // DESIGN FIELDS PANEL
+  // ============================================================
+  function renderDesignFieldsPanel() {
+    const body = document.getElementById('design-fields-body');
+    if (!state.queryColumns.length) {
+      body.innerHTML = '<div class="text-muted text-sm" style="padding:12px 10px">Run a query first</div>';
+      return;
+    }
+    body.innerHTML = '';
+    for (const col of state.queryColumns) { 
+      // TODO: state.queryColumns should include source table and field internal names
+      // so we can do a precise lookup in state.tables for the displayType instead of guessing based on the first row value
+      const ti = FIELD_TYPE_ICONS[sniffType(col)] || FIELD_TYPE_ICONS.default;
+      const item = document.createElement('div');
+      item.className = 'field-item';
+      item.draggable = true;
+      item.innerHTML = `<span class="field-type-icon ${ti.cls}">${ti.icon}</span><span class="field-label">${col}</span>`;
+      item.addEventListener('dragstart', e => {
+        safeDragSet(e, { type: 'result-field', field: col, dataType: sniffType(col) });
+      });
+      body.appendChild(item);
     }
   }
-
-  // Fallback: sniff type from first result row value
-  const firstRow = (state.queryResults && state.queryResults[0]) || null;
-  function sniffType(col) {
-  if (typeMap[col]) return typeMap[col];
-  if (!firstRow) return 'default';
-  const v = firstRow[col];
-  if (Array.isArray(v)) return 'array';
-  if (typeof v === 'number') return 'number';
-  if (typeof v === 'boolean') return 'bool';
-  if (typeof v === 'string' && ISO_DATE_RE.test(v)) return 'date';
-  return 'text';
-}
-
-  body.innerHTML = '';
-  for (const col of state.queryColumns) {
-    const ti = FIELD_TYPE_ICONS[sniffType(col)] || FIELD_TYPE_ICONS.default;
-    const item = document.createElement('div');
-    item.className = 'field-item';
-    item.draggable = true;
-    item.innerHTML = `<span class="field-type-icon ${ti.cls}">${ti.icon}</span><span class="field-label">${col}</span>`;
-    item.addEventListener('dragstart', e => {
-      safeDragSet(e, { type: 'result-field', field: col });
-    });
-    body.appendChild(item);
-  }
-}
 
       // ============================================================
       // WIDGET TYPES
@@ -7539,7 +7755,7 @@ async function loadConfig(cfg) {
           btn.addEventListener('dragstart', e => {
             safeDragSet(e, { type: 'widget-type', widgetType: wt.id });
           });
-          btn.addEventListener('click', () => addWidgetToCanvas(wt.id, null));
+          btn.addEventListener('click', () => { addWidgetToCanvas(wt.id, null, null); }); // TODO: Does this conflict with another event?
           grid.appendChild(btn);
         }
       }
@@ -7560,10 +7776,28 @@ async function loadConfig(cfg) {
         event.currentTarget.classList.remove('drag-over');
         const data = safeDragParse(event);
         if (!data) return;
-        if (data.type === 'widget-type') addWidgetToCanvas(data.widgetType, null);
-        else if (data.type === 'result-field') addWidgetToCanvas('table', [data.field]);
+        if (data.type === 'widget-type') {
+          if (data.widgetType === 'table') {
+            addWidgetToCanvas('table', null, data.table);
+          } else {
+            addWidgetToCanvas(data.widgetType, null, null);
+          }
+        }
         else if (data.type === 'table') addWidgetToCanvas('table', null, data.table);
-        else if (data.type === 'field') addWidgetToCanvas('table', [data.field]);
+
+        if(data.type === 'result-field' || data.type === 'field') {
+          switch (data.dataType) {
+            case 'number':
+              addWidgetToCanvas('bar', [...(state.queryColumns.filter(c => c !== data.field && sniffType(c) === 'text')[0] || data.field), data.field], null);
+              break;
+            case 'date':
+              addWidgetToCanvas('line', [data.field, ...state.queryColumns.filter(c => c !== data.field && sniffType(c) === 'number')], null); break;
+            case 'boolean':
+              addWidgetToCanvas('pie', [data.field, ...state.queryColumns.filter(c => c !== data.field && sniffType(c) === 'number')], null); break;
+            default:
+              addWidgetToCanvas('table', [data.field], null);
+          }
+        }
       }
 
       function onDropToFilterBar(event) {
@@ -7591,16 +7825,16 @@ async function loadConfig(cfg) {
           title: getDefaultTitle(widgetType),
           widthPct: 45,
           heightVh: 30,
-          fields: fields || (state.queryColumns.length ? (widgetType === 'kpi' ? [state.queryColumns[0]] : state.queryColumns.slice(0, 5)) : []),
-          xField: state.queryColumns[0] || '',
-          yField: state.queryColumns[1] || '',
+          fields: fields || (state.queryColumns.length ? (widgetType === 'kpi' ? [state.queryColumns[0]] : state.queryColumns.slice(0, 8)) : []),
+          xField: (fields && fields.length>0) ? fields[0] : state.queryColumns[0] || '', // TODO: guess x and y based on dataType
+          yField: (fields && fields.length>1) ? fields[1] : state.queryColumns[1] || '',
           aggregation: '',
           fillColor: '#0078d4',
           borderColor: '#edebe9',
           borderSize: 1,
           fontSize: 13,
           fontColor: '#323130',
-          textContent: 'Enter text here...',
+          textContent: 'Enter text or HTML here...',
           imageUrl: '',
           filters: []
         };
@@ -8227,6 +8461,8 @@ async function loadConfig(cfg) {
       // PREVIEW TAB
       // ============================================================
       async function refreshDashboardPreview() {
+        console.log('DEBUG: Entered refreshDashboardPreview()');
+        console.log('DEBUG: Refreshing dashboard preview with SQL:', state.sql);
         if (!state.sql.trim()) { toast('Please build a query first', 'error'); return; }
         if(!state.reportMode) setStatus('⏳ Loading preview data...');
 
@@ -8235,28 +8471,50 @@ async function loadConfig(cfg) {
           for (const tname of referencedTables) {
             await ensureTableData(tname, true); // Load all rows
           }
+          console.log("DEBUG: looping through tables to DROP and CREATE in alasql:", referencedTables);
           for (const tname of referencedTables) {
             const t = state.tables[tname];
             if (!t || !t.data.length) continue;
+            console.log(`DEBUG: Dropping table if it exists: ${tname}`);
             alasql(`DROP TABLE IF EXISTS [${tname}]`);
+            console.log('DEBUG: Creating table:', tname);
             alasql(`CREATE TABLE [${tname}]`);
+            console.log(`DEBUG: Inserting data into table ${tname}. Row count: ${t.data.length}`);
             alasql.tables[tname].data = t.data;
             // Also register by alias so QB-generated SQL (FROM alias) works in preview
+            console.log('DEBUG: Checking for alias for table:', tname, 'Alias:', t.alias);
             if (t.alias && t.alias !== tname) {
+              console.log(`DEBUG: Dropping alias table if it exists: ${t.alias}`);
               alasql(`DROP TABLE IF EXISTS [${t.alias}]`);
+              console.log('DEBUG: Creating alias table:', t.alias);
               alasql(`CREATE TABLE [${t.alias}]`);
+              console.log('DEBUG: Inserting data into alias table:', t.alias, 'Row count:', t.data.length);
               alasql.tables[t.alias].data = t.data;
+              console.log(`DEBUG: Table ${tname} also registered as alias ${t.alias} in alasql.`);
             }
           }
 
+          console.log("DEBUG: Tables loaded into alasql. Preprocessing query...");
           const processedSQL = preprocessSQL(state.sql);
-          const results = alasql(processedSQL);
+          console.log("DEBUG: Processed SQL:", processedSQL);
+          console.log("DEBUG: Executing query in alasql...");
+          try{
+            const results = alasql(processedSQL);
+            console.log("DEBUG: Raw query results from alasql:", results);
+          } catch (err) {
+            console.error("DEBUG: Query execution error:", err);
+            throw err;
+          }
+          console.log("DEBUG: Query executed. Results:")
+          console.log(results);
           state.previewResults = results;
           state.queryResults = results;
           state.queryColumns = results.length ? Object.keys(results[0]) : state.queryColumns;
 
+          console.log("DEBUG: Rendering preview tab with results...");
           renderPreviewTab();
           
+          console.log("DEBUG: Preview tab rendered.");
           if(!state.reportMode) setStatus(`✅ Preview: ${results.length} rows`);
         } catch (err) {
           if(!state.reportMode) {
@@ -8269,10 +8527,12 @@ async function loadConfig(cfg) {
       }
 
       function renderPreviewTab() {
+        console.log('DEBUG: Entered renderPreviewTab()');
         if(!state.reportMode) document.getElementById('preview-toolbar').classList.remove('hidden');
         document.getElementById('preview-title-bar').textContent = state.design.title || 'DataLaVista Report';
         document.getElementById('preview-title-bar').classList.remove('hidden');
         // Filter bar
+        console.log('DEBUG: Rendering filter bar with filters:', state.design.filters);
         const filterBar = document.getElementById('preview-filter-bar');
         filterBar.innerHTML = '';
         const barFilters = state.design.filters.filter(f => f.position === 'bar' || !f.position);
@@ -8291,10 +8551,12 @@ async function loadConfig(cfg) {
         } else filterBar.classList.add('hidden');
 
         // Canvas
+        console.log('DEBUG: Rendering design canvas with widgets');
         const canvas = document.getElementById('preview-canvas');
         canvas.innerHTML = '';
 
         // Destroy old preview charts
+        console.log('DEBUG: Disposing old preview charts');
         for (const [id, chart] of Object.entries(state.charts)) {
           if (id.startsWith('prev_')) { try { chart.dispose(); } catch (e) { } delete state.charts[id]; }
         }
@@ -8314,9 +8576,11 @@ async function loadConfig(cfg) {
           canvas.appendChild(el);
         }
 
+        console.log('DEBUG: Widget elements created. Rendering charts if any... requestAnimationFrame()');
         requestAnimationFrame(() => {
           for (const w of state.design.widgets) {
             if (['bar', 'line', 'pie', 'scatter'].includes(w.type)) {
+              console.log(`DEBUG: Rendering preview chart for widget ${w.id} of type ${w.type}`);
               renderPreviewChart(w, results);
             }
           }
@@ -8555,11 +8819,12 @@ async function loadConfig(cfg) {
       // TABS
       // ============================================================
       function switchTab(tab) {
+        console.log('DEBUG: Switching from tab:', state.activeTab, 'to tab:', tab);
         state.activeTab = tab;
         document.querySelectorAll('.tb-tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
         document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === 'tab-' + tab));
 
-        if (tab === 'dashboardPreview') { refreshDashboardPreview(); }
+        if (tab === 'dashboardPreview') { console.log('DEBUG: inside switchtab, calling refreshDashboardPreview.'); refreshDashboardPreview(); }
         if (tab === 'design' && !state.reportMode) {
           renderDesignCanvas(); renderFilterBar(); renderDesignFieldsPanel();
           requestAnimationFrame(() => { for (const c of Object.values(state.charts)) { try { c.resize(); } catch (e) { } } });
@@ -8614,7 +8879,7 @@ async function loadConfig(cfg) {
       }
 
       function showHelp() {
-        toast('DataLaVista — Connect a SharePoint site, build queries, design reports, then generate standalone report.', 'info');
+        toast('DataLaVista — Connect a SharePoint site, CSVs, or JSON, and create beautiful dashboards.', 'info');
       }
 
 
@@ -8872,12 +9137,14 @@ async function loadConfig(cfg) {
        * normal designer UI is presented so the user can still work.
        */
       async function loadReportFromUrl(reportUrl) {
+        console.log('DEBUG: Entering loadReportFromUrl()');
         // Show full-screen loading overlay immediately
         showLoadingPopup('⏳ Loading report. Please wait...');
         hideConnectPopup();
         setStatus('⏳ Loading report…');
 
         try {
+          console.log("DEBUG: Fetching report config from URL: " + reportUrl);
           // ── Step 1: Fetch the config JSON ──────────────────────────────
           const resp = await fetch(reportUrl, { credentials: 'same-origin' });
           if (!resp.ok) {
@@ -8886,17 +9153,21 @@ async function loadConfig(cfg) {
           const cfg = await resp.json();
 
           // ── Step 2: Load config (restores DS, tables, SQL, design) ─────
+          console.log("DEBUG: Report config fetched successfully. Loading config...");
           await loadConfig(cfg);
 
           // ── Step 3: Run SQL and render all widgets ─────────────────────
+          console.log("DEBUG: Report config loaded. Refreshing dashboard preview...");
           showLoadingPopup('⏳ Refreshing data…');
           if (!state.sql || state.sql.trim()==='') {
             showLoadingPopup('⚠ Unable to load report data.');
             throw new Error('Report config contains no SQL query.');
           }
+          console.log("DEBUG: Running SQL query to get data for preview - refreshDashboardPreview()...");
           await refreshDashboardPreview();
 
           // ── Step 4: Switch to preview and maximise ─────────────────────
+          console.log("DEBUG: Data loaded and widgets rendered. Switching to preview tab and applying report mode styles...");
           switchTab('dashboardPreview');
           document.body.classList.add('dlv-report-mode');
           setStatus('✅ Report ready');
@@ -8937,8 +9208,8 @@ async function loadConfig(cfg) {
       }
 
       /// Main initialization function to set up event listeners, resizers, and default states.
-      function init() {
-        console.log("*** Initializing DataLaVista. Come with me if you want to report... ***");
+      async function init() {
+        console.log("Come with me if you want to query...");
         setupAlaSQL();
         
 
@@ -8965,6 +9236,12 @@ async function loadConfig(cfg) {
           }
         }
 
+        // Default SQL hint
+            if (document.getElementById('sql-editor')) {
+              setupCodeMirror();
+              if (window._cmEditor) window._cmEditor.setValue('-- Connect to a data source and drag a table into the query builder\n-- or write your SQL here directly\nSELECT * FROM [YourList] LIMIT 20');
+            }
+
         // Detect whether we're in Report mode (report= parameter) or Designer mode, and show/hide UI accordingly
         const reportParam = siteUrlParams.get('report');
         if (reportParam) {
@@ -8972,7 +9249,8 @@ async function loadConfig(cfg) {
             state.reportMode = true;
             swapDesignReportModes(true);
             document.getElementById('preview-canvas').innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-secondary);font-size:14px">Your DataLaVista dashboard is loading...</div>';
-            loadReportFromUrl(reportParam);
+            console.log('DEBUG: Leaving init()... calling loadReportFromUrl()');
+            await loadReportFromUrl(reportParam);
           } else {
             /* *** DATALAVISTA DESIGNER MODE *** */
             state.reportMode = false;
@@ -8994,6 +9272,8 @@ async function loadConfig(cfg) {
               const el = document.getElementById('config-json-input');
               if (el) el.value = text;
             });
+
+            // Handle CSV upload (file input change event) for Connect popup
             document.getElementById('csv-file')?.addEventListener('change', async function () {
               const f = this.files[0];
               if (!f) return;
@@ -9004,19 +9284,13 @@ async function loadConfig(cfg) {
                 toast('Error reading file: ' + e.message, 'error');
                 return;
               }
-              const dsNameEl = document.getElementById('csv-ds-name');
-              const tableName = (dsNameEl?.value || '').trim();
-              const dsName = generateDataSourceName('csv', tableName);
-              loadCSVData(text, dsName, f.name);
+              const dsEl = document.getElementById('csv-ds-name');
+              const rawDsName = (dsEl?.value || '').trim();
+              const dsName = generateDataSourceName('csv', rawDsName);
+              loadCSVData(dsName, f.name, '', true, text); // Create new DS for this CSV file, with isUploadedFile=true
+              updateConnectButton();
               hideConnectPopup();
             });
-
-
-            // Default SQL hint
-            if (document.getElementById('sql-editor')) {
-              setupCodeMirror();
-              if (window._cmEditor) window._cmEditor.setValue('-- Connect to a data source and drag a table into the query builder\n-- or write your SQL here directly\nSELECT * FROM [YourList] LIMIT 20');
-            }
 
             // Wire options panel left-edge resizer
             initAdvOptsResizer();
@@ -9041,12 +9315,11 @@ async function loadConfig(cfg) {
             }
           }
 
+        // Show the main content (hidden by default) after setup is done
         const contentDiv = document.getElementById('content');
         if (contentDiv) contentDiv.style.display = 'flex';
-
         console.log("*** DataLaVista visual component loading complete. ***");
       }
-
 
       // ── Expose all functions on window so onclick="foo()" works in SharePoint ──
       window.dlv = {
@@ -9082,6 +9355,7 @@ async function loadConfig(cfg) {
         doConnect,
         loadSharePointSource,
         loadJSONSource,
+        fetchCSVFromURL,
         loadCSVData,
         ensureTableData,
         fetchTableData,
@@ -9119,7 +9393,6 @@ async function loadConfig(cfg) {
         spPickerClose,
         spPickerConfirm,
         spPickerCheckVisibility,
-        loadSharePointSource,
         setupCodeMirror,
         dlvSQLHint,
         updateCMHints,
@@ -9224,6 +9497,7 @@ async function loadConfig(cfg) {
         updateWidgetContent,
         renderFilterBar,
         removeFilterFromBar,
+        sniffType,
         applyPreviewFilter,
         refreshWidgets,
         refreshDashboardPreview,
@@ -9256,7 +9530,7 @@ async function loadConfig(cfg) {
 
       // Self-init
 (function startDataLaVista() {
-    console.log("Starting DataLaVista...");
+    console.log("*** Starting DataLaVista ***");
     try {      
       init();
     } catch (e) {
