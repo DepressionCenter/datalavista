@@ -2662,7 +2662,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
             </div>
             <div class="form-group">
               <label>Or upload a local CSV file</label>
-              <input type="file" class="form-input" id="csv-file" accept=".csv, .CSV, text/csv" />
+              <input type="file" class="form-input" id="csv-file" accept=".csv" />
             </div>
           </div>
 
@@ -2675,7 +2675,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
             </div>
             <div class="form-group">
               <label>Or load from file</label>
-              <input type="file" class="form-input" id="config-file" accept=".json, .JSON, .json5, .JSON5, text/json, application/json" />
+              <input type="file" class="form-input" id="config-file" accept=".json" />
             </div>
           </div>
 
@@ -3566,7 +3566,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
     // Map a raw data row into our internal format.
     // OUTPUT KEYS ARE ALWAYS internalName (so SQL "SELECT [table].[InternalName]" works).
     // The SQL query builder adds "AS [fieldAlias]" to give result columns friendly names.
-    function mapDataRow(tableName, row, fieldDefs) {
+    function mapDataRow(row, fieldDefs) {
       const mapped = {};
       const processingRow = { ...row };
 
@@ -3605,15 +3605,15 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         }
 
         if (isUser && !isMulti && typeof value === 'object' && !Array.isArray(value)) {
-          const _siteBase = (state.tables[tableName] && state.tables[tableName].siteUrl)
-            ? state.tables[tableName].siteUrl.replace(/\/$/, '')
-            : '..';
+          const _siteBase = (state.source && state.source.url)
+            ? state.source.url.replace(/\/$/, '')
+            : window.location.origin;
           mapped[outKey]              = value.Title || value.Name || JSON.stringify(value);
           mapped[outKey + 'Id']       = value.Id;
           mapped[outKey + 'Claims']   = value.Name || '';
           mapped[outKey + 'Email']    = extractEmail(value.Name);
           mapped[outKey + 'PictureUrl'] = value.Name
-            ? `${_siteBase}/_layouts/15/userphoto.aspx?size=L&accountname=${encodeURIComponent(value.Name)}`
+            ? `${_siteBase}/_layouts/15/userphoto.aspx?size=M&accountname=${encodeURIComponent(value.Name)}`
             : '';
           mapped[outKey + 'Data']     = [value];
           delete processingRow[key]; delete processingRow[key + 'Id'];
@@ -3686,10 +3686,10 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
     // SHAREPOINT REST API ADAPTER
     // ============================================================
     // Rule 1: Use application/json instead of verbose
-    async function spFetch(url, dsName) {
+    async function spFetch(url) {
       const headers = { 'Accept': 'application/json' };
-      if (state.dataSources[dsName] && state.dataSources[dsName].auth === 'token' && state.dataSources[dsName].token) {
-        headers['Authorization'] = 'Bearer ' + state.dataSources[dsName].token;
+      if (state.source.auth === 'token' && state.source.token) {
+        headers['Authorization'] = 'Bearer ' + state.source.token;
       }
       const res = await fetch(url, { headers, credentials: 'include' });
       if (!res.ok) {
@@ -3752,7 +3752,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       const ds = state.dataSources[t.dataSource];
       const dsAlias = (ds && ds.alias) || t.dataSource || '';
       const tAlias = t.alias || t.internalName || tableKey;
-      return dsAlias ? dsAlias + '_' + tAlias : tAlias; // TODO: Check if this works after renaming a data source
+      return dsAlias ? dsAlias + '_' + tAlias : tAlias;
     }
 
     /** Register a table in AlaSQL under its immutable tableKey only.
@@ -3764,7 +3764,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       const t = state.tables[tableKey];
       if (!t || !t.data) return;
       alasql(`DROP TABLE IF EXISTS [${tableKey}]`);
-      alasql(`CREATE TABLE [${tableKey}]`); // TODO: store table alises in alasql
+      alasql(`CREATE TABLE [${tableKey}]`);
       const actual = Object.keys(alasql.tables).find(k => k.toLowerCase() === tableKey.toLowerCase()) || tableKey;
       alasql.tables[actual].data = t.data;
     }
@@ -3825,9 +3825,9 @@ function stripODataMetadata(rows, quickCheck = false) {
 }
 
     // Rule 2: Fetch only custom lists
-    async function fetchSPLists(siteUrl, dsName) {
+    async function fetchSPLists(siteUrl) {
       const url = `${siteUrl}/_api/web/lists?$select=Id,EntityTypeName,Title,Description,ItemCount,BaseType,Hidden,ImageUrl,IsApplicationList,LastItemModifiedDate&$filter=(Hidden eq false and IsApplicationList eq false and BaseTemplate ne 115 and BaseTemplate ne 121 and BaseTemplate ne 330 and BaseTemplate ne 544 and Title ne 'MicroFeed' and EntityTypeName ne 'AppCatalog' and EntityTypeName ne 'FormServerTemplates' and EntityTypeName ne 'Style_x0020_Library') or (Title eq 'User Information List' or Title eq 'Events')`;
-      const json = await spFetch(url, dsName);
+      const json = await spFetch(url);
       let rows = extractRows(json);
       rows = stripODataMetadata(rows);
       return rows;
@@ -3958,7 +3958,7 @@ async function fetchTableData(tableName, fetchAll = false) {
       let rawData = [];
       
       if (t.sourceType === 'sharepoint') {
-        const spSiteUrl = t.url || t.siteUrl || (state.dataSources[t.dataSource] && state.dataSources[t.dataSource].siteUrl);
+        const spSiteUrl = state.source.url || t.siteUrl;
         const baseSelect = new Set(['ID', 'Title', 'Created', 'Modified', 'Author/Id', 'Author/Title', 'Author/Name', 'Editor/Id', 'Editor/Title', 'Editor/Name']);
         const baseExpand = new Set(['Author', 'Editor']);
         
@@ -3998,7 +3998,7 @@ async function fetchTableData(tableName, fetchAll = false) {
         return; 
       }
       
-      t.data = rawData.map(row => mapDataRow(tableName, row, spFields)); 
+      t.data = rawData.map(row => mapDataRow(row, spFields)); 
       t.loaded = fetchAll;
       
       if (!t.originalFields) {
@@ -4353,6 +4353,7 @@ async function deriveStructureFromSample(dataArray) {
 
 
 async function doConnect() {
+    console.log('Loading data source...');
     const activeTab = document.querySelector('.source-tab.active')?.dataset?.src || 'sharepoint';
     const btn = document.getElementById('btn-do-connect');
     const prog = document.getElementById('popup-progress');
@@ -4362,41 +4363,26 @@ async function doConnect() {
 
   try {
     if (activeTab === 'sharepoint') {
-      /* SharePoint Tab */
-      const siteUrl = (document.getElementById('sp-url')?.value || '').trim().replace(/\/$/, '');
-      if (!siteUrl) { toast('Please enter a SharePoint site URL', 'error'); return; }
+      const url = (document.getElementById('sp-url')?.value || '').trim().replace(/\/$/, '');
+      if (!url) { toast('Please enter a SharePoint site URL', 'error'); return; }
       const rawDsName = (document.getElementById('sp-ds-name')?.value || '').trim();
       const dsName = generateDataSourceName('sharepoint', rawDsName);
-
-      if(!state.dataSources[dsName]) {
-        state.dataSources[dsName] = {
-          type: 'sharepoint',
-          url: siteUrl,
-          auth: document.getElementById('sp-auth')?.value || 'current',
-          token: document.getElementById('sp-token')?.value || '',
-          internalName: dsName,
-          alias: dsName,
-          description: null,
-          tables: [],
-          keepRawData: false
-        };
-      }
-      
+      state.source = {
+        type: 'sharepoint',
+        url,
+        auth: document.getElementById('sp-auth')?.value || 'current',
+        token: document.getElementById('sp-token')?.value || ''
+      };
       progText.textContent = 'Fetching list inventory...';
-      await loadSharePointSource(siteUrl, dsName);
-      
+      await loadSharePointSource(url, dsName);
     } else if (activeTab === 'json') {
-      /* JSON Tab */
-      const siteUrl = (document.getElementById('json-url')?.value || '').trim();
-      if (!siteUrl) { toast('Please enter a URL', 'error'); return; }
+      const url = (document.getElementById('json-url')?.value || '').trim();
+      if (!url) { toast('Please enter a URL', 'error'); return; }
       const rawDsName = (document.getElementById('json-ds-name')?.value || '').trim();
       const dsName = generateDataSourceName('json', rawDsName);
       progText.textContent = 'Loading JSON...';
-      await loadJSONSource(siteUrl, dsName);
-
+      await loadJSONSource(url, dsName);
     } else if (activeTab === 'csv') {
-      /* CSV Tab */
-      // Handles CSV URLs. File uploads are handled separately in spPickerCheckVisibility() → handleFileUpload().
       const urlEl = document.getElementById('csv-url');
       const dsEl  = document.getElementById('csv-ds-name');
       const url = (urlEl?.value || '').trim();
@@ -4404,21 +4390,25 @@ async function doConnect() {
       const rawDsName = (dsEl?.value || '').trim();
       const dsName = generateDataSourceName('csv', rawDsName);
       progText.textContent = 'Loading CSV...';
-
+      let res;
+      try {
+        res = await fetch(url, { credentials: 'include' });
+      } catch (fetchErr) {
+        console.error('[DLV CSV] fetch threw:', fetchErr);
+        throw fetchErr;
+      }
+      if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
       let text;
-      try{
-        text = await fetchCSVFromURL(url);
-      } catch (e) {
-        console.error('[DLV CSV] res.text() threw:', e);
-        throw e;
+      try {
+        text = await res.text();
+      } catch (textErr) {
+        console.error('[DLV CSV] res.text() threw:', textErr);
+        throw textErr;
       }
       if (!text.trim()) throw new Error('CSV file appears to be empty');
       const fileName = url.split('/').pop();
-      
-      loadCSVData(dsName, fileName, url, false, text); // Create new DS for this CSV file, with isUploadedFile=false
-
+      loadCSVData(text, dsName, fileName);
     } else if (activeTab === 'loadconfig') {
-      /* Load Report Config Tab */
       const jsonText = (document.getElementById('config-json-input')?.value || '').trim();
       if (!jsonText) { toast('Please paste or load a config', 'error'); return; }
       const parsed = safeJSONParse(jsonText, 'Config');
@@ -4627,23 +4617,21 @@ function tryJSONP(url) {
 async function loadSharePointSource(siteUrl, dsName) {
   setStatus('⏳ Loading SharePoint lists from ' + siteUrl + '...');
 
-  
   // dsName is the immutable internal key; alias = user-entered name from connect popup
   if (!state.dataSources[dsName]) {
     state.dataSources[dsName] = {
       type: 'sharepoint',
       url: siteUrl,
-      auth: state.dataSources[dsName]?.auth || 'current',
-      token: state.dataSources[dsName]?.token || '',
+      auth: state.source.auth || 'current',
+      token: state.source.token || '',
       internalName: dsName,
-      alias: dsName,
+      alias: dsName,          // user can rename this; it's the DS prefix in SQL
       description: '',
-      tables: [],
-      keepRawData: false
+      tables: []
     };
   }
 
-  const lists = await fetchSPLists(siteUrl, dsName);
+  const lists = await fetchSPLists(siteUrl);
   let loadedCount = 0;
 
   for (const list of lists) {
@@ -4665,7 +4653,7 @@ async function loadSharePointSource(siteUrl, dsName) {
 
       state.tables[tableKey] = {
         internalName: entityTypeName,
-        displayName: list.Title || tableAlias || entityTypeName,
+        displayName: list.Title || entityTypeName,
         description: list.Description || '',
         alias: tableAlias,
         dsAlias: dsName,
@@ -4678,8 +4666,7 @@ async function loadSharePointSource(siteUrl, dsName) {
         guid: list.Id,
         siteUrl,
         itemCount: list.ItemCount || 0,
-        dataSource: dsName,
-        keepRawData: false
+        dataSource: dsName
       };
 
       if (!state.dataSources[dsName].tables.includes(tableKey)) {
@@ -4823,22 +4810,11 @@ async function loadJSONSource(url, dsName) {
     return out;
   });
 
-  const tableKey = dsName + '_Data'; // TODO: where is ds created for JSON url downloads?
+  const tableKey = dsName + '_Data';
 
   // Register data source
   if (!state.dataSources[dsName]) {
-    state.dataSources[dsName] = {
-      alias: dsName,
-      auth: null,
-      description: '',
-      internalName: dsName, // TODO: was dsname already generated/processed with alias?
-      type: 'json',
-      tables: [],
-      token: '',
-      url: url,
-      siteUrl: null,
-      keepRawData: false
-    };
+    state.dataSources[dsName] = { type: 'json', url, alias: dsName, tables: [] };
   }
 
   state.tables[tableKey] = {
@@ -4849,12 +4825,7 @@ async function loadJSONSource(url, dsName) {
     data: normalizedRows,
     loaded: true,
     sourceType: 'json',
-    dataSource: dsName,
-    dsAlias: dsName,
-    keepRawData: false,
-    siteUrl: null,
-    url: url,
-    itemCount: normalizedRows.length || 0
+    dataSource: dsName
   };
 
   if (!state.dataSources[dsName].tables.includes(tableKey)) {
@@ -4866,22 +4837,9 @@ async function loadJSONSource(url, dsName) {
   setupCodeMirror();
 }
 
-// Fetch CSV text with error handling
-async function fetchCSVFromURL(url) {
-      try {
-        const res = await fetch(url, { credentials: 'include' });
-        if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
-        const text = await res.text();
-        if (!text.trim()) throw new Error('CSV file appears to be empty');
-        return text; // Return raw text; parsing is handled separately in loadCSVData()
-      } catch (err) {
-        console.error('Failed to download CSV: ', err);
-        throw new Error('Failed to download CSV: ' + err.message);
-      }
-    }
 
 // Simple CSV parser and loader
-function loadCSVData(dsName, fileName = '', fileUrl = '', isLocalFile = false, text = '') {
+function loadCSVData(text, dsName, fileName) {
   let parsed;
   try {
     parsed = parseCSV(text);
@@ -4892,53 +4850,32 @@ function loadCSVData(dsName, fileName = '', fileUrl = '', isLocalFile = false, t
   }
   const { headers, rows } = parsed;
   if (!headers.length) {
-    console.warn('No headers found in CSV');
+    console.warn('[DLV CSV] No headers found in CSV');
     toast('CSV appears to have no header row', 'error');
     return;
   }
   const fields = headers.map(h => ({
-    internalName: h.replace(/[^A-Za-z0-9_]/g, '_').replace('__','_'),
-    displayName: toPascalCase(h) || h,
-    alias: toPascalCase(h) || h,
-    type: 'text',
-    displayType: 'text'
+    internalName: h, displayName: h, alias: toPascalCase(h) || h,
+    type: 'text', displayType: 'text'
   }));
 
   const tableKey = dsName + '_Data';
 
-// Register data source
-  if (!state.dataSources[dsName]) { // TODO: left off here. What about csv-url vs csv-file?
-    state.dataSources[dsName] = {
-      alias: 'Data',
-      auth: null,
-      description: 'This CSV file (' + (fileName || dsName + '.csv') + ') was uploaded manually, and only the dashboard creator can refresh it.',
-      internalName: dsName,
-      tables: [],
-      token: null,
-      type: 'csv',
-      fileName: fileName || '',
-      isLocalfile: isLocalFile, // true if uploaded from local file picker; false if loaded from URL
-      url: fileUrl || fileName || dsName + '.csv',
-      keepRawData: (isLocalFile) ? true : false, // if loaded from file, keep raw data
-    };
+
+  // Register data source
+  if (!state.dataSources[dsName]) {
+    state.dataSources[dsName] = { type: 'csv', fileName: fileName || dsName + '.csv', alias: dsName, tables: [] };
   }
 
   state.tables[tableKey] = {
-    alias: tableKey,
-    data: rows || [],
-    dataSource: dsName,
-    description: 'This table was created from a CSV file (' + (fileName || dsName + '.csv') + ').',
     displayName: 'Data',
+    alias: 'Data',
     dsAlias: dsName,
-    fields: Array.isArray(headers) && headers.length ? fields : [{ internalName: 'Column1', displayName: 'Column1', alias: 'Column1', type: 'text', displayType: 'text' }],
-    internalName: tableKey,
-    itemCount: rows.length || 0,
-    siteUrl: null,
-    url: fileUrl || fileName || dsName + '.csv',
+    fields,
+    data: rows,
     loaded: true,
     sourceType: 'csv',
-    isLocalFile: isLocalFile, // true if uploaded from local file picker; false if loaded from URL
-    keepRawData: (isLocalFile) ? true : false, // if loaded from file, keep raw data
+    dataSource: dsName
   };
 
   if (!state.dataSources[dsName].tables.includes(tableKey)) {
@@ -5027,7 +4964,6 @@ function saveConfig() {
   downloadText(json, 'DataLaVista-config.json', 'application/json');
 }
 
-// Build a clean, minimal config object from the current state, suitable for saving or sharing
 function buildConfig() {
   const cleanFields = (arr) => (arr || []).map(f => ({
     InternalName: f.InternalName || f.internalName || '',
@@ -5044,66 +4980,40 @@ function buildConfig() {
     choices: (Array.isArray(f.choices) && f.choices.length <= 50) ? f.choices : null
   }));
 
-
-  // Save dataSources
-  let dataSourcesMeta = {};
-  let uploadedFilesDsNames = [];
-  for (const [dsName, ds] of Object.entries(state.dataSources)) {
-    dataSourcesMeta[dsName] = {
-      alias: ds.alias || dsName,
-      auth: ds.auth || 'current',
-      fileName: ds.fileName || '',
-      internalName: ds.internalName || dsName,
-      tables: ds.tables || [],
-      token: ds.token || '',
-      type: ds.type || 'sharepoint',
-      url: ds.url || ''
-    };
-    if(ds.type!=='sharepoint' && ds.url && ds.url !=='') {
-      uploadedFilesDsNames.push(dsName);
-    }
-  }
-
-  // Bring over preview/flat table data if the source contains an uploaded file
-  let previewResults = [];
-  // TODO: Do we need to load preview data, or just re-run SQL when report loads?
-  if(uploadedFilesDsNames && uploadedFilesDsNames.length>0 && state.previewResults && state.previewResults.length>0) {
-    //previewResults = state.previewResults || []; // Since we found files that were uploaded, we preserve the flat table data
-  }
-
-  // Save tables (and row data if the files were uploaded)
   const tablesMeta = {};
   for (const [name, t] of Object.entries(state.tables)) {
     const ds = t.dataSource ? state.dataSources[t.dataSource] : null;
     tablesMeta[name] = {
-      alias: t.alias || name,
-      dataSource: t.dataSource || '',
-      description: t.description || '',
-      displayName: t.displayName || name,
-      dsAlias: t.dsAlias || '',
-      fields: cleanFields(t.fields),
-      guid: t.guid || '',
       internalName: t.internalName || name,
-      itemCount: t.itemCount || 0,   // for SharePoint lists?
-      loaded: false,   
+      displayName: t.displayName || name,
+      description: t.description || '',
+      alias: t.alias || name,
+      dsAlias: t.dsAlias || '',
+      dataSource: t.dataSource || '',
+      fields: cleanFields(t.fields),
       originalFields: cleanFields(t.originalFields || t.fields),
-      siteUrl: t.siteUrl || '', // for SharePoint lists
+      guid: t.guid || '',
       sourceType: t.sourceType || 'sharepoint',
-      url: ds ? (ds.url || '') : ''  // for CSV/JSON standalone fetching
+      siteUrl: t.siteUrl || '',
+      url: ds ? (ds.url || '') : '',          // for CSV/JSON standalone fetching
+      itemCount: t.itemCount || 0
     };
+  }
 
-    // Only include row data for tables that were loaded from uploaded files, to keep config lightweight and avoid sharing sensitive data from connected sources
-    try{
-      if(t.loaded && uploadedFilesDsNames.includes(t.dataSource) && t.data && t.data.length>0) {
-        tablesMeta[name].data = t.data; // Only include row data for tables that were loaded from uploaded files
-        tablesMeta[name].loaded = true; // Mark as loaded since we have the data in the config
-      } else {
-        tablesMeta[name].data = []; // For other tables, we don't include row data in the config to keep it lightweight
-      }
-    } catch(e) {
-      console.warn(`Error including data for uploaded file, table ${name}, in config:`, e);
-      tablesMeta[name].data = []; // On error, don't include data
-    }
+
+  // Save dataSources (without raw data)
+  const dataSourcesMeta = {};
+  for (const [dsName, ds] of Object.entries(state.dataSources)) {
+    dataSourcesMeta[dsName] = {
+      type: ds.type || 'sharepoint',
+      url: ds.url || '',
+      auth: ds.auth || 'current',
+      token: ds.token || '',
+      fileName: ds.fileName || '',
+      internalName: ds.internalName || dsName,
+      alias: ds.alias || dsName,
+      tables: ds.tables || []
+    };
   }
 
   const cleanWidgets = (state.design.widgets || []).map(w => ({
@@ -5144,80 +5054,28 @@ function buildConfig() {
 
   return {
     _license: 'This file is part of DataLaVista. This is a configuration script for a report designed in DataLaVista. Copyright © 2026 The Regents of the University of Michigan. This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version. This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details. You should have received a copy of the GNU General Public License along with this program. If not, see https://www.gnu.org/licenses.',
-    activeTab: (state.reportMode) ? 'dashboardPreview' : 'design',
-    advancedQB: state.advancedQB || {},
-    basicQB: state.basicQB || {},
-    charts: state.charts || {},
-    currentWidgetId: state.currentWidgetId || null,
+    dataSource: { type: state.source.type || 'sharepoint', url: state.source.url || '', auth: state.source.auth || 'current' },
     dataSources: dataSourcesMeta,
-    design: cleanDesign,
-    previewFilters: state.previewFilters || {},
-    previewResults: Array.isArray(previewResults) ? [...previewResults] : [],
-    qbCollapsed: state.qbCollapsed || false,
-    qbSectionHeight: state.qbSectionHeight || 60,
-    qmTab: state.qmTab || 'dataPreview',
-    queryColumns: Array.isArray(state.queryColumns) ? [...state.queryColumns] : [],    
-    queryMode: (state.queryMode && state.queryMode != null && state.queryMode != undefined && state.queryMode != '') ? state.queryMode : 'sql',
-    queryResults: Array.isArray(state.queryResults) ? [...state.queryResults] : [],
-    queryResultsReady: state.queryResultsReady || false,
+    tables: tablesMeta,
     sql: state.sql || '',
-    sqlLocked: state.sqlLocked || false,
-    tables: tablesMeta
+    design: cleanDesign,
+    queryColumns: Array.isArray(state.queryColumns) ? [...state.queryColumns] : []
   };
 }
 
 async function loadConfig(cfg) {
-  if (!cfg._license) throw new Error('Invalid report config — missing _license key');
-  if (!cfg.dataSources || typeof cfg.dataSources != 'object'|| !cfg.tables || typeof cfg.tables != 'object') throw new Error('Invalid report config — missing data sources or tables.');
-  // If the config provided is a string, try parsing it safely as JSON
-  if (cfg && typeof cfg == 'string')
-    {
-      let cfgString = cfg.trim();
-      if(cfgString.startsWith('{') && cfgString.endsWith('}')) {
-        try{
-          cfg = safeJSONParse(cfgString, 'Config');
-        } catch (e) {
-          throw new Error('Invalid report config — the report JSON is invalid.');
-        }
-      } else {
-        throw new Error('Invalid report config — the report JSON is invalid.');
-      }
-    }
-  
-    // At this point, cfg should be an object. If it's not, throw an error.
-    if (cfg && typeof cfg !== 'object') throw new Error('Invalid report config — no report JSON detected.');
-
-    // Basic validation passed — now clear the existing state and load the config values
-  //state.source = { ...cfg.dataSource };
-  state.activeTab = 'dashboardPreview';
-  state.advancedQB = cfg.advancedQB || {};
-  state.basicQB = cfg.basicQB || {};
-  state.charts = cfg.charts || {};
-  state.currentWidgetId = null;
-  state.dataSources = cfg.dataSources || {};
-  state.design = cfg.design || { title: 'DataLaVista Report', widgets: [], filters: [] };
-  state.previewFilters = cfg.previewFilters || {};
-  state.previewResults = Array.isArray(cfg.previewResults) ? [...cfg.previewResults] : [];
-  state.qmTab = cfg.qmTab || 'previewData';
-  state.activeTab = (state.reportMode)?'dataPreview':'design';
-  state.queryColumns = Array.isArray(cfg.queryColumns) ? [...cfg.queryColumns] : [];
-  state.queryMode = (cfg.queryMode && cfg.queryMode != null && cfg.queryMode != undefined && cfg.queryMode != '') ? cfg.queryMode : 'sql';
-  state.queryResults = Array.isArray(cfg.queryResults) ? [...cfg.queryResults] : [];
-  state.queryResultsReady = cfg.queryResultsReady || false;
-  // Don't load reportMode or reportUrl from config - it's handled by init()
+  if (!cfg._license) throw new Error('Invalid config — missing _license key');
+  state.source = { ...cfg.dataSource };
   state.sql = cfg.sql || '';
-  state.sqlLocked = cfg.sqlLocked || false;
   state.queryColumns = cfg.queryColumns || [];
-  state.tables = cfg.tables || {};
-  
-  switchTab(state.activeTab);
+  state.dataSources = {};
   // Support new dataSources map
-  /*if (cfg.dataSources && typeof cfg.dataSources === 'object' && !Array.isArray(cfg.dataSources)) {
+  if (cfg.dataSources && typeof cfg.dataSources === 'object' && !Array.isArray(cfg.dataSources)) {
     // New format: keyed object
     for (const [dsName, dsMeta] of Object.entries(cfg.dataSources)) {
       if (dsMeta.type === 'sharepoint' && dsMeta.url) {
         state.source = { type: 'sharepoint', url: dsMeta.url, auth: dsMeta.auth || 'current', token: dsMeta.token || '' };
-        await loadSharePointSource(dsMeta.url, dsName); // TODO: why are we re-loading the data source from scratch?
+        await loadSharePointSource(dsMeta.url, dsName);
       } else if (dsMeta.type === 'json' || dsMeta.type === 'csv') {
         // Non-SP sources: restore from tables metadata (data will need re-fetch for SP, but CSV/JSON preserve structure)
         if (!state.dataSources[dsName]) {
@@ -5231,21 +5089,21 @@ async function loadConfig(cfg) {
         }
       }
     }
-  }*/ //else if (cfg.dataSources && Array.isArray(cfg.dataSources)) {
+  } else if (cfg.dataSources && Array.isArray(cfg.dataSources)) {
     // Legacy array format
-    //for (const src of cfg.dataSources) {
-    //  if (!src.url) continue;
-    //  const dsName = src.prefix || generateDataSourceName('sharepoint', '');
-    //  state.source = { type: 'sharepoint', url: src.url, auth: src.auth || 'current', token: src.token || '' };
-    //  await loadSharePointSource(src.url, dsName);
-    //}
-  //} // else if (state.source.url) {
+    for (const src of cfg.dataSources) {
+      if (!src.url) continue;
+      const dsName = src.prefix || generateDataSourceName('sharepoint', '');
+      state.source = { type: 'sharepoint', url: src.url, auth: src.auth || 'current', token: src.token || '' };
+      await loadSharePointSource(src.url, dsName);
+    }
+  } else if (state.source.url) {
     // Very legacy: single source
-    //await loadSharePointSource(state.source.url, 'SP');
-  //}
+    await loadSharePointSource(state.source.url, 'SP');
+  }
 
   // Restore table metadata overrides (aliases, internalNames, fields etc.) from config
-  /*for (const [tname, tmeta] of Object.entries(cfg.tables || {})) {
+  for (const [tname, tmeta] of Object.entries(cfg.tables || {})) {
     if (state.tables[tname]) {
       if (tmeta.internalName) state.tables[tname].internalName = tmeta.internalName;
       if (tmeta.alias)        state.tables[tname].alias = tmeta.alias;
@@ -5255,18 +5113,17 @@ async function loadConfig(cfg) {
       if (tmeta.dataSource) state.tables[tname].dataSource = tmeta.dataSource;
       if (tmeta.dsAlias)    state.tables[tname].dsAlias    = tmeta.dsAlias;
     }
-  }*/
+  }
 
   // Restore saved DS aliases (the user may have renamed DSes before saving)
-  /*for (const [dsName, dsMeta] of Object.entries(cfg.dataSources || {})) {
+  for (const [dsName, dsMeta] of Object.entries(cfg.dataSources || {})) {
     if (state.dataSources[dsName]) {
       if (dsMeta.alias)        state.dataSources[dsName].alias        = dsMeta.alias;
       if (dsMeta.internalName) state.dataSources[dsName].internalName = dsMeta.internalName;
     }
-  }*/
+  }
 
-  /*
-  const rawDesign = state.design;
+  const rawDesign = cfg.design || { title: '', widgets: [], filters: [] };
   state.design = {
     title: rawDesign.title || '',
     filters: (rawDesign.filters || []).map(f => ({
@@ -5302,7 +5159,7 @@ async function loadConfig(cfg) {
       clean.widgetSql = generateWidgetSQL(clean, '_results');
       return clean;
     })
-  };*/
+  };
 
   if (state.sql && window._cmEditor) {
     window._cmEditor.setValue(state.sql);
@@ -5829,8 +5686,6 @@ async function loadConfig(cfg) {
           renderDesignCanvas();
         }
       }
-
-
       function setupCodeMirror() {
         const sqlEditorTextArea = document.getElementById('sql-editor');
         if (window._cmEditor) {
@@ -6960,12 +6815,12 @@ async function loadConfig(cfg) {
           const toAlias   = toND?.alias   || toND?.tableName   || '';
 
           const JOIN_TYPES = [
-            { val: 'INNER', label: 'Inner Join',    desc: 'ℹ️ Matching rows in both sides' },
-            { val: 'LEFT',  label: 'Left Join',     desc: 'ℹ️ Everything on the left, only matching rows on the right' },
-            { val: 'RIGHT', label: 'Right Join',    desc: 'ℹ️ Everything on the right, only matching rows on the left' },
-            { val: 'CROSS', label: 'Cross Join',    desc: 'ℹ️ Combine tables, repeating all rows in 2nd table for every row in 1st table' },
-            { val: 'UNION', label: 'Union',         desc: 'ℹ️ Combine tables, removing duplicate rows' },
-            { val: 'UNION ALL', label: 'Union All', desc: 'ℹ️ Combine tables, keeping duplicate rows' }
+            { val: 'INNER', label: 'Inner Join',    desc: 'Matching rows in both sides' },
+            { val: 'LEFT',  label: 'Left Join',     desc: 'Everything on the left, only matching rows on the right' },
+            { val: 'RIGHT', label: 'Right Join',    desc: 'Everything on the right, only matching rows on the left' },
+            { val: 'CROSS', label: 'Cross Join',    desc: 'Matrix multiplication' },
+            { val: 'UNION', label: 'Union',         desc: 'Combine tables, removing duplicate rows' },
+            { val: 'UNION ALL', label: 'Union All', desc: 'Combine tables, keeping duplicate rows' }
           ];
 
           const fromFieldOpts = (fromT?.fields || []).filter(f => !f.isAutoId)
@@ -7436,12 +7291,6 @@ async function loadConfig(cfg) {
           const toKey     = toNd.tableName;
           const fromIname = getInternal(fromKey, j.fromKey);
           const toIname   = getInternal(toKey,   j.toKey);
-          if(j.type==='CROSS') {
-            sql += `\nCROSS JOIN [${toKey}]`;
-          } else {
-            // TODO: handle array joins using custom alasql function "INCLUDES" instead of "="
-            
-
           sql += `\n${j.type} JOIN [${toKey}] ON [${fromKey}].[${fromIname}] = [${toKey}].[${toIname}]`;
         }
 
@@ -8765,7 +8614,7 @@ async function loadConfig(cfg) {
       }
 
       function showHelp() {
-        toast('DataLaVista — Connect a SharePoint site, CSVs, or JSON, and create beautiful dashboards.', 'info');
+        toast('DataLaVista — Connect a SharePoint site, build queries, design reports, then generate standalone report.', 'info');
       }
 
 
@@ -9089,7 +8938,7 @@ async function loadConfig(cfg) {
 
       /// Main initialization function to set up event listeners, resizers, and default states.
       function init() {
-        console.log("Come with me if you want to query...");
+        console.log("*** Initializing DataLaVista. Come with me if you want to report... ***");
         setupAlaSQL();
         
 
@@ -9145,8 +8994,6 @@ async function loadConfig(cfg) {
               const el = document.getElementById('config-json-input');
               if (el) el.value = text;
             });
-
-            // Handle CSV upload (file input change event) for Connect popup
             document.getElementById('csv-file')?.addEventListener('change', async function () {
               const f = this.files[0];
               if (!f) return;
@@ -9157,11 +9004,10 @@ async function loadConfig(cfg) {
                 toast('Error reading file: ' + e.message, 'error');
                 return;
               }
-              const dsEl = document.getElementById('csv-ds-name');
-              const rawDsName = (dsEl?.value || '').trim();
-              const dsName = generateDataSourceName('csv', rawDsName);
-              loadCSVData(dsName, f.name, '', true, text); // Create new DS for this CSV file, with isUploadedFile=true
-              updateConnectButton();
+              const dsNameEl = document.getElementById('csv-ds-name');
+              const tableName = (dsNameEl?.value || '').trim();
+              const dsName = generateDataSourceName('csv', tableName);
+              loadCSVData(text, dsName, f.name);
               hideConnectPopup();
             });
 
@@ -9236,7 +9082,6 @@ async function loadConfig(cfg) {
         doConnect,
         loadSharePointSource,
         loadJSONSource,
-        fetchCSVFromURL,
         loadCSVData,
         ensureTableData,
         fetchTableData,
@@ -9274,6 +9119,7 @@ async function loadConfig(cfg) {
         spPickerClose,
         spPickerConfirm,
         spPickerCheckVisibility,
+        loadSharePointSource,
         setupCodeMirror,
         dlvSQLHint,
         updateCMHints,
@@ -9410,7 +9256,7 @@ async function loadConfig(cfg) {
 
       // Self-init
 (function startDataLaVista() {
-    console.log("*** Starting DataLaVista ***");
+    console.log("Starting DataLaVista...");
     try {      
       init();
     } catch (e) {

@@ -299,13 +299,13 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
     .qm-actions { display: flex; align-items: center; gap: 6px; }
 
     /* ── Query-main panels ── */
-    #qm-panel-qb, #qm-panel-sql, #qm-panel-preview {
+    #qm-panel-qb, #qm-panel-sql, #qm-panel-dataPreview {
       display: none;
       flex: 1;
       overflow: hidden;
       flex-direction: column;
     }
-    #qm-panel-qb.active, #qm-panel-sql.active, #qm-panel-preview.active {
+    #qm-panel-qb.active, #qm-panel-sql.active, #qm-panel-dataPreview.active {
       display: flex;
     }
 
@@ -344,10 +344,11 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       align-items: flex-start;
       justify-content: center;
       padding-top: 60px;
+      pointer-events: none;
     }
 
     #popup-overlay .active {
-      pointer-events: none;
+      pointer-events: inherit;
       display: flex;
     }
 
@@ -1383,7 +1384,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       padding-bottom: 4px;
     }
 
-    /* Preview table panel — now lives inside #qm-panel-preview which manages display */
+    /* Preview table panel — now lives inside #qm-panel-dataPreview which manages display */
     #preview-panel {
       display: flex;
       flex-direction: column;
@@ -1960,7 +1961,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
     /* ============================================================
    PREVIEW + GENERATE TABS
    ============================================================ */
-    #tab-preview {
+    #tab-dashboardPreview {
       overflow: hidden;
     }
 
@@ -2518,7 +2519,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
     body.dlv-report-mode #content > .tab-panel {
       display: none !important;
     }
-    body.dlv-report-mode #content > #tab-preview {
+    body.dlv-report-mode #content > #tab-dashboardPreview {
       display: flex !important;
       flex-direction: column;
     }
@@ -2537,10 +2538,11 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       align-items: flex-start;
       justify-content: center;
       padding-top: 200px;
+      pointer-events: none;
     }
 
     #dlv-report-loading-overlay .active {
-      pointer-events: none;
+      pointer-events:inherit;
       display: flex;
     }
     #dlv-report-loading-overlay .spinner {
@@ -2660,7 +2662,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
             </div>
             <div class="form-group">
               <label>Or upload a local CSV file</label>
-              <input type="file" class="form-input" id="csv-file" accept=".csv" />
+              <input type="file" class="form-input" id="csv-file" accept=".csv, .CSV, text/csv" />
             </div>
           </div>
 
@@ -2669,11 +2671,11 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
             <div class="form-group">
               <label>Paste JSON Configuration</label>
               <textarea class="form-input" id="config-json-input" rows="8"
-                placeholder='{"_license":"This file is part of DataLaVista. Copyright © 2026 The Regents of the University of Michigan. This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version. This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details. You should have received a copy of the GNU General Public License along with this program. If not, see <https://www.gnu.org/licenses/>.","dataSource":...}'></textarea>
+                placeholder='{"_license":"", "dataSources": {}, "tables":{}, "queryColumns":{}, "deisgn": {}, "sql": ""\n}'></textarea>
             </div>
             <div class="form-group">
               <label>Or load from file</label>
-              <input type="file" class="form-input" id="config-file" accept=".json" />
+              <input type="file" class="form-input" id="config-file" accept=".json, .JSON, .json5, .JSON5, text/json, application/json" />
             </div>
           </div>
 
@@ -2706,13 +2708,13 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         <span class="tb-tab-sep">›</span>
         <button id="toolbar-button-design" class="tb-tab-btn" data-tab="design" onclick="switchTab('design')">Design</button>
         <span class="tb-tab-sep">›</span>
-        <button id="toolbar-button-preview" class="tb-tab-btn" data-tab="preview" onclick="switchTab('preview')">Preview</button>
+        <button id="toolbar-button-preview" class="tb-tab-btn" data-tab="dashboardPreview" onclick="switchTab('dashboardPreview')">Preview Dashboard</button>
         <span class="tb-tab-sep">›</span>
         <button id="toolbar-button-generate" class="tb-tab-btn" data-tab="generate" onclick="switchTab('generate')">Generate Report</button>
       </div>
       <!-- Report mode toolbar buttons shown instead of design mode tabs-->
       <div id="toolbar-tab-reportMode" class="hidden">
-        <button id="toolbar-reportMode-button-1" class="btn btn-primary btn-sm" onclick="refreshPreview()" title="Refresh report data">🔄 Refresh</button>
+        <button id="toolbar-reportMode-button-1" class="btn btn-primary btn-sm" onclick="refreshDashboardPreview()" title="Refresh report data">🔄 Refresh</button>
         <span class="tb-tab-sep">›</span>
         <button id="toolbar-reportMode-button-2" class="btn btn-primary btn-sm" onclick="downloadCSV()" title="Download as CSV">📄 CSV</button>
         <span class="tb-tab-sep">›</span>
@@ -2762,14 +2764,14 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
               </span>
             </div>
             <div class="qm-tab" id="qmt-sql" onclick="switchQMTab('sql')">🗃 SQL Editor</div>
-            <div class="qm-tab" id="qmt-preview" onclick="switchQMTab('preview')">📊 Results</div>
+            <div class="qm-tab" id="qmt-dataPreview" onclick="switchQMTab('dataPreview')">📊 Results</div>
             <div class="qm-spacer"></div>
             <div class="qm-actions">
               <button class="btn btn-ghost btn-sm" id="btn-sql-locked" onclick="unlockSQL()"
                 title="SQL is locked. Click to unlock." style="display:none">🔒 Locked</button>
-              <button class="btn btn-default btn-sm" onclick="clearQueryBuilder()" title="Clear query builder">🗑 Clear</button>
-              <button class="btn btn-primary btn-sm" onclick="runQuery()">▶ Run Query</button>
-              <button class="btn btn-default btn-sm" id="btn-use-in-design" onclick="useResultsInDesign()" style="display:none">→ Use in Design</button>
+              <button class="btn btn-default btn-sm" id="btn-clear-query" onclick="clearQueryBuilder()" title="Clear query builder">🗑️ Clear</button>
+              <button class="btn btn-primary btn-sm" id="btn-run-query" onclick="runQuery(); switchQMTab('dataPreview');">▶ Run Query</button>
+              <button class="btn btn-primary btn-sm" id="btn-use-in-design" onclick="useResultsInDesign()" style="display:none">🎨 Use in Design</button>
             </div>
           </div>
 
@@ -2829,8 +2831,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
             </div>
           </div>
 
-          <!-- Panel: Results Preview -->
-          <div id="qm-panel-preview">
+          <!-- Panel: Data Preview -->
+          <div id="qm-panel-dataPreview">
             <div id="preview-panel">
               <div class="preview-toolbar">
                 <span class="section-label">Results</span>
@@ -2909,10 +2911,10 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 
 
       <!-- ======================== TAB 3: PREVIEW ======================== -->
-      <div class="tab-panel" id="tab-preview">
+      <div class="tab-panel" id="tab-dashboardPreview">
         <div id="preview-toolbar" class="hidden">
           <span id="preview-label"class="preview-label">Report Preview</span>
-          <button id="preview-toolbar-button-refresh" class="btn btn-default btn-sm" onclick="refreshPreview()">🔄 Refresh</button>
+          <button id="preview-toolbar-button-refresh" class="btn btn-default btn-sm" onclick="refreshDashboardPreview()">🔄 Refresh</button>
           <button id="preview-toolbar-button-download" class="btn btn-default btn-sm" onclick="downloadCSV()">📄 CSV</button>
           <button id="preview-toolbar-button-print" class="btn btn-default btn-sm" onclick="printPreview()">⬇🖨️ Print</button>
           <button id="preview-toolbar-button-generate" class="btn btn-primary btn-sm" onclick="switchTab('generate')">→ Generate &nbsp; Publish</button>
@@ -3564,7 +3566,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
     // Map a raw data row into our internal format.
     // OUTPUT KEYS ARE ALWAYS internalName (so SQL "SELECT [table].[InternalName]" works).
     // The SQL query builder adds "AS [fieldAlias]" to give result columns friendly names.
-    function mapDataRow(row, fieldDefs) {
+    function mapDataRow(tableName, row, fieldDefs) {
       const mapped = {};
       const processingRow = { ...row };
 
@@ -3603,15 +3605,15 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         }
 
         if (isUser && !isMulti && typeof value === 'object' && !Array.isArray(value)) {
-          const _siteBase = (state.source && state.source.url)
-            ? state.source.url.replace(/\/$/, '')
-            : window.location.origin;
+          const _siteBase = (state.tables[tableName] && state.tables[tableName].siteUrl)
+            ? state.tables[tableName].siteUrl.replace(/\/$/, '')
+            : '..';
           mapped[outKey]              = value.Title || value.Name || JSON.stringify(value);
           mapped[outKey + 'Id']       = value.Id;
           mapped[outKey + 'Claims']   = value.Name || '';
           mapped[outKey + 'Email']    = extractEmail(value.Name);
           mapped[outKey + 'PictureUrl'] = value.Name
-            ? `${_siteBase}/_layouts/15/userphoto.aspx?size=M&accountname=${encodeURIComponent(value.Name)}`
+            ? `${_siteBase}/_layouts/15/userphoto.aspx?size=L&accountname=${encodeURIComponent(value.Name)}`
             : '';
           mapped[outKey + 'Data']     = [value];
           delete processingRow[key]; delete processingRow[key + 'Id'];
@@ -3684,10 +3686,10 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
     // SHAREPOINT REST API ADAPTER
     // ============================================================
     // Rule 1: Use application/json instead of verbose
-    async function spFetch(url) {
+    async function spFetch(url, dsName) {
       const headers = { 'Accept': 'application/json' };
-      if (state.source.auth === 'token' && state.source.token) {
-        headers['Authorization'] = 'Bearer ' + state.source.token;
+      if (state.dataSources[dsName] && state.dataSources[dsName].auth === 'token' && state.dataSources[dsName].token) {
+        headers['Authorization'] = 'Bearer ' + state.dataSources[dsName].token;
       }
       const res = await fetch(url, { headers, credentials: 'include' });
       if (!res.ok) {
@@ -3750,7 +3752,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       const ds = state.dataSources[t.dataSource];
       const dsAlias = (ds && ds.alias) || t.dataSource || '';
       const tAlias = t.alias || t.internalName || tableKey;
-      return dsAlias ? dsAlias + '_' + tAlias : tAlias;
+      return dsAlias ? dsAlias + '_' + tAlias : tAlias; // TODO: Check if this works after renaming a data source
     }
 
     /** Register a table in AlaSQL under its immutable tableKey only.
@@ -3762,7 +3764,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       const t = state.tables[tableKey];
       if (!t || !t.data) return;
       alasql(`DROP TABLE IF EXISTS [${tableKey}]`);
-      alasql(`CREATE TABLE [${tableKey}]`);
+      alasql(`CREATE TABLE [${tableKey}]`); // TODO: store table alises in alasql
       const actual = Object.keys(alasql.tables).find(k => k.toLowerCase() === tableKey.toLowerCase()) || tableKey;
       alasql.tables[actual].data = t.data;
     }
@@ -3823,9 +3825,9 @@ function stripODataMetadata(rows, quickCheck = false) {
 }
 
     // Rule 2: Fetch only custom lists
-    async function fetchSPLists(siteUrl) {
+    async function fetchSPLists(siteUrl, dsName) {
       const url = `${siteUrl}/_api/web/lists?$select=Id,EntityTypeName,Title,Description,ItemCount,BaseType,Hidden,ImageUrl,IsApplicationList,LastItemModifiedDate&$filter=(Hidden eq false and IsApplicationList eq false and BaseTemplate ne 115 and BaseTemplate ne 121 and BaseTemplate ne 330 and BaseTemplate ne 544 and Title ne 'MicroFeed' and EntityTypeName ne 'AppCatalog' and EntityTypeName ne 'FormServerTemplates' and EntityTypeName ne 'Style_x0020_Library') or (Title eq 'User Information List' or Title eq 'Events')`;
-      const json = await spFetch(url);
+      const json = await spFetch(url, dsName);
       let rows = extractRows(json);
       rows = stripODataMetadata(rows);
       return rows;
@@ -3933,7 +3935,6 @@ async function fetchSPItemsWithRetry(siteUrl, listGuid, selectStr, expandStr, to
 }
 
 // Fetch Table Data with intelligent retry and pagination logic, plus promise tracking to prevent duplicate fetches
-// Fetch Table Data with intelligent retry and pagination logic, plus promise tracking to prevent duplicate fetches
 async function fetchTableData(tableName, fetchAll = false) {
   const t = state.tables[tableName];
   if (!t) return;
@@ -3957,7 +3958,7 @@ async function fetchTableData(tableName, fetchAll = false) {
       let rawData = [];
       
       if (t.sourceType === 'sharepoint') {
-        const spSiteUrl = state.source.url || t.siteUrl;
+        const spSiteUrl = t.url || t.siteUrl || (state.dataSources[t.dataSource] && state.dataSources[t.dataSource].siteUrl);
         const baseSelect = new Set(['ID', 'Title', 'Created', 'Modified', 'Author/Id', 'Author/Title', 'Author/Name', 'Editor/Id', 'Editor/Title', 'Editor/Name']);
         const baseExpand = new Set(['Author', 'Editor']);
         
@@ -3997,10 +3998,9 @@ async function fetchTableData(tableName, fetchAll = false) {
         return; 
       }
       
-      t.data = rawData.map(row => mapDataRow(row, spFields)); 
+      t.data = rawData.map(row => mapDataRow(tableName, row, spFields)); 
       t.loaded = fetchAll;
       
-      // *** THE FIX IS HERE ***
       if (!t.originalFields) {
         t.originalFields = [...t.fields]; 
         
@@ -4283,9 +4283,7 @@ async function deriveStructureFromSample(dataArray) {
     // CSV PARSING
     // ============================================================
     function parseCSV(text) {
-      console.debug('[DLV CSV] parseCSV called | text type:', typeof text, '| length:', text?.length);
       const lines = text.split('\n').filter(l => l.trim());
-      console.debug('[DLV CSV] parseCSV | non-empty lines:', lines.length, '| first line:', lines[0]?.slice(0, 100));
       if (!lines.length) return { headers: [], rows: [] };
       const parse = line => {
         const result = []; let cur = ''; let inQ = false;
@@ -4355,73 +4353,72 @@ async function deriveStructureFromSample(dataArray) {
 
 
 async function doConnect() {
-    console.log('Loading data source...');
     const activeTab = document.querySelector('.source-tab.active')?.dataset?.src || 'sharepoint';
     const btn = document.getElementById('btn-do-connect');
     const prog = document.getElementById('popup-progress');
     const progText = document.getElementById('popup-progress-text');
-    console.debug('[DLV] btn:', !!btn, '| prog:', !!prog, '| progText:', !!progText);
     btn.disabled = true;
     prog.classList.remove('hidden');
 
   try {
     if (activeTab === 'sharepoint') {
-      const url = (document.getElementById('sp-url')?.value || '').trim().replace(/\/$/, '');
-      if (!url) { toast('Please enter a SharePoint site URL', 'error'); return; }
+      /* SharePoint Tab */
+      const siteUrl = (document.getElementById('sp-url')?.value || '').trim().replace(/\/$/, '');
+      if (!siteUrl) { toast('Please enter a SharePoint site URL', 'error'); return; }
       const rawDsName = (document.getElementById('sp-ds-name')?.value || '').trim();
       const dsName = generateDataSourceName('sharepoint', rawDsName);
-      state.source = {
-        type: 'sharepoint',
-        url,
-        auth: document.getElementById('sp-auth')?.value || 'current',
-        token: document.getElementById('sp-token')?.value || ''
-      };
+
+      if(!state.dataSources[dsName]) {
+        state.dataSources[dsName] = {
+          type: 'sharepoint',
+          url: siteUrl,
+          auth: document.getElementById('sp-auth')?.value || 'current',
+          token: document.getElementById('sp-token')?.value || '',
+          internalName: dsName,
+          alias: dsName,
+          description: null,
+          tables: [],
+          keepRawData: false
+        };
+      }
+      
       progText.textContent = 'Fetching list inventory...';
-      await loadSharePointSource(url, dsName);
+      await loadSharePointSource(siteUrl, dsName);
+      
     } else if (activeTab === 'json') {
-      const url = (document.getElementById('json-url')?.value || '').trim();
-      if (!url) { toast('Please enter a URL', 'error'); return; }
+      /* JSON Tab */
+      const siteUrl = (document.getElementById('json-url')?.value || '').trim();
+      if (!siteUrl) { toast('Please enter a URL', 'error'); return; }
       const rawDsName = (document.getElementById('json-ds-name')?.value || '').trim();
       const dsName = generateDataSourceName('json', rawDsName);
       progText.textContent = 'Loading JSON...';
-      await loadJSONSource(url, dsName);
+      await loadJSONSource(siteUrl, dsName);
+
     } else if (activeTab === 'csv') {
-      console.debug('[DLV CSV] doConnect: activeTab=csv');
+      /* CSV Tab */
+      // Handles CSV URLs. File uploads are handled separately in spPickerCheckVisibility() → handleFileUpload().
       const urlEl = document.getElementById('csv-url');
       const dsEl  = document.getElementById('csv-ds-name');
-      console.debug('[DLV CSV] csv-url element:', urlEl);
-      console.debug('[DLV CSV] csv-ds-name element:', dsEl);
       const url = (urlEl?.value || '').trim();
-      console.debug('[DLV CSV] url value:', url);
       if (!url) { toast('Please enter a CSV URL or upload a file', 'error'); return; }
       const rawDsName = (dsEl?.value || '').trim();
-      console.debug('[DLV CSV] rawDsName:', rawDsName);
       const dsName = generateDataSourceName('csv', rawDsName);
-      console.debug('[DLV CSV] dsName:', dsName);
       progText.textContent = 'Loading CSV...';
-      console.debug('[DLV CSV] Fetching URL...');
-      let res;
-      try {
-        res = await fetch(url, { credentials: 'include' });
-        console.debug('[DLV CSV] fetch response:', res.status, res.statusText, res.ok);
-      } catch (fetchErr) {
-        console.error('[DLV CSV] fetch threw:', fetchErr);
-        throw fetchErr;
-      }
-      if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+
       let text;
-      try {
-        text = await res.text();
-        console.debug('[DLV CSV] text length:', text.length, '| first 200 chars:', text.slice(0, 200));
-      } catch (textErr) {
-        console.error('[DLV CSV] res.text() threw:', textErr);
-        throw textErr;
+      try{
+        text = await fetchCSVFromURL(url);
+      } catch (e) {
+        console.error('[DLV CSV] res.text() threw:', e);
+        throw e;
       }
       if (!text.trim()) throw new Error('CSV file appears to be empty');
       const fileName = url.split('/').pop();
-      console.debug('[DLV CSV] calling loadCSVData with dsName:', dsName, 'fileName:', fileName);
-      loadCSVData(text, dsName, fileName);
+      
+      loadCSVData(dsName, fileName, url, false, text); // Create new DS for this CSV file, with isUploadedFile=false
+
     } else if (activeTab === 'loadconfig') {
+      /* Load Report Config Tab */
       const jsonText = (document.getElementById('config-json-input')?.value || '').trim();
       if (!jsonText) { toast('Please paste or load a config', 'error'); return; }
       const parsed = safeJSONParse(jsonText, 'Config');
@@ -4630,21 +4627,23 @@ function tryJSONP(url) {
 async function loadSharePointSource(siteUrl, dsName) {
   setStatus('⏳ Loading SharePoint lists from ' + siteUrl + '...');
 
+  
   // dsName is the immutable internal key; alias = user-entered name from connect popup
   if (!state.dataSources[dsName]) {
     state.dataSources[dsName] = {
       type: 'sharepoint',
       url: siteUrl,
-      auth: state.source.auth || 'current',
-      token: state.source.token || '',
+      auth: state.dataSources[dsName]?.auth || 'current',
+      token: state.dataSources[dsName]?.token || '',
       internalName: dsName,
-      alias: dsName,          // user can rename this; it's the DS prefix in SQL
+      alias: dsName,
       description: '',
-      tables: []
+      tables: [],
+      keepRawData: false
     };
   }
 
-  const lists = await fetchSPLists(siteUrl);
+  const lists = await fetchSPLists(siteUrl, dsName);
   let loadedCount = 0;
 
   for (const list of lists) {
@@ -4666,7 +4665,7 @@ async function loadSharePointSource(siteUrl, dsName) {
 
       state.tables[tableKey] = {
         internalName: entityTypeName,
-        displayName: list.Title || entityTypeName,
+        displayName: list.Title || tableAlias || entityTypeName,
         description: list.Description || '',
         alias: tableAlias,
         dsAlias: dsName,
@@ -4679,7 +4678,8 @@ async function loadSharePointSource(siteUrl, dsName) {
         guid: list.Id,
         siteUrl,
         itemCount: list.ItemCount || 0,
-        dataSource: dsName
+        dataSource: dsName,
+        keepRawData: false
       };
 
       if (!state.dataSources[dsName].tables.includes(tableKey)) {
@@ -4823,11 +4823,22 @@ async function loadJSONSource(url, dsName) {
     return out;
   });
 
-  const tableKey = dsName + '_Data';
+  const tableKey = dsName + '_Data'; // TODO: where is ds created for JSON url downloads?
 
   // Register data source
   if (!state.dataSources[dsName]) {
-    state.dataSources[dsName] = { type: 'json', url, alias: dsName, tables: [] };
+    state.dataSources[dsName] = {
+      alias: dsName,
+      auth: null,
+      description: '',
+      internalName: dsName, // TODO: was dsname already generated/processed with alias?
+      type: 'json',
+      tables: [],
+      token: '',
+      url: url,
+      siteUrl: null,
+      keepRawData: false
+    };
   }
 
   state.tables[tableKey] = {
@@ -4838,7 +4849,12 @@ async function loadJSONSource(url, dsName) {
     data: normalizedRows,
     loaded: true,
     sourceType: 'json',
-    dataSource: dsName
+    dataSource: dsName,
+    dsAlias: dsName,
+    keepRawData: false,
+    siteUrl: null,
+    url: url,
+    itemCount: normalizedRows.length || 0
   };
 
   if (!state.dataSources[dsName].tables.includes(tableKey)) {
@@ -4850,14 +4866,25 @@ async function loadJSONSource(url, dsName) {
   setupCodeMirror();
 }
 
+// Fetch CSV text with error handling
+async function fetchCSVFromURL(url) {
+      try {
+        const res = await fetch(url, { credentials: 'include' });
+        if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+        const text = await res.text();
+        if (!text.trim()) throw new Error('CSV file appears to be empty');
+        return text; // Return raw text; parsing is handled separately in loadCSVData()
+      } catch (err) {
+        console.error('Failed to download CSV: ', err);
+        throw new Error('Failed to download CSV: ' + err.message);
+      }
+    }
 
 // Simple CSV parser and loader
-function loadCSVData(text, dsName, fileName) {
-  console.debug('[DLV CSV] loadCSVData called | dsName:', dsName, '| fileName:', fileName, '| text length:', text?.length);
+function loadCSVData(dsName, fileName = '', fileUrl = '', isLocalFile = false, text = '') {
   let parsed;
   try {
     parsed = parseCSV(text);
-    console.debug('[DLV CSV] parseCSV result | headers:', parsed.headers, '| row count:', parsed.rows.length, '| first row:', parsed.rows[0]);
   } catch (e) {
     console.error('[DLV CSV] parseCSV threw:', e);
     toast('CSV parse error: ' + e.message, 'error');
@@ -4865,45 +4892,62 @@ function loadCSVData(text, dsName, fileName) {
   }
   const { headers, rows } = parsed;
   if (!headers.length) {
-    console.warn('[DLV CSV] No headers found in CSV');
+    console.warn('No headers found in CSV');
     toast('CSV appears to have no header row', 'error');
     return;
   }
   const fields = headers.map(h => ({
-    internalName: h, displayName: h, alias: toPascalCase(h) || h,
-    type: 'text', displayType: 'text'
+    internalName: h.replace(/[^A-Za-z0-9_]/g, '_').replace('__','_'),
+    displayName: toPascalCase(h) || h,
+    alias: toPascalCase(h) || h,
+    type: 'text',
+    displayType: 'text'
   }));
-  console.debug('[DLV CSV] fields:', fields.map(f => f.internalName));
-  const tableKey = dsName + '_Data';
-  console.debug('[DLV CSV] tableKey:', tableKey);
 
-  // Register data source
-  if (!state.dataSources[dsName]) {
-    state.dataSources[dsName] = { type: 'csv', fileName: fileName || dsName + '.csv', alias: dsName, tables: [] };
+  const tableKey = dsName + '_Data';
+
+// Register data source
+  if (!state.dataSources[dsName]) { // TODO: left off here. What about csv-url vs csv-file?
+    state.dataSources[dsName] = {
+      alias: 'Data',
+      auth: null,
+      description: 'This CSV file (' + (fileName || dsName + '.csv') + ') was uploaded manually, and only the dashboard creator can refresh it.',
+      internalName: dsName,
+      tables: [],
+      token: null,
+      type: 'csv',
+      fileName: fileName || '',
+      isLocalfile: isLocalFile, // true if uploaded from local file picker; false if loaded from URL
+      url: fileUrl || fileName || dsName + '.csv',
+      keepRawData: (isLocalFile) ? true : false, // if loaded from file, keep raw data
+    };
   }
 
   state.tables[tableKey] = {
+    alias: tableKey,
+    data: rows || [],
+    dataSource: dsName,
+    description: 'This table was created from a CSV file (' + (fileName || dsName + '.csv') + ').',
     displayName: 'Data',
-    alias: 'Data',
     dsAlias: dsName,
-    fields,
-    data: rows,
+    fields: Array.isArray(headers) && headers.length ? fields : [{ internalName: 'Column1', displayName: 'Column1', alias: 'Column1', type: 'text', displayType: 'text' }],
+    internalName: tableKey,
+    itemCount: rows.length || 0,
+    siteUrl: null,
+    url: fileUrl || fileName || dsName + '.csv',
     loaded: true,
     sourceType: 'csv',
-    dataSource: dsName
+    isLocalFile: isLocalFile, // true if uploaded from local file picker; false if loaded from URL
+    keepRawData: (isLocalFile) ? true : false, // if loaded from file, keep raw data
   };
-  console.debug('[DLV CSV] state.tables[' + tableKey + '] registered with', rows.length, 'rows');
 
   if (!state.dataSources[dsName].tables.includes(tableKey)) {
     state.dataSources[dsName].tables.push(tableKey);
   }
 
   setStatus(`✅ Loaded ${rows.length} rows from CSV`);
-  console.debug('[DLV CSV] calling renderFieldsPanel...');
   renderFieldsPanel();
-  console.debug('[DLV CSV] calling setupCodeMirror...');
   setupCodeMirror();
-  console.debug('[DLV CSV] done');
   toast(`Loaded ${rows.length} rows from CSV as "${dsName}"`, 'success');
 }
 
@@ -4983,6 +5027,7 @@ function saveConfig() {
   downloadText(json, 'DataLaVista-config.json', 'application/json');
 }
 
+// Build a clean, minimal config object from the current state, suitable for saving or sharing
 function buildConfig() {
   const cleanFields = (arr) => (arr || []).map(f => ({
     InternalName: f.InternalName || f.internalName || '',
@@ -4999,39 +5044,66 @@ function buildConfig() {
     choices: (Array.isArray(f.choices) && f.choices.length <= 50) ? f.choices : null
   }));
 
+
+  // Save dataSources
+  let dataSourcesMeta = {};
+  let uploadedFilesDsNames = [];
+  for (const [dsName, ds] of Object.entries(state.dataSources)) {
+    dataSourcesMeta[dsName] = {
+      alias: ds.alias || dsName,
+      auth: ds.auth || 'current',
+      fileName: ds.fileName || '',
+      internalName: ds.internalName || dsName,
+      tables: ds.tables || [],
+      token: ds.token || '',
+      type: ds.type || 'sharepoint',
+      url: ds.url || ''
+    };
+    if(ds.type!=='sharepoint' && ds.url && ds.url !=='') {
+      uploadedFilesDsNames.push(dsName);
+    }
+  }
+
+  // Bring over preview/flat table data if the source contains an uploaded file
+  let previewResults = [];
+  // TODO: Do we need to load preview data, or just re-run SQL when report loads?
+  if(uploadedFilesDsNames && uploadedFilesDsNames.length>0 && state.previewResults && state.previewResults.length>0) {
+    //previewResults = state.previewResults || []; // Since we found files that were uploaded, we preserve the flat table data
+  }
+
+  // Save tables (and row data if the files were uploaded)
   const tablesMeta = {};
   for (const [name, t] of Object.entries(state.tables)) {
     const ds = t.dataSource ? state.dataSources[t.dataSource] : null;
     tablesMeta[name] = {
-      internalName: t.internalName || name,
-      displayName: t.displayName || name,
-      description: t.description || '',
       alias: t.alias || name,
-      dsAlias: t.dsAlias || '',
       dataSource: t.dataSource || '',
+      description: t.description || '',
+      displayName: t.displayName || name,
+      dsAlias: t.dsAlias || '',
       fields: cleanFields(t.fields),
-      originalFields: cleanFields(t.originalFields || t.fields),
       guid: t.guid || '',
+      internalName: t.internalName || name,
+      itemCount: t.itemCount || 0,   // for SharePoint lists?
+      loaded: false,   
+      originalFields: cleanFields(t.originalFields || t.fields),
+      siteUrl: t.siteUrl || '', // for SharePoint lists
       sourceType: t.sourceType || 'sharepoint',
-      siteUrl: t.siteUrl || '',
-      url: ds ? (ds.url || '') : '',          // for CSV/JSON standalone fetching
-      itemCount: t.itemCount || 0
+      url: ds ? (ds.url || '') : ''  // for CSV/JSON standalone fetching
     };
-  }
 
-  // Save dataSources (without raw data)
-  const dataSourcesMeta = {};
-  for (const [dsName, ds] of Object.entries(state.dataSources)) {
-    dataSourcesMeta[dsName] = {
-      type: ds.type || 'sharepoint',
-      url: ds.url || '',
-      auth: ds.auth || 'current',
-      token: ds.token || '',
-      fileName: ds.fileName || '',
-      internalName: ds.internalName || dsName,
-      alias: ds.alias || dsName,
-      tables: ds.tables || []
-    };
+    // Only include row data for tables that were loaded from uploaded files, to keep config lightweight and avoid sharing sensitive data from connected sources
+    try{
+      if(t.loaded && uploadedFilesDsNames.includes(t.dataSource) && t.data && t.data.length>0) {
+        tablesMeta[name].data = t.data; // Only include row data for tables that were loaded from uploaded files
+        tablesMeta[name].loaded = true; // Mark as loaded since we have the data in the config
+      } else {
+        tablesMeta[name].data = []; // For other tables, we don't include row data in the config to keep it lightweight
+      }
+    } catch(e) {
+      console.warn(`Error including data for uploaded file, table ${name}, in config:`, e);
+      tablesMeta[name].data = []; // On error, don't include data
+    }
   }
 
   const cleanWidgets = (state.design.widgets || []).map(w => ({
@@ -5071,30 +5143,81 @@ function buildConfig() {
   };
 
   return {
-    _license: 'This file is part of DataLaVista. This is a configuration script for a report designed in DataLaVista. Copyright © 2026 The Regents of the University of Michigan. This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version. This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details. You should have received a copy of the GNU General Public License along with this program. If not, see <https://www.gnu.org/licenses/>.',
-    dataSource: { type: state.source.type || 'sharepoint', url: state.source.url || '', auth: state.source.auth || 'current' },
+    _license: 'This file is part of DataLaVista. This is a configuration script for a report designed in DataLaVista. Copyright © 2026 The Regents of the University of Michigan. This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version. This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details. You should have received a copy of the GNU General Public License along with this program. If not, see https://www.gnu.org/licenses.',
+    activeTab: (state.reportMode) ? 'dashboardPreview' : 'design',
+    advancedQB: state.advancedQB || {},
+    basicQB: state.basicQB || {},
+    charts: state.charts || {},
+    currentWidgetId: state.currentWidgetId || null,
     dataSources: dataSourcesMeta,
-    tables: tablesMeta,
-    sql: state.sql || '',
     design: cleanDesign,
-    queryColumns: Array.isArray(state.queryColumns) ? [...state.queryColumns] : []
+    previewFilters: state.previewFilters || {},
+    previewResults: Array.isArray(previewResults) ? [...previewResults] : [],
+    qbCollapsed: state.qbCollapsed || false,
+    qbSectionHeight: state.qbSectionHeight || 60,
+    qmTab: state.qmTab || 'dataPreview',
+    queryColumns: Array.isArray(state.queryColumns) ? [...state.queryColumns] : [],    
+    queryMode: (state.queryMode && state.queryMode != null && state.queryMode != undefined && state.queryMode != '') ? state.queryMode : 'sql',
+    queryResults: Array.isArray(state.queryResults) ? [...state.queryResults] : [],
+    queryResultsReady: state.queryResultsReady || false,
+    sql: state.sql || '',
+    sqlLocked: state.sqlLocked || false,
+    tables: tablesMeta
   };
 }
 
 async function loadConfig(cfg) {
-  if (!cfg._license) throw new Error('Invalid config — missing _license key');
-  state.source = { ...cfg.dataSource };
+  if (!cfg._license) throw new Error('Invalid report config — missing _license key');
+  if (!cfg.dataSources || typeof cfg.dataSources != 'object'|| !cfg.tables || typeof cfg.tables != 'object') throw new Error('Invalid report config — missing data sources or tables.');
+  // If the config provided is a string, try parsing it safely as JSON
+  if (cfg && typeof cfg == 'string')
+    {
+      let cfgString = cfg.trim();
+      if(cfgString.startsWith('{') && cfgString.endsWith('}')) {
+        try{
+          cfg = safeJSONParse(cfgString, 'Config');
+        } catch (e) {
+          throw new Error('Invalid report config — the report JSON is invalid.');
+        }
+      } else {
+        throw new Error('Invalid report config — the report JSON is invalid.');
+      }
+    }
+  
+    // At this point, cfg should be an object. If it's not, throw an error.
+    if (cfg && typeof cfg !== 'object') throw new Error('Invalid report config — no report JSON detected.');
+
+    // Basic validation passed — now clear the existing state and load the config values
+  //state.source = { ...cfg.dataSource };
+  state.activeTab = 'dashboardPreview';
+  state.advancedQB = cfg.advancedQB || {};
+  state.basicQB = cfg.basicQB || {};
+  state.charts = cfg.charts || {};
+  state.currentWidgetId = null;
+  state.dataSources = cfg.dataSources || {};
+  state.design = cfg.design || { title: 'DataLaVista Report', widgets: [], filters: [] };
+  state.previewFilters = cfg.previewFilters || {};
+  state.previewResults = Array.isArray(cfg.previewResults) ? [...cfg.previewResults] : [];
+  state.qmTab = cfg.qmTab || 'previewData';
+  state.activeTab = (state.reportMode)?'dataPreview':'design';
+  state.queryColumns = Array.isArray(cfg.queryColumns) ? [...cfg.queryColumns] : [];
+  state.queryMode = (cfg.queryMode && cfg.queryMode != null && cfg.queryMode != undefined && cfg.queryMode != '') ? cfg.queryMode : 'sql';
+  state.queryResults = Array.isArray(cfg.queryResults) ? [...cfg.queryResults] : [];
+  state.queryResultsReady = cfg.queryResultsReady || false;
+  // Don't load reportMode or reportUrl from config - it's handled by init()
   state.sql = cfg.sql || '';
+  state.sqlLocked = cfg.sqlLocked || false;
   state.queryColumns = cfg.queryColumns || [];
-  state.dataSources = {};
-console.log('DEBUG: inside loadConfig()');
+  state.tables = cfg.tables || {};
+  
+  switchTab(state.activeTab);
   // Support new dataSources map
-  if (cfg.dataSources && typeof cfg.dataSources === 'object' && !Array.isArray(cfg.dataSources)) {
+  /*if (cfg.dataSources && typeof cfg.dataSources === 'object' && !Array.isArray(cfg.dataSources)) {
     // New format: keyed object
     for (const [dsName, dsMeta] of Object.entries(cfg.dataSources)) {
       if (dsMeta.type === 'sharepoint' && dsMeta.url) {
         state.source = { type: 'sharepoint', url: dsMeta.url, auth: dsMeta.auth || 'current', token: dsMeta.token || '' };
-        await loadSharePointSource(dsMeta.url, dsName);
+        await loadSharePointSource(dsMeta.url, dsName); // TODO: why are we re-loading the data source from scratch?
       } else if (dsMeta.type === 'json' || dsMeta.type === 'csv') {
         // Non-SP sources: restore from tables metadata (data will need re-fetch for SP, but CSV/JSON preserve structure)
         if (!state.dataSources[dsName]) {
@@ -5108,21 +5231,21 @@ console.log('DEBUG: inside loadConfig()');
         }
       }
     }
-  } else if (cfg.dataSources && Array.isArray(cfg.dataSources)) {
+  }*/ //else if (cfg.dataSources && Array.isArray(cfg.dataSources)) {
     // Legacy array format
-    for (const src of cfg.dataSources) {
-      if (!src.url) continue;
-      const dsName = src.prefix || generateDataSourceName('sharepoint', '');
-      state.source = { type: 'sharepoint', url: src.url, auth: src.auth || 'current', token: src.token || '' };
-      await loadSharePointSource(src.url, dsName);
-    }
-  } else if (state.source.url) {
+    //for (const src of cfg.dataSources) {
+    //  if (!src.url) continue;
+    //  const dsName = src.prefix || generateDataSourceName('sharepoint', '');
+    //  state.source = { type: 'sharepoint', url: src.url, auth: src.auth || 'current', token: src.token || '' };
+    //  await loadSharePointSource(src.url, dsName);
+    //}
+  //} // else if (state.source.url) {
     // Very legacy: single source
-    await loadSharePointSource(state.source.url, 'SP');
-  }
+    //await loadSharePointSource(state.source.url, 'SP');
+  //}
 
   // Restore table metadata overrides (aliases, internalNames, fields etc.) from config
-  for (const [tname, tmeta] of Object.entries(cfg.tables || {})) {
+  /*for (const [tname, tmeta] of Object.entries(cfg.tables || {})) {
     if (state.tables[tname]) {
       if (tmeta.internalName) state.tables[tname].internalName = tmeta.internalName;
       if (tmeta.alias)        state.tables[tname].alias = tmeta.alias;
@@ -5132,17 +5255,18 @@ console.log('DEBUG: inside loadConfig()');
       if (tmeta.dataSource) state.tables[tname].dataSource = tmeta.dataSource;
       if (tmeta.dsAlias)    state.tables[tname].dsAlias    = tmeta.dsAlias;
     }
-  }
+  }*/
 
   // Restore saved DS aliases (the user may have renamed DSes before saving)
-  for (const [dsName, dsMeta] of Object.entries(cfg.dataSources || {})) {
+  /*for (const [dsName, dsMeta] of Object.entries(cfg.dataSources || {})) {
     if (state.dataSources[dsName]) {
       if (dsMeta.alias)        state.dataSources[dsName].alias        = dsMeta.alias;
       if (dsMeta.internalName) state.dataSources[dsName].internalName = dsMeta.internalName;
     }
-  }
+  }*/
 
-  const rawDesign = cfg.design || { title: '', widgets: [], filters: [] };
+  /*
+  const rawDesign = state.design;
   state.design = {
     title: rawDesign.title || '',
     filters: (rawDesign.filters || []).map(f => ({
@@ -5178,7 +5302,7 @@ console.log('DEBUG: inside loadConfig()');
       clean.widgetSql = generateWidgetSQL(clean, '_results');
       return clean;
     })
-  };
+  };*/
 
   if (state.sql && window._cmEditor) {
     window._cmEditor.setValue(state.sql);
@@ -5705,6 +5829,8 @@ console.log('DEBUG: inside loadConfig()');
           renderDesignCanvas();
         }
       }
+
+
       function setupCodeMirror() {
         const sqlEditorTextArea = document.getElementById('sql-editor');
         if (window._cmEditor) {
@@ -6834,12 +6960,12 @@ console.log('DEBUG: inside loadConfig()');
           const toAlias   = toND?.alias   || toND?.tableName   || '';
 
           const JOIN_TYPES = [
-            { val: 'INNER', label: 'Inner Join',    desc: 'Matching rows in both sides' },
-            { val: 'LEFT',  label: 'Left Join',     desc: 'Everything on the left, only matching rows on the right' },
-            { val: 'RIGHT', label: 'Right Join',    desc: 'Everything on the right, only matching rows on the left' },
-            { val: 'CROSS', label: 'Cross Join',    desc: 'Matrix multiplication' },
-            { val: 'UNION', label: 'Union',         desc: 'Combine tables, removing duplicate rows' },
-            { val: 'UNION ALL', label: 'Union All', desc: 'Combine tables, keeping duplicate rows' }
+            { val: 'INNER', label: 'Inner Join',    desc: 'ℹ️ Matching rows in both sides' },
+            { val: 'LEFT',  label: 'Left Join',     desc: 'ℹ️ Everything on the left, only matching rows on the right' },
+            { val: 'RIGHT', label: 'Right Join',    desc: 'ℹ️ Everything on the right, only matching rows on the left' },
+            { val: 'CROSS', label: 'Cross Join',    desc: 'ℹ️ Combine tables, repeating all rows in 2nd table for every row in 1st table' },
+            { val: 'UNION', label: 'Union',         desc: 'ℹ️ Combine tables, removing duplicate rows' },
+            { val: 'UNION ALL', label: 'Union All', desc: 'ℹ️ Combine tables, keeping duplicate rows' }
           ];
 
           const fromFieldOpts = (fromT?.fields || []).filter(f => !f.isAutoId)
@@ -7310,6 +7436,12 @@ console.log('DEBUG: inside loadConfig()');
           const toKey     = toNd.tableName;
           const fromIname = getInternal(fromKey, j.fromKey);
           const toIname   = getInternal(toKey,   j.toKey);
+          if(j.type==='CROSS') {
+            sql += `\nCROSS JOIN [${toKey}]`;
+          } else {
+            // TODO: handle array joins using custom alasql function "INCLUDES" instead of "="
+            
+
           sql += `\n${j.type} JOIN [${toKey}] ON [${fromKey}].[${fromIname}] = [${toKey}].[${toIname}]`;
         }
 
@@ -7363,12 +7495,18 @@ console.log('DEBUG: inside loadConfig()');
         }).join(' ');
       }
       function clearQueryBuilder() {
-        state.basicQB = { tableName: null, selectedFields: [], filters: [] };
-        state.advancedQB = { nodes: {}, joins: [], activeJoinIdx: -1 };
-        if (window._cmEditor) window._cmEditor.setValue('');
-        state.sql = '';
-        renderBasicQB();
-        if (state.queryMode === 'advanced') renderAdvancedQB();
+        if(document.getElementById('qmt-sql').classList.contains('active')) {
+          if (window._cmEditor) window._cmEditor.setValue('');
+          state.sql = '';
+          hideUseInDesign();
+        } else {
+          state.basicQB = { tableName: null, selectedFields: [], filters: [] };
+          state.advancedQB = { nodes: {}, joins: [], activeJoinIdx: -1 };
+          if (window._cmEditor) window._cmEditor.setValue('');
+          state.sql = '';
+          renderBasicQB();
+          if (state.queryMode === 'advanced') renderAdvancedQB();
+        }
       }
 
       // ============================================================
@@ -7449,8 +7587,6 @@ console.log('DEBUG: inside loadConfig()');
         }
         html += '</tbody></table>';
         wrap.innerHTML = html;
-
-        switchQMTab('preview');
         showUseInDesign();
       }
 
@@ -8241,7 +8377,7 @@ console.log('DEBUG: inside loadConfig()');
       // ============================================================
       // PREVIEW TAB
       // ============================================================
-      async function refreshPreview() {
+      async function refreshDashboardPreview() {
         if (!state.sql.trim()) { toast('Please build a query first', 'error'); return; }
         if(!state.reportMode) setStatus('⏳ Loading preview data...');
 
@@ -8284,7 +8420,6 @@ console.log('DEBUG: inside loadConfig()');
       }
 
       function renderPreviewTab() {
-        console.log('DEBUG: Rendering preview...');
         if(!state.reportMode) document.getElementById('preview-toolbar').classList.remove('hidden');
         document.getElementById('preview-title-bar').textContent = state.design.title || 'DataLaVista Report';
         document.getElementById('preview-title-bar').classList.remove('hidden');
@@ -8476,6 +8611,7 @@ console.log('DEBUG: inside loadConfig()');
 
         document.getElementById('btn-copy-json').disabled = false;
         document.getElementById('btn-dl-json').disabled = false;
+        
         toast('Report generated!', 'success');
       }
 
@@ -8574,7 +8710,7 @@ console.log('DEBUG: inside loadConfig()');
         document.querySelectorAll('.tb-tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
         document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === 'tab-' + tab));
 
-        if (tab === 'preview') { refreshPreview(); }
+        if (tab === 'dashboardPreview') { refreshDashboardPreview(); }
         if (tab === 'design' && !state.reportMode) {
           renderDesignCanvas(); renderFilterBar(); renderDesignFieldsPanel();
           requestAnimationFrame(() => { for (const c of Object.values(state.charts)) { try { c.resize(); } catch (e) { } } });
@@ -8585,7 +8721,7 @@ console.log('DEBUG: inside loadConfig()');
       // ── Query-main panel tab switcher ─────────────────────────────────────────────
       function switchQMTab(tab) {
         state.qmTab = tab;
-        ['qb','sql','preview'].forEach(t => {
+        ['qb','sql','dataPreview'].forEach(t => {
           document.getElementById('qmt-' + t)?.classList.toggle('active', t === tab);
           document.getElementById('qm-panel-' + t)?.classList.toggle('active', t === tab);
         });
@@ -8593,6 +8729,15 @@ console.log('DEBUG: inside loadConfig()');
         const subtabs = document.getElementById('qb-subtabs');
         if (subtabs) subtabs.style.display = tab === 'qb' ? '' : 'none';
         if (tab === 'sql' && window._cmEditor) setTimeout(() => window._cmEditor.refresh(), 50);
+        if (tab === 'dataPreview') {
+          runQuery();
+          document.getElementById('btn-clear-query').disabled = true;
+          document.getElementById('btn-run-query').disabled = true;
+
+        } else {
+          document.getElementById('btn-clear-query').disabled = false;
+          document.getElementById('btn-run-query').disabled = false;
+        }
       }
 
       // ============================================================
@@ -8620,7 +8765,7 @@ console.log('DEBUG: inside loadConfig()');
       }
 
       function showHelp() {
-        toast('DataLaVista — Connect a SharePoint site, build queries, design reports, then generate standalone report.', 'info');
+        toast('DataLaVista — Connect a SharePoint site, CSVs, or JSON, and create beautiful dashboards.', 'info');
       }
 
 
@@ -8869,7 +9014,7 @@ console.log('DEBUG: inside loadConfig()');
        *   2. Fetch the JSON config from the URL.
        *   3. Call loadConfig() to restore data-sources, tables, SQL, and
        *      design widgets (this also triggers background SharePoint fetches).
-       *   4. Call refreshPreview() to run the SQL query and render all widgets.
+       *   4. Call refreshDashboardPreview() to run the SQL query and render all widgets.
        *   5. Switch to the Preview tab and apply the .dlv-report-mode CSS class
        *      so the preview panel fills the entire viewport (toolbar hidden,
        *      filter bar visible, no designer chrome).
@@ -8900,10 +9045,10 @@ console.log('DEBUG: inside loadConfig()');
             showLoadingPopup('⚠ Unable to load report data.');
             throw new Error('Report config contains no SQL query.');
           }
-          await refreshPreview();
+          await refreshDashboardPreview();
 
           // ── Step 4: Switch to preview and maximise ─────────────────────
-          switchTab('preview');
+          switchTab('dashboardPreview');
           document.body.classList.add('dlv-report-mode');
           setStatus('✅ Report ready');
           toast('Report loaded', 'success');
@@ -8919,10 +9064,8 @@ console.log('DEBUG: inside loadConfig()');
       }
 
       function swapDesignReportModes(isReportMode = false) {
-        console.log('DEBUG: Swapping to ' + (isReportMode ? 'REPORT' : 'DESIGN') + ' mode');
         state.reportMode = isReportMode;
         if (isReportMode) {
-          console.log('DEBUG: Swapped to REPORT mode: hiding designer UI and maximizing preview');
           document.body.classList.add('dlv-report-mode');
           // Hide design mode buttons
           if(document.getElementById('btn-connect')) document.getElementById('btn-connect').classList.add('hidden');
@@ -8933,7 +9076,6 @@ console.log('DEBUG: inside loadConfig()');
           if(document.getElementById('toolbar-tab-reportMode')) document.getElementById('toolbar-tab-reportMode').classList.remove('hidden');
           if(document.getElementById('preview-toolbar')) document.getElementById('preview-toolbar').classList.add('hidden');
         } else {
-          console.log('DEBUG: Swapped to DESIGN mode: showing designer UI and restoring preview size');
           document.body.classList.remove('dlv-report-mode');
           // Show design mode buttons
           if(document.getElementById('btn-connect')) document.getElementById('btn-connect').classList.remove('hidden');
@@ -8947,7 +9089,7 @@ console.log('DEBUG: inside loadConfig()');
 
       /// Main initialization function to set up event listeners, resizers, and default states.
       function init() {
-        console.log("*** Initializing DataLaVista. Come with me if you want to report... ***");
+        console.log("Come with me if you want to query...");
         setupAlaSQL();
         
 
@@ -8978,18 +9120,13 @@ console.log('DEBUG: inside loadConfig()');
         const reportParam = siteUrlParams.get('report');
         if (reportParam) {
             /* *** DATALAVISTA REPORT MODE *** */
-            console.log("DEBUG: DataLaVista is entering Report mode. Loading config from: ", reportParam);
             state.reportMode = true;
-            console.log('DEBUG: calling swapDesignReportModes(true)');
             swapDesignReportModes(true);
-            console.log('DEBUG: calling loadReportFromUrl');
             document.getElementById('preview-canvas').innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-secondary);font-size:14px">Your DataLaVista dashboard is loading...</div>';
             loadReportFromUrl(reportParam);
-            console.log('DEBUG: finished calling loadReportFromUrl');
           } else {
             /* *** DATALAVISTA DESIGNER MODE *** */
             state.reportMode = false;
-            console.log('DEBUG: calling swapDesignReportModes(false)');
             swapDesignReportModes(false);
             initToolbox();
             initResizers();
@@ -9008,6 +9145,8 @@ console.log('DEBUG: inside loadConfig()');
               const el = document.getElementById('config-json-input');
               if (el) el.value = text;
             });
+
+            // Handle CSV upload (file input change event) for Connect popup
             document.getElementById('csv-file')?.addEventListener('change', async function () {
               const f = this.files[0];
               if (!f) return;
@@ -9018,10 +9157,11 @@ console.log('DEBUG: inside loadConfig()');
                 toast('Error reading file: ' + e.message, 'error');
                 return;
               }
-              const dsNameEl = document.getElementById('csv-ds-name');
-              const tableName = (dsNameEl?.value || '').trim();
-              const dsName = generateDataSourceName('csv', tableName);
-              loadCSVData(text, dsName, f.name);
+              const dsEl = document.getElementById('csv-ds-name');
+              const rawDsName = (dsEl?.value || '').trim();
+              const dsName = generateDataSourceName('csv', rawDsName);
+              loadCSVData(dsName, f.name, '', true, text); // Create new DS for this CSV file, with isUploadedFile=true
+              updateConnectButton();
               hideConnectPopup();
             });
 
@@ -9096,6 +9236,7 @@ console.log('DEBUG: inside loadConfig()');
         doConnect,
         loadSharePointSource,
         loadJSONSource,
+        fetchCSVFromURL,
         loadCSVData,
         ensureTableData,
         fetchTableData,
@@ -9133,7 +9274,6 @@ console.log('DEBUG: inside loadConfig()');
         spPickerClose,
         spPickerConfirm,
         spPickerCheckVisibility,
-        loadSharePointSource,
         setupCodeMirror,
         dlvSQLHint,
         updateCMHints,
@@ -9240,7 +9380,7 @@ console.log('DEBUG: inside loadConfig()');
         removeFilterFromBar,
         applyPreviewFilter,
         refreshWidgets,
-        refreshPreview,
+        refreshDashboardPreview,
         renderPreviewTab,
         getPrevWidgetContent,
         renderPrevKPI,
@@ -9270,7 +9410,7 @@ console.log('DEBUG: inside loadConfig()');
 
       // Self-init
 (function startDataLaVista() {
-    console.log("Starting DataLaVista...");
+    console.log("*** Starting DataLaVista ***");
     try {      
       init();
     } catch (e) {
