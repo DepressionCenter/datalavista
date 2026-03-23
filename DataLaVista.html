@@ -4144,7 +4144,7 @@ async function deriveStructureFromSample(dataArray) {
           out[f.alias] = normalizeDate(val);
         }
         // Boolean
-        else if (f.type === 'bool') {
+        else if (f.type.startsWith('bool')) {
           out[f.alias] = val === true || val === 'Yes' || val === 1 ? 'Yes' : 'No';
         }
         // Default
@@ -4166,7 +4166,7 @@ async function deriveStructureFromSample(dataArray) {
       if (t === 'lookupmulti') return 'lookup-multi';
       if (t === 'choice') return 'choice';
       if (t === 'multichoice') return 'choice-multi';
-      if (t === 'boolean' || t === 'yesno') return 'bool';
+      if (t.startsWith('bool') || t === 'yesno' || t === 'yes/no') return 'boolean';
       if (t === 'number' || t === 'currency' || t === 'integer') return 'number';
       if (t === 'datetime') return 'date';
       if (t === 'calculated') return 'text';
@@ -4372,12 +4372,14 @@ async function doConnect() {
         state.dataSources[dsName] = {
           type: 'sharepoint',
           url: siteUrl,
+          siteUrl: siteUrl,
           auth: document.getElementById('sp-auth')?.value || 'current',
           token: document.getElementById('sp-token')?.value || '',
           internalName: dsName,
           alias: dsName,
           description: null,
           tables: [],
+          isFileUpload: false,
           keepRawData: false
         };
       }
@@ -4633,12 +4635,14 @@ async function loadSharePointSource(siteUrl, dsName) {
     state.dataSources[dsName] = {
       type: 'sharepoint',
       url: siteUrl,
+      siteUrl: siteUrl,
       auth: state.dataSources[dsName]?.auth || 'current',
       token: state.dataSources[dsName]?.token || '',
       internalName: dsName,
       alias: dsName,
-      description: '',
+      description: siteUrl,
       tables: [],
+      isFileUpload: false,
       keepRawData: false
     };
   }
@@ -4676,9 +4680,10 @@ async function loadSharePointSource(siteUrl, dsName) {
         sourceType: 'sharepoint',
         isDocLib,
         guid: list.Id,
-        siteUrl,
+        siteUrl: siteUrl,
         itemCount: list.ItemCount || 0,
         dataSource: dsName,
+        isFileUpload: false,
         keepRawData: false
       };
 
@@ -4801,7 +4806,7 @@ async function loadJSONSource(url, dsName) {
     const val = first[k];
     let type  = "text";
     if (typeof val === "number")                               type = "number";
-    else if (typeof val === "boolean")                         type = "bool";
+    else if (typeof val === "boolean")                         type = "boolean";
     else if (typeof val === "string" && ISO_DATE_RE.test(val)) type = "date";
     return {
       internalName: k,
@@ -4837,6 +4842,7 @@ async function loadJSONSource(url, dsName) {
       token: '',
       url: url,
       siteUrl: null,
+      isFileUpload: false,
       keepRawData: false
     };
   }
@@ -4851,6 +4857,7 @@ async function loadJSONSource(url, dsName) {
     sourceType: 'json',
     dataSource: dsName,
     dsAlias: dsName,
+    isFileUpload: false,
     keepRawData: false,
     siteUrl: null,
     url: url,
@@ -4881,7 +4888,7 @@ async function fetchCSVFromURL(url) {
     }
 
 // Simple CSV parser and loader
-function loadCSVData(dsName, fileName = '', fileUrl = '', isLocalFile = false, text = '') {
+function loadCSVData(dsName, fileName = '', fileUrl = '', isFileUpload = false, text = '') {
   let parsed;
   try {
     parsed = parseCSV(text);
@@ -4917,9 +4924,9 @@ function loadCSVData(dsName, fileName = '', fileUrl = '', isLocalFile = false, t
       token: null,
       type: 'csv',
       fileName: fileName || '',
-      isLocalfile: isLocalFile, // true if uploaded from local file picker; false if loaded from URL
+      isFileUpload: isFileUpload, // true if uploaded from local file picker; false if loaded from URL
       url: fileUrl || fileName || dsName + '.csv',
-      keepRawData: (isLocalFile) ? true : false, // if loaded from file, keep raw data
+      keepRawData: (isFileUpload) ? true : false // if loaded from file, keep raw data
     };
   }
 
@@ -4937,8 +4944,8 @@ function loadCSVData(dsName, fileName = '', fileUrl = '', isLocalFile = false, t
     url: fileUrl || fileName || dsName + '.csv',
     loaded: true,
     sourceType: 'csv',
-    isLocalFile: isLocalFile, // true if uploaded from local file picker; false if loaded from URL
-    keepRawData: (isLocalFile) ? true : false, // if loaded from file, keep raw data
+    isFileUpload: isFileUpload, // true if uploaded from local file picker; false if loaded from URL
+    keepRawData: (isFileUpload) ? true : false // if loaded from file, keep raw data
   };
 
   if (!state.dataSources[dsName].tables.includes(tableKey)) {
@@ -5057,9 +5064,12 @@ function buildConfig() {
       tables: ds.tables || [],
       token: ds.token || '',
       type: ds.type || 'sharepoint',
-      url: ds.url || ''
+      url: ds.url || '',
+      siteUrl: ds.siteUrl || '',
+      isFileUpload: ds.isFileUpload || false,
+      keepRawData: ds.keepRawData || false
     };
-    if(ds.type!=='sharepoint' && ds.url && ds.url !=='') {
+    if(ds.type!=='sharepoint' && ds.keepRawData) {
       uploadedFilesDsNames.push(dsName);
     }
   }
@@ -5067,9 +5077,9 @@ function buildConfig() {
   // Bring over preview/flat table data if the source contains an uploaded file
   let previewResults = [];
   // TODO: Do we need to load preview data, or just re-run SQL when report loads?
-  if(uploadedFilesDsNames && uploadedFilesDsNames.length>0 && state.previewResults && state.previewResults.length>0) {
+//  if(uploadedFilesDsNames && uploadedFilesDsNames.length>0 && state.previewResults && state.previewResults.length>0) {
     //previewResults = state.previewResults || []; // Since we found files that were uploaded, we preserve the flat table data
-  }
+//  }
 
   // Save tables (and row data if the files were uploaded)
   const tablesMeta = {};
@@ -5085,7 +5095,9 @@ function buildConfig() {
       guid: t.guid || '',
       internalName: t.internalName || name,
       itemCount: t.itemCount || 0,   // for SharePoint lists?
-      loaded: false,   
+      loaded: false,
+      isFileUpload: t.isFileUpload || false,
+      keepRawData: t.keepRawData || false,
       originalFields: cleanFields(t.originalFields || t.fields),
       siteUrl: t.siteUrl || '', // for SharePoint lists
       sourceType: t.sourceType || 'sharepoint',
@@ -5094,11 +5106,12 @@ function buildConfig() {
 
     // Only include row data for tables that were loaded from uploaded files, to keep config lightweight and avoid sharing sensitive data from connected sources
     try{
-      if(t.loaded && uploadedFilesDsNames.includes(t.dataSource) && t.data && t.data.length>0) {
+      if(t.loaded && t.keepRawData && t.data && t.data.length>0) {
         tablesMeta[name].data = t.data; // Only include row data for tables that were loaded from uploaded files
         tablesMeta[name].loaded = true; // Mark as loaded since we have the data in the config
       } else {
         tablesMeta[name].data = []; // For other tables, we don't include row data in the config to keep it lightweight
+        tablesMeta.loaded = false;
       }
     } catch(e) {
       console.warn(`Error including data for uploaded file, table ${name}, in config:`, e);
@@ -5207,7 +5220,6 @@ async function loadConfig(cfg) {
   // Don't load reportMode or reportUrl from config - it's handled by init()
   state.sql = cfg.sql || '';
   state.sqlLocked = cfg.sqlLocked || false;
-  state.queryColumns = cfg.queryColumns || [];
   state.tables = cfg.tables || {};
   
   switchTab(state.activeTab);
@@ -5352,9 +5364,7 @@ async function loadConfig(cfg) {
           const dsAlias = ds.alias || dsName;
 
           // Determine tooltip for DS header
-          let dsTitle = dsName;
-          if (ds.type === 'sharepoint' || ds.type === 'json') dsTitle = ds.url || dsName;
-          else if (ds.type === 'csv') dsTitle = ds.fileName || dsName;
+          let dsTitle = (ds.isFileUpload) ? (ds.fileName || ds.url || dsName) : (ds.url || dsName);
 
           // Sort tables alphabetically
           const tableKeys = (ds.tables || [])
@@ -5429,8 +5439,8 @@ async function loadConfig(cfg) {
             // Build fields list, sorted alphabetically
             const flist = node.querySelector('.fields-list');
             const sortedFields = [...t.fields]
-              .filter(f => !f.isAutoId)
               .sort((a, b) => (a.alias || a.displayName || '').localeCompare(b.alias || b.displayName || ''));
+              //TODO: removed this from above .sort:  .filter(f => !f.isAutoId)
 
             for (const f of sortedFields) {
               const ti = FIELD_TYPE_ICONS[f.displayType] || FIELD_TYPE_ICONS.default;
@@ -6061,13 +6071,8 @@ async function loadConfig(cfg) {
             setQBMode('basic');
             addTableToBasicQB(data.table);
 
-            // Auto-select Title or Name by default
-            for (const f of t.fields) {
-              if (f.isAutoId) continue;
-              if ((f.internalName === 'Title' || (f.alias || '').toLowerCase() === 'name' ||  (f.alias || '').toLowerCase().includes('fullname') || (f.alias || '').toLowerCase() == 'uniqname') && !state.basicQB.selectedFields.includes(f.alias))
-                state.basicQB.selectedFields.push(f.alias);
-            }
-            
+            // Auto-select all fields by default
+            selectAllBasicFields();
             rebuildBasicSQL();
           } else {
             // Insert alias name at cursor
@@ -6118,13 +6123,8 @@ async function loadConfig(cfg) {
         state.basicQB.groupBy = [];
         state.basicQB.rowLimit = 500;
 
-        // Auto-select Title or Name by default
-        for (const f of t.fields) {
-          if (f.isAutoId) continue;
-          if ((f.internalName === 'Title' || (f.alias || '').toLowerCase() === 'name' ||  (f.alias || '').toLowerCase().includes('fullname') || (f.alias || '').toLowerCase() == 'uniqname') && !state.basicQB.selectedFields.includes(f.alias))
-            state.basicQB.selectedFields.push(f.alias);
-        }
-
+        // Auto-select all fields by default
+        selectAllBasicFields();
         renderBasicQB();
         ensureTableData(tableName);
       }
@@ -7436,7 +7436,7 @@ async function loadConfig(cfg) {
           const toKey     = toNd.tableName;
           const fromIname = getInternal(fromKey, j.fromKey);
           const toIname   = getInternal(toKey,   j.toKey);
-         if(j.type==='CROSS') {
+          if(j.type==='CROSS') {
             sql += `\nCROSS JOIN [${toKey}]`;
           } else {
             // TODO: handle array joins using custom alasql function "INCLUDES" instead of "="
@@ -7529,6 +7529,7 @@ async function loadConfig(cfg) {
           }
 
           // Register each referenced table in AlaSQL under its live query name (DSAlias_TableAlias)
+          // TODO shouldnt this be internal names? Can we use alasql aliases?
           for (const tname of referencedTables) {
             const t = state.tables[tname];
             if (!t || !t.data) continue;
@@ -7620,50 +7621,54 @@ async function loadConfig(cfg) {
         toast('Switched to Design tab — drag widgets onto the canvas', 'success');
       }
 
-      // ============================================================
-      // DESIGN FIELDS PANEL
-      // ============================================================
-      function renderDesignFieldsPanel() {
-  const body = document.getElementById('design-fields-body');
-  if (!state.queryColumns.length) {
-    body.innerHTML = '<div class="text-muted text-sm" style="padding:12px 10px">Run a query first</div>';
-    return;
-  }
 
   // Build alias→displayType map from all loaded tables
-  const typeMap = {};
-  for (const t of Object.values(state.tables)) {
-    for (const f of (t.fields || [])) {
-      if (f.alias && f.displayType) typeMap[f.alias] = f.displayType;
+  // TODO: Need to keep track of source ds/table/internal field ID/data type
+  // This will probably break if two tables have the a field with the same alias but different types
+  function sniffType(col) {
+    const typeMap = {};
+    for (const t of Object.values(state.tables)) {
+      for (const f of (t.fields || [])) {
+        if (f.alias && f.displayType) typeMap[f.alias] = f.displayType;
+      }
+    }
+    if (typeMap[col]) return typeMap[col];
+    // Fallback: sniff type from first result row value
+    const firstRow = (state.queryResults && state.queryResults[0]) || null;
+    if (!firstRow) return 'default';
+    const v = firstRow[col];
+    if (Array.isArray(v)) return 'array';
+    if (typeof v === 'number') return 'number';
+    if (typeof v === 'boolean') return 'boolean';
+    if (typeof v === 'object') return 'object';
+    if (typeof v === 'string' && ISO_DATE_RE.test(v)) return 'date';
+    return 'text';
+  }
+  
+  // ============================================================
+  // DESIGN FIELDS PANEL
+  // ============================================================
+  function renderDesignFieldsPanel() {
+    const body = document.getElementById('design-fields-body');
+    if (!state.queryColumns.length) {
+      body.innerHTML = '<div class="text-muted text-sm" style="padding:12px 10px">Run a query first</div>';
+      return;
+    }
+    body.innerHTML = '';
+    for (const col of state.queryColumns) { 
+      // TODO: state.queryColumns should include source table and field internal names
+      // so we can do a precise lookup in state.tables for the displayType instead of guessing based on the first row value
+      const ti = FIELD_TYPE_ICONS[sniffType(col)] || FIELD_TYPE_ICONS.default;
+      const item = document.createElement('div');
+      item.className = 'field-item';
+      item.draggable = true;
+      item.innerHTML = `<span class="field-type-icon ${ti.cls}">${ti.icon}</span><span class="field-label">${col}</span>`;
+      item.addEventListener('dragstart', e => {
+        safeDragSet(e, { type: 'result-field', field: col, dataType: sniffType(col) });
+      });
+      body.appendChild(item);
     }
   }
-
-  // Fallback: sniff type from first result row value
-  const firstRow = (state.queryResults && state.queryResults[0]) || null;
-  function sniffType(col) {
-  if (typeMap[col]) return typeMap[col];
-  if (!firstRow) return 'default';
-  const v = firstRow[col];
-  if (Array.isArray(v)) return 'array';
-  if (typeof v === 'number') return 'number';
-  if (typeof v === 'boolean') return 'bool';
-  if (typeof v === 'string' && ISO_DATE_RE.test(v)) return 'date';
-  return 'text';
-}
-
-  body.innerHTML = '';
-  for (const col of state.queryColumns) {
-    const ti = FIELD_TYPE_ICONS[sniffType(col)] || FIELD_TYPE_ICONS.default;
-    const item = document.createElement('div');
-    item.className = 'field-item';
-    item.draggable = true;
-    item.innerHTML = `<span class="field-type-icon ${ti.cls}">${ti.icon}</span><span class="field-label">${col}</span>`;
-    item.addEventListener('dragstart', e => {
-      safeDragSet(e, { type: 'result-field', field: col });
-    });
-    body.appendChild(item);
-  }
-}
 
       // ============================================================
       // WIDGET TYPES
@@ -7711,10 +7716,28 @@ async function loadConfig(cfg) {
         event.currentTarget.classList.remove('drag-over');
         const data = safeDragParse(event);
         if (!data) return;
-        if (data.type === 'widget-type') addWidgetToCanvas(data.widgetType, null);
-        else if (data.type === 'result-field') addWidgetToCanvas('table', [data.field]);
+        if (data.type === 'widget-type') {
+          if (data.widgetType === 'table') {
+            addWidgetToCanvas('table', null, data.table);
+          } else {
+            addWidgetToCanvas(data.widgetType, null, null);
+          }
+        }
         else if (data.type === 'table') addWidgetToCanvas('table', null, data.table);
-        else if (data.type === 'field') addWidgetToCanvas('table', [data.field]);
+
+        if(data.type === 'result-field' || data.type === 'field') {
+          switch (data.dataType) {
+            case 'number':
+              addWidgetToCanvas('bar', [...(state.queryColumns.filter(c => c !== data.field && sniffType(c) === 'text')[0] || data.field), data.field], null);
+              break;
+            case 'date':
+              addWidgetToCanvas('line', [data.field, ...state.queryColumns.filter(c => c !== data.field && sniffType(c) === 'number')], null); break;
+            case 'boolean':
+              addWidgetToCanvas('pie', [data.field, ...state.queryColumns.filter(c => c !== data.field && sniffType(c) === 'number')], null); break;
+            default:
+              addWidgetToCanvas('table', [data.field], null);
+          }
+        }
       }
 
       function onDropToFilterBar(event) {
@@ -7742,16 +7765,16 @@ async function loadConfig(cfg) {
           title: getDefaultTitle(widgetType),
           widthPct: 45,
           heightVh: 30,
-          fields: fields || (state.queryColumns.length ? (widgetType === 'kpi' ? [state.queryColumns[0]] : state.queryColumns.slice(0, 5)) : []),
-          xField: state.queryColumns[0] || '',
-          yField: state.queryColumns[1] || '',
+          fields: fields || (state.queryColumns.length ? (widgetType === 'kpi' ? [state.queryColumns[0]] : state.queryColumns.slice(0, 8)) : []),
+          xField: (fields && fields.length>0) ? fields[0] : state.queryColumns[0] || '', // TODO: guess x and y based on dataType
+          yField: (fields && fields.length>1) ? fields[1] : state.queryColumns[1] || '',
           aggregation: '',
           fillColor: '#0078d4',
           borderColor: '#edebe9',
           borderSize: 1,
           fontSize: 13,
           fontColor: '#323130',
-          textContent: 'Enter text here...',
+          textContent: 'Enter text or HTML here...',
           imageUrl: '',
           filters: []
         };
@@ -9378,6 +9401,7 @@ async function loadConfig(cfg) {
         updateWidgetContent,
         renderFilterBar,
         removeFilterFromBar,
+        sniffType,
         applyPreviewFilter,
         refreshWidgets,
         refreshDashboardPreview,
