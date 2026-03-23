@@ -5429,8 +5429,8 @@ async function loadConfig(cfg) {
             // Build fields list, sorted alphabetically
             const flist = node.querySelector('.fields-list');
             const sortedFields = [...t.fields]
-              .filter(f => !f.isAutoId)
               .sort((a, b) => (a.alias || a.displayName || '').localeCompare(b.alias || b.displayName || ''));
+              //TODO: removed this from above .sort:  .filter(f => !f.isAutoId)
 
             for (const f of sortedFields) {
               const ti = FIELD_TYPE_ICONS[f.displayType] || FIELD_TYPE_ICONS.default;
@@ -6061,13 +6061,8 @@ async function loadConfig(cfg) {
             setQBMode('basic');
             addTableToBasicQB(data.table);
 
-            // Auto-select Title or Name by default
-            for (const f of t.fields) {
-              if (f.isAutoId) continue;
-              if ((f.internalName === 'Title' || (f.alias || '').toLowerCase() === 'name' ||  (f.alias || '').toLowerCase().includes('fullname') || (f.alias || '').toLowerCase() == 'uniqname') && !state.basicQB.selectedFields.includes(f.alias))
-                state.basicQB.selectedFields.push(f.alias);
-            }
-            
+            // Auto-select all fields by default
+            selectAllBasicFields();
             rebuildBasicSQL();
           } else {
             // Insert alias name at cursor
@@ -6118,13 +6113,8 @@ async function loadConfig(cfg) {
         state.basicQB.groupBy = [];
         state.basicQB.rowLimit = 500;
 
-        // Auto-select Title or Name by default
-        for (const f of t.fields) {
-          if (f.isAutoId) continue;
-          if ((f.internalName === 'Title' || (f.alias || '').toLowerCase() === 'name' ||  (f.alias || '').toLowerCase().includes('fullname') || (f.alias || '').toLowerCase() == 'uniqname') && !state.basicQB.selectedFields.includes(f.alias))
-            state.basicQB.selectedFields.push(f.alias);
-        }
-
+        // Auto-select all fields by default
+        selectAllBasicFields();
         renderBasicQB();
         ensureTableData(tableName);
       }
@@ -7440,9 +7430,9 @@ async function loadConfig(cfg) {
             sql += `\nCROSS JOIN [${toKey}]`;
           } else {
             // TODO: handle array joins using custom alasql function "INCLUDES" instead of "="
-            
-
-          sql += `\n${j.type} JOIN [${toKey}] ON [${fromKey}].[${fromIname}] = [${toKey}].[${toIname}]`;
+            // TODO: synthetic fields are only in alasql but do not exist in state.tables.fields
+            sql += `\n${j.type} JOIN [${toKey}] ON [${fromKey}].[${fromIname}] = [${toKey}].[${toIname}]`;
+          }
         }
 
         const allWhere = [];

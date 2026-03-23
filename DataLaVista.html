@@ -7436,13 +7436,13 @@ async function loadConfig(cfg) {
           const toKey     = toNd.tableName;
           const fromIname = getInternal(fromKey, j.fromKey);
           const toIname   = getInternal(toKey,   j.toKey);
-          if(j.type==='CROSS') {
+         if(j.type==='CROSS') {
             sql += `\nCROSS JOIN [${toKey}]`;
           } else {
             // TODO: handle array joins using custom alasql function "INCLUDES" instead of "="
-            
-
-          sql += `\n${j.type} JOIN [${toKey}] ON [${fromKey}].[${fromIname}] = [${toKey}].[${toIname}]`;
+            // TODO: synthetic fields are only in alasql but do not exist in state.tables.fields
+            sql += `\n${j.type} JOIN [${toKey}] ON [${fromKey}].[${fromIname}] = [${toKey}].[${toIname}]`;
+          }
         }
 
         const allWhere = [];
