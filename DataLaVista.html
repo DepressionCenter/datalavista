@@ -4572,91 +4572,85 @@ async function deriveStructureFromSample(dataArray) {
 
     
 
-
+/* Handles the Connect / Load button click in the popup.
+   Initiates the connection/loading process based on the active tab
+   (SharePoint, JSON, CSV, or Load Config). Shows progress and
+   status messages, and handles errors gracefully with user feedback. */
 async function doConnect() {
-    const activeTab = document.querySelector('.source-tab.active')?.dataset?.src || 'sharepoint';
-    const btn = document.getElementById('btn-do-connect');
-    const prog = document.getElementById('popup-progress');
-    const progText = document.getElementById('popup-progress-text');
-    btn.disabled = true;
-    prog.classList.remove('hidden');
+  const activeTab = document.querySelector('.source-tab.active')?.dataset?.src || 'sharepoint';
+  const btn = document.getElementById('btn-do-connect');
+  const prog = document.getElementById('popup-progress');
+  const progText = document.getElementById('popup-progress-text');
+  btn.disabled = true;
+  prog.classList.remove('hidden');
+  let dsName = '';
 
+  // Process connection based on active tab
   try {
     if (activeTab === 'sharepoint') {
       /* SharePoint Tab */
       const siteUrl = (document.getElementById('sp-url')?.value || '').trim().replace(/\/$/, '');
-      if (!siteUrl) { toast('Please enter a SharePoint site URL', 'error'); return; }
-      const rawDsName = (document.getElementById('sp-ds-name')?.value || '').trim();
-      const dsName = generateDataSourceName('sharepoint', rawDsName);
-
-      if(!state.dataSources[dsName]) {
-        state.dataSources[dsName] = {
-          type: 'sharepoint',
-          url: siteUrl,
-          siteUrl: siteUrl,
-          auth: document.getElementById('sp-auth')?.value || 'current',
-          token: document.getElementById('sp-token')?.value || '',
-          internalName: dsName,
-          alias: dsName,
-          description: null,
-          tables: [],
-          isFileUpload: false,
-          keepRawData: false
-        };
+      if (!siteUrl) {
+        throw new Error('Invalid SharePoint URL.');
       }
-      
+      const fileName = siteUrl.split('/').pop().replace(/\.[^/.]+$/, ""); // Use last segment of URL as default name, without file extension
+      const rawDsName = (document.getElementById('sp-ds-name')?.value || fileName || '').trim();
+      dsName = generateDataSourceName('sharepoint', rawDsName);
       progText.textContent = 'Fetching list inventory...';
-      await loadSharePointSource(siteUrl, dsName);
-      
+      await loadSharePointListsSource(siteUrl, dsName, document.getElementById('sp-auth')?.value || 'current', document.getElementById('sp-token')?.value || '', '');
+
     } else if (activeTab === 'json') {
       /* JSON Tab */
       const siteUrl = (document.getElementById('json-url')?.value || '').trim();
-      if (!siteUrl) { toast('Please enter a URL', 'error'); return; }
-      const rawDsName = (document.getElementById('json-ds-name')?.value || '').trim();
+      if (!siteUrl) {
+        throw new Error('Invalid JSON URL.');
+      }
+      // Use last segment of URL as default name, without file extension
+      const fileName = siteUrl.split('/').pop().replace(/\.[^/.]+$/, "");
+      const rawDsName = (fileName || '').trim();
       const dsName = generateDataSourceName('json', rawDsName);
       progText.textContent = 'Loading JSON...';
       await loadJSONSource(siteUrl, dsName);
 
     } else if (activeTab === 'csv') {
       /* CSV Tab */
-      // Handles CSV URLs. File uploads are handled separately in spPickerCheckVisibility() → handleFileUpload().
-      const urlEl = document.getElementById('csv-url');
-      const dsEl  = document.getElementById('csv-ds-name');
-      const url = (urlEl?.value || '').trim();
-      if (!url) { toast('Please enter a CSV URL or upload a file', 'error'); return; }
-      const rawDsName = (dsEl?.value || '').trim();
+      // Handles CSV URLs only.
+      // File uploads are handled separately in spPickerCheckVisibility() → handleFileUpload().
+      const siteUrl = (document.getElementById('csv-url')?.value || '').trim();
+      if (!siteUrl) {
+        throw new Error('Invalid CSV URL.');
+      }
+      // Use last segment of URL as default name, without file extension
+      const fileName = siteUrl.split('/').pop().replace(/\.[^/.]+$/, "");
+      const rawDsName = (fileName || '').trim();
       const dsName = generateDataSourceName('csv', rawDsName);
       progText.textContent = 'Loading CSV...';
-
-      let text;
-      try{
-        text = await fetchCSVFromURL(url);
-      } catch (e) {
-        console.error('[DLV CSV] res.text() threw:', e);
-        throw e;
-      }
-      if (!text.trim()) throw new Error('CSV file appears to be empty');
-      const fileName = url.split('/').pop();
+      await loadCSVSource(siteUrl, dsName);
       
-      loadCSVData(dsName||'CSV', '', fileName, url, false, text); // Create new DS for this CSV file, with isUploadedFile=false
-
     } else if (activeTab === 'loadconfig') {
       /* Load Report Config Tab */
       const jsonText = (document.getElementById('config-json-input')?.value || '').trim();
-      if (!jsonText) { toast('Please paste or load a config', 'error'); return; }
+      if (!jsonText) {
+        throw new Error('Please paste or load a config file.');
+      }
+      progText.textContent = 'Loading report config...';
       const parsed = safeJSONParse(jsonText, 'Config');
       if (!parsed) return;
       await loadConfig(parsed);
     }
 
+    // Post successful connection popup cleanup and UI updates
     updateConnectButton();
     document.getElementById('btn-save-config').disabled = false;
     hideConnectPopup();
+
   } catch (err) {
     console.error(err);
-    toast('Error: ' + err.message, 'error');
+    toast('Unable to connect or load: ' + err.message, 'error');
+    setStatus('Unable to connect or load: ' + err.message, 'error');
   } finally {
     btn.disabled = false;
+    progText.textContent = '';
     prog.classList.add('hidden');
   }
 }
@@ -4744,7 +4738,7 @@ function safeJSONParse(text) {
 // - Reads as text first (handles Content-Type mismatches / forced downloads)
 // - Hard size cap on both Content-Length header and actual body
 
-async function fetchWithTimeout(url, opts = {}, ms = FETCH_TIMEOUT_MS) {
+async function fetchWithTimeout(url, opts = {}, ms = FETCH_TIMEOUT_MS, returnText = false) {
   const controller = new AbortController();
   const timeoutId  = setTimeout(() => controller.abort(), ms);
 
@@ -4772,7 +4766,7 @@ async function fetchWithTimeout(url, opts = {}, ms = FETCH_TIMEOUT_MS) {
       );
     }
 
-    return safeJSONParse(text);
+    return returnText ? text : safeJSONParse(text);
 
   } catch (err) {
     clearTimeout(timeoutId);
@@ -4847,21 +4841,20 @@ function tryJSONP(url) {
 // ============================================================
 // SHAREPOINT SOURCE LOADER
 // ============================================================
-async function loadSharePointSource(siteUrl, dsName) {
+async function loadSharePointListsSource(siteUrl, dsName, newAuth='current', newToken='', description='') {
   setStatus('⏳ Loading SharePoint lists from ' + siteUrl + '...');
 
-  
   // dsName is the immutable internal key; alias = user-entered name from connect popup
   if (!state.dataSources[dsName]) {
     state.dataSources[dsName] = {
       type: 'sharepoint',
       url: siteUrl,
       siteUrl: siteUrl,
-      auth: state.dataSources[dsName]?.auth || 'current',
-      token: state.dataSources[dsName]?.token || '',
+      auth: newAuth || 'current',
+      token: newToken || '',
       internalName: dsName,
       alias: dsName,
-      description: siteUrl,
+      description: description || 'SharePoint Lists - ' + siteUrl,
       tables: [],
       isFileUpload: false,
       keepRawData: false
@@ -4913,7 +4906,7 @@ async function loadSharePointSource(siteUrl, dsName) {
       }
       loadedCount++;
     } catch (e) {
-      console.warn('[loadSharePointSource] Skipped list:', list.Title, e.message);
+      console.warn('[loadSharePointListsSource] Skipped list:', list.Title, e.message);
     }
   }
   renderFieldsPanel();
@@ -4929,88 +4922,110 @@ async function loadSharePointSource(siteUrl, dsName) {
 // DATA SOURCE LOADER
 // ============================================================
 
+// Fetch JSON from a URL trying multiple strategies.
+// Skips external proxies if the URL is on the same site as the current page
+// (or the detected SharePoint site), since proxies can't authenticate there.
+async function fetchJSONWithFallbacks(url) {
+  if (window.location.protocol === 'file:') {
+    throw new Error(
+      'Cannot fetch external URLs when running from a local file. ' +
+      'Open the page from a web server instead (e.g. a local server, or host it on SharePoint).'
+    );
+  }
+
+  const encodedUrl = encodeURIComponent(url);
+
+  const isSameOrigin = (() => {
+    try {
+      const target = new URL(url);
+      if (target.origin === window.location.origin) return true;
+      const spSite = typeof getSpSiteUrl === 'function' && getSpSiteUrl();
+      if (spSite && url.startsWith(spSite)) return true;
+    } catch (e) {}
+    return false;
+  })();
+
+  const strategies = [
+    { name: 'CORS',        fn: () => fetchWithTimeout(url, { mode: 'cors' }, FETCH_TIMEOUT_MS) },
+    { name: 'Credentials', fn: () => fetchWithTimeout(url, { mode: 'cors', credentials: 'include' }, FETCH_TIMEOUT_MS) },
+    ...(!isSameOrigin ? [
+      { name: 'JSONP',       fn: () => tryJSONP(url) },
+      { name: 'CORSProxy.io',fn: () => fetchWithTimeout(`https://corsproxy.io/?url=${encodedUrl}`, { mode: 'cors' }, PROXY_TIMEOUT_MS) },
+      { name: 'AllOrigins',  fn: () => fetchWithTimeout(`https://api.allorigins.win/raw?url=${encodedUrl}`, { mode: 'cors' }, PROXY_TIMEOUT_MS) },
+      { name: 'Thingproxy',  fn: () => fetchWithTimeout(`https://thingproxy.freeboard.io/fetch/${url}`, { mode: 'cors' }, PROXY_TIMEOUT_MS) },
+    ] : []),
+  ];
+
+  const errors = {};
+  for (const s of strategies) {
+    try {
+      const result = await s.fn();
+      console.info(`[fetchJSONWithFallbacks] ✅ succeeded via: ${s.name} (${isSameOrigin ? 'same-origin' : 'cross-origin'})`);
+      return result;
+    } catch (err) {
+      errors[s.name] = err.message;
+      console.warn(`[fetchJSONWithFallbacks] ${s.name} failed:`, err.message);
+    }
+  }
+
+  const summary = Object.entries(errors).map(([k, v]) => `  [${k}] ${v}`).join('\n');
+  throw new Error(`All fetch strategies failed for "${url}":\n${summary}`);
+}
+
+// Fetch raw CSV text from a URL trying multiple strategies.
+// Skips JSONP (JSON-only) and skips external proxies for same-origin URLs.
+async function fetchCSVWithFallbacks(url) {
+  if (window.location.protocol === 'file:') {
+    throw new Error(
+      'Cannot fetch external URLs when running from a local file. ' +
+      'Open the page from a web server instead (e.g. a local server, or host it on SharePoint).'
+    );
+  }
+
+  const encodedUrl = encodeURIComponent(url);
+
+  const isSameOrigin = (() => {
+    try {
+      const target = new URL(url);
+      if (target.origin === window.location.origin) return true;
+      const spSite = typeof getSpSiteUrl === 'function' && getSpSiteUrl();
+      if (spSite && url.startsWith(spSite)) return true;
+    } catch (e) {}
+    return false;
+  })();
+
+  const strategies = [
+    { name: 'CORS',        fn: () => fetchWithTimeout(url, { mode: 'cors' }, FETCH_TIMEOUT_MS, true) },
+    { name: 'Credentials', fn: () => fetchWithTimeout(url, { mode: 'cors', credentials: 'include' }, FETCH_TIMEOUT_MS, true) },
+    ...(!isSameOrigin ? [
+      { name: 'CORSProxy.io', fn: () => fetchWithTimeout(`https://corsproxy.io/?url=${encodedUrl}`, { mode: 'cors' }, PROXY_TIMEOUT_MS, true) },
+      { name: 'AllOrigins',   fn: () => fetchWithTimeout(`https://api.allorigins.win/raw?url=${encodedUrl}`, { mode: 'cors' }, PROXY_TIMEOUT_MS, true) },
+      { name: 'Thingproxy',   fn: () => fetchWithTimeout(`https://thingproxy.freeboard.io/fetch/${url}`, { mode: 'cors' }, PROXY_TIMEOUT_MS, true) },
+    ] : []),
+  ];
+
+  const errors = {};
+  for (const s of strategies) {
+    try {
+      const text = await s.fn();
+      console.info(`[fetchCSVWithFallbacks] ✅ succeeded via: ${s.name} (${isSameOrigin ? 'same-origin' : 'cross-origin'})`);
+      return text;
+    } catch (err) {
+      errors[s.name] = err.message;
+      console.warn(`[fetchCSVWithFallbacks] ${s.name} failed:`, err.message);
+    }
+  }
+
+  const summary = Object.entries(errors).map(([k, v]) => `  [${k}] ${v}`).join('\n');
+  throw new Error(`All CSV fetch strategies failed for "${url}":\n${summary}`);
+}
+
 // Load JSON from URL with multiple strategies and robust error handling
 async function loadJSONSource(url, dsName) {
   // Validate before any network activity
   validateURL(url);
 
-  const encodedUrl = encodeURIComponent(url);
-
-  const strategies = [
-    {
-      name: "CORS",
-      fn: () => fetchWithTimeout(url, { mode: "cors" }, FETCH_TIMEOUT_MS),
-    },
-    {
-      name: "Credentials",
-      fn: () => fetchWithTimeout(
-        url,
-        { mode: "cors", credentials: "include" },
-        FETCH_TIMEOUT_MS
-      ),
-    },
-    {
-      name: "JSONP",
-      fn: () => tryJSONP(url),
-    },
-    {
-      name: "CORSProxy.io",
-      fn: () => fetchWithTimeout(
-        `https://corsproxy.io/?url=${encodedUrl}`,
-        { mode: "cors" },
-        PROXY_TIMEOUT_MS
-      ),
-    },
-    {
-      name: "AllOrigins",
-      // /raw returns JSON directly — no wrapper object to unwrap
-      fn: () => fetchWithTimeout(
-        `https://api.allorigins.win/raw?url=${encodedUrl}`,
-        { mode: "cors" },
-        PROXY_TIMEOUT_MS
-      ),
-    },
-    {
-      name: "Thingproxy",
-      fn: () => fetchWithTimeout(
-        `https://thingproxy.freeboard.io/fetch/${url}`,
-        { mode: "cors" },
-        PROXY_TIMEOUT_MS
-      ),
-    },
-  ];
-
-  const errors  = {};
-  let json      = undefined; // explicit undefined — distinguishes "not yet set"
-  let succeeded = false;     // explicit flag — valid JSON can be falsy (null, 0, false)
-
-  for (const strategy of strategies) {
-    try {
-      json      = await strategy.fn();
-      succeeded = true;
-      console.info(
-        `[loadJSONSource] ✅ "${dsName}" loaded via: ${strategy.name}`
-      );
-      break;
-    } catch (err) {
-      errors[strategy.name] = err.message;
-      console.warn(
-        `[loadJSONSource] ${strategy.name} failed for "${dsName}":`,
-        err.message
-      );
-    }
-  }
-
-  // Use succeeded flag, not truthiness of json — null/false/0 are valid JSON
-  if (!succeeded) {
-    const summary = Object.entries(errors)
-      .map(([method, msg]) => `  [${method}] ${msg}`)
-      .join("\n");
-    throw new Error(
-      `Could not load JSON from "${url}" (source: "${dsName}").\n` +
-      `All methods failed:\n${summary}`
-    );
-  }
+  const json = await fetchJSONWithFallbacks(url);
 
   // ── Data Normalization & State ─────────────────────────────────────────────
   // Preserved exactly from your original application logic.
@@ -5107,6 +5122,59 @@ async function fetchCSVFromURL(url) {
         throw new Error('Failed to download CSV: ' + err.message);
       }
     }
+
+// Load CSV from URL — tries alasql's built-in fetch first, falls back to fetchCSVFromURL + loadCSVData
+async function loadCSVSource(url, dsName, fileName) {
+  validateURL(url);
+
+  // Strategy 1: alasql built-in CSV fetch+parse
+  try {
+    const rows = await alasql.promise('SELECT * FROM CSV(?)', [url]);
+    if (rows && rows.length > 0) {
+      console.log('[DLV CSV] alasql strategy succeeded:', rows.length, 'rows');
+      // alasql returns parsed row objects — register directly, skipping text parsing
+      const headers = Object.keys(rows[0]);
+      const tableKey = (dsName + '_Data').replace(/[^A-Za-z0-9_]/g, '_').replace('__', '_');
+      const fields = headers.map(h => ({
+        internalName: h.replace(/[^A-Za-z0-9_]/g, '_').replace('__', '_'),
+        displayName: toPascalCase(h) || h,
+        alias: toPascalCase(h) || h,
+        type: 'text',
+        displayType: 'text'
+      }));
+      if (!state.dataSources[dsName]) {
+        state.dataSources[dsName] = {
+          alias: 'Data', auth: null,
+          description: 'This CSV file (' + (fileName || dsName + '.csv') + ') was loaded from a URL.',
+          internalName: dsName, tables: [], token: null, type: 'csv',
+          fileName: fileName || '', isFileUpload: false,
+          url: url, keepRawData: false
+        };
+      }
+      state.tables[tableKey] = {
+        alias: tableKey, data: rows, dataSource: dsName,
+        description: 'This table was created from a CSV file (' + (fileName || dsName + '.csv') + ').',
+        displayName: 'Data', dsAlias: dsName, fields,
+        internalName: tableKey, itemCount: rows.length,
+        siteUrl: null, url: url, loaded: true,
+        sourceType: 'csv', isFileUpload: false, keepRawData: false
+      };
+      if (!state.dataSources[dsName].tables.includes(tableKey)) state.dataSources[dsName].tables.push(tableKey);
+      setStatus(`✅ Loaded ${rows.length} rows from CSV`);
+      if (!state.reportMode) { renderFieldsPanel(); setupCodeMirror(); }
+      toast(`Loaded ${rows.length} rows from CSV as "${dsName}"`, 'success');
+      return;
+    }
+    console.warn('[DLV CSV] alasql returned empty result, falling back');
+  } catch (e) {
+    console.warn('[DLV CSV] alasql strategy failed, falling back:', e.message);
+  }
+
+  // Strategy 2: multi-strategy fetch + loadCSVData
+  const text = await fetchCSVWithFallbacks(url);
+  if (!text.trim()) throw new Error('CSV file is empty.');
+  loadCSVData(dsName || 'CSV', '', fileName, url, false, text);
+}
 
 // Simple CSV parser and loader
 function loadCSVData(dsName, tableKey = '', fileName = '', fileUrl = '', isFileUpload = false, text = '') {
@@ -9883,18 +9951,37 @@ async function loadConfig(cfg) {
       // ============================================================
       // UTILITIES
       // ============================================================
-      function setStatus(msg) {
-        document.getElementById('status-bar').textContent = msg;
+      let _statusClearTimer = null;
+      const _statusIcons = {
+        "loading": '⌛', "loading-emoji": '⏳',
+        "success": '✓', "success-emoji": '✅',
+        "error": '✕', "error-emoji": '❌',
+        "warning": '⚠', "warning-emoji": '⚠️',
+        "info": 'ℹ', "info-emoji": 'ℹ️',
+        "question": '?', "question-emoji": '❓',
+        "skipped": '»', "skipped-emoji": '⏭️',
+        "disabled": '✕', "disabled-emoji": '🚫', // Or '➖' / '⚪'
+        "locked": '⦸', "locked-emoji": '🔒',
+        "searching": '⌕', "search-emoji": '🔍'
+      };
+
+      function setStatus(msg, type = 'info') {
+        const icon = _statusIcons[type] ?? _statusIcons['info'] ?? 'ℹ';
+        document.getElementById('status-bar').textContent = `${icon} ${msg}`;
+        clearTimeout(_statusClearTimer);
+        _statusClearTimer = setTimeout(() => {
+          document.getElementById('status-bar').textContent = '';
+        }, 10000);
       }
 
-      function toast(message, type = 'info') {
+      function toast(msg, type = 'info') {
+        const icon = _statusIcons[type] ?? _statusIcons['info'] ?? 'ℹ';
         const container = document.getElementById('toast-container');
         const t = document.createElement('div');
         t.className = 'toast ' + type;
-        const icons = { success: '✓', error: '✕', warning: '⚠', info: 'ℹ' };
-        t.innerHTML = `<span>${icons[type] || 'ℹ'}</span><span>${message}</span>`;
+        t.innerHTML = `<span>${icon}</span><span>${msg}</span>`;
         container.appendChild(t);
-        setTimeout(() => { t.style.opacity = '0'; t.style.transition = 'opacity 300ms'; setTimeout(() => t.remove(), 300); }, 3000);
+        setTimeout(() => { t.style.opacity = '0'; t.style.transition = 'opacity 400ms'; setTimeout(() => t.remove(), 400); }, 4400);
       }
 
       function downloadText(text, filename, mime) {
@@ -10148,17 +10235,6 @@ async function loadConfig(cfg) {
        *
        * Called automatically at startup when the page URL contains a
        * "report=" query parameter pointing at a DataLaVista JSON config.
-       *
-       * Steps:
-       *   1. Show a full-screen loading banner.
-       *   2. Fetch the JSON config from the URL.
-       *   3. Call loadConfig() to restore data-sources, tables, SQL, and
-       *      design widgets (this also triggers background SharePoint fetches).
-       *   4. Call refreshDashboardPreview() to run the SQL query and render all widgets.
-       *   5. Switch to the Preview tab and apply the .dlv-report-mode CSS class
-       *      so the preview panel fills the entire viewport (toolbar hidden,
-       *      filter bar visible, no designer chrome).
-       *
        * On any error the loading banner is removed, a toast is shown, and the
        * normal designer UI is presented so the user can still work.
        */
@@ -10172,11 +10248,7 @@ async function loadConfig(cfg) {
         try {
           console.log("DEBUG: Fetching report config from URL: " + reportUrl);
           // ── Step 1: Fetch the config JSON ──────────────────────────────
-          const resp = await fetch(reportUrl, { credentials: 'same-origin' });
-          if (!resp.ok) {
-            throw new Error(`HTTP ${resp.status} ${resp.statusText} — could not fetch: ${reportUrl}`);
-          }
-          const cfg = await resp.json();
+          const cfg = await fetchJSONWithFallbacks(reportUrl);
 
           // ── Step 2: Load config (restores DS, tables, SQL, design) ─────
           console.log('2222222222222222 DEBUG: loadReportFromUrl -> calling loadConfig');
@@ -10382,9 +10454,12 @@ async function loadConfig(cfg) {
         hideLoadingPopup,
         switchSourceTab,
         doConnect,
-        loadSharePointSource,
+        loadSharePointListsSource,
+        fetchJSONWithFallbacks,
         loadJSONSource,
+        fetchCSVWithFallbacks,
         fetchCSVFromURL,
+        loadCSVSource,
         loadCSVData,
         ensureTableData,
         fetchTableData,

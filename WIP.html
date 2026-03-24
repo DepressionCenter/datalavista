@@ -3,7 +3,7 @@ This file is part of DataLaVista
 DataLaVista.html: Report and dashboard designer main file.
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 Created: 2026-03-10
-Last Modified: 2026-03-19
+Last Modified: 2026-03-23
 Summary: Main window in DataLaVista for loading data and designing reports and dashboards.
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
@@ -1321,6 +1321,125 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       transform: translateY(-50%);
     }
 
+    /* ── Poof animation ──────────────────────────────────────── */
+    @keyframes dlv-poof {
+      0%   { transform: scale(1);   opacity: 1; }
+      50%  { transform: scale(1.5); opacity: .7; }
+      100% { transform: scale(0);   opacity: 0; }
+    }
+    .dlv-poof { animation: dlv-poof 0.32s ease-in forwards; pointer-events: none; }
+
+    /* ── Node body / pills ───────────────────────────────────── */
+    .qb-node-body { padding: 6px 8px; }
+    .qb-node-desc {
+      font-size: 10px; color: var(--text-secondary); margin-bottom: 3px;
+      font-style: italic; white-space: normal;
+      display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical;
+      overflow: hidden; text-overflow: ellipsis; cursor: help;
+    }
+    .qb-node-count { font-size: 10px; color: var(--text-disabled); margin-bottom: 5px; }
+    .qb-node-pills { display: flex; flex-wrap: wrap; gap: 4px; min-height: 20px; }
+    .qb-node-pill {
+      display: inline-flex; align-items: center; gap: 2px;
+      background: var(--primary); color: white;
+      border-radius: 10px; padding: 2px 7px; font-size: 10px;
+      cursor: grab; user-select: none; white-space: nowrap;
+      transition: opacity var(--transition);
+    }
+    .qb-node-pill.agg-pill { background: #e9950d; }
+    .qb-node-pill:hover { opacity: .85; }
+    .qb-node-pill .pill-x { cursor: pointer; font-size: 9px; opacity: .65; margin-left: 1px; line-height: 1; }
+    .qb-node-pill .pill-x:hover { opacity: 1; }
+
+    /* ── Join icon in node header ────────────────────────────── */
+    .qb-node-join-icon {
+      cursor: crosshair; font-size: 14px; padding: 0 3px;
+      color: rgba(255,255,255,.65); transition: color var(--transition);
+      line-height: 1; flex-shrink: 0;
+    }
+    .qb-node-join-icon:hover { color: white; }
+
+    /* ── Trash drag handle in node header ────────────────────── */
+    .qb-node-trash-icon {
+      cursor: grab; font-size: 14px; padding: 0 3px;
+      color: rgba(255,255,255,.45); transition: color var(--transition);
+      line-height: 1; flex-shrink: 0;
+    }
+    .qb-node-trash-icon:hover { color: #ff6b6b; }
+
+    /* ── Resize handles at node corners ─────────────────────── */
+    .qb-node-resize {
+      position: absolute; width: 10px; height: 10px;
+      background: var(--border-strong); border-radius: 2px; z-index: 3;
+      transition: background var(--transition);
+    }
+    .qb-node-resize:hover { background: var(--primary); }
+    .qb-node-resize.br { bottom: -4px; right: -4px; cursor: se-resize; }
+    .qb-node-resize.bl { bottom: -4px; left: -4px;  cursor: sw-resize; }
+    .qb-node-resize.tr { top:    -4px; right: -4px; cursor: ne-resize; }
+    .qb-node-resize.tl { top:    -4px; left:  -4px; cursor: nw-resize; }
+
+    /* ── In-canvas trash drop target ────────────────────────── */
+    #adv-canvas-trash {
+      position: absolute; bottom: 14px; right: 14px; z-index: 20;
+      width: 52px; height: 52px; border-radius: 50%;
+      background: var(--surface); border: 2px dashed var(--border-strong);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 26px; cursor: default; user-select: none;
+      transition: background .15s, border-color .15s, transform .15s;
+      box-shadow: var(--shadow-sm);
+    }
+    #adv-canvas-trash.drag-over {
+      background: #fdecea; border-color: #e53935; transform: scale(1.15);
+      box-shadow: 0 0 0 4px rgba(229,57,53,.2);
+    }
+
+    /* ── Adv field rows in options panel ─────────────────────── */
+    .adv-field-row {
+      display: flex; align-items: center; gap: 5px;
+      padding: 3px 6px; border-radius: 4px; cursor: pointer;
+      transition: background var(--transition);
+    }
+    .adv-field-row.selected { background: var(--primary-ultralight); }
+    .adv-field-row:hover    { background: var(--primary-ultralight); }
+    .adv-field-row input[type=checkbox] { accent-color: var(--primary); pointer-events: none; flex-shrink: 0; }
+    .adv-field-row .field-name { flex: 1; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .adv-field-row .field-type-icon { font-size: 10px; flex-shrink: 0; width: 14px; text-align: center; }
+
+    /* ── Agg button per field ────────────────────────────────── */
+    .adv-agg-btn {
+      font-size: 10px; padding: 1px 5px; border-radius: 3px; min-width: 24px; text-align: center;
+      background: var(--surface2); border: 1px solid var(--border);
+      cursor: pointer; flex-shrink: 0; color: var(--text-secondary);
+      transition: all var(--transition);
+    }
+    .adv-agg-btn.has-agg { background: #e9950d; color: white; border-color: transparent; }
+
+    /* ── Agg popup ───────────────────────────────────────────── */
+    .adv-agg-popup {
+      position: fixed; background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); box-shadow: var(--shadow); z-index: 400;
+      min-width: 130px; padding: 4px 0;
+    }
+    .adv-agg-popup .agg-opt { padding: 5px 12px; font-size: 11px; cursor: pointer; }
+    .adv-agg-popup .agg-opt:hover { background: var(--primary-ultralight); color: var(--primary); }
+    .adv-agg-popup .agg-opt.selected { font-weight: 700; color: var(--primary); }
+
+    /* ── Drop zones in options panel ─────────────────────────── */
+    .adv-drop-zone {
+      border: 2px dashed transparent; border-radius: 4px;
+      transition: border-color var(--transition), background var(--transition);
+    }
+    .adv-drop-zone.drag-over { border-color: var(--primary); background: var(--primary-ultralight); padding: 2px 4px; }
+
+    /* ── SVG Venn in join lines ──────────────────────────────── */
+    .join-venn-badge {
+      display: flex; flex-direction: column; align-items: center;
+      cursor: grab; user-select: none; pointer-events: all;
+    }
+    .join-venn-badge:hover { filter: brightness(1.1); }
+    .join-venn-label { font-size: 8px; color: #0078d4; white-space: nowrap; margin-top: 1px; pointer-events: none; }
+
     /* Table/Join properties popup */
     #node-props {
       position: absolute;
@@ -1951,11 +2070,38 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
     }
 
     /* ============================================================
-   DESIGN FIELDS PANEL (right side of design tab)
+   DESIGN FIELDS PANEL (left side of design tab)
    ============================================================ */
     #design-fields-panel {
-      border-left: 1px solid var(--border);
-      border-right: none;
+      border-left: none;
+      border-right: 1px solid var(--border);
+    }
+
+    .design-field-row {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      padding: 2px 4px;
+      border-radius: 2px;
+      cursor: grab;
+      transition: background var(--transition);
+    }
+    .design-field-row:hover { background: var(--primary-ultralight); }
+    .design-field-row .field-label { font-size: 12px; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .design-agg-select {
+      width: 108px !important;
+      flex-shrink: 0;
+      font-size: 10px !important;
+      height: 20px !important;
+      padding: 0 4px !important;
+      background: var(--primary-ultralight);
+      color: var(--primary-dark);
+      border-color: var(--primary) !important;
+    }
+    .design-agg-select.agg-active {
+      background: var(--primary);
+      color: white;
+      border-color: var(--primary-dark) !important;
     }
 
     /* ============================================================
@@ -2797,6 +2943,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
                   <div id="qb-canvas" ondragover="event.preventDefault()" ondrop="onDropToAdvancedQB(event)">
                     <svg id="qb-svg"></svg>
                   </div>
+                  <div id="adv-canvas-trash" title="Drop here to remove">🗑️</div>
                 </div>
                 <div id="adv-opts-resizer"></div>
                 <div id="adv-options-panel">
@@ -2823,7 +2970,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           <div id="qm-panel-sql">
             <div id="sql-section">
               <div class="sql-toolbar">
-                <button class="btn btn-ghost btn-sm" onclick="formatSQL()" title="Format SQL">⊞ Format SQL</button>
+                <button class="btn btn-ghost btn-sm" onclick="formatSQL()" title="Format SQL">🖋️ Format SQL</button>
+                <button class="btn btn-default btn-sm" onclick="clearSQLEditor()" title="Clear SQL editor">🗑️ Clear Code</button>
               </div>
               <div id="sql-editor-wrap">
                 <textarea id="sql-editor"></textarea>
@@ -2849,10 +2997,13 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       <!-- ======================== TAB 2: DESIGN ======================== -->
       <div class="tab-panel" id="tab-design">
 
-        <!-- Left: query result fields -->
-        <div class="panel" id="design-fields-panel" style="width:200px">
+        <!-- Left: data shaping panel (fields + filter/sort/group) -->
+        <div class="panel" id="design-fields-panel" style="width:260px">
           <div class="panel-header">
-            <span>Result Fields</span>
+            <span>Data</span>
+            <div class="panel-actions">
+              <button class="btn btn-ghost btn-sm btn-icon" id="btn-apply-design-transform" title="Apply filters / sorts / grouping to canvas" onclick="applyDesignTransforms()" style="font-size:14px">▶</button>
+            </div>
           </div>
           <div class="panel-body" id="design-fields-body">
             <div class="text-muted text-sm" style="padding:12px 10px">Run a query first to see fields</div>
@@ -2977,7 +3128,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
     DataLaVista.js: Report and dashboard designer main script file.
     Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
     Created: 2026-03-10
-    Last Modified: 2026-03-19
+    Last Modified: 2026-03-23
     Summary: Main window in DataLaVista for loading data and designing reports and dashboards.
     Notes: See README file for documentation and full license information.
     Website: https://github.com/DepressionCenter/datalavista
@@ -3120,7 +3271,12 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         design: {
           title: '',
           widgets: [],     // widget objects
-          filters: []      // { field, label, position }
+          filters: [],     // { field, label, position }  — preview filter bar chips
+          conditions: [],  // { conj, field, op, value }  — design-level data filter
+          sorts: [],       // { field, dir }              — design-level sort
+          groupBy: [],     // string[]                    — design-level group by
+          fieldAggs: {},   // { [col]: aggVal }           — design-level aggregates
+          transformedResults: null  // cached result of applyDesignTransforms()
         },
         currentWidgetId: null,
         previewResults: null,
@@ -3264,7 +3420,12 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       design: {
         title: '',
         widgets: [],     // widget objects
-        filters: []      // { field, label, position }
+        filters: [],     // { field, label, position }  — preview filter bar chips
+        conditions: [],  // { conj, field, op, value }  — design-level data filter
+        sorts: [],       // { field, dir }              — design-level sort
+        groupBy: [],     // string[]                    — design-level group by
+        fieldAggs: {},   // { [col]: aggVal }           — design-level aggregates
+        transformedResults: null
       },
       currentWidgetId: null,
       previewResults: null,
@@ -4018,7 +4179,7 @@ async function fetchTableData(tableName, fetchAll = false) {
           return;
         }
         const json = await res.json();
-        rawData = extractRows(parseJSONSafe(json));
+        rawData = extractRows(json);
       } else if(t.sourceType === 'csv') {
         console.log('DEBUG: Fetching CSV data for', tableName);
         let csvUrl = (state.tables[tableName] && state.tables[tableName].url) || (state.dataSources[t.dataSource] && state.dataSources[t.dataSource].url);
@@ -4411,91 +4572,85 @@ async function deriveStructureFromSample(dataArray) {
 
     
 
-
+/* Handles the Connect / Load button click in the popup.
+   Initiates the connection/loading process based on the active tab
+   (SharePoint, JSON, CSV, or Load Config). Shows progress and
+   status messages, and handles errors gracefully with user feedback. */
 async function doConnect() {
-    const activeTab = document.querySelector('.source-tab.active')?.dataset?.src || 'sharepoint';
-    const btn = document.getElementById('btn-do-connect');
-    const prog = document.getElementById('popup-progress');
-    const progText = document.getElementById('popup-progress-text');
-    btn.disabled = true;
-    prog.classList.remove('hidden');
+  const activeTab = document.querySelector('.source-tab.active')?.dataset?.src || 'sharepoint';
+  const btn = document.getElementById('btn-do-connect');
+  const prog = document.getElementById('popup-progress');
+  const progText = document.getElementById('popup-progress-text');
+  btn.disabled = true;
+  prog.classList.remove('hidden');
+  let dsName = '';
 
+  // Process connection based on active tab
   try {
     if (activeTab === 'sharepoint') {
       /* SharePoint Tab */
       const siteUrl = (document.getElementById('sp-url')?.value || '').trim().replace(/\/$/, '');
-      if (!siteUrl) { toast('Please enter a SharePoint site URL', 'error'); return; }
-      const rawDsName = (document.getElementById('sp-ds-name')?.value || '').trim();
-      const dsName = generateDataSourceName('sharepoint', rawDsName);
-
-      if(!state.dataSources[dsName]) {
-        state.dataSources[dsName] = {
-          type: 'sharepoint',
-          url: siteUrl,
-          siteUrl: siteUrl,
-          auth: document.getElementById('sp-auth')?.value || 'current',
-          token: document.getElementById('sp-token')?.value || '',
-          internalName: dsName,
-          alias: dsName,
-          description: null,
-          tables: [],
-          isFileUpload: false,
-          keepRawData: false
-        };
+      if (!siteUrl) {
+        throw new Error('Invalid SharePoint URL.');
       }
-      
+      const fileName = siteUrl.split('/').pop().replace(/\.[^/.]+$/, ""); // Use last segment of URL as default name, without file extension
+      const rawDsName = (document.getElementById('sp-ds-name')?.value || fileName || '').trim();
+      dsName = generateDataSourceName('sharepoint', rawDsName);
       progText.textContent = 'Fetching list inventory...';
-      await loadSharePointSource(siteUrl, dsName);
-      
+      await loadSharePointListsSource(siteUrl, dsName, document.getElementById('sp-auth')?.value || 'current', document.getElementById('sp-token')?.value || '', '');
+
     } else if (activeTab === 'json') {
       /* JSON Tab */
       const siteUrl = (document.getElementById('json-url')?.value || '').trim();
-      if (!siteUrl) { toast('Please enter a URL', 'error'); return; }
-      const rawDsName = (document.getElementById('json-ds-name')?.value || '').trim();
+      if (!siteUrl) {
+        throw new Error('Invalid JSON URL.');
+      }
+      // Use last segment of URL as default name, without file extension
+      const fileName = siteUrl.split('/').pop().replace(/\.[^/.]+$/, "");
+      const rawDsName = (fileName || '').trim();
       const dsName = generateDataSourceName('json', rawDsName);
       progText.textContent = 'Loading JSON...';
       await loadJSONSource(siteUrl, dsName);
 
     } else if (activeTab === 'csv') {
       /* CSV Tab */
-      // Handles CSV URLs. File uploads are handled separately in spPickerCheckVisibility() → handleFileUpload().
-      const urlEl = document.getElementById('csv-url');
-      const dsEl  = document.getElementById('csv-ds-name');
-      const url = (urlEl?.value || '').trim();
-      if (!url) { toast('Please enter a CSV URL or upload a file', 'error'); return; }
-      const rawDsName = (dsEl?.value || '').trim();
+      // Handles CSV URLs only.
+      // File uploads are handled separately in spPickerCheckVisibility() → handleFileUpload().
+      const siteUrl = (document.getElementById('csv-url')?.value || '').trim();
+      if (!siteUrl) {
+        throw new Error('Invalid CSV URL.');
+      }
+      // Use last segment of URL as default name, without file extension
+      const fileName = siteUrl.split('/').pop().replace(/\.[^/.]+$/, "");
+      const rawDsName = (fileName || '').trim();
       const dsName = generateDataSourceName('csv', rawDsName);
       progText.textContent = 'Loading CSV...';
-
-      let text;
-      try{
-        text = await fetchCSVFromURL(url);
-      } catch (e) {
-        console.error('[DLV CSV] res.text() threw:', e);
-        throw e;
-      }
-      if (!text.trim()) throw new Error('CSV file appears to be empty');
-      const fileName = url.split('/').pop();
+      await loadCSVSource(siteUrl, dsName);
       
-      loadCSVData(dsName||'CSV', '', fileName, url, false, text); // Create new DS for this CSV file, with isUploadedFile=false
-
     } else if (activeTab === 'loadconfig') {
       /* Load Report Config Tab */
       const jsonText = (document.getElementById('config-json-input')?.value || '').trim();
-      if (!jsonText) { toast('Please paste or load a config', 'error'); return; }
+      if (!jsonText) {
+        throw new Error('Please paste or load a config file.');
+      }
+      progText.textContent = 'Loading report config...';
       const parsed = safeJSONParse(jsonText, 'Config');
       if (!parsed) return;
       await loadConfig(parsed);
     }
 
+    // Post successful connection popup cleanup and UI updates
     updateConnectButton();
     document.getElementById('btn-save-config').disabled = false;
     hideConnectPopup();
+
   } catch (err) {
     console.error(err);
-    toast('Error: ' + err.message, 'error');
+    toast('Unable to connect or load: ' + err.message, 'error');
+    setStatus('Unable to connect or load: ' + err.message, 'error');
   } finally {
     btn.disabled = false;
+    progText.textContent = '';
     prog.classList.add('hidden');
   }
 }
@@ -4583,7 +4738,7 @@ function safeJSONParse(text) {
 // - Reads as text first (handles Content-Type mismatches / forced downloads)
 // - Hard size cap on both Content-Length header and actual body
 
-async function fetchWithTimeout(url, opts = {}, ms = FETCH_TIMEOUT_MS) {
+async function fetchWithTimeout(url, opts = {}, ms = FETCH_TIMEOUT_MS, returnText = false) {
   const controller = new AbortController();
   const timeoutId  = setTimeout(() => controller.abort(), ms);
 
@@ -4611,7 +4766,7 @@ async function fetchWithTimeout(url, opts = {}, ms = FETCH_TIMEOUT_MS) {
       );
     }
 
-    return safeJSONParse(text);
+    return returnText ? text : safeJSONParse(text);
 
   } catch (err) {
     clearTimeout(timeoutId);
@@ -4686,21 +4841,20 @@ function tryJSONP(url) {
 // ============================================================
 // SHAREPOINT SOURCE LOADER
 // ============================================================
-async function loadSharePointSource(siteUrl, dsName) {
+async function loadSharePointListsSource(siteUrl, dsName, newAuth='current', newToken='', description='') {
   setStatus('⏳ Loading SharePoint lists from ' + siteUrl + '...');
 
-  
   // dsName is the immutable internal key; alias = user-entered name from connect popup
   if (!state.dataSources[dsName]) {
     state.dataSources[dsName] = {
       type: 'sharepoint',
       url: siteUrl,
       siteUrl: siteUrl,
-      auth: state.dataSources[dsName]?.auth || 'current',
-      token: state.dataSources[dsName]?.token || '',
+      auth: newAuth || 'current',
+      token: newToken || '',
       internalName: dsName,
       alias: dsName,
-      description: siteUrl,
+      description: description || 'SharePoint Lists - ' + siteUrl,
       tables: [],
       isFileUpload: false,
       keepRawData: false
@@ -4752,7 +4906,7 @@ async function loadSharePointSource(siteUrl, dsName) {
       }
       loadedCount++;
     } catch (e) {
-      console.warn('[loadSharePointSource] Skipped list:', list.Title, e.message);
+      console.warn('[loadSharePointListsSource] Skipped list:', list.Title, e.message);
     }
   }
   renderFieldsPanel();
@@ -4768,88 +4922,110 @@ async function loadSharePointSource(siteUrl, dsName) {
 // DATA SOURCE LOADER
 // ============================================================
 
+// Fetch JSON from a URL trying multiple strategies.
+// Skips external proxies if the URL is on the same site as the current page
+// (or the detected SharePoint site), since proxies can't authenticate there.
+async function fetchJSONWithFallbacks(url) {
+  if (window.location.protocol === 'file:') {
+    throw new Error(
+      'Cannot fetch external URLs when running from a local file. ' +
+      'Open the page from a web server instead (e.g. a local server, or host it on SharePoint).'
+    );
+  }
+
+  const encodedUrl = encodeURIComponent(url);
+
+  const isSameOrigin = (() => {
+    try {
+      const target = new URL(url);
+      if (target.origin === window.location.origin) return true;
+      const spSite = typeof getSpSiteUrl === 'function' && getSpSiteUrl();
+      if (spSite && url.startsWith(spSite)) return true;
+    } catch (e) {}
+    return false;
+  })();
+
+  const strategies = [
+    { name: 'CORS',        fn: () => fetchWithTimeout(url, { mode: 'cors' }, FETCH_TIMEOUT_MS) },
+    { name: 'Credentials', fn: () => fetchWithTimeout(url, { mode: 'cors', credentials: 'include' }, FETCH_TIMEOUT_MS) },
+    ...(!isSameOrigin ? [
+      { name: 'JSONP',       fn: () => tryJSONP(url) },
+      { name: 'CORSProxy.io',fn: () => fetchWithTimeout(`https://corsproxy.io/?url=${encodedUrl}`, { mode: 'cors' }, PROXY_TIMEOUT_MS) },
+      { name: 'AllOrigins',  fn: () => fetchWithTimeout(`https://api.allorigins.win/raw?url=${encodedUrl}`, { mode: 'cors' }, PROXY_TIMEOUT_MS) },
+      { name: 'Thingproxy',  fn: () => fetchWithTimeout(`https://thingproxy.freeboard.io/fetch/${url}`, { mode: 'cors' }, PROXY_TIMEOUT_MS) },
+    ] : []),
+  ];
+
+  const errors = {};
+  for (const s of strategies) {
+    try {
+      const result = await s.fn();
+      console.info(`[fetchJSONWithFallbacks] ✅ succeeded via: ${s.name} (${isSameOrigin ? 'same-origin' : 'cross-origin'})`);
+      return result;
+    } catch (err) {
+      errors[s.name] = err.message;
+      console.warn(`[fetchJSONWithFallbacks] ${s.name} failed:`, err.message);
+    }
+  }
+
+  const summary = Object.entries(errors).map(([k, v]) => `  [${k}] ${v}`).join('\n');
+  throw new Error(`All fetch strategies failed for "${url}":\n${summary}`);
+}
+
+// Fetch raw CSV text from a URL trying multiple strategies.
+// Skips JSONP (JSON-only) and skips external proxies for same-origin URLs.
+async function fetchCSVWithFallbacks(url) {
+  if (window.location.protocol === 'file:') {
+    throw new Error(
+      'Cannot fetch external URLs when running from a local file. ' +
+      'Open the page from a web server instead (e.g. a local server, or host it on SharePoint).'
+    );
+  }
+
+  const encodedUrl = encodeURIComponent(url);
+
+  const isSameOrigin = (() => {
+    try {
+      const target = new URL(url);
+      if (target.origin === window.location.origin) return true;
+      const spSite = typeof getSpSiteUrl === 'function' && getSpSiteUrl();
+      if (spSite && url.startsWith(spSite)) return true;
+    } catch (e) {}
+    return false;
+  })();
+
+  const strategies = [
+    { name: 'CORS',        fn: () => fetchWithTimeout(url, { mode: 'cors' }, FETCH_TIMEOUT_MS, true) },
+    { name: 'Credentials', fn: () => fetchWithTimeout(url, { mode: 'cors', credentials: 'include' }, FETCH_TIMEOUT_MS, true) },
+    ...(!isSameOrigin ? [
+      { name: 'CORSProxy.io', fn: () => fetchWithTimeout(`https://corsproxy.io/?url=${encodedUrl}`, { mode: 'cors' }, PROXY_TIMEOUT_MS, true) },
+      { name: 'AllOrigins',   fn: () => fetchWithTimeout(`https://api.allorigins.win/raw?url=${encodedUrl}`, { mode: 'cors' }, PROXY_TIMEOUT_MS, true) },
+      { name: 'Thingproxy',   fn: () => fetchWithTimeout(`https://thingproxy.freeboard.io/fetch/${url}`, { mode: 'cors' }, PROXY_TIMEOUT_MS, true) },
+    ] : []),
+  ];
+
+  const errors = {};
+  for (const s of strategies) {
+    try {
+      const text = await s.fn();
+      console.info(`[fetchCSVWithFallbacks] ✅ succeeded via: ${s.name} (${isSameOrigin ? 'same-origin' : 'cross-origin'})`);
+      return text;
+    } catch (err) {
+      errors[s.name] = err.message;
+      console.warn(`[fetchCSVWithFallbacks] ${s.name} failed:`, err.message);
+    }
+  }
+
+  const summary = Object.entries(errors).map(([k, v]) => `  [${k}] ${v}`).join('\n');
+  throw new Error(`All CSV fetch strategies failed for "${url}":\n${summary}`);
+}
+
 // Load JSON from URL with multiple strategies and robust error handling
 async function loadJSONSource(url, dsName) {
   // Validate before any network activity
   validateURL(url);
 
-  const encodedUrl = encodeURIComponent(url);
-
-  const strategies = [
-    {
-      name: "CORS",
-      fn: () => fetchWithTimeout(url, { mode: "cors" }, FETCH_TIMEOUT_MS),
-    },
-    {
-      name: "Credentials",
-      fn: () => fetchWithTimeout(
-        url,
-        { mode: "cors", credentials: "include" },
-        FETCH_TIMEOUT_MS
-      ),
-    },
-    {
-      name: "JSONP",
-      fn: () => tryJSONP(url),
-    },
-    {
-      name: "CORSProxy.io",
-      fn: () => fetchWithTimeout(
-        `https://corsproxy.io/?url=${encodedUrl}`,
-        { mode: "cors" },
-        PROXY_TIMEOUT_MS
-      ),
-    },
-    {
-      name: "AllOrigins",
-      // /raw returns JSON directly — no wrapper object to unwrap
-      fn: () => fetchWithTimeout(
-        `https://api.allorigins.win/raw?url=${encodedUrl}`,
-        { mode: "cors" },
-        PROXY_TIMEOUT_MS
-      ),
-    },
-    {
-      name: "Thingproxy",
-      fn: () => fetchWithTimeout(
-        `https://thingproxy.freeboard.io/fetch/${url}`,
-        { mode: "cors" },
-        PROXY_TIMEOUT_MS
-      ),
-    },
-  ];
-
-  const errors  = {};
-  let json      = undefined; // explicit undefined — distinguishes "not yet set"
-  let succeeded = false;     // explicit flag — valid JSON can be falsy (null, 0, false)
-
-  for (const strategy of strategies) {
-    try {
-      json      = await strategy.fn();
-      succeeded = true;
-      console.info(
-        `[loadJSONSource] ✅ "${dsName}" loaded via: ${strategy.name}`
-      );
-      break;
-    } catch (err) {
-      errors[strategy.name] = err.message;
-      console.warn(
-        `[loadJSONSource] ${strategy.name} failed for "${dsName}":`,
-        err.message
-      );
-    }
-  }
-
-  // Use succeeded flag, not truthiness of json — null/false/0 are valid JSON
-  if (!succeeded) {
-    const summary = Object.entries(errors)
-      .map(([method, msg]) => `  [${method}] ${msg}`)
-      .join("\n");
-    throw new Error(
-      `Could not load JSON from "${url}" (source: "${dsName}").\n` +
-      `All methods failed:\n${summary}`
-    );
-  }
+  const json = await fetchJSONWithFallbacks(url);
 
   // ── Data Normalization & State ─────────────────────────────────────────────
   // Preserved exactly from your original application logic.
@@ -4946,6 +5122,59 @@ async function fetchCSVFromURL(url) {
         throw new Error('Failed to download CSV: ' + err.message);
       }
     }
+
+// Load CSV from URL — tries alasql's built-in fetch first, falls back to fetchCSVFromURL + loadCSVData
+async function loadCSVSource(url, dsName, fileName) {
+  validateURL(url);
+
+  // Strategy 1: alasql built-in CSV fetch+parse
+  try {
+    const rows = await alasql.promise('SELECT * FROM CSV(?)', [url]);
+    if (rows && rows.length > 0) {
+      console.log('[DLV CSV] alasql strategy succeeded:', rows.length, 'rows');
+      // alasql returns parsed row objects — register directly, skipping text parsing
+      const headers = Object.keys(rows[0]);
+      const tableKey = (dsName + '_Data').replace(/[^A-Za-z0-9_]/g, '_').replace('__', '_');
+      const fields = headers.map(h => ({
+        internalName: h.replace(/[^A-Za-z0-9_]/g, '_').replace('__', '_'),
+        displayName: toPascalCase(h) || h,
+        alias: toPascalCase(h) || h,
+        type: 'text',
+        displayType: 'text'
+      }));
+      if (!state.dataSources[dsName]) {
+        state.dataSources[dsName] = {
+          alias: 'Data', auth: null,
+          description: 'This CSV file (' + (fileName || dsName + '.csv') + ') was loaded from a URL.',
+          internalName: dsName, tables: [], token: null, type: 'csv',
+          fileName: fileName || '', isFileUpload: false,
+          url: url, keepRawData: false
+        };
+      }
+      state.tables[tableKey] = {
+        alias: tableKey, data: rows, dataSource: dsName,
+        description: 'This table was created from a CSV file (' + (fileName || dsName + '.csv') + ').',
+        displayName: 'Data', dsAlias: dsName, fields,
+        internalName: tableKey, itemCount: rows.length,
+        siteUrl: null, url: url, loaded: true,
+        sourceType: 'csv', isFileUpload: false, keepRawData: false
+      };
+      if (!state.dataSources[dsName].tables.includes(tableKey)) state.dataSources[dsName].tables.push(tableKey);
+      setStatus(`✅ Loaded ${rows.length} rows from CSV`);
+      if (!state.reportMode) { renderFieldsPanel(); setupCodeMirror(); }
+      toast(`Loaded ${rows.length} rows from CSV as "${dsName}"`, 'success');
+      return;
+    }
+    console.warn('[DLV CSV] alasql returned empty result, falling back');
+  } catch (e) {
+    console.warn('[DLV CSV] alasql strategy failed, falling back:', e.message);
+  }
+
+  // Strategy 2: multi-strategy fetch + loadCSVData
+  const text = await fetchCSVWithFallbacks(url);
+  if (!text.trim()) throw new Error('CSV file is empty.');
+  loadCSVData(dsName || 'CSV', '', fileName, url, false, text);
+}
 
 // Simple CSV parser and loader
 function loadCSVData(dsName, tableKey = '', fileName = '', fileUrl = '', isFileUpload = false, text = '') {
@@ -5215,7 +5444,11 @@ function buildConfig() {
       field: f.field || '',
       label: f.label || f.field || '',
       position: f.position || 'bar'
-    }))
+    })),
+    conditions: (state.design.conditions || []).map(c => ({ conj: c.conj || 'AND', field: c.field || '', op: c.op || '=', value: c.value || '' })),
+    sorts: (state.design.sorts || []).map(s => ({ field: s.field || '', dir: s.dir || 'ASC' })),
+    groupBy: (state.design.groupBy || []).filter(g => g),
+    fieldAggs: Object.assign({}, state.design.fieldAggs || {})
   };
 
   return {
@@ -5273,7 +5506,17 @@ async function loadConfig(cfg) {
   state.charts = cfg.charts || {};
   state.currentWidgetId = null;
   state.dataSources = cfg.dataSources || {};
-  state.design = cfg.design || { title: 'DataLaVista Report', widgets: [], filters: [] };
+  const loadedDesign = cfg.design || {};
+  state.design = {
+    title: loadedDesign.title || 'DataLaVista Report',
+    widgets: loadedDesign.widgets || [],
+    filters: loadedDesign.filters || [],
+    conditions: loadedDesign.conditions || [],
+    sorts: loadedDesign.sorts || [],
+    groupBy: loadedDesign.groupBy || [],
+    fieldAggs: loadedDesign.fieldAggs || {},
+    transformedResults: null
+  };
   state.previewFilters = cfg.previewFilters || {};
   state.previewResults = Array.isArray(cfg.previewResults) ? [...cfg.previewResults] : [];
   state.qmTab = cfg.qmTab || 'previewData';
@@ -6009,7 +6252,12 @@ async function loadConfig(cfg) {
         document.getElementById('qb-advanced').style.display = mode === 'advanced' ? 'flex' : 'none';
         document.getElementById('qb-basic-btn').classList.toggle('active', mode === 'basic');
         document.getElementById('qb-adv-btn').classList.toggle('active', mode === 'advanced');
-        if (mode === 'advanced') { renderAdvancedQB(); renderAdvOptionsPanel(); }
+        if (mode === 'advanced') {
+          renderAdvancedQB(); renderAdvOptionsPanel();
+        } else {
+          // Leaving advanced mode — re-enable design tabs (join restriction only applies to AQB)
+          setDesignTabsEnabled(true);
+        }
       }
 
       // ============================================================
@@ -6673,6 +6921,7 @@ async function loadConfig(cfg) {
       let drawingJoin = null; // { fromNode, fromSide, startX, startY }
       let selectedNode = null;
       let selectedJoin = null;
+      let _advOptsFieldsExpanded = false; // track expand/collapse of fields list in options panel
 
       function renderAdvancedQB() {
         const canvas = document.getElementById('qb-canvas');
@@ -6684,6 +6933,7 @@ async function loadConfig(cfg) {
           createAdvNode(id, nd);
         }
         redrawJoins();
+        setupClearButtonDrop();
 
         // Click on empty canvas background → deselect everything
         canvas._dlvClickHandler && canvas.removeEventListener('click', canvas._dlvClickHandler);
@@ -6698,39 +6948,170 @@ async function loadConfig(cfg) {
         canvas.addEventListener('click', canvas._dlvClickHandler);
       }
 
+      // ── Wire the in-canvas trash as drag-drop target for AQB items ──────────
+      function setupClearButtonDrop() {
+        const trash = document.getElementById('adv-canvas-trash');
+        if (!trash || trash._dlvDropReady) return;
+        trash._dlvDropReady = true;
+
+        const AQB_DROP_TYPES = new Set(['adv-node-trash','adv-field-pill','adv-join-trash',
+                                         'adv-node-cond','adv-node-sort','adv-node-gb']);
+
+        trash.addEventListener('dragover', e => {
+          // Browsers block dataTransfer content during dragover — only .types is readable.
+          // Accept any drag carrying our MIME type or text/plain (fallback).
+          const types = e.dataTransfer && e.dataTransfer.types;
+          if (types && (types.includes('application/x-datalavista') || types.includes('text/plain'))) {
+            e.preventDefault();
+            trash.classList.add('drag-over');
+          }
+        });
+        trash.addEventListener('dragleave', () => trash.classList.remove('drag-over'));
+        trash.addEventListener('drop', e => {
+          e.preventDefault();
+          trash.classList.remove('drag-over');
+          const data = safeDragParse(e);
+          if (!data) return;
+
+          const trashR = trash.getBoundingClientRect();
+          const tx = trashR.left + trashR.width / 2;
+          const ty = trashR.top  + trashR.height / 2;
+
+          if (data.type === 'adv-node-trash') {
+            const nodeId = data.nodeId;
+            const nodeEl = document.getElementById('adv-' + nodeId);
+            if (nodeEl) {
+              const nr = nodeEl.getBoundingClientRect();
+              shootLightning(tx, ty, nr.left + nr.width/2, nr.top + nr.height/2, () => {
+                poofAndRemove(nodeEl, () => {
+                  delete state.advancedQB.nodes[nodeId];
+                  state.advancedQB.joins = state.advancedQB.joins.filter(j => j.fromNode !== nodeId && j.toNode !== nodeId);
+                  redrawJoins(); rebuildAdvancedSQL(); renderAdvOptionsPanel(null, null);
+                });
+              });
+            }
+          } else if (data.type === 'adv-field-pill') {
+            const { nodeId, field } = data;
+            const pillEl = document.querySelector(`#adv-pills-${nodeId} [data-field="${field}"]`);
+            if (pillEl) {
+              const pr = pillEl.getBoundingClientRect();
+              shootLightning(tx, ty, pr.left + pr.width/2, pr.top + pr.height/2, () => {
+                poofPill(nodeId, field, () => { advNodeToggleField(nodeId, field); });
+              });
+            } else {
+              poofPill(nodeId, field, () => { advNodeToggleField(nodeId, field); });
+            }
+          } else if (data.type === 'adv-join-trash') {
+            const idx = data.idx;
+            const doRemoveJoin = () => {
+              if (idx != null && idx >= 0 && idx < state.advancedQB.joins.length) {
+                state.advancedQB.joins.splice(idx, 1);
+                if (state.advancedQB.activeJoinIdx === idx) state.advancedQB.activeJoinIdx = -1;
+                redrawJoins(); rebuildAdvancedSQL(); renderAdvOptionsPanel(null, null);
+              }
+            };
+            const badges = document.querySelectorAll('.join-venn-badge');
+            const badgeEl = badges[idx];
+            if (badgeEl) {
+              const br = badgeEl.getBoundingClientRect();
+              shootLightning(tx, ty, br.left + br.width/2, br.top + br.height/2, doRemoveJoin);
+            } else {
+              doRemoveJoin();
+            }
+          } else if (data.type === 'adv-node-cond') {
+            const nd = state.advancedQB.nodes[data.nodeId];
+            if (nd && nd.conditions) {
+              nd.conditions.splice(data.idx, 1);
+              rebuildAdvancedSQL();
+              if (selectedNode === data.nodeId) renderAdvOptionsPanel('node', data.nodeId);
+            }
+          } else if (data.type === 'adv-node-sort') {
+            const nd = state.advancedQB.nodes[data.nodeId];
+            if (nd && nd.sorts) {
+              nd.sorts.splice(data.idx, 1);
+              rebuildAdvancedSQL();
+              if (selectedNode === data.nodeId) renderAdvOptionsPanel('node', data.nodeId);
+            }
+          } else if (data.type === 'adv-node-gb') {
+            const nd = state.advancedQB.nodes[data.nodeId];
+            if (nd && nd.groupBy) {
+              nd.groupBy.splice(data.idx, 1);
+              rebuildAdvancedSQL();
+              if (selectedNode === data.nodeId) renderAdvOptionsPanel('node', data.nodeId);
+            }
+          }
+        });
+      }
+
+      function clearSQLEditor() {
+        if (window._cmEditor) window._cmEditor.setValue('');
+        state.sql = '';
+        hideUseInDesign();
+      }
+
       function onDropToAdvancedQB(event) {
         event.preventDefault();
         const data = safeDragParse(event);
         if (!data) return;
+
+        const canvas = document.getElementById('qb-canvas');
+        const rect = canvas.getBoundingClientRect();
+        const x = event.clientX - rect.left - 80;
+        const y = event.clientY - rect.top - 40;
+
         if (data.type === 'table') {
-          const canvas = document.getElementById('qb-canvas');
-          const rect = canvas.getBoundingClientRect();
-          const x = event.clientX - rect.left - 80;
-          const y = event.clientY - rect.top - 40;
           addAdvNode(data.table, x, y);
+          return;
+        }
+
+        if (data.type === 'field') {
+          // Check if dropped onto an existing node
+          const targetNodeEl = event.target?.closest('.qb-table-node');
+          if (targetNodeEl) {
+            const nodeId = targetNodeEl.id.replace(/^adv-/, '');
+            const nd = state.advancedQB.nodes[nodeId];
+            // Only add if field belongs to this exact table
+            if (nd && nd.tableName === data.table) {
+              if (!nd.selectedFields.includes(data.field)) {
+                nd.selectedFields.push(data.field);
+                updateAdvNodePills(nodeId);
+                rebuildAdvancedSQL();
+                if (selectedNode === nodeId) renderAdvOptionsPanel('node', nodeId);
+              }
+            }
+            // Different table: do nothing (silent ignore)
+            return;
+          }
+          // Drop on canvas background — add table with this field pre-selected
+          addAdvNode(data.table, x, y, data.field);
         }
       }
 
-      function addAdvNode(tableName, x, y) {
+      function addAdvNode(tableName, x, y, preselectedField) {
         const id = 'node_' + (++advNodeCounter);
         const t = state.tables[tableName];
         if (!t) return;
 
-        // Auto-select Title/Name fields only — same logic as basic QB
-        const defaultFields = [];
-        for (const f of t.fields) {
-          if (f.isAutoId) continue;
-          if (f.internalName === 'Title' ||
-              (f.alias || '').toLowerCase() === 'name' ||
-              (f.alias || '').toLowerCase().includes('fullname') ||
-              (f.alias || '').toLowerCase() === 'uniqname') {
-            defaultFields.push(f.alias);
+        let defaultFields = [];
+        if (preselectedField) {
+          // Caller specified which field to pre-select
+          defaultFields = [preselectedField];
+        } else {
+          // Auto-select Title/Name fields — same logic as basic QB
+          for (const f of t.fields) {
+            if (f.isAutoId) continue;
+            if (f.internalName === 'Title' ||
+                (f.alias || '').toLowerCase() === 'name' ||
+                (f.alias || '').toLowerCase().includes('fullname') ||
+                (f.alias || '').toLowerCase() === 'uniqname') {
+              defaultFields.push(f.alias);
+            }
           }
-        }
-        // Fallback: if nothing matched, select the first non-auto field
-        if (!defaultFields.length) {
-          const first = t.fields.find(f => !f.isAutoId);
-          if (first) defaultFields.push(first.alias);
+          // Fallback: if nothing matched, select the first non-auto field
+          if (!defaultFields.length) {
+            const first = t.fields.find(f => !f.isAutoId);
+            if (first) defaultFields.push(first.alias);
+          }
         }
 
         state.advancedQB.nodes[id] = {
@@ -6739,7 +7120,8 @@ async function loadConfig(cfg) {
           alias: t.alias || tableName,
           conditions: [],
           sorts: [],
-          groupBy: []
+          groupBy: [],
+          fieldAggs: {}
         };
         createAdvNode(id, state.advancedQB.nodes[id]);
         ensureTableData(tableName);
@@ -6758,51 +7140,73 @@ async function loadConfig(cfg) {
         if (!t) return;
         const canvas = document.getElementById('qb-canvas');
 
+        // Remove any existing element with this id (re-render case)
+        document.getElementById('adv-' + id)?.remove();
+
         const el = document.createElement('div');
         el.className = 'qb-table-node';
         el.id = 'adv-' + id;
-        el.style.cssText = `left:${nd.x}px;top:${nd.y}px;min-width:160px`;
+        el.style.cssText = `left:${nd.x}px;top:${nd.y}px;min-width:160px;max-width:280px`;
 
-        // Build fields list
-        const fieldRows = t.fields.filter(f => !f.isAutoId).map(f => {
-          const ti = FIELD_TYPE_ICONS[f.displayType] || FIELD_TYPE_ICONS.default;
-          const sel = nd.selectedFields.includes(f.alias);
-          return `<div class="qb-node-field ${sel ? 'selected' : ''}" data-field="${f.alias}">
-      <span class="${ti.cls}" style="font-size:10px">${ti.icon}</span>
-      <span>${f.alias}</span>
-    </div>`;
-        }).join('');
+        const descHTML = t.description ? `<div class="qb-node-desc" title="${t.description.replace(/"/g,'&quot;')}">${t.description}</div>` : '';
+        const rowCount = (t.itemCount || (t.data && t.data.length) || 0).toLocaleString();
 
         el.innerHTML = `
     <div class="qb-node-header">
-      <span>${nd.alias || nd.tableName}</span>
-      <button style="background:none;border:none;color:rgba(255,255,255,.7);cursor:pointer;padding:0 2px;font-size:13px" onclick="removeAdvNode('${id}')">✕</button>
+      <span class="qb-node-join-icon" title="Drag to another table to create a join">🔗</span>
+      <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin:0 4px">${nd.alias || nd.tableName}</span>
+      <span class="qb-node-trash-icon" draggable="true" title="Drag to Clear button to remove">⠿</span>
+      <button style="background:none;border:none;color:rgba(255,255,255,.7);cursor:pointer;padding:0 2px;font-size:13px;line-height:1" onclick="removeAdvNode('${id}')">✕</button>
     </div>
-    <div class="qb-node-fields">${fieldRows}</div>
-    <div class="snap-point top" data-node="${id}" data-side="top"></div>
-    <div class="snap-point bottom" data-node="${id}" data-side="bottom"></div>
-    <div class="snap-point left" data-node="${id}" data-side="left"></div>
-    <div class="snap-point right" data-node="${id}" data-side="right"></div>
+    <div class="qb-node-body">
+      ${descHTML}
+      <div class="qb-node-count" id="adv-count-${id}">${rowCount} rows</div>
+      <div class="qb-node-pills" id="adv-pills-${id}"></div>
+    </div>
+    <div class="qb-node-resize tl"></div>
+    <div class="qb-node-resize tr"></div>
+    <div class="qb-node-resize bl"></div>
+    <div class="qb-node-resize br"></div>
   `;
 
-        // Drag to move
-        el.querySelector('.qb-node-header').addEventListener('mousedown', e => startNodeDrag(e, id, el));
-        // Click to select / show props
-        el.addEventListener('click', e => { if (!e.target.closest('.snap-point') && !e.target.closest('button')) selectAdvNode(id); });
-        // Click field
-        el.querySelectorAll('.qb-node-field').forEach(fd => {
-          fd.addEventListener('click', e => {
-            e.stopPropagation();
-            const field = fd.dataset.field;
-            toggleAdvField(id, field, fd);
-          });
-        });
-        // Snap points — draw join
-        el.querySelectorAll('.snap-point').forEach(sp => {
-          sp.addEventListener('mousedown', e => { e.stopPropagation(); startDrawJoin(e, id, sp.dataset.side); });
+        canvas.appendChild(el);
+
+        // Fill pills now that element is in DOM
+        updateAdvNodePills(id);
+
+        // Drag header to move node (ignore join/trash icons and buttons)
+        el.querySelector('.qb-node-header').addEventListener('mousedown', e => {
+          if (e.target.closest('.qb-node-join-icon') || e.target.closest('.qb-node-trash-icon') || e.target.closest('button')) return;
+          startNodeDrag(e, id, el);
         });
 
-        canvas.appendChild(el);
+        // Click node to select (ignore action elements)
+        el.addEventListener('click', e => {
+          if (!e.target.closest('.qb-node-join-icon') && !e.target.closest('.qb-node-trash-icon') &&
+              !e.target.closest('button') && !e.target.closest('.qb-node-resize')) {
+            selectAdvNode(id);
+          }
+        });
+
+        // Join icon: mousedown → start drawing join to another node
+        el.querySelector('.qb-node-join-icon').addEventListener('mousedown', e => {
+          e.stopPropagation(); startJoinDrag(e, id);
+        });
+
+        // Trash icon: HTML5 drag → drop on clear button
+        const trashHandle = el.querySelector('.qb-node-trash-icon');
+        trashHandle.addEventListener('dragstart', e => {
+          e.stopPropagation();
+          safeDragSet(e, { type: 'adv-node-trash', nodeId: id });
+          setTimeout(() => { el.style.opacity = '.45'; }, 0);
+        });
+        trashHandle.addEventListener('dragend', () => { el.style.opacity = '1'; });
+
+        // Corner resize handles
+        el.querySelectorAll('.qb-node-resize').forEach(rh => {
+          const corner = Array.from(rh.classList).find(c => ['tl','tr','bl','br'].includes(c)) || 'br';
+          rh.addEventListener('mousedown', e => { e.stopPropagation(); startNodeResize(e, id, el, corner); });
+        });
       }
 
       function startNodeDrag(e, id, el) {
@@ -6827,9 +7231,288 @@ async function loadConfig(cfg) {
         const nd = state.advancedQB.nodes[nodeId];
         if (!nd) return;
         const idx = nd.selectedFields.indexOf(field);
-        if (idx >= 0) { nd.selectedFields.splice(idx, 1); el.classList.remove('selected'); }
-        else { nd.selectedFields.push(field); el.classList.add('selected'); }
+        if (idx >= 0) { nd.selectedFields.splice(idx, 1); el && el.classList.remove('selected'); }
+        else { nd.selectedFields.push(field); el && el.classList.add('selected'); }
+        updateAdvNodePills(nodeId);
         rebuildAdvancedSQL();
+        if (selectedNode === nodeId) renderAdvOptionsPanel('node', nodeId);
+      }
+
+      // ── Returns a short icon/label for an aggregate function ─────────────────
+      function getAggIcon(agg) {
+        const m = { COUNT:'🔢', COUNT_DISTINCT:'🔢*', SUM:'∑', AVG:'x̄', MEDIAN:'med', MIN:'↓', MAX:'↑', FIRST:'⟨', LAST:'⟩', STDEV:'σ', VAR:'σ²' };
+        return m[agg] || '∑';
+      }
+
+      // ── Returns an inline SVG Venn diagram for the given join type ────────────
+      let _vennIdCounter = 0;
+      function getVennSVG(type, size) {
+        size = size || 36;
+        const uid = 'vcp' + (++_vennIdCounter);
+        const r = size * 0.32, cx1 = size * 0.37, cx2 = size * 0.63, cy = size / 2;
+        const cfgs = {
+          'INNER':    { l:'none',                       r:'none',                       mid:'rgba(0,120,212,.75)' },
+          'LEFT':     { l:'rgba(0,120,212,.45)',         r:'none',                       mid:'rgba(0,120,212,.75)' },
+          'RIGHT':    { l:'none',                       r:'rgba(0,120,212,.45)',         mid:'rgba(0,120,212,.75)' },
+          'CROSS':    { l:'rgba(0,120,212,.3)',          r:'rgba(0,120,212,.3)',          mid:'rgba(0,120,212,.55)' },
+          'UNION':    { l:'rgba(0,120,212,.5)',          r:'rgba(0,120,212,.5)',          mid:'rgba(0,120,212,.25)' },
+          'UNION ALL':{ l:'rgba(0,120,212,.5)',          r:'rgba(0,120,212,.5)',          mid:'rgba(0,120,212,.5)' }
+        };
+        const c = cfgs[type] || cfgs['INNER'];
+        return `<svg width="${size}" height="${size}" xmlns="http://www.w3.org/2000/svg" style="display:block">
+          <defs><clipPath id="${uid}"><circle cx="${cx2}" cy="${cy}" r="${r}"/></clipPath></defs>
+          <circle cx="${cx1}" cy="${cy}" r="${r}" fill="${c.l}" stroke="#0078d4" stroke-width="1.5"/>
+          <circle cx="${cx2}" cy="${cy}" r="${r}" fill="${c.r}" stroke="#0078d4" stroke-width="1.5"/>
+          <circle cx="${cx1}" cy="${cy}" r="${r}" fill="${c.mid}" clip-path="url(#${uid})" stroke="none"/>
+        </svg>`;
+      }
+
+      // ── Poof-animate an element then remove it (calls callback after) ─────────
+      function poofAndRemove(el, callback) {
+        if (typeof el === 'string') el = document.getElementById(el);
+        if (!el) { callback && callback(); return; }
+        el.classList.add('dlv-poof');
+        el.addEventListener('animationend', () => { el.remove(); callback && callback(); }, { once: true });
+      }
+
+      // ── Poof a specific pill in a node then deselect that field ──────────────
+      function poofPill(nodeId, field, callback) {
+        const pillEl = document.querySelector(`#adv-pills-${nodeId} [data-field="${field}"]`);
+        if (pillEl) {
+          pillEl.classList.add('dlv-poof');
+          pillEl.addEventListener('animationend', () => { pillEl.remove(); callback && callback(); }, { once: true });
+        } else {
+          callback && callback();
+        }
+      }
+
+      // ── Lightning bolt from trash can to deleted element ─────────────────────
+      function shootLightning(x1, y1, x2, y2, callback) {
+        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        svg.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:9999;pointer-events:none;overflow:visible';
+        document.body.appendChild(svg);
+
+        const segments = 10;
+        const spread = Math.max(20, Math.hypot(x2-x1, y2-y1) * 0.15);
+
+        const makeBolt = () => {
+          let d = `M${x1},${y1}`;
+          for (let i = 1; i < segments; i++) {
+            const t = i / segments;
+            d += ` L${x1+(x2-x1)*t+(Math.random()-.5)*spread*2},${y1+(y2-y1)*t+(Math.random()-.5)*spread*2}`;
+          }
+          return d + ` L${x2},${y2}`;
+        };
+
+        const layers = [
+          { color:'rgba(60,140,255,0.3)',  width:18 },
+          { color:'rgba(140,210,255,0.7)', width:6  },
+          { color:'white',                 width:2  },
+        ];
+        const paths = layers.map(({ color, width }) => {
+          const p = document.createElementNS('http://www.w3.org/2000/svg','path');
+          p.setAttribute('stroke', color);
+          p.setAttribute('stroke-width', width);
+          p.setAttribute('fill','none');
+          p.setAttribute('stroke-linecap','round');
+          svg.appendChild(p);
+          return p;
+        });
+
+        const mkCircle = (cx, cy, r, fill) => {
+          const c = document.createElementNS('http://www.w3.org/2000/svg','circle');
+          c.setAttribute('cx', cx); c.setAttribute('cy', cy);
+          c.setAttribute('r', r);  c.setAttribute('fill', fill);
+          svg.appendChild(c); return c;
+        };
+        mkCircle(x1, y1, 8, 'rgba(140,210,255,0.8)');
+        mkCircle(x2, y2, 8, 'rgba(140,210,255,0.8)');
+
+        let flickers = 0;
+        const FLICKER_COUNT = 5;
+        const flicker = () => {
+          const d = makeBolt();
+          paths.forEach(p => p.setAttribute('d', d));
+          flickers++;
+          if (flickers < FLICKER_COUNT) {
+            setTimeout(flicker, 27);
+          } else {
+            svg.style.transition = 'opacity 90ms ease-out';
+            svg.style.opacity = '0';
+            setTimeout(() => { svg.remove(); callback && callback(); }, 100);
+          }
+        };
+        flicker();
+      }
+
+      const MAX_NODE_PILLS = 10;
+
+      // ── Rebuild the pills display for one node ────────────────────────────────
+      function updateAdvNodePills(nodeId) {
+        const nd = state.advancedQB.nodes[nodeId];
+        const pillsEl = document.getElementById('adv-pills-' + nodeId);
+        if (!nd || !pillsEl) return;
+        const fieldAggs = nd.fieldAggs || {};
+
+        if (!nd.selectedFields.length) {
+          pillsEl.innerHTML = '<span style="font-size:10px;color:var(--text-disabled);font-style:italic">No fields — select in Options</span>';
+          return;
+        }
+
+        const visible = nd.selectedFields.slice(0, MAX_NODE_PILLS);
+        const extra   = nd.selectedFields.length - MAX_NODE_PILLS;
+
+        let html = visible.map(f => {
+          const agg = fieldAggs[f];
+          const isAgg = agg && agg !== '';
+          const label = isAgg ? `${f} (${getAggIcon(agg)})` : f;
+          return `<span class="qb-node-pill${isAgg ? ' agg-pill' : ''}" data-field="${f}" draggable="true">${label
+            }<span class="pill-x" data-node-id="${nodeId}" data-field="${f}">×</span></span>`;
+        }).join('');
+
+        if (extra > 0) {
+          html += `<span class="qb-node-pill" style="background:var(--text-disabled);cursor:default"
+            title="Do you really need this many fields?">+${extra}</span>`;
+        }
+
+        pillsEl.innerHTML = html;
+
+        pillsEl.querySelectorAll('.qb-node-pill[data-field]').forEach(pill => {
+          pill.addEventListener('dragstart', e => {
+            e.stopPropagation();
+            safeDragSet(e, { type: 'adv-field-pill', nodeId, field: pill.dataset.field });
+          });
+        });
+        pillsEl.querySelectorAll('.pill-x').forEach(x => {
+          x.addEventListener('click', e => {
+            e.stopPropagation();
+            advNodeToggleField(x.dataset.nodeId, x.dataset.field);
+          });
+        });
+      }
+
+      // ── Toggle a field's selected state on a node (pill-based) ───────────────
+      function advNodeToggleField(nodeId, field) {
+        const nd = state.advancedQB.nodes[nodeId];
+        if (!nd) return;
+        const idx = nd.selectedFields.indexOf(field);
+        if (idx >= 0) {
+          nd.selectedFields.splice(idx, 1);
+          if (nd.fieldAggs) delete nd.fieldAggs[field];
+        } else {
+          nd.selectedFields.push(field);
+        }
+        updateAdvNodePills(nodeId);
+        rebuildAdvancedSQL();
+        if (selectedNode === nodeId) renderAdvOptionsPanel('node', nodeId);
+      }
+
+      // ── Set (or clear) an aggregate for a field on a node ────────────────────
+      function setAdvNodeFieldAgg(nodeId, field, agg) {
+        const nd = state.advancedQB.nodes[nodeId];
+        if (!nd) return;
+        if (!nd.fieldAggs) nd.fieldAggs = {};
+        if (!agg) delete nd.fieldAggs[field]; else nd.fieldAggs[field] = agg;
+        updateAdvNodePills(nodeId);
+        rebuildAdvancedSQL();
+        if (selectedNode === nodeId) renderAdvOptionsPanel('node', nodeId);
+      }
+
+      // ── Show a small aggregate-picker popup near a button ────────────────────
+      function showAdvAggPopup(nodeId, field, btn) {
+        document.querySelectorAll('.adv-agg-popup').forEach(p => p.remove());
+        const nd = state.advancedQB.nodes[nodeId];
+        if (!nd) return;
+        const t = state.tables[nd.tableName];
+        const fm = t ? t.fields.find(f => f.alias === field) : null;
+        const aggs = aggsForType(fm ? fm.displayType : 'text');
+        const current = (nd.fieldAggs || {})[field] || '';
+        const popup = document.createElement('div');
+        popup.className = 'adv-agg-popup';
+        popup.innerHTML = aggs.map(a =>
+          `<div class="agg-opt${a.val === current ? ' selected' : ''}"
+            onclick="setAdvNodeFieldAgg('${nodeId}','${field}','${a.val}'); document.querySelectorAll('.adv-agg-popup').forEach(p=>p.remove())">${a.label}</div>`
+        ).join('');
+        document.body.appendChild(popup);
+        const rect = btn.getBoundingClientRect();
+        popup.style.top  = (rect.bottom + 2) + 'px';
+        popup.style.left = Math.max(0, rect.left - popup.offsetWidth + rect.width) + 'px';
+        setTimeout(() => {
+          document.addEventListener('click', function close(e) {
+            if (!popup.contains(e.target)) { popup.remove(); document.removeEventListener('click', close); }
+          });
+        }, 10);
+      }
+
+      // ── Start drawing a join line from a node's join icon ─────────────────────
+      function startJoinDrag(e, nodeId) {
+        e.preventDefault();
+        const canvas = document.getElementById('qb-canvas');
+        const crect  = canvas.getBoundingClientRect();
+        const el = document.getElementById('adv-' + nodeId);
+        if (!el) return;
+        const nd = state.advancedQB.nodes[nodeId];
+        const startX = nd.x + el.offsetWidth / 2;
+        const startY = nd.y;
+        drawingJoin = { fromNode: nodeId, fromSide: 'top', startX, startY };
+
+        const tmpLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        tmpLine.setAttribute('stroke', '#0078d4');
+        tmpLine.setAttribute('stroke-width', '2');
+        tmpLine.setAttribute('stroke-dasharray', '6 3');
+        tmpLine.id = 'tmp-join-line';
+        document.getElementById('qb-svg').appendChild(tmpLine);
+
+        const onMove = mv => {
+          const x2 = mv.clientX - crect.left, y2 = mv.clientY - crect.top;
+          tmpLine.setAttribute('x1', startX); tmpLine.setAttribute('y1', startY);
+          tmpLine.setAttribute('x2', x2);     tmpLine.setAttribute('y2', y2);
+        };
+        const onUp = mv => {
+          document.removeEventListener('mousemove', onMove);
+          document.removeEventListener('mouseup', onUp);
+          tmpLine.remove();
+          const target = document.elementFromPoint(mv.clientX, mv.clientY);
+          const targetNode = target?.closest('.qb-table-node');
+          if (targetNode) {
+            const toId = targetNode.id.replace(/^adv-/, '');
+            if (toId && toId !== nodeId) addJoin(nodeId, 'right', toId, 'left');
+          }
+          drawingJoin = null;
+        };
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup', onUp);
+      }
+
+      // ── Resize a node by dragging a corner handle ─────────────────────────────
+      function startNodeResize(e, nodeId, el, corner) {
+        e.preventDefault();
+        const startMouseX = e.clientX;
+        const startW = el.offsetWidth;
+        const nd = state.advancedQB.nodes[nodeId];
+        const startNdX = nd.x;
+
+        const onMove = mv => {
+          const dx = mv.clientX - startMouseX;
+          let newW;
+          if (corner === 'br' || corner === 'tr') {
+            newW = Math.max(160, startW + dx);
+          } else {
+            newW = Math.max(160, startW - dx);
+            nd.x = startNdX + (startW - newW);
+            el.style.left = nd.x + 'px';
+          }
+          el.style.width = newW + 'px';
+          el.style.minWidth = newW + 'px';
+          el.style.maxWidth = newW + 'px';
+          redrawJoins();
+        };
+        const onUp = () => {
+          document.removeEventListener('mousemove', onMove);
+          document.removeEventListener('mouseup', onUp);
+        };
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup', onUp);
       }
 
       function removeAdvNode(id) {
@@ -6842,11 +7525,11 @@ async function loadConfig(cfg) {
       }
 
       function selectAdvNode(id) {
+        // No canvas selection highlight — the options panel shows which table is active
         document.querySelectorAll('.qb-table-node').forEach(n => n.classList.remove('selected'));
-        document.getElementById('adv-' + id)?.classList.add('selected');
+        if (selectedNode !== id) _advOptsFieldsExpanded = false; // reset expand on new node
         selectedNode = id;
         state.advancedQB.activeJoinIdx = -1;
-        showNodeProps(id);
         renderAdvOptionsPanel('node', id);
       }
 
@@ -6886,18 +7569,8 @@ async function loadConfig(cfg) {
       }
 
       function toggleAdvFieldInProps(nodeId, field, rowEl) {
-        const nd = state.advancedQB.nodes[nodeId];
-        if (!nd) return;
-        const idx = nd.selectedFields.indexOf(field);
-        const chk = rowEl.querySelector('input[type=checkbox]');
-        if (idx >= 0) { nd.selectedFields.splice(idx, 1); if (chk) chk.checked = false; }
-        else { nd.selectedFields.push(field); if (chk) chk.checked = true; }
-        // Update the canvas node too
-        const el = document.getElementById('adv-' + nodeId);
-        el && el.querySelectorAll('.qb-node-field').forEach(fd => {
-          fd.classList.toggle('selected', nd.selectedFields.includes(fd.dataset.field));
-        });
-        rebuildAdvancedSQL();
+        // Delegate to advNodeToggleField which also refreshes pills + options panel
+        advNodeToggleField(nodeId, field);
       }
 
       function closeNodeProps() { selectedNode = null; }
@@ -6996,6 +7669,10 @@ async function loadConfig(cfg) {
                 ${JOIN_TYPES.find(jt => jt.val === j.type)?.desc || ''}
               </div>
             </div>
+            <div style="display:flex;flex-direction:column;align-items:center;margin-top:10px;gap:4px">
+              <div id="adv-join-venn">${getVennSVG(j.type, 72)}</div>
+              <div style="font-size:11px;color:var(--text-disabled)">${JOIN_TYPES.find(jt=>jt.val===j.type)?.label||j.type}</div>
+            </div>
             <button class="btn btn-danger btn-sm" style="margin-top:8px;width:100%" onclick="removeActiveJoin()">✕ Remove Join</button>`;
           return;
         }
@@ -7008,14 +7685,47 @@ async function loadConfig(cfg) {
           if (!t) return;
           const fields = t.fields.filter(f => !f.isAutoId);
 
-          // Ensure arrays exist on older nodes
+          // Ensure state arrays / maps exist on older nodes
           if (!nd.conditions) nd.conditions = [];
           if (!nd.sorts)      nd.sorts = [];
           if (!nd.groupBy)    nd.groupBy = [];
+          if (!nd.fieldAggs)  nd.fieldAggs = {};
 
-          const fieldOpts = fields.map(f => `<option value="${f.alias}">${f.alias}</option>`).join('');
+          // ── FIELDS section ───────────────────────────────────────
+          const FIELDS_COLLAPSED_COUNT = 5;
+          const renderFieldRow = f => {
+            const ti  = FIELD_TYPE_ICONS[f.displayType] || FIELD_TYPE_ICONS.default;
+            const sel = nd.selectedFields.includes(f.alias);
+            const agg = nd.fieldAggs[f.alias] || '';
+            const aggActive = agg !== '';
+            return `<div class="adv-field-row${sel ? ' selected' : ''}"
+                onclick="advNodeToggleField('${id}','${f.alias}')" draggable="true"
+                ondragstart="event.stopPropagation();safeDragSet(event,{type:'adv-field-pill',nodeId:'${id}',field:'${f.alias}'})">
+              <input type="checkbox" ${sel ? 'checked' : ''}/>
+              <span class="field-type-icon ${ti.cls}">${ti.icon}</span>
+              <span class="field-name">${f.alias}</span>
+              <button class="adv-agg-btn${aggActive ? ' has-agg' : ''}"
+                title="${aggActive ? agg : 'No aggregate'}"
+                onclick="event.stopPropagation();showAdvAggPopup('${id}','${f.alias}',this)">${aggActive ? getAggIcon(agg) : '∑'}</button>
+            </div>`;
+          };
+          const renderFieldsSection = () => {
+            const visible = _advOptsFieldsExpanded ? fields : fields.slice(0, FIELDS_COLLAPSED_COUNT);
+            const extra   = fields.length - FIELDS_COLLAPSED_COUNT;
+            let html = visible.map(renderFieldRow).join('');
+            if (fields.length > FIELDS_COLLAPSED_COUNT) {
+              if (_advOptsFieldsExpanded) {
+                html += `<button class="btn btn-ghost btn-sm" style="width:100%;margin-top:4px;font-size:10px"
+                  onclick="_advOptsFieldsExpanded=false; renderAdvOptionsPanel('node','${id}')">▲ Show less</button>`;
+              } else {
+                html += `<button class="btn btn-ghost btn-sm" style="width:100%;margin-top:4px;font-size:10px"
+                  onclick="_advOptsFieldsExpanded=true; renderAdvOptionsPanel('node','${id}')">▼ Show ${extra} more</button>`;
+              }
+            }
+            return html;
+          };
 
-          // Build conditions HTML
+          // ── FILTER CONDITIONS section ───────────────────────────
           const renderNodeConditions = () => {
             if (!nd.conditions.length)
               return '<div style="font-size:11px;color:var(--text-disabled);padding:2px 0">No filters — click + Add</div>';
@@ -7026,7 +7736,8 @@ async function loadConfig(cfg) {
               const isMacro = DATE_MACRO_VALS.has(c.op);
               const macroMeta = DATE_MACRO_OPS.find(o => o.val === c.op);
               const needsValue = c.op !== 'NULL' && c.op !== 'NOTNULL' && !(isMacro && !macroMeta?.hasInput);
-              return `<div class="qb-condition-row">
+              return `<div class="qb-condition-row" draggable="true"
+                  ondragstart="event.stopPropagation();safeDragSet(event,{type:'adv-node-cond',nodeId:'${id}',idx:${ci}})">
                 ${ci === 0
                   ? `<span class="qb-where-badge">WHERE</span>`
                   : `<select class="form-input qb-conj-select" onchange="advNodeCond('${id}',${ci},'conj',this.value)">
@@ -7048,12 +7759,13 @@ async function loadConfig(cfg) {
             }).join('');
           };
 
-          // Build sorts HTML
+          // ── SORT section ────────────────────────────────────────
           const renderNodeSorts = () => {
             if (!nd.sorts.length)
               return '<div style="font-size:11px;color:var(--text-disabled);padding:2px 0">No sorts — click + Add</div>';
             return nd.sorts.map((s, si) => `
-              <div class="qb-sort-row">
+              <div class="qb-sort-row" draggable="true"
+                  ondragstart="event.stopPropagation();safeDragSet(event,{type:'adv-node-sort',nodeId:'${id}',idx:${si}})">
                 <select class="form-input qb-field-select" onchange="advNodeSort('${id}',${si},'field',this.value)">
                   ${fields.map(f=>`<option value="${f.alias}" ${f.alias===s.field?'selected':''}>${f.alias}</option>`).join('')}
                 </select>
@@ -7065,12 +7777,13 @@ async function loadConfig(cfg) {
               </div>`).join('');
           };
 
-          // Build group-by HTML
+          // ── GROUP BY section ────────────────────────────────────
           const renderNodeGroupBy = () => {
             if (!nd.groupBy.length)
               return '<div style="font-size:11px;color:var(--text-disabled);padding:2px 0">No grouping — click + Add</div>';
             return nd.groupBy.map((g, gi) => `
-              <div class="qb-sort-row">
+              <div class="qb-sort-row" draggable="true"
+                  ondragstart="event.stopPropagation();safeDragSet(event,{type:'adv-node-gb',nodeId:'${id}',idx:${gi}})">
                 <select class="form-input qb-field-select" onchange="advNodeGB('${id}',${gi},this.value)">
                   ${fields.map(f=>`<option value="${f.alias}" ${f.alias===g?'selected':''}>${f.alias}</option>`).join('')}
                 </select>
@@ -7078,29 +7791,83 @@ async function loadConfig(cfg) {
               </div>`).join('');
           };
 
+          // ── Drop-zone handler factories ─────────────────────────
+          const makeDZHandlers = (zone, dropAction) => {
+            zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
+            zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+            zone.addEventListener('drop', e => {
+              e.preventDefault(); zone.classList.remove('drag-over');
+              const data = safeDragParse(e);
+              if (!data) return;
+              dropAction(data);
+            });
+          };
+
+          // ── GROUP BY auto-lock when aggregates active ────────────
+          const activeAggs = nd.selectedFields.filter(f => (nd.fieldAggs || {})[f]);
+          const hasAggs    = activeAggs.length > 0;
+          const nonAggFields = nd.selectedFields.filter(f => !(nd.fieldAggs || {})[f]);
+          const gbAutoHTML = hasAggs
+            ? (nonAggFields.length
+                ? `<div style="font-size:11px;color:var(--text-disabled);padding:2px 0">Auto: ${nonAggFields.join(', ')}</div>`
+                : `<div style="font-size:11px;color:var(--text-disabled);padding:2px 0">All fields aggregated — no GROUP BY needed</div>`)
+            : null;
+
           setTitle(nd.alias || nd.tableName);
           body.innerHTML = `
+            <div class="adv-node-section">
+              <div class="adv-node-section-hdr"><span>FIELDS</span></div>
+              <div id="adv-node-fields">${renderFieldsSection()}</div>
+            </div>
             <div class="adv-node-section">
               <div class="adv-node-section-hdr">
                 <span>FILTER CONDITIONS</span>
                 <button class="btn btn-ghost btn-sm" onclick="advNodeAddCond('${id}')">+ Add</button>
               </div>
-              <div id="adv-node-conds">${renderNodeConditions()}</div>
+              <div id="adv-node-conds" class="adv-drop-zone">${renderNodeConditions()}</div>
             </div>
             <div class="adv-node-section">
               <div class="adv-node-section-hdr">
                 <span>SORT ORDER</span>
                 <button class="btn btn-ghost btn-sm" onclick="advNodeAddSort('${id}')">+ Add</button>
               </div>
-              <div id="adv-node-sorts">${renderNodeSorts()}</div>
+              <div id="adv-node-sorts" class="adv-drop-zone">${renderNodeSorts()}</div>
             </div>
             <div class="adv-node-section">
               <div class="adv-node-section-hdr">
-                <span>GROUP BY</span>
-                <button class="btn btn-ghost btn-sm" onclick="advNodeAddGB('${id}')">+ Add</button>
+                <span>${hasAggs ? 'GROUP BY (auto)' : 'GROUP BY'}</span>
+                ${hasAggs ? '' : `<button class="btn btn-ghost btn-sm" onclick="advNodeAddGB('${id}')">+ Add</button>`}
               </div>
-              <div id="adv-node-groupby">${renderNodeGroupBy()}</div>
+              <div id="adv-node-groupby" class="adv-drop-zone">${hasAggs ? gbAutoHTML : renderNodeGroupBy()}</div>
             </div>`;
+
+          // Wire drop zones to accept field pills / field rows dropped onto them
+          const condZone  = body.querySelector('#adv-node-conds');
+          const sortZone  = body.querySelector('#adv-node-sorts');
+          const groupZone = body.querySelector('#adv-node-groupby');
+
+          makeDZHandlers(condZone, data => {
+            if (data.type === 'adv-field-pill' || data.type === 'adv-field-row') {
+              const fAlias = data.field;
+              if (!nd.conditions) nd.conditions = [];
+              nd.conditions.push({ conj:'AND', field: fAlias, op:'=', value:'' });
+              rebuildAdvancedSQL(); renderAdvOptionsPanel('node', id);
+            }
+          });
+          makeDZHandlers(sortZone, data => {
+            if (data.type === 'adv-field-pill' || data.type === 'adv-field-row') {
+              if (!nd.sorts) nd.sorts = [];
+              nd.sorts.push({ field: data.field, dir:'ASC' });
+              rebuildAdvancedSQL(); renderAdvOptionsPanel('node', id);
+            }
+          });
+          makeDZHandlers(groupZone, data => {
+            if (data.type === 'adv-field-pill' || data.type === 'adv-field-row') {
+              if (!nd.groupBy) nd.groupBy = [];
+              nd.groupBy.push(data.field);
+              rebuildAdvancedSQL(); renderAdvOptionsPanel('node', id);
+            }
+          });
         }
       }
 
@@ -7263,13 +8030,22 @@ async function loadConfig(cfg) {
       function redrawJoins() {
         const svg = document.getElementById('qb-svg');
         svg.innerHTML = '';
-        for (const j of state.advancedQB.joins) {
-          const from = getSnapPoint(j.fromNode, j.fromSide);
-          const to = getSnapPoint(j.toNode, j.toSide);
-          const dx = (to.x - from.x) * 0.5;
-          const d = `M${from.x},${from.y} C${from.x + dx},${from.y} ${to.x - dx},${to.y} ${to.x},${to.y}`;
 
-          // Invisible wide path for a larger click target
+        // Arrowhead marker (must be first)
+        const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+        defs.innerHTML = `<marker id="arrowhead" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+    <polygon points="0 0, 8 3, 0 6" fill="#0078d4"/>
+  </marker>`;
+        svg.appendChild(defs);
+
+        for (let ji = 0; ji < state.advancedQB.joins.length; ji++) {
+          const j = state.advancedQB.joins[ji];
+          const from = getSnapPoint(j.fromNode, j.fromSide);
+          const to   = getSnapPoint(j.toNode,   j.toSide);
+          const dx   = (to.x - from.x) * 0.5;
+          const d    = `M${from.x},${from.y} C${from.x+dx},${from.y} ${to.x-dx},${to.y} ${to.x},${to.y}`;
+
+          // Invisible wide hit path
           const hitPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
           hitPath.setAttribute('d', d);
           hitPath.setAttribute('stroke', 'transparent');
@@ -7277,8 +8053,7 @@ async function loadConfig(cfg) {
           hitPath.setAttribute('fill', 'none');
           hitPath.style.cursor = 'pointer';
           hitPath.style.pointerEvents = 'stroke';
-          const joinObj = j;
-          hitPath.addEventListener('click', (e) => { e.stopPropagation(); selectJoin(joinObj, from, to); });
+          hitPath.addEventListener('click', e => { e.stopPropagation(); selectJoin(j, from, to); });
           svg.appendChild(hitPath);
 
           // Visible path
@@ -7291,27 +8066,36 @@ async function loadConfig(cfg) {
           path.classList.add('join-line');
           path.style.cursor = 'pointer';
           path.style.pointerEvents = 'stroke';
-          path.addEventListener('click', (e) => { e.stopPropagation(); selectJoin(joinObj, from, to); });
+          path.addEventListener('click', e => { e.stopPropagation(); selectJoin(j, from, to); });
           svg.appendChild(path);
 
-          // Join type label
+          // Venn badge at midpoint via foreignObject (allows HTML drag events)
           const mx = (from.x + to.x) / 2, my = (from.y + to.y) / 2;
-          const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-          label.setAttribute('x', mx); label.setAttribute('y', my - 6);
-          label.setAttribute('text-anchor', 'middle');
-          label.setAttribute('font-size', '10');
-          label.setAttribute('fill', '#0078d4');
-          label.style.pointerEvents = 'none';
-          label.textContent = j.type;
-          svg.appendChild(label);
-        }
+          const badgeW = 44, badgeH = 44;
+          const fo = document.createElementNS('http://www.w3.org/2000/svg', 'foreignObject');
+          fo.setAttribute('x', mx - badgeW / 2);
+          fo.setAttribute('y', my - badgeH / 2);
+          fo.setAttribute('width', badgeW);
+          fo.setAttribute('height', badgeH);
+          fo.style.pointerEvents = 'all';
+          fo.style.overflow = 'visible';
 
-        // Arrowhead marker
-        const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
-        defs.innerHTML = `<marker id="arrowhead" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
-    <polygon points="0 0, 8 3, 0 6" fill="#0078d4"/>
-  </marker>`;
-        svg.insertBefore(defs, svg.firstChild);
+          const badge = document.createElement('div');
+          badge.setAttribute('xmlns', 'http://www.w3.org/1999/xhtml');
+          badge.className = 'join-venn-badge';
+          badge.draggable = true;
+          badge.title = 'Drag to Clear to remove join • Click to edit';
+          badge.innerHTML = getVennSVG(j.type, 32) + `<span class="join-venn-label">${j.type}</span>`;
+
+          const jCapture = j;
+          badge.addEventListener('click', e => { e.stopPropagation(); selectJoin(jCapture, from, to); });
+          badge.addEventListener('dragstart', e => {
+            e.stopPropagation();
+            safeDragSet(e, { type: 'adv-join-trash', idx: ji });
+          });
+          fo.appendChild(badge);
+          svg.appendChild(fo);
+        }
       }
 
       function selectJoin(joinObj, from, to) {
@@ -7347,13 +8131,33 @@ async function loadConfig(cfg) {
         renderAdvOptionsPanel(null, null);
       }
 
-      // ── Advanced QB: build SQL ────────────────────────────────────────────
-      // Rule: FROM/JOIN use the immutable tableKey (what AlaSQL has registered).
-      //       Column refs: [tableKey].[internalName] AS [fieldAlias]
+      // ── Enable / disable the Design › Preview › Generate toolbar buttons ──────
+      function setDesignTabsEnabled(enabled, reason) {
+        const ids = ['toolbar-button-design', 'toolbar-button-preview', 'toolbar-button-generate'];
+        ids.forEach(id => {
+          const btn = document.getElementById(id);
+          if (!btn) return;
+          btn.disabled = !enabled;
+          btn.title = enabled ? '' : (reason || 'Disabled');
+          btn.style.opacity = enabled ? '' : '.4';
+          btn.style.pointerEvents = enabled ? '' : 'none';
+        });
+      }
+
       function rebuildAdvancedSQL() {
         if (state.sqlLocked) return;
         const nodes = Object.entries(state.advancedQB.nodes);
         if (!nodes.length) { if (window._cmEditor) window._cmEditor.setValue(''); return; }
+
+        const joins = state.advancedQB.joins;
+        const multiNode = nodes.length > 1;
+
+        // ── Multiple tables (with or without joins) → disable Design/Preview/Generate ──
+        if (multiNode) {
+          setDesignTabsEnabled(false, 'Run the query first to use results in Design, Preview, and Generate');
+        } else {
+          setDesignTabsEnabled(true);
+        }
 
         // Helper: field alias → internalName for SQL column refs
         const getInternal = (tableName, fieldAlias) => {
@@ -7366,28 +8170,50 @@ async function loadConfig(cfg) {
         const [mainId, mainNd] = nodes[0];
         const mainKey = mainNd.tableName;
 
-        // Collect SELECT fields, detect duplicate output aliases
+        // Collect SELECT fields, detect duplicate output aliases, apply per-field aggregates
         const allFields = [];
         for (const [id, nd] of nodes) {
+          const fieldAggs = nd.fieldAggs || {};
           for (const fa of nd.selectedFields) {
-            allFields.push({ tkey: nd.tableName, fa, iname: getInternal(nd.tableName, fa) });
+            allFields.push({ tkey: nd.tableName, fa, iname: getInternal(nd.tableName, fa), agg: fieldAggs[fa] || '' });
           }
         }
         const seenAliases = {};
-        const selects = allFields.length ? allFields.map(({ tkey, fa, iname }) => {
+        const selects = allFields.length ? allFields.map(({ tkey, fa, iname, agg }) => {
           const count = seenAliases[fa] = (seenAliases[fa] || 0) + 1;
           const outAlias = count === 1 ? fa : fa + (count - 1);
+          if (agg === 'COUNT_DISTINCT') return `  COUNT(DISTINCT [${tkey}].[${iname}]) AS [${outAlias}]`;
+          if (agg)                      return `  ${agg}([${tkey}].[${iname}]) AS [${outAlias}]`;
           return `  [${tkey}].[${iname}] AS [${outAlias}]`;
         }) : ['  *'];
 
-        const hasUnion = state.advancedQB.joins.some(j => j.type === 'UNION' || j.type === 'UNION ALL');
+        // Auto GROUP BY: if any field has an agg, non-agg fields need to be in GROUP BY
+        const hasAnyAgg = allFields.some(f => f.agg);
+        if (hasAnyAgg) {
+          for (const [id, nd] of nodes) {
+            if (!nd.groupBy) nd.groupBy = [];
+            const fieldAggs = nd.fieldAggs || {};
+            for (const fa of nd.selectedFields) {
+              if (!fieldAggs[fa] && !nd.groupBy.includes(fa)) nd.groupBy.push(fa);
+            }
+          }
+        }
+
+        const hasUnion = joins.some(j => j.type === 'UNION' || j.type === 'UNION ALL');
 
         if (hasUnion) {
           const parts = [];
           for (const [id, nd] of nodes) {
             const nodeKey = nd.tableName;
+            const fAggs = nd.fieldAggs || {};
             const nodeSelects = nd.selectedFields.length
-              ? nd.selectedFields.map(fa => `  [${nodeKey}].[${getInternal(nodeKey, fa)}] AS [${fa}]`).join(',\n')
+              ? nd.selectedFields.map(fa => {
+                  const iname = getInternal(nodeKey, fa);
+                  const agg = fAggs[fa] || '';
+                  if (agg === 'COUNT_DISTINCT') return `  COUNT(DISTINCT [${nodeKey}].[${iname}]) AS [${fa}]`;
+                  if (agg)                      return `  ${agg}([${nodeKey}].[${iname}]) AS [${fa}]`;
+                  return `  [${nodeKey}].[${iname}] AS [${fa}]`;
+                }).join(',\n')
               : '  *';
             let part = `SELECT\n${nodeSelects}\nFROM [${nodeKey}]`;
             const where = buildNodeWhere(nd, nodeKey);
@@ -7397,7 +8223,7 @@ async function loadConfig(cfg) {
           let sql = '';
           for (let i = 0; i < parts.length; i++) {
             if (i === 0) { sql = parts[0].sql; continue; }
-            const j = state.advancedQB.joins.find(j => j.toNode === Object.keys(state.advancedQB.nodes)[i]);
+            const j = joins.find(j => j.toNode === Object.keys(state.advancedQB.nodes)[i]);
             sql += `\n${j ? j.type : 'UNION'}\n` + parts[i].sql;
           }
           sql += `\nLIMIT ${state.advancedQB.rowLimit || 500}`;
@@ -7406,7 +8232,7 @@ async function loadConfig(cfg) {
 
         let sql = `SELECT\n${selects.join(',\n')}\nFROM [${mainKey}]`;
 
-        for (const j of state.advancedQB.joins) {
+        for (const j of joins) {
           const fromNd = state.advancedQB.nodes[j.fromNode];
           const toNd   = state.advancedQB.nodes[j.toNode];
           if (!fromNd || !toNd) continue;
@@ -7414,11 +8240,9 @@ async function loadConfig(cfg) {
           const toKey     = toNd.tableName;
           const fromIname = getInternal(fromKey, j.fromKey);
           const toIname   = getInternal(toKey,   j.toKey);
-          if(j.type==='CROSS') {
+          if (j.type === 'CROSS') {
             sql += `\nCROSS JOIN [${toKey}]`;
           } else {
-            // TODO: handle array joins using custom alasql function "INCLUDES" instead of "="
-            // TODO: synthetic fields are only in alasql but do not exist in state.tables.fields
             sql += `\n${j.type} JOIN [${toKey}] ON [${fromKey}].[${fromIname}] = [${toKey}].[${toIname}]`;
           }
         }
@@ -7524,6 +8348,9 @@ async function loadConfig(cfg) {
 
           // Show preview
           showQueryPreview(results);
+          // Reset design transforms when new query results arrive
+          state.design.transformedResults = null;
+          applyDesignTransforms();
           renderDesignFieldsPanel();
           setStatus(`✅ Query returned ${results.length} rows`);
           toast(`Query returned ${results.length} rows`, 'success');
@@ -7624,7 +8451,7 @@ async function loadConfig(cfg) {
   }
   
   // ============================================================
-  // DESIGN FIELDS PANEL
+  // DESIGN FIELDS PANEL  (fields with agg dropdowns + filter/sort/group sections)
   // ============================================================
   function renderDesignFieldsPanel() {
     const body = document.getElementById('design-fields-body');
@@ -7632,19 +8459,355 @@ async function loadConfig(cfg) {
       body.innerHTML = '<div class="text-muted text-sm" style="padding:12px 10px">Run a query first</div>';
       return;
     }
+
+    // Ensure design transform arrays exist
+    if (!state.design.conditions) state.design.conditions = [];
+    if (!state.design.sorts)      state.design.sorts = [];
+    if (!state.design.groupBy)    state.design.groupBy = [];
+    if (!state.design.fieldAggs)  state.design.fieldAggs = {};
+
+    const cols = state.queryColumns;
+    const fieldAggs = state.design.fieldAggs;
+
     body.innerHTML = '';
-    for (const col of state.queryColumns) { 
-      // TODO: state.queryColumns should include source table and field internal names
-      // so we can do a precise lookup in state.tables for the displayType instead of guessing based on the first row value
-      const ti = FIELD_TYPE_ICONS[sniffType(col)] || FIELD_TYPE_ICONS.default;
-      const item = document.createElement('div');
-      item.className = 'field-item';
-      item.draggable = true;
-      item.innerHTML = `<span class="field-type-icon ${ti.cls}">${ti.icon}</span><span class="field-label">${col}</span>`;
-      item.addEventListener('dragstart', e => {
-        safeDragSet(e, { type: 'result-field', field: col, dataType: sniffType(col) });
+
+    // ── 1. FIELDS section ──────────────────────────────────────────────────
+    const secFields = document.createElement('div');
+    secFields.className = 'qb-section';
+    secFields.style.borderTop = 'none';
+    secFields.innerHTML = `<div class="qb-section-header"><span>FIELDS</span><span style="font-size:10px;font-weight:400">drag → canvas</span></div>`;
+
+    for (const col of cols) {
+      const dt = sniffType(col);
+      const ti = FIELD_TYPE_ICONS[dt] || FIELD_TYPE_ICONS.default;
+      const availAggs = aggsForType(dt);
+      const curAgg = fieldAggs[col] || '';
+      const aggOpts = availAggs.map(a =>
+        `<option value="${a.val}" ${a.val === curAgg ? 'selected' : ''}>${a.label}</option>`
+      ).join('');
+
+      const row = document.createElement('div');
+      row.className = 'design-field-row';
+      row.draggable = true;
+      row.innerHTML = `
+        <span class="field-type-icon ${ti.cls}" style="font-size:10px">${ti.icon}</span>
+        <span class="field-label" title="${col}">${col}</span>
+        <select class="form-input design-agg-select${curAgg ? ' agg-active' : ''}"
+          title="Aggregate function"
+          onchange="setDesignFieldAgg('${col.replace(/'/g,"\\'")}', this.value)">${aggOpts}</select>
+      `;
+      row.addEventListener('dragstart', e => {
+        safeDragSet(e, { type: 'result-field', field: col, dataType: dt });
       });
-      body.appendChild(item);
+      secFields.appendChild(row);
+    }
+    body.appendChild(secFields);
+
+    // ── 2. FILTER CONDITIONS section ───────────────────────────────────────
+    const secFilters = document.createElement('div');
+    secFilters.className = 'qb-section';
+    secFilters.innerHTML = `
+      <div class="qb-section-header">
+        <span>FILTER CONDITIONS</span>
+        <button class="btn btn-ghost btn-sm" onclick="addDesignCondition()">+ Add</button>
+      </div>
+      <div id="design-conditions-area"></div>`;
+    body.appendChild(secFilters);
+
+    // ── 3. SORT ORDER section ──────────────────────────────────────────────
+    const secSorts = document.createElement('div');
+    secSorts.className = 'qb-section';
+    secSorts.innerHTML = `
+      <div class="qb-section-header">
+        <span>SORT ORDER</span>
+        <button class="btn btn-ghost btn-sm" onclick="addDesignSort()">+ Add</button>
+      </div>
+      <div id="design-sorts-area"></div>`;
+    body.appendChild(secSorts);
+
+    // ── 4. GROUP BY section ────────────────────────────────────────────────
+    const secGroup = document.createElement('div');
+    secGroup.className = 'qb-section';
+    secGroup.innerHTML = `
+      <div class="qb-section-header">
+        <span id="design-groupby-label">GROUP BY</span>
+        <button class="btn btn-ghost btn-sm" id="design-groupby-add-btn" onclick="addDesignGroupBy()">+ Add</button>
+      </div>
+      <div id="design-groupby-area"></div>`;
+    body.appendChild(secGroup);
+
+    // Render the sub-sections
+    renderDesignConditions();
+    renderDesignSorts();
+    syncDesignGroupBySection();
+  }
+
+  // ============================================================
+  // DESIGN DATA TRANSFORMS (filter / sort / group / aggregate)
+  // Uses the same QB_OPS, DATE_MACRO_OPS, QB_AGGS, and aggsForType()
+  // as the Query Builder so the UI is identical.
+  // ============================================================
+
+  /** Returns design-transformed data if transforms are active, otherwise raw query results. */
+  function getDesignData() {
+    return state.design.transformedResults || state.queryResults || [];
+  }
+
+  /** Re-runs the design-level AlaSQL transform on state.queryResults and
+   *  stores the result in state.design.transformedResults, then re-renders widgets. */
+  function applyDesignTransforms() {
+    if (!state.queryResults || !state.queryResults.length) {
+      state.design.transformedResults = null;
+      renderDesignCanvas();
+      return;
+    }
+
+    const cols = state.queryColumns;
+    if (!cols.length) { state.design.transformedResults = null; renderDesignCanvas(); return; }
+
+    const conditions = (state.design.conditions || []).filter(c => c.field);
+    const sorts      = (state.design.sorts      || []).filter(s => s.field);
+    const groups     = state.design.groupBy || [];
+    const fieldAggs  = state.design.fieldAggs || {};
+    const anyAgg     = cols.some(c => fieldAggs[c]);
+
+    // No transforms at all → clear cache and use raw data
+    if (!conditions.length && !sorts.length && !groups.length && !anyAgg) {
+      state.design.transformedResults = null;
+      renderDesignCanvas();
+      renderDesignFieldsPanel();
+      return;
+    }
+
+    // SELECT parts — preserve original column name with AS so widgets keep working
+    const selParts = cols.map(col => {
+      const agg = fieldAggs[col];
+      if (!agg) return `[${col}]`;
+      if (agg === 'COUNT_DISTINCT') return `COUNT(DISTINCT [${col}]) AS [${col}]`;
+      return `${agg}([${col}]) AS [${col}]`;
+    });
+
+    // WHERE parts — identical logic to buildBasicSQL / renderNodeConditions
+    const whereParts = conditions.map((c, i) => {
+      const conj = i === 0 ? '' : (c.conj || 'AND') + ' ';
+      const col  = `[${c.field}]`;
+      if (c.op === 'NULL')    return conj + `${col} IS NULL`;
+      if (c.op === 'NOTNULL') return conj + `${col} IS NOT NULL`;
+      if (DATE_MACRO_VALS.has(c.op)) {
+        const expr = dateMacroToSQL(c.op, c.value, col);
+        return expr ? conj + expr : conj + `${col} IS NOT NULL`;
+      }
+      const raw = c.value || '';
+      const val = c.op === 'LIKE'
+        ? `'%${raw}%'`
+        : (raw !== '' && !isNaN(raw) ? raw : `'${raw.replace(/'/g, "''")}'`);
+      return conj + `${col} ${c.op} ${val}`;
+    });
+
+    // GROUP BY parts
+    let groupParts;
+    if (anyAgg) {
+      groupParts = cols.filter(c => !fieldAggs[c]).map(c => `[${c}]`);
+    } else {
+      groupParts = groups.filter(g => g).map(g => `[${g}]`);
+    }
+
+    const orderParts = sorts.map(s => `[${s.field}] ${s.dir || 'ASC'}`);
+
+    let sql = `SELECT ${selParts.join(', ')} FROM ?`;
+    if (whereParts.length) sql += ` WHERE ${whereParts.join(' ')}`;
+    if (groupParts.length) sql += ` GROUP BY ${groupParts.join(', ')}`;
+    if (orderParts.length) sql += ` ORDER BY ${orderParts.join(', ')}`;
+
+    try {
+      const results = alasql(sql, [state.queryResults]);
+      state.design.transformedResults = Array.isArray(results) ? results : null;
+      const rowCount = state.design.transformedResults ? state.design.transformedResults.length : 0;
+      toast(`Design transform applied — ${rowCount} rows`, 'success');
+    } catch (e) {
+      console.error('Design transform error:', e);
+      state.design.transformedResults = null;
+      toast('Design transform error: ' + e.message, 'error');
+    }
+
+    renderDesignCanvas();
+    renderDesignFieldsPanel();
+  }
+
+  // ── Design aggregate dropdown ─────────────────────────────────────────────
+  function setDesignFieldAgg(col, agg) {
+    if (!state.design.fieldAggs) state.design.fieldAggs = {};
+    if (agg) state.design.fieldAggs[col] = agg;
+    else delete state.design.fieldAggs[col];
+    syncDesignGroupBySection();
+    // Update the select's active styling inline without full re-render
+    const sel = document.querySelector(`.design-agg-select`);
+    // Re-render fields panel to update agg-active class
+    renderDesignFieldsPanel();
+  }
+
+  // ── Design conditions ─────────────────────────────────────────────────────
+  function addDesignCondition() {
+    if (!state.queryColumns.length) return;
+    if (!state.design.conditions) state.design.conditions = [];
+    state.design.conditions.push({ conj: 'AND', field: state.queryColumns[0], op: '=', value: '' });
+    renderDesignConditions();
+  }
+
+  function removeDesignCondition(i) {
+    state.design.conditions.splice(i, 1);
+    renderDesignConditions();
+  }
+
+  function renderDesignConditions() {
+    const area = document.getElementById('design-conditions-area');
+    if (!area) return;
+    const cols = state.queryColumns;
+    const conds = state.design.conditions || [];
+
+    area.innerHTML = '';
+    if (!conds.length) {
+      area.innerHTML = '<div style="font-size:11px;color:var(--text-disabled);padding:2px 0">No filters — click + Add</div>';
+      return;
+    }
+
+    const fieldOpts = cols.map(c => `<option value="${c}">${c}</option>`).join('');
+
+    conds.forEach((c, i) => {
+      const dt = sniffType(c.field);
+      const isDate = dt === 'date';
+      const ops = isDate ? [...QB_OPS, ...DATE_MACRO_OPS] : QB_OPS;
+      const isMacro = DATE_MACRO_VALS.has(c.op);
+      const macroMeta = DATE_MACRO_OPS.find(o => o.val === c.op);
+      const needsValue = c.op !== 'NULL' && c.op !== 'NOTNULL' && !(isMacro && !macroMeta?.hasInput);
+      const valPlaceholder = isMacro && macroMeta?.hasInput ? 'e.g. 3' : 'value';
+
+      const row = document.createElement('div');
+      row.className = 'qb-condition-row';
+      row.innerHTML = `
+        ${i === 0
+          ? `<span class="qb-where-badge">WHERE</span>`
+          : `<select class="form-input qb-conj-select" onchange="state.design.conditions[${i}].conj=this.value">
+               <option ${c.conj==='AND'?'selected':''}>AND</option>
+               <option ${c.conj==='OR'?'selected':''}>OR</option>
+             </select>`}
+        <select class="form-input qb-field-select"
+          onchange="state.design.conditions[${i}].field=this.value; renderDesignConditions()">
+          ${cols.map(f=>`<option value="${f}" ${f===c.field?'selected':''}>${f}</option>`).join('')}
+        </select>
+        <select class="form-input qb-op-select" style="width:${isDate?'150px':'112px'}!important"
+          onchange="state.design.conditions[${i}].op=this.value; renderDesignConditions()">
+          ${ops.map(o=>`<option value="${o.val}" ${o.val===c.op?'selected':''}>${o.label}</option>`).join('')}
+        </select>
+        ${needsValue
+          ? `<input type="${isMacro?'number':'text'}" class="form-input qb-val-input"
+               placeholder="${valPlaceholder}" min="1"
+               value="${(c.value||'').replace(/"/g,'&quot;')}"
+               oninput="state.design.conditions[${i}].value=this.value"/>`
+          : `<span class="qb-val-blank"></span>`}
+        <button class="btn btn-ghost btn-sm btn-icon qb-remove-btn" onclick="removeDesignCondition(${i})">✕</button>
+      `;
+      area.appendChild(row);
+    });
+  }
+
+  // ── Design sorts ──────────────────────────────────────────────────────────
+  function addDesignSort() {
+    if (!state.queryColumns.length) return;
+    if (!state.design.sorts) state.design.sorts = [];
+    state.design.sorts.push({ field: state.queryColumns[0], dir: 'ASC' });
+    renderDesignSorts();
+  }
+
+  function removeDesignSort(i) {
+    state.design.sorts.splice(i, 1);
+    renderDesignSorts();
+  }
+
+  function renderDesignSorts() {
+    const area = document.getElementById('design-sorts-area');
+    if (!area) return;
+    const cols = state.queryColumns;
+    const sorts = state.design.sorts || [];
+
+    area.innerHTML = '';
+    if (!sorts.length) {
+      area.innerHTML = '<div style="font-size:11px;color:var(--text-disabled);padding:2px 0">No sorts — click + Add</div>';
+      return;
+    }
+
+    sorts.forEach((s, i) => {
+      const row = document.createElement('div');
+      row.className = 'qb-sort-row';
+      row.innerHTML = `
+        <select class="form-input qb-field-select" onchange="state.design.sorts[${i}].field=this.value">
+          ${cols.map(f=>`<option value="${f}" ${f===s.field?'selected':''}>${f}</option>`).join('')}
+        </select>
+        <select class="form-input qb-dir-select" onchange="state.design.sorts[${i}].dir=this.value">
+          <option ${s.dir==='ASC'?'selected':''}>ASC</option>
+          <option ${s.dir==='DESC'?'selected':''}>DESC</option>
+        </select>
+        <button class="btn btn-ghost btn-sm btn-icon qb-remove-btn" onclick="removeDesignSort(${i})">✕</button>
+      `;
+      area.appendChild(row);
+    });
+  }
+
+  // ── Design group by ───────────────────────────────────────────────────────
+  function addDesignGroupBy() {
+    if (!state.queryColumns.length) return;
+    if (!state.design.groupBy) state.design.groupBy = [];
+    state.design.groupBy.push(state.queryColumns[0]);
+    syncDesignGroupBySection();
+  }
+
+  function removeDesignGroupBy(i) {
+    state.design.groupBy.splice(i, 1);
+    syncDesignGroupBySection();
+  }
+
+  function renderDesignGroupBy() {
+    const area = document.getElementById('design-groupby-area');
+    if (!area) return;
+    const cols = state.queryColumns;
+    const groups = state.design.groupBy || [];
+
+    area.innerHTML = '';
+    if (!groups.length) {
+      area.innerHTML = '<div style="font-size:11px;color:var(--text-disabled);padding:2px 0">No grouping — click + Add</div>';
+      return;
+    }
+
+    groups.forEach((g, i) => {
+      const row = document.createElement('div');
+      row.className = 'qb-sort-row';
+      row.innerHTML = `
+        <select class="form-input qb-field-select" onchange="state.design.groupBy[${i}]=this.value">
+          ${cols.map(f=>`<option value="${f}" ${f===g?'selected':''}>${f}</option>`).join('')}
+        </select>
+        <button class="btn btn-ghost btn-sm btn-icon qb-remove-btn" onclick="removeDesignGroupBy(${i})">✕</button>
+      `;
+      area.appendChild(row);
+    });
+  }
+
+  /** Shows/hides the manual GROUP BY add-button when aggregates are active (auto-group then). */
+  function syncDesignGroupBySection() {
+    const anyAgg = state.queryColumns.some(c => (state.design.fieldAggs || {})[c]);
+    const label  = document.getElementById('design-groupby-label');
+    const addBtn = document.getElementById('design-groupby-add-btn');
+    if (label)  label.textContent = anyAgg ? 'GROUP BY (auto)' : 'GROUP BY';
+    if (addBtn) addBtn.style.display = anyAgg ? 'none' : '';
+    if (anyAgg) {
+      const area = document.getElementById('design-groupby-area');
+      if (area) {
+        const nonAgg = state.queryColumns.filter(c => !(state.design.fieldAggs || {})[c]);
+        area.innerHTML = nonAgg.length
+          ? `<div style="font-size:11px;color:var(--text-disabled);padding:2px 0">Auto: ${nonAgg.join(', ')}</div>`
+          : `<div style="font-size:11px;color:var(--text-disabled);padding:2px 0">All fields aggregated — no GROUP BY needed</div>`;
+      }
+    } else {
+      renderDesignGroupBy();
     }
   }
 
@@ -7862,7 +9025,7 @@ async function loadConfig(cfg) {
        * If xField is absent (KPI-only widget), just returns the filtered rows.
        */
       function aggregateDataForWidget(w, data) {
-        data = data || state.queryResults || [];
+        data = data || getDesignData();
         if (!data.length) return [];
 
         // 1. Apply per-widget filters (field + operator + value)
@@ -7934,25 +9097,28 @@ async function loadConfig(cfg) {
 
       function renderKPIContent(w, data) {
         let value = '—', label = w.fields[0] || '';
-        if (state.queryResults && state.queryResults.length && label) {
+        const kpiData = data || getDesignData();
+        if (kpiData && kpiData.length && label) {
           const field = label;
           const agg = w.aggregation || 'SUM';
-          const vals = state.queryResults.map(r => parseFloat(r[field]) || 0);
-          if (agg === 'COUNT') value = state.queryResults.length;
+          const vals = kpiData.map(r => parseFloat(r[field]) || 0);
+          if (agg === 'COUNT') value = kpiData.length;
           else if (agg === 'SUM') value = vals.reduce((a, b) => a + b, 0).toLocaleString();
           else if (agg === 'AVG') value = vals.length ? (vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(2) : '—';
-          else value = state.queryResults[0][field] ?? '—';
+          else value = kpiData[0][field] ?? '—';
         }
         return `<div class="kpi-card"><div class="kpi-value" style="color:${w.fillColor}">${value}</div><div class="kpi-label">${label}</div></div>`;
       }
 
       function renderTableContent(w) {
-        if (!state.queryResults || !state.queryResults.length) {
+        const tableData = getDesignData();
+        if (!tableData || !tableData.length) {
           return '<div class="text-muted text-sm" style="padding:12px">No data — run a query first</div>';
         }
-        const cols = w.fields.filter(f => state.queryColumns.includes(f));
+        const allCols = tableData.length ? Object.keys(tableData[0]) : state.queryColumns;
+        const cols = w.fields.filter(f => allCols.includes(f));
         if (!cols.length) return '<div class="text-muted text-sm" style="padding:12px">No fields selected</div>';
-        const rows = state.queryResults;
+        const rows = tableData;
         let html = '<div style="overflow:auto;max-height:100%"><table class="widget-table"><thead><tr>' + cols.map(c => `<th>${c}</th>`).join('') + '</tr></thead><tbody>';
         for (const row of rows) {
           html += '<tr>' + cols.map(c => `<td>${row[c] ?? ''}</td>`).join('') + '</tr>';
@@ -7969,14 +9135,16 @@ async function loadConfig(cfg) {
         const chart = echarts.init(chartEl);
         state.charts[w.id] = chart;
 
-        if (!state.queryResults || !state.queryResults.length) {
+        const chartData = getDesignData();
+        if (!chartData || !chartData.length) {
           chart.setOption({ title: { text: 'No data', left: 'center', top: 'middle', textStyle: { color: '#a19f9d', fontSize: 13 } } });
           return;
         }
 
-        const xField = w.xField || (state.queryColumns[0] || '');
-        const yField = w.yField || (state.queryColumns[1] || state.queryColumns[0] || '');
-        const data = state.queryResults;
+        const allChartCols = chartData.length ? Object.keys(chartData[0]) : state.queryColumns;
+        const xField = w.xField || (allChartCols[0] || '');
+        const yField = w.yField || (allChartCols[1] || allChartCols[0] || '');
+        const data = chartData;
 
         let option = {};
         if (w.type === 'bar') {
@@ -8671,7 +9839,7 @@ async function loadConfig(cfg) {
         // Fields panel (left) — query tab
         makeColResizer('fields-resizer', 'fields-panel', 'panel-fields-w', 160, 400);
         // Design fields panel
-        makeColResizer('design-fields-resizer', 'design-fields-panel', null, 120, 320);
+        makeColResizer('design-fields-resizer', 'design-fields-panel', null, 160, 420);
         // Toolbox panel (right)
         makeColResizer('toolbox-resizer', 'toolbox-panel', null, 160, 400, true);
         // QBvsSQL vertical
@@ -8767,6 +9935,8 @@ async function loadConfig(cfg) {
         const subtabs = document.getElementById('qb-subtabs');
         if (subtabs) subtabs.style.display = tab === 'qb' ? '' : 'none';
         if (tab === 'sql' && window._cmEditor) setTimeout(() => window._cmEditor.refresh(), 50);
+        // Switching to SQL editor lifts the advanced-QB join restriction
+        if (tab === 'sql' && state.queryMode === 'advanced') setDesignTabsEnabled(true);
         if (tab === 'dataPreview') {
           runQuery();
           document.getElementById('btn-clear-query').disabled = true;
@@ -8781,18 +9951,37 @@ async function loadConfig(cfg) {
       // ============================================================
       // UTILITIES
       // ============================================================
-      function setStatus(msg) {
-        document.getElementById('status-bar').textContent = msg;
+      let _statusClearTimer = null;
+      const _statusIcons = {
+        "loading": '⌛', "loading-emoji": '⏳',
+        "success": '✓', "success-emoji": '✅',
+        "error": '✕', "error-emoji": '❌',
+        "warning": '⚠', "warning-emoji": '⚠️',
+        "info": 'ℹ', "info-emoji": 'ℹ️',
+        "question": '?', "question-emoji": '❓',
+        "skipped": '»', "skipped-emoji": '⏭️',
+        "disabled": '✕', "disabled-emoji": '🚫', // Or '➖' / '⚪'
+        "locked": '⦸', "locked-emoji": '🔒',
+        "searching": '⌕', "search-emoji": '🔍'
+      };
+
+      function setStatus(msg, type = 'info') {
+        const icon = _statusIcons[type] ?? _statusIcons['info'] ?? 'ℹ';
+        document.getElementById('status-bar').textContent = `${icon} ${msg}`;
+        clearTimeout(_statusClearTimer);
+        _statusClearTimer = setTimeout(() => {
+          document.getElementById('status-bar').textContent = '';
+        }, 10000);
       }
 
-      function toast(message, type = 'info') {
+      function toast(msg, type = 'info') {
+        const icon = _statusIcons[type] ?? _statusIcons['info'] ?? 'ℹ';
         const container = document.getElementById('toast-container');
         const t = document.createElement('div');
         t.className = 'toast ' + type;
-        const icons = { success: '✓', error: '✕', warning: '⚠', info: 'ℹ' };
-        t.innerHTML = `<span>${icons[type] || 'ℹ'}</span><span>${message}</span>`;
+        t.innerHTML = `<span>${icon}</span><span>${msg}</span>`;
         container.appendChild(t);
-        setTimeout(() => { t.style.opacity = '0'; t.style.transition = 'opacity 300ms'; setTimeout(() => t.remove(), 300); }, 3000);
+        setTimeout(() => { t.style.opacity = '0'; t.style.transition = 'opacity 400ms'; setTimeout(() => t.remove(), 400); }, 4400);
       }
 
       function downloadText(text, filename, mime) {
@@ -9046,17 +10235,6 @@ async function loadConfig(cfg) {
        *
        * Called automatically at startup when the page URL contains a
        * "report=" query parameter pointing at a DataLaVista JSON config.
-       *
-       * Steps:
-       *   1. Show a full-screen loading banner.
-       *   2. Fetch the JSON config from the URL.
-       *   3. Call loadConfig() to restore data-sources, tables, SQL, and
-       *      design widgets (this also triggers background SharePoint fetches).
-       *   4. Call refreshDashboardPreview() to run the SQL query and render all widgets.
-       *   5. Switch to the Preview tab and apply the .dlv-report-mode CSS class
-       *      so the preview panel fills the entire viewport (toolbar hidden,
-       *      filter bar visible, no designer chrome).
-       *
        * On any error the loading banner is removed, a toast is shown, and the
        * normal designer UI is presented so the user can still work.
        */
@@ -9070,11 +10248,7 @@ async function loadConfig(cfg) {
         try {
           console.log("DEBUG: Fetching report config from URL: " + reportUrl);
           // ── Step 1: Fetch the config JSON ──────────────────────────────
-          const resp = await fetch(reportUrl, { credentials: 'same-origin' });
-          if (!resp.ok) {
-            throw new Error(`HTTP ${resp.status} ${resp.statusText} — could not fetch: ${reportUrl}`);
-          }
-          const cfg = await resp.json();
+          const cfg = await fetchJSONWithFallbacks(reportUrl);
 
           // ── Step 2: Load config (restores DS, tables, SQL, design) ─────
           console.log('2222222222222222 DEBUG: loadReportFromUrl -> calling loadConfig');
@@ -9219,6 +10393,8 @@ async function loadConfig(cfg) {
 
             // Wire options panel left-edge resizer
             initAdvOptsResizer();
+            // Wire clear button as drag-drop target for AQB items
+            setupClearButtonDrop();
             
             // Show the connect popup by default to encourage users to connect to their data,
             // but if we detect we're in SharePoint edit mode, hide it since it can interfere with page editing.
@@ -9278,9 +10454,12 @@ async function loadConfig(cfg) {
         hideLoadingPopup,
         switchSourceTab,
         doConnect,
-        loadSharePointSource,
+        loadSharePointListsSource,
+        fetchJSONWithFallbacks,
         loadJSONSource,
+        fetchCSVWithFallbacks,
         fetchCSVFromURL,
+        loadCSVSource,
         loadCSVData,
         ensureTableData,
         fetchTableData,
@@ -9383,7 +10562,20 @@ async function loadConfig(cfg) {
         advNodeRemoveGB,
         buildNodeWhere,
         rebuildAdvancedSQL,
+        getAggIcon,
+        getVennSVG,
+        poofAndRemove,
+        poofPill,
+        startJoinDrag,
+        startNodeResize,
+        updateAdvNodePills,
+        advNodeToggleField,
+        setAdvNodeFieldAgg,
+        showAdvAggPopup,
+        setupClearButtonDrop,
+        setDesignTabsEnabled,
         clearQueryBuilder,
+        clearSQLEditor,
         runQuery,
         findReferencedTables,
         showQueryPreview,
@@ -9394,6 +10586,19 @@ async function loadConfig(cfg) {
         initAdvOptsResizer,
         useResultsInDesign,
         renderDesignFieldsPanel,
+        getDesignData,
+        applyDesignTransforms,
+        setDesignFieldAgg,
+        addDesignCondition,
+        removeDesignCondition,
+        renderDesignConditions,
+        addDesignSort,
+        removeDesignSort,
+        renderDesignSorts,
+        addDesignGroupBy,
+        removeDesignGroupBy,
+        renderDesignGroupBy,
+        syncDesignGroupBySection,
         initToolbox,
         onCanvasDragOver,
         onCanvasDragLeave,
