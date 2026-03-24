@@ -1,0 +1,67 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/sp/v2/column-formatting.schema.json",
+  "elmType": "div",
+  "style": {
+    "text-align": "left",
+    "vertical-align": "middle",
+    "text-decoration": "none",
+    "cursor": "pointer",
+    "display": "flex",
+    "min-width": "180px",
+    "padding": "0 2px",
+    "margin-left": "2px",
+    "margin-right": "4px",
+    "text-overflow": "ellipsis",
+    "justify-content": "space-between",
+    "clear": "both",
+    "max-height": "44px"
+  },
+  "attributes": {
+    "class": "ms-fontColor-themePrimary ms-fontColor-themeDark--hover"
+  },
+  "children": [
+    {
+      "elmType": "a",
+      "style": {
+        "text-align": "left",
+        "vertical-align": "middle",
+        "text-decoration": "none"
+      },
+      "attributes": {
+        "href": "=if(indexOf(toLowerCase([$FileLeafRef]),'.json')>1, @currentWeb + '/SitePages/DataLaVista.aspx?report=https://umhealth.sharepoint.com/sites/DepressionCenter-TrackMaster/Shared%20Documents/Reports/' + [$FileLeafRef], if(startsWith(@currentField,'https:') || startsWith(@currentField,'http:'), @currentField, ''))",
+        "target": "_blank",
+        "title": "=if(indexOf(toLowerCase([$FileLeafRef]),'.json')>1, @currentWeb + '/SitePages/DataLaVista.aspx?report=https://umhealth.sharepoint.com/sites/DepressionCenter-TrackMaster/Shared%20Documents/Reports/' + [$FileLeafRef], if(startsWith(@currentField,'https:') || startsWith(@currentField,'http:'), @currentField, ''))",
+        "class": "ms-fontSize-12 ms-fontColor-themePrimary ms-fontColor-themeDark--hover"
+      },
+      "children": [
+        {
+          "elmType": "span",
+          "attributes": {
+            "iconName": "=if(indexOf(toLowerCase([$FileLeafRef]),'.json')>1, 'BIDashboard', if(@currentField=='','','Link12'))",
+            "class": "sp-field-quickAction ms-fontSize-16"
+          },
+          "style": {
+            "text-align": "left",
+            "vertical-align": "middle",
+            "text-decoration": "none",
+            "padding-left": "2px",
+            "padding-right": "3px"
+          }
+        },
+        {
+          "elmType": "span",
+          "txtContent": "=if(indexOf(toLowerCase([$FileLeafRef]),'.json')>1, 'Open Report', if(@currentField=='','','Visit Link'))",
+          "attributes": {
+            "class": "ms-fontSize-12"
+          },
+          "style": {
+            "padding-left": "3px",
+            "padding-right": "2px",
+            "vertical-align": "middle",
+            "text-decoration": "none"
+          }
+        }
+      ]
+    }
+  ]
+}

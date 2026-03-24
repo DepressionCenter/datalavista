@@ -8407,12 +8407,6 @@ async function loadConfig(cfg) {
         state.queryResultsReady = false;
       }
 
-      function closePreviewPanel() { /* no-op — panel switching handles visibility */ }
-
-      // Kept for backward-compat; no longer does collapse logic
-      function toggleQBCollapse() {}
-      function toggleSQLEditor() {}
-
       function toggleAdvOptionsPanel() {
         const panel = document.getElementById('adv-options-panel');
         const btn   = document.getElementById('adv-opts-toggle');
@@ -10579,9 +10573,6 @@ async function loadConfig(cfg) {
         runQuery,
         findReferencedTables,
         showQueryPreview,
-        closePreviewPanel,
-        toggleQBCollapse,
-        toggleSQLEditor,
         toggleAdvOptionsPanel,
         initAdvOptsResizer,
         useResultsInDesign,
