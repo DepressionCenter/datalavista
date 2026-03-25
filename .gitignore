@@ -3,8 +3,11 @@
 # Ignore log files
 *.log
 
-#Ignore VSCode settings
+#Ignore IDE and tool settings
 .vscode/
+.claude/
+.gemini/
+.copilot/
 
 #Ignore temporary files
 *.tmp
