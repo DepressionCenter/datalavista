@@ -69,8 +69,8 @@ Most enterprise data is trapped behind bloated frameworks or expensive BI tools.
 + Use the Query Builder and/or SQL Editor to pre-process your data. This will create a flat table, displayed in the preview.
 + Switch to the Design tab to create your dashboard using visuals, tables, or HTML widgets.
 + Switch to the Preview tab to see the final version of your dashboard.
-+ Switch to the Generate Report tab. From here, you will see code for either a stand-alone HTML file, or just a JSON config. The easiest way to publish your report is to copy the contents of the stand-aline HTML file, and save them to a new page following the same process you used to create the designer page.
-+ Once your report code is on its own page, simply refresh the page and the report will load all the data and visuals. Users will need to be already logged in to your data source, which is typically already done if you are hosting it inside SharePoint or a web app.
++ Switch to the Generate Report tab. From here, you will see the report configuration in JSON with options to copy, download, or publish to SharePoint.
++ Once your report code is on SharePoint (either as a list item attachment or as a plain .json file in a document library), copy its share link and pass it to DataLaVista (e.g. DataLaVista.html?report=yourlink.json). That will be your shareable link.
 
 
 
