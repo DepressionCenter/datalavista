@@ -1,4 +1,4 @@
-<!--
+﻿<!--
 This file is part of DataLaVista
 DataLaVista.html: Report and dashboard designer main file.
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
@@ -25,7 +25,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Data La Vista, Baby!</title>
+  <title>DataLaVista: Reports & Dashboards</title>
 
   <!-- AlaSQL -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/alasql/4.1.3/alasql.min.js"></script>
@@ -39,11 +39,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
   <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/hint/sql-hint.min.js"></script>
   <link rel="stylesheet"
     href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/hint/show-hint.min.css" />
-  <!-- Google Fonts -->
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@300;400;500;600;700&display=swap"
-    rel="stylesheet" />
 
+    <!-- Custom styles and scripts -->
   <style>
     /* ============================================================
    CSS VARIABLES — Fluent-inspired, themeable
@@ -2228,6 +2225,76 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
     }
 
     /* ============================================================
+   GENERATE — INFO PANEL
+   ============================================================ */
+    .gen-info-panel {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      overflow-y: auto;
+      padding: 18px 20px;
+      background: var(--surface);
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius);
+    }
+
+    .gen-info-logo {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      line-height: 1.35;
+      color: var(--primary);
+      white-space: pre;
+      user-select: none;
+    }
+
+    .gen-info-section {
+      font-size: 12px;
+      color: var(--text-secondary);
+      line-height: 1.5;
+    }
+
+    .gen-info-section a {
+      color: var(--primary);
+      text-decoration: none;
+    }
+
+    .gen-info-section a:hover {
+      text-decoration: underline;
+    }
+
+    .gen-info-section h4 {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text);
+      margin: 0 0 4px 0;
+    }
+
+    .gen-info-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .gen-info-copyright {
+      margin-top: auto;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-disabled);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .gen-info-copyright a {
+      color: var(--text-disabled);
+    }
+
+    .gen-info-copyright a:hover {
+      color: var(--text-secondary);
+    }
+
+    /* ============================================================
    LOADING / SPINNER
    ============================================================ */
     .spinner {
@@ -2705,7 +2772,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 
       <!-- Right-click context menu (shared, positioned dynamically) -->
   <div id="dlv-ctx-menu">
-    <div class="ctx-menu-item" id="ctx-copy-url" onclick="dlvCtxCopyUrl()">🔗 Copy URL</div>
+    <div class="ctx-menu-item" id="ctx-copy-url" onclick="dlvCtxCopyUrl();">🔗 Copy URL</div>
     <div class="ctx-menu-sep" id="ctx-sep-url"></div>
     <div class="ctx-menu-item" id="ctx-rename" onclick="dlvCtxRename()">✏️ Rename</div>
     <div class="ctx-menu-item danger" id="ctx-delete" onclick="dlvCtxDelete()">🗑 Delete</div>
@@ -2903,19 +2970,19 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           <!-- Query-main tab toolbar -->
           <div id="qm-tabs">
             <div class="qm-tab active" id="qmt-qb" onclick="switchQMTab('qb')">
-              🔧 Query Builder
+              🧩 Query Builder
               <span class="qm-subtabs" id="qb-subtabs">
                 <span class="qm-sub active" id="qb-basic-btn" onclick="event.stopPropagation();setQBMode('basic')">Basic</span>
                 <span class="qm-sub" id="qb-adv-btn" onclick="event.stopPropagation();setQBMode('advanced')">Advanced</span>
               </span>
             </div>
-            <div class="qm-tab" id="qmt-sql" onclick="switchQMTab('sql')">🗃 SQL Editor</div>
-            <div class="qm-tab" id="qmt-dataPreview" onclick="switchQMTab('dataPreview')">📊 Results</div>
+            <div class="qm-tab" id="qmt-sql" onclick="switchQMTab('sql')">📜 SQL Editor</div>
+            <div class="qm-tab" id="qmt-dataPreview" onclick="switchQMTab('dataPreview')">✨ Results</div>
             <div class="qm-spacer"></div>
             <div class="qm-actions">
               <button class="btn btn-ghost btn-sm" id="btn-sql-locked" onclick="unlockSQL()"
                 title="SQL is locked. Click to unlock." style="display:none">🔒 Locked</button>
-              <button class="btn btn-default btn-sm" id="btn-clear-query" onclick="clearQueryBuilder()" title="Clear query builder">🗑️ Clear</button>
+              <button class="btn btn-default btn-sm" id="btn-clear-query" onclick="clearQueryBuilder()" title="Clear query builder">🗑️ Clear Query</button>
               <button class="btn btn-primary btn-sm" id="btn-run-query" onclick="runQuery(); switchQMTab('dataPreview');">▶ Run Query</button>
               <button class="btn btn-primary btn-sm" id="btn-use-in-design" onclick="useResultsInDesign()" style="display:none">🎨 Use in Design</button>
             </div>
@@ -2970,8 +3037,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           <div id="qm-panel-sql">
             <div id="sql-section">
               <div class="sql-toolbar">
-                <button class="btn btn-ghost btn-sm" onclick="formatSQL()" title="Format SQL">🖋️ Format SQL</button>
-                <button class="btn btn-default btn-sm" onclick="clearSQLEditor()" title="Clear SQL editor">🗑️ Clear Code</button>
+                <button class="btn btn-default btn-sm" onclick="formatSQL()" title="Format SQL">🖋️ Format SQL</button>
+                <button class="btn btn-default btn-sm" onclick="clearSQLEditor()" title="Clear SQL editor">🧹 Clear Code</button>
               </div>
               <div id="sql-editor-wrap">
                 <textarea id="sql-editor"></textarea>
@@ -3068,7 +3135,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           <button id="preview-toolbar-button-refresh" class="btn btn-default btn-sm" onclick="refreshDashboardPreview()">🔄 Refresh</button>
           <button id="preview-toolbar-button-download" class="btn btn-default btn-sm" onclick="downloadCSV()">📄 CSV</button>
           <button id="preview-toolbar-button-print" class="btn btn-default btn-sm" onclick="printPreview()">⬇🖨️ Print</button>
-          <button id="preview-toolbar-button-generate" class="btn btn-primary btn-sm" onclick="switchTab('generate')">→ Generate &nbsp; Publish</button>
+          <button id="preview-toolbar-button-generate" class="btn btn-primary btn-sm" onclick="switchTab('generate')">✅ Generate Report</button>
         </div>
         <div id="preview-title-bar" class="hidden"></div>
         <div id="preview-filter-bar" class="hidden"></div>
@@ -3084,23 +3151,10 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       <!-- ======================== TAB 4: GENERATE ======================== -->
       <div class="tab-panel" id="tab-generate">
         <div id="generate-toolbar">
-          <h2>Generate Standalone Report</h2>
+          <h2>Generate and Publish</h2>
           <button class="btn btn-primary" onclick="generateReport()">⚙ Generate</button>
         </div>
         <div id="generate-body">
-          <div class="generate-col">
-            <div class="generate-col-label">
-              <span>📄 Report HTML</span>
-              <div class="gen-actions">
-                <button class="btn btn-default btn-sm" id="btn-copy-html" onclick="copyGenCode('html')" disabled>📋
-                  Copy</button>
-                <button class="btn btn-default btn-sm" id="btn-dl-html" onclick="downloadGenCode('html')" disabled>⬇
-                  Download .html</button>
-              </div>
-            </div>
-            <textarea id="gen-code-area"
-              placeholder="Click Generate to produce the standalone report HTML..."></textarea>
-          </div>
           <div class="generate-col">
             <div class="generate-col-label">
               <span>⚙ Report Config (JSON)</span>
@@ -3114,6 +3168,52 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
             <textarea id="gen-json-area"
               placeholder="Click Generate to produce the report configuration JSON..."></textarea>
           </div>
+          
+          <div class="gen-info-panel">
+
+            <div class="gen-info-logo"><pre style="font-family: monospace; line-height: 1;">
+       /|____________|\
+      ||  /--------\  ||    ___       _          _            _    _ _     _
+      ||_|__________| ||   |   \ __ _| |_ __ _  | |   __ _  | \  / (_) ___| |_ __  
+      ||              ||   | |) / _` |  _/ _` | | |__/ _` |  \ \/ /| (_-<  _/ _` |
+      | \____________/ |   |___/\__,_| |_\__,_| |____\__,_|   \__/ |_/__/\__\__,_|
+       \  |_|_|_|_|  / 
+        \___________/         🕶️ "The BI Terminator" 🕶️
+      </pre></div>
+
+            <div class="gen-info-section">
+              <h4>License</h4>
+              DataLaVista is free software. Licensed under <a href="https://www.gnu.org/licenses/" target="_blank">GNU GPL v3 or later.</a>
+            </div>
+
+            <div class="gen-info-section">
+              <h4>Source &amp; Documentation</h4>
+              <a href="https://github.com/DepressionCenter/datalavista" target="_blank">https://github.com/DepressionCenter/datalavista</a>
+            </div>
+
+            <div class="gen-info-section">
+              <h4>Viewing a Report</h4>
+              After generating a report configuration (JSON), publish it to a URL-accessible location,
+              then open DataLaVista with the <code>?report=</code> parameter pointing to that URL:<br><br>
+              <code>DataLaVista.html?report=https://&lt;your-host&gt;/report.json</code>
+            </div>
+
+            <div class="gen-info-section">
+              <h4>Publish &amp; Save</h4>
+            </div>
+            <div class="gen-info-actions">
+              <button class="btn btn-primary btn-sm" disabled title="Coming soon">☁ Publish to SharePoint</button>
+              <button class="btn btn-default btn-sm" disabled title="Coming soon">📋 Save to SharePoint List</button>
+              <button class="btn btn-default btn-sm" title="Coming soon" onclick="downloadGenCode('json')">💾 Save Local Copy</button>
+            </div>
+            <div class="gen-info-copyright">
+              Copyright &copy; 2026 The Regents of the University of Michigan
+              &nbsp;|&nbsp;
+              <a href="https://depressioncenter.org" target="_blank">Eisenberg Family Depression Center</a>
+            </div>
+
+          </div>
+          
         </div>
       </div>
 
@@ -3122,35 +3222,36 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 
   <!-- Toast container -->
   <div id="toast-container"></div>
-  <script>
-    /* ============================================================
-    This file is part of DataLaVista
-    DataLaVista.js: Report and dashboard designer main script file.
-    Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
-    Created: 2026-03-10
-    Last Modified: 2026-03-23
-    Summary: Main window in DataLaVista for loading data and designing reports and dashboards.
-    Notes: See README file for documentation and full license information.
-    Website: https://github.com/DepressionCenter/datalavista
-    
-    Copyright © 2026 The Regents of the University of Michigan
-    
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-    GNU General Public License for more details.
-    You should have received a copy of the GNU General Public License along
-    with this program. If not, see <https://www.gnu.org/licenses/>.
-    ================================================================ */
 
+      <!-- DataLaVista Scripts -->
+         <script>
+/* ============================================================
+This file is part of DataLaVista
+01-constants.js: Constants, state object, and core DataLaVista objects.
+Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
+Created: 2026-03-24
+Last Modified: 2026-03-24
+Summary: Constants, state object, and core DataLaVista objects.
+Notes: See README file for documentation and full license information.
+Website: https://github.com/DepressionCenter/datalavista
 
-    /* ============================================================
+Copyright (c) 2026 The Regents of the University of Michigan
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU General Public License for more details.
+You should have received a copy of the GNU General Public License along
+with this program. If not, see <https://www.gnu.org/licenses/>.
+================================================================ */
+
+/* ============================================================
     Data La Vista Core
     [I'll be backbone...]
-    =============================================================== */
+  =============================================================== */
     const DataLaVista = {
       /* ===== CONSTANTS ===== */
       // Field type icons for display in field lists, query builder, etc.
@@ -3170,23 +3271,11 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         list:    { icon: '📋', title: 'SharePoint List' },
         library: { icon: '📁', title: 'Document Library' }
       },
-      json:    { icon: '🗂️', title: 'JSON' },
-      csv:     { icon: '📊', title: 'Spreadsheet' },
-      excel:   { icon: '📗', title: 'Excel' },
-      default: { icon: '📋', title: 'Table' }
+      json:    { icon: '📚', title: 'JSON' },
+      csv:     { icon: '🏁', title: 'CSV Spreadsheet' },
+      excel:   { icon: '📗', title: 'Excel Spreadsheet' },
+      default: { icon: '⏹️', title: 'Table' }
     },
-
-      // Table/source type icons — SharePoint has sub-keys (list vs library); others are flat.
-      TABLE_SOURCE_ICONS: {
-        sharepoint: {
-          list:    { icon: '📋', title: 'SharePoint List' },
-          library: { icon: '📁', title: 'Document Library' }
-        },
-        json:    { icon: '🗂️', title: 'JSON' },
-        csv:     { icon: '📊', title: 'Spreadsheet' },
-        excel:   { icon: '📗', title: 'Excel' },
-        default: { icon: '📋', title: 'Table' }
-      },
 
       DATE_MACRO_OPS: [
         { val: 'TODAY', label: '= ☀️ Today', hasInput: false },
@@ -3476,7 +3565,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       json:    { icon: '🗂️', title: 'JSON' },
       csv:     { icon: '📊', title: 'Spreadsheet' },
       excel:   { icon: '📗', title: 'Excel' },
-      default: { icon: '📋', title: 'Table' }
+      default: { icon: '⊞', title: 'Table' }
     };
 
     /** Returns the TABLE_SOURCE_ICONS entry for a table object from state.tables. */
@@ -3588,6 +3677,29 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
     }
 
 
+
+/* ============================================================
+This file is part of DataLaVista
+02-alasql.js: AlaSQL in-browser SQL engine setup and custom functions.
+Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
+Created: 2026-03-24
+Last Modified: 2026-03-24
+Summary: AlaSQL in-browser SQL engine setup and custom functions.
+Notes: See README file for documentation and full license information.
+Website: https://github.com/DepressionCenter/datalavista
+
+Copyright (c) 2026 The Regents of the University of Michigan
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU General Public License for more details.
+You should have received a copy of the GNU General Public License along
+with this program. If not, see <https://www.gnu.org/licenses/>.
+================================================================ */
     // ============================================================
     // ALASQL SETUP
     // ============================================================
@@ -3843,6 +3955,29 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       return mapped;
     }
 
+
+/* ============================================================
+This file is part of DataLaVista
+03-sharepoint.js: SharePoint REST API adapter and field structure loader.
+Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
+Created: 2026-03-24
+Last Modified: 2026-03-24
+Summary: SharePoint REST API adapter and field structure loader.
+Notes: See README file for documentation and full license information.
+Website: https://github.com/DepressionCenter/datalavista
+
+Copyright (c) 2026 The Regents of the University of Michigan
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU General Public License for more details.
+You should have received a copy of the GNU General Public License along
+with this program. If not, see <https://www.gnu.org/licenses/>.
+================================================================ */
     // ============================================================
     // SHAREPOINT REST API ADAPTER
     // ============================================================
@@ -3996,7 +4131,7 @@ function stripODataMetadata(rows, quickCheck = false) {
 
     // Rule 3, 6, 7, 8, 9, 10: Fetch and filter structure
     const EXCLUDED_FIELDS = [
-      'ItemChildCount', 'FolderChildCount', 'MetaInfo', 'DocIcon', 'AppAuthor', 'AppEditor', 'Edit', 'ContentType', 'TemplateUrl', 'xd_ProgID', 'xd_Signature', 'HTML_x0020_File_x0020_Type', '_ModerationStatus', '_ModerationComments', 'InstanceID', 'Order', 'GUID', 'WorkflowVersion', 'WorkflowInstanceID', 'ParentVersionString', 'ParentLeafName', 'CheckedOutUserId', 'IsCheckedoutToLocal', 'UniqueId', 'SyncClientId', 'ProgId', 'ScopeId', 'FileRef', 'FileDirRef', 'Last_x0020_Modified', 'Created_x0020_Date', 'FSObjType', 'SortBehavior', 'FileLeafRef', 'OriginatorId', 'NoExecute', 'ContentVersion', 'UIVersionString', 'AccessPolicy', '_UIVersionString', 'ParentUniqueId', '_Level', 'IsCurrentVersion', 'ColorTag', '_ColorTag', '_IsRecord', '_LabelAppliedBy', '_LabelSetting', 'ComplianceAssetId', '_ComplianceFlags', '_ComplianceTag', '_ComplianceTagWrittenTime', '_ComplianceTagUserId', 'OData__SysVersion', 'OData__SysFlow', 'OData__SysProfile', '_SysVersion', '_SysFlow', '_SysProfile', 'odata.id', 'odata.etag', 'odata.type', 'odata.link', 'odata.editLink', 'odata.navigationLinkUrl', 'Author@odata.navigationLinkUrl', 'Editor@odata.navigationLinkUrl'
+      'ItemChildCount', 'FolderChildCount', 'MetaInfo', 'DocIcon', 'AppAuthor', 'AppEditor', 'Edit', 'ContentType', 'TemplateUrl', 'xd_ProgID', 'xd_Signature', 'HTML_x0020_File_x0020_Type', '_ModerationStatus', '_ModerationComments', 'InstanceID', 'Order', 'GUID', 'WorkflowVersion', 'WorkflowInstanceID', 'ParentVersionString', 'ParentLeafName', 'CheckedOutUserId', 'IsCheckedoutToLocal', 'UniqueId', 'SyncClientId', 'ProgId', 'ScopeId', 'FileRef', 'FileDirRef', 'Last_x0020_Modified', 'Created_x0020_Date', 'FSObjType', 'SortBehavior', 'OriginatorId', 'NoExecute', 'ContentVersion', 'UIVersionString', 'AccessPolicy', '_UIVersionString', 'ParentUniqueId', '_Level', 'IsCurrentVersion', 'ColorTag', '_ColorTag', '_IsRecord', '_LabelAppliedBy', '_LabelSetting', 'ComplianceAssetId', '_ComplianceFlags', '_ComplianceTag', '_ComplianceTagWrittenTime', '_ComplianceTagUserId', 'OData__SysVersion', 'OData__SysFlow', 'OData__SysProfile', '_SysVersion', '_SysFlow', '_SysProfile', 'odata.id', 'odata.etag', 'odata.type', 'odata.link', 'odata.editLink', 'odata.navigationLinkUrl', 'Author@odata.navigationLinkUrl', 'Editor@odata.navigationLinkUrl'
     ];
 
 
@@ -4270,6 +4405,29 @@ async function deriveStructureFromSample(dataArray) {
 
 
 
+
+/* ============================================================
+This file is part of DataLaVista
+04-normalization.js: Data normalization, field type parsing, and CSV parsing.
+Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
+Created: 2026-03-24
+Last Modified: 2026-03-24
+Summary: Data normalization, field type parsing, and CSV parsing.
+Notes: See README file for documentation and full license information.
+Website: https://github.com/DepressionCenter/datalavista
+
+Copyright (c) 2026 The Regents of the University of Michigan
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU General Public License for more details.
+You should have received a copy of the GNU General Public License along
+with this program. If not, see <https://www.gnu.org/licenses/>.
+================================================================ */
     // ============================================================
     // FIELD NORMALIZATION
     // ============================================================
@@ -4527,10 +4685,34 @@ async function deriveStructureFromSample(dataArray) {
       return { headers, rows };
     }
 
+/* ============================================================
+This file is part of DataLaVista
+05-data-sources.js: Data source connection popup, remote fetch guards, and source loaders.
+Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
+Created: 2026-03-24
+Last Modified: 2026-03-24
+Summary: Data source connection popup, remote fetch guards, and source loaders.
+Notes: See README file for documentation and full license information.
+Website: https://github.com/DepressionCenter/datalavista
+
+Copyright (c) 2026 The Regents of the University of Michigan
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU General Public License for more details.
+You should have received a copy of the GNU General Public License along
+with this program. If not, see <https://www.gnu.org/licenses/>.
+================================================================ */
+
     // ============================================================
     // POPUP LOGIC
     // ============================================================
     function showConnectPopup() {
+      ensureInit();
       const overlayDiv = document.getElementById('popup-overlay');
       if(overlayDiv) {
         overlayDiv.classList.add('active');
@@ -5256,6 +5438,29 @@ async function ensureTableData(tableName, allRows = true) {
   return fetchTableData(tableName, allRows);
 }
   
+
+/* ============================================================
+This file is part of DataLaVista
+06-config.js: Widget SQL generation, configuration save/load, and fields panel rendering.
+Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
+Created: 2026-03-24
+Last Modified: 2026-03-24
+Summary: Widget SQL generation, configuration save/load, and fields panel rendering.
+Notes: See README file for documentation and full license information.
+Website: https://github.com/DepressionCenter/datalavista
+
+Copyright (c) 2026 The Regents of the University of Michigan
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU General Public License for more details.
+You should have received a copy of the GNU General Public License along
+with this program. If not, see <https://www.gnu.org/licenses/>.
+================================================================ */
 // ============================================================
 // PER-WIDGET SQL GENERATOR
 // ============================================================
@@ -5735,6 +5940,29 @@ async function loadConfig(cfg) {
         });
       }
 
+
+/* ============================================================
+This file is part of DataLaVista
+07-ui-context-menu.js: Right-click context menus and data source management.
+Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
+Created: 2026-03-24
+Last Modified: 2026-03-24
+Summary: Right-click context menus and data source management.
+Notes: See README file for documentation and full license information.
+Website: https://github.com/DepressionCenter/datalavista
+
+Copyright (c) 2026 The Regents of the University of Michigan
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU General Public License for more details.
+You should have received a copy of the GNU General Public License along
+with this program. If not, see <https://www.gnu.org/licenses/>.
+================================================================ */
       // ============================================================
       // RIGHT-CLICK CONTEXT MENU
       // ============================================================
@@ -6243,6 +6471,29 @@ async function loadConfig(cfg) {
   }
 
 
+
+/* ============================================================
+This file is part of DataLaVista
+08-qb-basic.js: Basic query builder - field selection, filters, sorts, and SQL generation.
+Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
+Created: 2026-03-24
+Last Modified: 2026-03-24
+Summary: Basic query builder - field selection, filters, sorts, and SQL generation.
+Notes: See README file for documentation and full license information.
+Website: https://github.com/DepressionCenter/datalavista
+
+Copyright (c) 2026 The Regents of the University of Michigan
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU General Public License for more details.
+You should have received a copy of the GNU General Public License along
+with this program. If not, see <https://www.gnu.org/licenses/>.
+================================================================ */
       // ============================================================
       // QUERY BUILDER — BASIC MODE
       // ============================================================
@@ -6270,7 +6521,7 @@ async function loadConfig(cfg) {
 
         const cm = window._cmEditor;
         if (!cm) return; // Exist if no editor (shouldn't happen since drop target is editor wrapper, but just in case)
-        const isQueryEmpty = (!cm || cm.getValue().trim().replace('-- Connect to a data source and drag a table into the query builder\n-- or write your SQL here directly\nSELECT * FROM [YourList] LIMIT 20','').length < 1);
+        const isQueryEmpty = (!cm || cm.getValue().trim().replace('-- Connect to a data source and drag a table into the query builder\n-- or write your SQL here directly\nSELECT \'DataLaVista\'','').length < 1);
        
         // Set cursor to drop position
         const pos = cm.coordsChar({ left: event.clientX, top: event.clientY });
@@ -6912,6 +7163,29 @@ async function loadConfig(cfg) {
       function renderBasicFilters() { renderBasicConditions(); }
       function selectBasicField(tname, alias) { basicQBSelectField(tname, alias); }
 
+
+/* ============================================================
+This file is part of DataLaVista
+09-qb-advanced.js: Advanced query builder - visual join graph, nodes, and options panel.
+Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
+Created: 2026-03-24
+Last Modified: 2026-03-24
+Summary: Advanced query builder - visual join graph, nodes, and options panel.
+Notes: See README file for documentation and full license information.
+Website: https://github.com/DepressionCenter/datalavista
+
+Copyright (c) 2026 The Regents of the University of Michigan
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU General Public License for more details.
+You should have received a copy of the GNU General Public License along
+with this program. If not, see <https://www.gnu.org/licenses/>.
+================================================================ */
       // ============================================================
       // QUERY BUILDER — ADVANCED MODE
       // ============================================================
@@ -8311,6 +8585,29 @@ async function loadConfig(cfg) {
         }
       }
 
+
+/* ============================================================
+This file is part of DataLaVista
+10-query.js: Query execution, result type detection, and query preview.
+Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
+Created: 2026-03-24
+Last Modified: 2026-03-24
+Summary: Query execution, result type detection, and query preview.
+Notes: See README file for documentation and full license information.
+Website: https://github.com/DepressionCenter/datalavista
+
+Copyright (c) 2026 The Regents of the University of Michigan
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU General Public License for more details.
+You should have received a copy of the GNU General Public License along
+with this program. If not, see <https://www.gnu.org/licenses/>.
+================================================================ */
       // ============================================================
       // RUN QUERY
       // ============================================================
@@ -8444,6 +8741,29 @@ async function loadConfig(cfg) {
     return 'text';
   }
   
+
+/* ============================================================
+This file is part of DataLaVista
+11-design.js: Design canvas, widget rendering, data transforms, and widget properties.
+Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
+Created: 2026-03-24
+Last Modified: 2026-03-24
+Summary: Design canvas, widget rendering, data transforms, and widget properties.
+Notes: See README file for documentation and full license information.
+Website: https://github.com/DepressionCenter/datalavista
+
+Copyright (c) 2026 The Regents of the University of Michigan
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU General Public License for more details.
+You should have received a copy of the GNU General Public License along
+with this program. If not, see <https://www.gnu.org/licenses/>.
+================================================================ */
   // ============================================================
   // DESIGN FIELDS PANEL  (fields with agg dropdowns + filter/sort/group sections)
   // ============================================================
@@ -9537,6 +9857,29 @@ async function loadConfig(cfg) {
         });
       }
 
+
+/* ============================================================
+This file is part of DataLaVista
+12-preview.js: Preview tab, CSV download, and report generation.
+Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
+Created: 2026-03-24
+Last Modified: 2026-03-24
+Summary: Preview tab, CSV download, and report generation.
+Notes: See README file for documentation and full license information.
+Website: https://github.com/DepressionCenter/datalavista
+
+Copyright (c) 2026 The Regents of the University of Michigan
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU General Public License for more details.
+You should have received a copy of the GNU General Public License along
+with this program. If not, see <https://www.gnu.org/licenses/>.
+================================================================ */
       // ============================================================
       // PREVIEW TAB
       // ============================================================
@@ -9826,6 +10169,29 @@ async function loadConfig(cfg) {
       }
 
       
+
+/* ============================================================
+This file is part of DataLaVista
+13-ui-utils.js: Resizable panels, tab switching, utility functions, and SharePoint file picker.
+Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
+Created: 2026-03-24
+Last Modified: 2026-03-24
+Summary: Resizable panels, tab switching, utility functions, and SharePoint file picker.
+Notes: See README file for documentation and full license information.
+Website: https://github.com/DepressionCenter/datalavista
+
+Copyright (c) 2026 The Regents of the University of Michigan
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU General Public License for more details.
+You should have received a copy of the GNU General Public License along
+with this program. If not, see <https://www.gnu.org/licenses/>.
+================================================================ */
       // ============================================================
       // RESIZABLE PANELS
       // ============================================================
@@ -9911,6 +10277,7 @@ async function loadConfig(cfg) {
         document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === 'tab-' + tab));
 
         if (tab === 'dashboardPreview') { console.log('DEBUG: inside switchtab, calling refreshDashboardPreview.'); refreshDashboardPreview(); }
+        if (tab === 'generate') { generateReport(); }
         if (tab === 'design' && !state.reportMode) {
           renderDesignCanvas(); renderFilterBar(); renderDesignFieldsPanel();
           requestAnimationFrame(() => { for (const c of Object.values(state.charts)) { try { c.resize(); } catch (e) { } } });
@@ -10192,6 +10559,29 @@ async function loadConfig(cfg) {
 
 
       
+
+/* ============================================================
+This file is part of DataLaVista
+14-init.js: App initialization, lazy init guard, and report URL loading.
+Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
+Created: 2026-03-24
+Last Modified: 2026-03-24
+Summary: App initialization, lazy init guard, and report URL loading.
+Notes: See README file for documentation and full license information.
+Website: https://github.com/DepressionCenter/datalavista
+
+Copyright (c) 2026 The Regents of the University of Michigan
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU General Public License for more details.
+You should have received a copy of the GNU General Public License along
+with this program. If not, see <https://www.gnu.org/licenses/>.
+================================================================ */
       // ============================================================
       // INIT
       // ============================================================
@@ -10299,8 +10689,15 @@ async function loadConfig(cfg) {
 
       }
 
+      // Guard: call init() automatically if it was never called (e.g. SiteAssets/lazy mode).
+      function ensureInit() {
+        if (!state._initialized) init();
+      }
+
       /// Main initialization function to set up event listeners, resizers, and default states.
       async function init() {
+        if (state._initialized) return;
+        state._initialized = true;
         console.log("Come with me if you want to query...");
         setupAlaSQL();
         
@@ -10331,7 +10728,7 @@ async function loadConfig(cfg) {
         // Default SQL hint
             if (document.getElementById('sql-editor')) {
               setupCodeMirror();
-              if (window._cmEditor) window._cmEditor.setValue('-- Connect to a data source and drag a table into the query builder\n-- or write your SQL here directly\nSELECT * FROM [YourList] LIMIT 20');
+              if (window._cmEditor) window._cmEditor.setValue('-- Connect to a data source and drag a table into the query builder\n-- or write your SQL here directly\nSELECT \'DataLaVista\'');
             }
 
         // Detect whether we're in Report mode (report= parameter) or Designer mode, and show/hide UI accordingly
@@ -10417,6 +10814,29 @@ async function loadConfig(cfg) {
       }
 
       // ── Expose all functions on window so onclick="foo()" works in SharePoint ──
+
+/* ============================================================
+This file is part of DataLaVista
+15-public-api.js: Public API (window.dlv) and app self-initialization entry point.
+Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
+Created: 2026-03-24
+Last Modified: 2026-03-24
+Summary: Public API (window.dlv) and app self-initialization entry point.
+Notes: See README file for documentation and full license information.
+Website: https://github.com/DepressionCenter/datalavista
+
+Copyright (c) 2026 The Regents of the University of Michigan
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU General Public License for more details.
+You should have received a copy of the GNU General Public License along
+with this program. If not, see <https://www.gnu.org/licenses/>.
+================================================================ */
       window.dlv = {
         safeDragParse,
         safeDragSet,
@@ -10659,7 +11079,6 @@ async function loadConfig(cfg) {
     }
   }
   )();
+
   </script>
 </body>
-
-</html>

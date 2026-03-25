@@ -1,0 +1,691 @@
+﻿/* ============================================================
+This file is part of DataLaVista
+08-qb-basic.js: Basic query builder - field selection, filters, sorts, and SQL generation.
+Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
+Created: 2026-03-24
+Last Modified: 2026-03-24
+Summary: Basic query builder - field selection, filters, sorts, and SQL generation.
+Notes: See README file for documentation and full license information.
+Website: https://github.com/DepressionCenter/datalavista
+
+Copyright (c) 2026 The Regents of the University of Michigan
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU General Public License for more details.
+You should have received a copy of the GNU General Public License along
+with this program. If not, see <https://www.gnu.org/licenses/>.
+================================================================ */
+      // ============================================================
+      // QUERY BUILDER — BASIC MODE
+      // ============================================================
+      function setQBMode(mode) {
+        state.queryMode = mode;
+        document.getElementById('qb-basic').style.display = mode === 'basic' ? 'flex' : 'none';
+        document.getElementById('qb-advanced').style.display = mode === 'advanced' ? 'flex' : 'none';
+        document.getElementById('qb-basic-btn').classList.toggle('active', mode === 'basic');
+        document.getElementById('qb-adv-btn').classList.toggle('active', mode === 'advanced');
+        if (mode === 'advanced') {
+          renderAdvancedQB(); renderAdvOptionsPanel();
+        } else {
+          // Leaving advanced mode — re-enable design tabs (join restriction only applies to AQB)
+          setDesignTabsEnabled(true);
+        }
+      }
+
+      // ============================================================
+      // SQL EDITOR DROP HANDLER
+      // ============================================================
+      function onDropToSQLEditor(event) {
+        event.preventDefault();
+
+        const data = safeDragParse(event);
+
+        const cm = window._cmEditor;
+        if (!cm) return; // Exist if no editor (shouldn't happen since drop target is editor wrapper, but just in case)
+        const isQueryEmpty = (!cm || cm.getValue().trim().replace('-- Connect to a data source and drag a table into the query builder\n-- or write your SQL here directly\nSELECT \'DataLaVista\'','').length < 1);
+       
+        // Set cursor to drop position
+        const pos = cm.coordsChar({ left: event.clientX, top: event.clientY });
+        cm.setCursor(pos);
+
+        // If it's not our custom drag data, just insert the plain text
+        if (!data) {
+            // Prefer plain text for a code editor, fall back to HTML stripped of tags
+            let text = event.dataTransfer.getData('text/plain');
+            if (!text) {
+                const html = event.dataTransfer.getData('text/html');
+                if (html) {
+                    text = stripHtml(html);
+                }
+            }
+            if (text) {
+                cm.replaceSelection(text);
+            }
+        } else if (data.type === 'table') {
+          const t = state.tables[data.table];
+          if (!t) return;
+          if (isQueryEmpty) {
+            // Switch to basic QB, load table, select default fields
+            setQBMode('basic');
+            addTableToBasicQB(data.table);
+
+            // Auto-select all fields by default
+            selectAllBasicFields();
+            rebuildBasicSQL();
+          } else {
+            // Insert alias name at cursor
+            if (cm) cm.replaceSelection(`[${t.alias || data.table}]`);
+          }
+        } else if (data.type === 'field') {
+          const t = state.tables[data.table];
+          if (!t) return;
+          if (isQueryEmpty) {
+            // Switch to basic QB, load table, select only this field
+            setQBMode('basic');
+            addTableToBasicQB(data.table);
+            state.basicQB.selectedFields = [data.field];
+            // Sync checkboxes if already rendered
+            document.querySelectorAll('#basic-fields-grid input[type=checkbox]').forEach(cb => {
+              cb.checked = cb.id === 'bfchk-' + data.field;
+            });
+            rebuildBasicSQL();
+          } else {
+            // Insert alias.field at cursor
+            if (cm) cm.replaceSelection(`[${t.alias || data.table}].[${data.field}]`);
+          }
+        } else {
+          // Unknown custom data type — just ignore and don't insert anything
+          return;
+        }
+      }
+
+      function onDropToBasicQB(event) {
+        event.preventDefault();
+        document.getElementById('qb-basic-drop').classList.remove('drag-over');
+        const data = safeDragParse(event);
+        if (!data) return;
+        if (data.type === 'table') addTableToBasicQB(data.table);
+        else if (data.type === 'field') { addTableToBasicQB(data.table); basicQBSelectField(data.table, data.field); }
+      }
+
+      function addTableToBasicQB(tableName) {
+        const t = state.tables[tableName];
+        if (!t) return;
+
+        // Always reset fully when a new table is dropped — even if same table
+        state.basicQB.tableName = tableName;
+        state.basicQB.selectedFields = [];
+        state.basicQB.fieldAggs = {};
+        state.basicQB.conditions = [];
+        state.basicQB.sorts = [];
+        state.basicQB.groupBy = [];
+        state.basicQB.rowLimit = 500;
+
+        // Auto-select all fields by default
+        selectAllBasicFields();
+        renderBasicQB();
+        ensureTableData(tableName);
+      }
+
+      function basicQBSelectField(tableName, fieldAlias) {
+        if (state.basicQB.tableName !== tableName) return;
+        if (!state.basicQB.selectedFields.includes(fieldAlias)) {
+          state.basicQB.selectedFields.push(fieldAlias);
+          renderBasicQB();
+        }
+      }
+
+      // ── Date macro helpers ────────────────────────────────────────────────────────
+      function dateMacroToSQL(op, value, colExpr) {
+        const now = new Date();
+        const pad = n => String(n).padStart(2, '0');
+        const fmt = d => `'${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}'`;
+
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const todayStr = fmt(today);
+
+        function fiscalStart(yr) { return new Date(yr, 6, 1); }   // July 1
+        function academicStart(yr) { return new Date(yr, 7, 1); } // Aug 1
+
+        switch (op) {
+          case 'THIS_YEAR': {
+            const s = fmt(new Date(today.getFullYear(), 0, 1));
+            const e = fmt(new Date(today.getFullYear(), 11, 31));
+            return `${colExpr} >= ${s} AND ${colExpr} <= ${e}`;
+          }
+          case 'LAST_YEAR': {
+            const y = today.getFullYear() - 1;
+            return `${colExpr} >= '${y}-01-01' AND ${colExpr} <= '${y}-12-31'`;
+          }
+          case 'THIS_FISCAL': {
+            // Fiscal year: July 1 – June 30
+            const fy = today.getMonth() >= 6 ? today.getFullYear() : today.getFullYear() - 1;
+            const s = fmt(fiscalStart(fy));
+            const e = fmt(new Date(fy + 1, 5, 30));
+            return `${colExpr} >= ${s} AND ${colExpr} <= ${e}`;
+          }
+          case 'LAST_FISCAL': {
+            const fy = (today.getMonth() >= 6 ? today.getFullYear() : today.getFullYear() - 1) - 1;
+            const s = fmt(fiscalStart(fy));
+            const e = fmt(new Date(fy + 1, 5, 30));
+            return `${colExpr} >= ${s} AND ${colExpr} <= ${e}`;
+          }
+          case 'THIS_ACADEMIC': {
+            // Academic year: Aug 1 – July 31
+            const ay = today.getMonth() >= 7 ? today.getFullYear() : today.getFullYear() - 1;
+            const s = fmt(academicStart(ay));
+            const e = fmt(new Date(ay + 1, 6, 31));
+            return `${colExpr} >= ${s} AND ${colExpr} <= ${e}`;
+          }
+          case 'LAST_ACADEMIC': {
+            const ay = (today.getMonth() >= 7 ? today.getFullYear() : today.getFullYear() - 1) - 1;
+            const s = fmt(academicStart(ay));
+            const e = fmt(new Date(ay + 1, 6, 31));
+            return `${colExpr} >= ${s} AND ${colExpr} <= ${e}`;
+          }
+          case 'THIS_MONTH': {
+            const s = fmt(new Date(today.getFullYear(), today.getMonth(), 1));
+            const e = fmt(new Date(today.getFullYear(), today.getMonth() + 1, 0));
+            return `${colExpr} >= ${s} AND ${colExpr} <= ${e}`;
+          }
+          case 'LAST_MONTH': {
+            const s = fmt(new Date(today.getFullYear(), today.getMonth() - 1, 1));
+            const e = fmt(new Date(today.getFullYear(), today.getMonth(), 0));
+            return `${colExpr} >= ${s} AND ${colExpr} <= ${e}`;
+          }
+          case 'THIS_WEEK': {
+            const dow = today.getDay();
+            const s = new Date(today); s.setDate(today.getDate() - dow);
+            const e = new Date(s); e.setDate(s.getDate() + 6);
+            return `${colExpr} >= ${fmt(s)} AND ${colExpr} <= ${fmt(e)}`;
+          }
+          case 'LAST_WEEK': {
+            const dow = today.getDay();
+            const s = new Date(today); s.setDate(today.getDate() - dow - 7);
+            const e = new Date(s); e.setDate(s.getDate() + 6);
+            return `${colExpr} >= ${fmt(s)} AND ${colExpr} <= ${fmt(e)}`;
+          }
+          case 'THIS_BIZ_WEEK': {
+            const dow = today.getDay();
+            // Adjust day of week so Monday is 0, Tuesday is 1... Sunday is 6
+            const diffToMonday = dow === 0 ? 6 : dow - 1;
+
+            const s = new Date(today); s.setDate(today.getDate() - diffToMonday); // Monday
+            const e = new Date(s); e.setDate(s.getDate() + 4); // Friday
+
+            return `${colExpr} >= ${fmt(s)} AND ${colExpr} <= ${fmt(e)}`;
+          }
+          case 'LAST_BIZ_WEEK': {
+            const dow = today.getDay();
+            const diffToMonday = dow === 0 ? 6 : dow - 1;
+
+            const s = new Date(today); s.setDate(today.getDate() - diffToMonday - 7); // Last Monday
+            const e = new Date(s); e.setDate(s.getDate() + 4); // Last Friday
+
+            return `${colExpr} >= ${fmt(s)} AND ${colExpr} <= ${fmt(e)}`;
+          }
+          case 'TODAY': return `${colExpr} >= ${todayStr} AND ${colExpr} < '${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate() + 1)}'`;
+          case 'PAST_X_DAYS': {
+            const x = parseInt(value) || 1;
+            const s = new Date(today); s.setDate(today.getDate() - x + 1);
+            return `${colExpr} >= ${fmt(s)} AND ${colExpr} <= ${todayStr}`;
+          }
+          case 'PAST_X_MONTHS': {
+            const x = parseInt(value) || 1;
+            const s = new Date(today); s.setMonth(today.getMonth() - x + 1); s.setDate(1);
+            return `${colExpr} >= ${fmt(s)} AND ${colExpr} <= ${todayStr}`;
+          }
+          case 'PAST_X_YEARS': {
+            const x = parseInt(value) || 1;
+            const s = new Date(today); s.setFullYear(today.getFullYear() - x + 1); s.setMonth(0); s.setDate(1);
+            return `${colExpr} >= ${fmt(s)} AND ${colExpr} <= ${todayStr}`;
+          }
+          case 'PAST_X_FISCAL': {
+            const x = parseInt(value) || 1;
+            const fy = (today.getMonth() >= 6 ? today.getFullYear() : today.getFullYear() - 1) - x + 1;
+            const s = fmt(fiscalStart(fy));
+            const currFyEnd = (() => { const fy2 = today.getMonth() >= 6 ? today.getFullYear() : today.getFullYear() - 1; return fmt(new Date(fy2 + 1, 5, 30)); })();
+            return `${colExpr} >= ${s} AND ${colExpr} <= ${currFyEnd}`;
+          }
+          default: return null;
+        }
+      }
+
+      // Which aggregates are visible for a given field displayType
+      function aggsForType(displayType) {
+        const isNumeric = displayType === 'number';
+        const isDate = displayType === 'date';
+        // text, lookup, bool, array → only 'all' tier
+        // date → 'all' + 'ordered'
+        // number → all tiers
+        return QB_AGGS.filter(a => {
+          if (a.types === 'all') return true;
+          if (a.types === 'ordered') return isNumeric || isDate;
+          if (a.types === 'numeric') return isNumeric;
+          return false;
+        });
+      }
+
+      // ── QB: build SQL from state ──────────────────────────────────────────────
+      // Rule: FROM always uses the immutable tableKey (registered in AlaSQL).
+      //       Column refs use [tableKey].[internalName].
+      //       AS clause adds the user-facing field alias as the result column name.
+      function buildBasicSQL(formatted = false) {
+        const tkey = state.basicQB.tableName;
+        const t = tkey ? state.tables[tkey] : null;
+        if (!t) return '';
+
+        // Helper: resolve a field alias → internalName for SQL column references
+        const getInternal = (alias) => {
+          const f = t.fields.find(f => f.alias === alias);
+          return f ? (f.internalName || alias) : alias;
+        };
+
+        const selectedAliases = state.basicQB.selectedFields;
+        const aggs   = state.basicQB.fieldAggs || {};
+        const conds  = state.basicQB.conditions.filter(c => c.field);
+        const sorts  = state.basicQB.sorts.filter(s => s.field);
+        const limit  = state.basicQB.rowLimit || 500;
+        const anyAgg = selectedAliases.some(a => aggs[a]);
+
+        // SELECT [tkey].[internalName] AS [fieldAlias]
+        const selCols = selectedAliases.length ? selectedAliases.map(fa => {
+          const agg   = aggs[fa];
+          const iname = getInternal(fa);
+          const col   = `[${tkey}].[${iname}]`;
+          if (!agg) return `${col} AS [${fa}]`;
+          if (agg === 'COUNT_DISTINCT') return `COUNT(DISTINCT ${col}) AS [CountDistinct_${fa}]`;
+          return `${agg}(${col}) AS [${agg}_${fa}]`;
+        }) : [`[${tkey}].*`];
+
+        const autoGroups   = anyAgg
+          ? selectedAliases.filter(a => !aggs[a]).map(a => `[${tkey}].[${getInternal(a)}]`)
+          : [];
+        const manualGroups = !anyAgg
+          ? (state.basicQB.groupBy || []).filter(g => g).map(g => `[${tkey}].[${getInternal(g)}]`)
+          : [];
+        const groupParts = anyAgg ? autoGroups : manualGroups;
+
+        const whereParts = conds.map((c, i) => {
+          const conj = i === 0 ? '' : (c.conj || 'AND') + ' ';
+          const col  = `[${tkey}].[${getInternal(c.field)}]`;
+          if (c.op === 'NULL')    return conj + `${col} IS NULL`;
+          if (c.op === 'NOTNULL') return conj + `${col} IS NOT NULL`;
+          if (DATE_MACRO_VALS.has(c.op)) {
+            const expr = dateMacroToSQL(c.op, c.value, col);
+            return expr ? conj + expr : conj + `${col} IS NOT NULL`;
+          }
+          const raw = c.value || '';
+          const val = c.op === 'LIKE'
+            ? `'%${raw}%'`
+            : (raw !== '' && !isNaN(raw) ? raw : `'${raw.replace(/'/g, "''")}'`);
+          return conj + `${col} ${c.op} ${val}`;
+        });
+
+        const orderParts = sorts.map(s => `[${tkey}].[${getInternal(s.field)}] ${s.dir || 'ASC'}`);
+
+        if (!formatted) {
+          let sql = `SELECT ${selCols.join(', ')} FROM [${tkey}]`;
+          if (whereParts.length) sql += ` WHERE ${whereParts.join(' ')}`;
+          if (groupParts.length) sql += ` GROUP BY ${groupParts.join(', ')}`;
+          if (orderParts.length) sql += ` ORDER BY ${orderParts.join(', ')}`;
+          sql += ` LIMIT ${limit}`;
+          return sql;
+        } else {
+          let sql = `SELECT\n  ${selCols.join(',\n  ')}\nFROM [${tkey}]`;
+          if (whereParts.length) sql += `\nWHERE\n  ${whereParts.join('\n  ')}`;
+          if (groupParts.length) sql += `\nGROUP BY\n  ${groupParts.join(',\n  ')}`;
+          if (orderParts.length) sql += `\nORDER BY\n  ${orderParts.join(',\n  ')}`;
+          sql += `\nLIMIT ${limit}`;
+          return sql;
+        }
+      }
+
+      // ── QB: render the full basic QB UI ──────────────────────────────────────────
+      function renderBasicQB() {
+        const tname = state.basicQB.tableName;
+        const t = tname ? state.tables[tname] : null;
+        const content = document.getElementById('qb-basic-content');
+        const dropZone = document.getElementById('qb-basic-drop');
+
+        if (!t) {
+          content.innerHTML = '';
+          dropZone.style.display = 'flex';
+          return;
+        }
+        dropZone.style.display = 'none';
+
+        const rows = t.fields.filter(f => !f.isAutoId);
+
+        content.innerHTML = `
+    <div class="basic-table-card">
+      <!-- Card header -->
+      <div class="basic-table-card-header">
+        <span style="font-weight:700;font-size:13px">${t.alias || t.displayName}</span>
+        <div style="display:flex;gap:6px;align-items:center">
+          <span style="font-size:11px;color:var(--text-disabled)">${t.displayName}</span>
+          <button class="btn btn-ghost btn-sm btn-icon" onclick="clearBasicQB()" title="Remove table">✕</button>
+        </div>
+      </div>
+
+      <!-- 1. COLUMNS -->
+      <div class="qb-section">
+        <div class="qb-section-header">
+          <span>COLUMNS</span>
+          <div style="display:flex;gap:4px">
+            <button class="btn btn-ghost btn-sm" onclick="selectAllBasicFields()">All</button>
+            <button class="btn btn-ghost btn-sm" onclick="clearBasicFields()">None</button>
+          </div>
+        </div>
+        <div class="basic-fields-grid" id="basic-fields-grid"></div>
+      </div>
+
+      <!-- 2. FILTER CONDITIONS -->
+      <div class="qb-section">
+        <div class="qb-section-header">
+          <span>FILTER CONDITIONS</span>
+          <button class="btn btn-ghost btn-sm" onclick="addBasicCondition()">+ Add</button>
+        </div>
+        <div id="basic-conditions-area"></div>
+      </div>
+
+      <!-- 3. SORT ORDER -->
+      <div class="qb-section">
+        <div class="qb-section-header">
+          <span>SORT ORDER</span>
+          <button class="btn btn-ghost btn-sm" onclick="addBasicSort()">+ Add</button>
+        </div>
+        <div id="basic-sorts-area"></div>
+      </div>
+
+      <!-- 4. GROUP BY -->
+      <div class="qb-section">
+        <div class="qb-section-header">
+          <span id="groupby-section-label">GROUP BY</span>
+          <button class="btn btn-ghost btn-sm" id="groupby-add-btn" onclick="addBasicGroupBy()">+ Add</button>
+        </div>
+        <div id="basic-groupby-area"></div>
+      </div>
+
+      <!-- 5. ROW LIMIT -->
+      <div class="qb-section">
+        <div class="qb-section-header"><span>ROW LIMIT</span></div>
+        <div style="padding:4px 0">
+          <input type="number" class="form-input" style="height:28px;font-size:12px;width:120px"
+            min="1" max="50000" value="${state.basicQB.rowLimit || 500}"
+            onchange="state.basicQB.rowLimit = Math.min(50000, Math.max(1, +this.value||500)); rebuildBasicSQL()"/>
+        </div>
+      </div>
+    </div>
+  `;
+
+        // Render field checkboxes with aggregate dropdown
+        const grid = document.getElementById('basic-fields-grid');
+        const aggs = state.basicQB.fieldAggs || {};
+        for (const f of rows) {
+          const checked = state.basicQB.selectedFields.includes(f.alias);
+          const currentAgg = aggs[f.alias] || '';
+          const ti = FIELD_TYPE_ICONS[f.displayType] || FIELD_TYPE_ICONS.default;
+          const availableAggs = aggsForType(f.displayType);
+          const aggOpts = availableAggs.map(a => `<option value="${a.val}" ${a.val === currentAgg ? 'selected' : ''}>${a.label}</option>`).join('');
+          const div = document.createElement('div');
+          div.className = 'basic-field-row' + (checked ? '' : ' field-row-unchecked');
+          div.innerHTML = `
+      <input type="checkbox" id="bfchk-${f.alias}" ${checked ? 'checked' : ''}
+        onchange="toggleBasicField('${f.alias}', this.checked)"/>
+      <span class="field-type-icon ${ti.cls}" style="font-size:10px">${ti.icon}</span>
+      <label for="bfchk-${f.alias}" title="${f.displayName}" style="flex:1">${f.alias}</label>
+      ${checked ? `<select class="form-input field-agg-select" title="Aggregate function"
+        onchange="setFieldAgg('${f.alias}', this.value)">${aggOpts}</select>` : ''}
+    `;
+          grid.appendChild(div);
+        }
+
+        renderBasicConditions();
+        renderBasicSorts();
+        syncGroupBySection();
+        rebuildBasicSQL();
+      }
+
+      function toggleBasicField(alias, checked) {
+        if (checked) {
+          if (!state.basicQB.selectedFields.includes(alias)) state.basicQB.selectedFields.push(alias);
+        } else {
+          state.basicQB.selectedFields = state.basicQB.selectedFields.filter(f => f !== alias);
+          if (state.basicQB.fieldAggs) delete state.basicQB.fieldAggs[alias];
+        }
+        // Re-render to show/hide agg dropdown and update GROUP BY section
+        renderBasicQB();
+      }
+
+      function setFieldAgg(alias, agg) {
+        if (!state.basicQB.fieldAggs) state.basicQB.fieldAggs = {};
+        if (agg) state.basicQB.fieldAggs[alias] = agg;
+        else delete state.basicQB.fieldAggs[alias];
+        syncGroupBySection();
+        rebuildBasicSQL();
+      }
+
+      // Show/hide the manual GROUP BY section & its add button based on whether aggs are active
+      function syncGroupBySection() {
+        const anyAgg = state.basicQB.selectedFields.some(f => (state.basicQB.fieldAggs || {})[f]);
+        const label = document.getElementById('groupby-section-label');
+        const addBtn = document.getElementById('groupby-add-btn');
+        if (label) label.textContent = anyAgg ? 'GROUP BY (auto)' : 'GROUP BY';
+        if (addBtn) addBtn.style.display = anyAgg ? 'none' : '';
+        if (anyAgg) {
+          // Clear manual group-by entries and show auto message
+          const area = document.getElementById('basic-groupby-area');
+          if (area) {
+            const nonAggFields = state.basicQB.selectedFields.filter(f => !(state.basicQB.fieldAggs || {})[f]);
+            area.innerHTML = nonAggFields.length
+              ? `<div style="font-size:11px;color:var(--text-disabled);padding:2px 0">Auto: ${nonAggFields.join(', ')}</div>`
+              : `<div style="font-size:11px;color:var(--text-disabled);padding:2px 0">All fields aggregated — no GROUP BY needed</div>`;
+          }
+        } else {
+          renderBasicGroupBy();
+        }
+      }
+
+      function selectAllBasicFields() {
+        const t = state.tables[state.basicQB.tableName];
+        if (!t) return;
+        state.basicQB.selectedFields = t.fields.filter(f => !f.isAutoId).map(f => f.alias);
+        renderBasicQB();
+      }
+      function clearBasicFields() { state.basicQB.selectedFields = []; renderBasicQB(); }
+      function clearBasicQB() {
+        state.basicQB = { tableName: null, selectedFields: [], fieldAggs: {}, conditions: [], sorts: [], groupBy: [], rowLimit: 500 };
+        renderBasicQB();
+        document.getElementById('qb-basic-drop').style.display = 'flex';
+      }
+
+      // ── Conditions ────────────────────────────────────────────────────────────────
+      const QB_OPS = [
+        { val: '=', label: '= equals' },
+        { val: '!=', label: '≠ not equals' },
+        { val: '>', label: '> greater than' },
+        { val: '<', label: '< less than' },
+        { val: '>=', label: '≥ greater or equal' },
+        { val: '<=', label: '≤ less or equal' },
+        { val: 'LIKE', label: '~ contains' },
+        { val: 'NULL', label: '∅ is blank' },
+        { val: 'NOTNULL', label: '✓ is not blank' },
+      ];
+
+      function addBasicCondition() {
+        const t = state.tables[state.basicQB.tableName];
+        if (!t) return;
+        const fields = t.fields.filter(f => !f.isAutoId);
+        state.basicQB.conditions.push({ conj: 'AND', field: fields[0]?.alias || '', op: '=', value: '' });
+        renderBasicConditions();
+      }
+
+      function removeBasicCondition(i) {
+        state.basicQB.conditions.splice(i, 1);
+        renderBasicConditions();
+        rebuildBasicSQL();
+      }
+
+      function renderBasicConditions() {
+        const area = document.getElementById('basic-conditions-area');
+        if (!area) return;
+        const t = state.tables[state.basicQB.tableName];
+        if (!t) return;
+        const fields = t.fields.filter(f => !f.isAutoId);
+        const fieldOpts = fields.map(f => `<option value="${f.alias}">${f.alias}</option>`).join('');
+
+        area.innerHTML = '';
+        if (!state.basicQB.conditions.length) {
+          area.innerHTML = '<div style="font-size:11px;color:var(--text-disabled);padding:2px 0">No filters — click + Add</div>';
+          return;
+        }
+
+        state.basicQB.conditions.forEach((c, i) => {
+          // Determine if the selected field is a date type
+          const fieldMeta = fields.find(f => f.alias === c.field);
+          const isDate = fieldMeta && fieldMeta.displayType === 'date';
+          const ops = isDate ? [...QB_OPS, ...DATE_MACRO_OPS] : QB_OPS;
+          // A date macro has no free-text value; only NULL/NOTNULL/macros hide the input
+          const isMacro = DATE_MACRO_VALS.has(c.op);
+          const macroMeta = DATE_MACRO_OPS.find(o => o.val === c.op);
+          const needsValue = c.op !== 'NULL' && c.op !== 'NOTNULL' && !(isMacro && !macroMeta?.hasInput);
+          const valPlaceholder = isMacro && macroMeta?.hasInput ? 'e.g. 3' : 'value';
+
+          const row = document.createElement('div');
+          row.className = 'qb-condition-row';
+          row.innerHTML = `
+      ${i === 0
+              ? `<span class="qb-where-badge">WHERE</span>`
+              : `<select class="form-input qb-conj-select" onchange="state.basicQB.conditions[${i}].conj=this.value; rebuildBasicSQL()">
+            <option ${c.conj === 'AND' ? 'selected' : ''}>AND</option>
+            <option ${c.conj === 'OR' ? 'selected' : ''}>OR</option>
+           </select>`
+            }
+      <select class="form-input qb-field-select" onchange="state.basicQB.conditions[${i}].field=this.value; renderBasicConditions(); rebuildBasicSQL()">
+        ${fields.map(f => `<option value="${f.alias}" ${f.alias === c.field ? 'selected' : ''}>${f.alias}</option>`).join('')}
+      </select>
+      <select class="form-input qb-op-select" style="width:${isDate ? '150px' : '112px'} !important" onchange="state.basicQB.conditions[${i}].op=this.value; renderBasicConditions(); rebuildBasicSQL()">
+        ${ops.map(o => `<option value="${o.val}" ${o.val === c.op ? 'selected' : ''}>${o.label}</option>`).join('')}
+      </select>
+      ${needsValue
+              ? `<input type="${isMacro ? 'number' : 'text'}" class="form-input qb-val-input" placeholder="${valPlaceholder}"
+             min="1" value="${(c.value || '').replace(/"/g, '&quot;')}"
+             oninput="state.basicQB.conditions[${i}].value=this.value; rebuildBasicSQL()"/>`
+              : `<span class="qb-val-blank"></span>`
+            }
+      <button class="btn btn-ghost btn-sm btn-icon qb-remove-btn" onclick="removeBasicCondition(${i})">✕</button>
+    `;
+          area.appendChild(row);
+        });
+      }
+
+      // ── Sorts ─────────────────────────────────────────────────────────────────────
+      function addBasicSort() {
+        const t = state.tables[state.basicQB.tableName];
+        if (!t) return;
+        const fields = t.fields.filter(f => !f.isAutoId);
+        state.basicQB.sorts.push({ field: fields[0]?.alias || '', dir: 'ASC' });
+        renderBasicSorts();
+      }
+
+      function removeBasicSort(i) {
+        state.basicQB.sorts.splice(i, 1);
+        renderBasicSorts();
+        rebuildBasicSQL();
+      }
+
+      function renderBasicSorts() {
+        const area = document.getElementById('basic-sorts-area');
+        if (!area) return;
+        const t = state.tables[state.basicQB.tableName];
+        if (!t) return;
+        const fields = t.fields.filter(f => !f.isAutoId);
+
+        area.innerHTML = '';
+        if (!state.basicQB.sorts.length) {
+          area.innerHTML = '<div style="font-size:11px;color:var(--text-disabled);padding:2px 0">No sorts — click + Add</div>';
+          return;
+        }
+
+        state.basicQB.sorts.forEach((s, i) => {
+          const row = document.createElement('div');
+          row.className = 'qb-sort-row';
+          row.innerHTML = `
+      <select class="form-input qb-field-select" onchange="state.basicQB.sorts[${i}].field=this.value; rebuildBasicSQL()">
+        ${fields.map(f => `<option value="${f.alias}" ${f.alias === s.field ? 'selected' : ''}>${f.alias}</option>`).join('')}
+      </select>
+      <select class="form-input qb-dir-select" onchange="state.basicQB.sorts[${i}].dir=this.value; rebuildBasicSQL()">
+        <option ${s.dir === 'ASC' ? 'selected' : ''}>ASC</option>
+        <option ${s.dir === 'DESC' ? 'selected' : ''}>DESC</option>
+      </select>
+      <button class="btn btn-ghost btn-sm btn-icon qb-remove-btn" onclick="removeBasicSort(${i})">✕</button>
+    `;
+          area.appendChild(row);
+        });
+      }
+
+      // ── Rebuild SQL and push to editor ────────────────────────────────────────────
+      function rebuildBasicSQL() {
+        if (state.sqlLocked) return;
+        const compact = buildBasicSQL(false);
+        const formatted = buildBasicSQL(true);
+        state.sql = compact;
+        if (window._cmEditor && formatted) window._cmEditor.setValue(formatted);
+        hideUseInDesign();
+      }
+
+      // ── Group By ─────────────────────────────────────────────────────────────────
+      function addBasicGroupBy() {
+        const t = state.tables[state.basicQB.tableName];
+        if (!t) return;
+        const fields = t.fields.filter(f => !f.isAutoId);
+        if (!state.basicQB.groupBy) state.basicQB.groupBy = [];
+        state.basicQB.groupBy.push(fields[0]?.alias || '');
+        renderBasicGroupBy();
+        rebuildBasicSQL();
+      }
+
+      function removeBasicGroupBy(i) {
+        state.basicQB.groupBy.splice(i, 1);
+        renderBasicGroupBy();
+        rebuildBasicSQL();
+      }
+
+      function renderBasicGroupBy() {
+        const area = document.getElementById('basic-groupby-area');
+        if (!area) return;
+        const t = state.tables[state.basicQB.tableName];
+        if (!t) return;
+        const fields = t.fields.filter(f => !f.isAutoId);
+        const groups = state.basicQB.groupBy || [];
+
+        area.innerHTML = '';
+        if (!groups.length) {
+          area.innerHTML = '<div style="font-size:11px;color:var(--text-disabled);padding:2px 0">No grouping — click + Add</div>';
+          return;
+        }
+        groups.forEach((g, i) => {
+          const row = document.createElement('div');
+          row.className = 'qb-sort-row';
+          row.innerHTML = `
+      <select class="form-input qb-field-select" onchange="state.basicQB.groupBy[${i}]=this.value; rebuildBasicSQL()">
+        ${fields.map(f => `<option value="${f.alias}" ${f.alias === g ? 'selected' : ''}>${f.alias}</option>`).join('')}
+      </select>
+      <button class="btn btn-ghost btn-sm btn-icon qb-remove-btn" onclick="removeBasicGroupBy(${i})">✕</button>
+    `;
+          area.appendChild(row);
+        });
+      }
+
+      // Legacy aliases kept so any other code that calls these still works
+      function addBasicFilter() { addBasicCondition(); }
+      function removeBasicFilter(i) { removeBasicCondition(i); }
+      function renderBasicFilters() { renderBasicConditions(); }
+      function selectBasicField(tname, alias) { basicQBSelectField(tname, alias); }
+

@@ -1,0 +1,16 @@
+ID,ProjectName,Department,PI,StartDate,EndDate,Budget,Status,FundingSource,IsExternal
+1,Neural Interface Study,Neuroscience,Dr. Sarah Chen,2024-01-15,2025-12-31,450000,Active,NIH Grant,true
+2,Climate Data Analysis,Environmental Science,Dr. James Park,2023-06-01,2024-05-31,125000,Completed,NSF,true
+3,Urban Mobility Survey,Civil Engineering,Dr. Maria Santos,2024-03-01,2026-02-28,280000,Active,DOT,true
+4,Cancer Biomarker Study,Oncology,Dr. Robert Kim,2024-07-01,2027-06-30,890000,Active,NIH Grant,true
+5,AI Ethics Framework,Computer Science,Dr. Lisa Okonkwo,2024-01-01,2024-12-31,95000,Completed,Internal,false
+6,Microbiome Research,Biology,Dr. Tom Nguyen,2023-09-01,2025-08-31,320000,Active,NSF,true
+7,Renewable Energy Grid,Engineering,Dr. Anna Petrov,2022-04-01,2024-03-31,750000,Completed,DOE,true
+8,Literacy Intervention Program,Education,Dr. Carlos Rivera,2024-02-01,2025-01-31,65000,Active,Dept of Ed,true
+9,Protein Folding Simulation,Biochemistry,Dr. Wei Zhang,2024-05-01,2026-04-30,415000,Active,NIH Grant,true
+10,Social Media Mental Health,Psychology,Dr. Rachel Green,2023-11-01,2025-10-31,180000,Active,NSF,true
+11,Smart Building Sensors,Architecture,Dr. Ahmed Hassan,2024-01-15,2025-06-30,230000,On Hold,Internal,false
+12,Vaccine Efficacy Trial,Immunology,Dr. Jennifer Walsh,2024-08-01,2027-07-31,1200000,Active,NIH Grant,true
+13,Ocean Plastic Mapping,Marine Biology,Dr. David Osei,2023-07-01,2024-06-30,145000,Completed,NOAA,true
+14,Quantum Computing Applications,Physics,Dr. Elena Volkov,2024-03-01,2026-02-28,525000,Active,NSF,true
+15,Indigenous Language Preservation,Linguistics,Dr. Michael Thunderbird,2024-06-01,2027-05-31,175000,Active,NEH,true

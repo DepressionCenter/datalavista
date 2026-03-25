@@ -1,4 +1,5 @@
 {
+  "$license": "This file is part of DataLaVista. Copyright (c) 2026 The Regents of the University of Michigan. Licensed under GPL-3.0 or later. See https://github.com/DepressionCenter/datalavista",
   "$schema": "https://developer.microsoft.com/json-schemas/sp/v2/column-formatting.schema.json",
   "elmType": "div",
   "style": {

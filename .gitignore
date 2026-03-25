@@ -1,16 +1,24 @@
 # .gitignore - special file for Git telling it which files to ignore when committing changes to the repository
 
-# Ignore RStudio project files/folders
-.Rproj.user/
-*.Rproj
+# Ignore log files
+*.log
 
-# Ignore R cache and history
-.RData
-.RHistory
-.Rhistory
-.Ruserdata
-.Rapp.history
+#Ignore VSCode settings
+.vscode/
+
+#Ignore temporary files
+*.tmp
+WIP.html
 
 # Ignore all data files except the one that's tracked
 # Example: .csv
 # Example: !sample-data.csv
+.csv
+.xls
+.xlsx
+.json
+!sample-data*.csv
+!sample-data*.xlsx
+!sample-data*.json
+!sample-report*.json
+!report-template.json

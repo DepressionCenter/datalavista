@@ -1,0 +1,155 @@
+﻿/* ============================================================
+This file is part of DataLaVista
+10-query.js: Query execution, result type detection, and query preview.
+Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
+Created: 2026-03-24
+Last Modified: 2026-03-24
+Summary: Query execution, result type detection, and query preview.
+Notes: See README file for documentation and full license information.
+Website: https://github.com/DepressionCenter/datalavista
+
+Copyright (c) 2026 The Regents of the University of Michigan
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU General Public License for more details.
+You should have received a copy of the GNU General Public License along
+with this program. If not, see <https://www.gnu.org/licenses/>.
+================================================================ */
+      // ============================================================
+      // RUN QUERY
+      // ============================================================
+      async function runQuery() {
+        const sql = window._cmEditor ? window._cmEditor.getValue() : state.sql;
+        if (!sql.trim()) { toast('Please enter a SQL query', 'error'); return; }
+        state.sql = sql;
+
+        setStatus('⏳ Running query...');
+
+        try {
+          // Find referenced tables
+          const referencedTables = findReferencedTables(sql);
+
+          // Load data for all referenced tables
+          for (const tname of referencedTables) {
+            await ensureTableData(tname,true);
+          }
+
+          // Register each referenced table in AlaSQL under its live query name (DSAlias_TableAlias)
+          // TODO shouldnt this be internal names? Can we use alasql aliases?
+          for (const tname of referencedTables) {
+            const t = state.tables[tname];
+            if (!t || !t.data) continue;
+            registerTableInAlaSQL(tname);
+          }
+
+          // Execute SQL with preprocessing
+          const processedSQL = preprocessSQL(sql);
+          const results = alasql(processedSQL);
+
+          if (!Array.isArray(results)) throw new Error('Query returned no results');
+          state.queryResults = results;
+          state.queryColumns = results.length ? Object.keys(results[0]) : [];
+
+          // Show preview
+          showQueryPreview(results);
+          // Reset design transforms when new query results arrive
+          state.design.transformedResults = null;
+          applyDesignTransforms();
+          renderDesignFieldsPanel();
+          setStatus(`✅ Query returned ${results.length} rows`);
+          toast(`Query returned ${results.length} rows`, 'success');
+        } catch (err) {
+          console.error(err);
+          toast('Query error: ' + err.message, 'error');
+          setStatus('❌ Query error: ' + err.message);
+          hideUseInDesign();
+        }
+      }
+
+      function findReferencedTables(sql) {
+        const found = [];
+        for (const [tkey] of Object.entries(state.tables)) {
+          // Match by the immutable table key only (e.g. SP_EngagementHistory)
+          // The alias form (SP_Contacts) appears in SQL as a FROM alias, not a table name
+          const esc = tkey.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          const re = new RegExp(`\\[${esc}\\]|\\b${esc}\\b`, 'i');
+          if (re.test(sql)) found.push(tkey);
+        }
+        return found;
+      }
+
+      function showQueryPreview(results) {
+        const wrap  = document.getElementById('preview-table-wrap');
+        const count = document.getElementById('preview-row-count');
+        count.textContent = `${results.length} rows (showing top 20)`;
+
+        if (!results.length) {
+          wrap.innerHTML = '<div class="text-muted text-sm" style="padding:12px">No results</div>';
+          hideUseInDesign();
+          return;
+        }
+
+        const cols  = Object.keys(results[0]);
+        const top20 = results.slice(0, 20);
+        let html = '<table><thead><tr>' + cols.map(c => `<th>${c}</th>`).join('') + '</tr></thead><tbody>';
+        for (const row of top20) {
+          html += '<tr>' + cols.map(c => `<td title="${row[c] ?? ''}">${row[c] ?? ''}</td>`).join('') + '</tr>';
+        }
+        html += '</tbody></table>';
+        wrap.innerHTML = html;
+        showUseInDesign();
+      }
+
+      function showUseInDesign() {
+        const btn = document.getElementById('btn-use-in-design');
+        if (btn) btn.style.display = '';
+        state.queryResultsReady = true;
+      }
+      function hideUseInDesign() {
+        const btn = document.getElementById('btn-use-in-design');
+        if (btn) btn.style.display = 'none';
+        state.queryResultsReady = false;
+      }
+
+      function toggleAdvOptionsPanel() {
+        const panel = document.getElementById('adv-options-panel');
+        const btn   = document.getElementById('adv-opts-toggle');
+        const collapsed = panel.classList.toggle('collapsed');
+        btn.textContent = collapsed ? '▶' : '◀';
+        btn.title       = collapsed ? 'Expand panel' : 'Collapse panel';
+      }
+
+      function useResultsInDesign() {
+        switchTab('design');
+        toast('Switched to Design tab — drag widgets onto the canvas', 'success');
+      }
+
+
+  // Build alias→displayType map from all loaded tables
+  // TODO: Need to keep track of source ds/table/internal field ID/data type
+  // This will probably break if two tables have the a field with the same alias but different types
+  function sniffType(col) {
+    const typeMap = {};
+    for (const t of Object.values(state.tables)) {
+      for (const f of (t.fields || [])) {
+        if (f.alias && f.displayType) typeMap[f.alias] = f.displayType;
+      }
+    }
+    if (typeMap[col]) return typeMap[col];
+    // Fallback: sniff type from first result row value
+    const firstRow = (state.queryResults && state.queryResults[0]) || null;
+    if (!firstRow) return 'default';
+    const v = firstRow[col];
+    if (Array.isArray(v)) return 'array';
+    if (typeof v === 'number') return 'number';
+    if (typeof v === 'boolean') return 'boolean';
+    if (typeof v === 'object') return 'object';
+    if (typeof v === 'string' && ISO_DATE_RE.test(v)) return 'date';
+    return 'text';
+  }
+  

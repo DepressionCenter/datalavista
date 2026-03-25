@@ -1,0 +1,59 @@
+# ============================================================
+#  This file is part of DataLaVista
+#  build.yml: GitHub Actions workflow - builds DataLaVista output files from src/.
+#  Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
+#  Created: 2026-03-24
+#  Last Modified: 2026-03-24
+#  Summary: Runs build.sh on push to src/ and commits the generated output files.
+#  Notes: See README file for documentation and full license information.
+#  Website: https://github.com/DepressionCenter/datalavista
+#
+#  Copyright (c) 2026 The Regents of the University of Michigan
+#
+#  This program is free software: you can redistribute it and/or modify
+#  it under the terms of the GNU General Public License as published by
+#  the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+#  This program is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+#  GNU General Public License for more details.
+#  You should have received a copy of the GNU General Public License along
+#  with this program. If not, see <https://www.gnu.org/licenses/>.
+#  ================================================================
+
+name: Build DataLaVista
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'build.sh'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build
+        run: |
+          chmod +x build.sh
+          ./build.sh
+
+      - name: Stage build outputs
+        id: changes
+        run: |
+          git add DataLaVista.html DataLaVista-nojs.html DataLaVista-dev.html datalavista.js
+          echo "changed=$(git diff --staged --quiet && echo 'false' || echo 'true')" >> $GITHUB_OUTPUT
+
+      - name: Commit and push
+        if: steps.changes.outputs.changed == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git commit -m "chore: rebuild outputs from src [skip ci]"
+          git push
