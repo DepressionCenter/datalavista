@@ -58,13 +58,13 @@ Most enterprise data is trapped behind bloated frameworks or expensive BI tools.
 
 
 ## Quick Start Guide
++ For testing or running in your computer, simply view the live demo at: [DataLaVista.html](https://code.depressioncenter.org/datalavista/DataLaVista.html)
 + If using SharePoint Online:
   - First ensure you have the "Modern Script Editor" app installed. If not available, contact your site administrator to [install it](https://github.com/pnp/sp-dev-fx-webparts/tree/main/samples/react-script-editor)
   - Create a page using a blank template or Modern Script Editor template, and call it "DataLaVista Designer"
   - Add a "Modern Script Editor" webpart.
   - Copy and the paste the code from [DataLaVista.html](DataLaVista.html) into the script editor. Save, and refresh.
 + If using inside a different web platform, follow the same steps as above with whatever method is available for adding scripts to the page. Alternatively, save [DataLaVista.html](DataLaVista.html) to your web server, and add its URL in an iframe tag.
-+ If running stand-alone (e.g. in your laptop), simply download and open [DataLaVista.html](DataLaVista.html)
 + Once the DataLaVista Designer is open, click Connect + Load and enter the location of your data. For SharePoint installations, it should automatically populate the URL for your site in a few seconds. You can also use the different tabs to connect to remote JSON files, CSV, Excel, or to upload a JSON or CSV file.
 + Use the Query Builder and/or SQL Editor to pre-process your data. This will create a flat table, displayed in the preview.
 + Switch to the Design tab to create your dashboard using visuals, tables, or HTML widgets.
