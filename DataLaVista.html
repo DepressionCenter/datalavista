@@ -10970,14 +10970,16 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
             defaultFileName: title + '.json',
             fileContent: jsonStr,
             fileExtensions: ['.json', '.json5', '.JSON', '.js', '.txt'],
-            defaultFolders: ['/Shared Documents/Reports', '/Shared Documents/Dashboards', '/Shared Documents', '/SiteAssets']
+            defaultFolders: ['/Shared Documents/Reports', '/Shared Documents/Dashboards', '/Shared Documents']
           });
         } catch (err) {
           if (err && err.message !== 'Dialog cancelled') toast(err.message || String(err), 'error');
           return;
         }
         if (!result) return;
-        _showPublishResult(result.url);
+        const currentDLVUrl = new URL(window.location.href);
+        const reportUrl = new URL(currentDLVUrl.origin + currentDLVUrl.pathname + '?report=' + encodeURIComponent(result.url));
+        _showPublishResult(reportUrl.toString());
         toast('Published to SharePoint!', 'success');
       }
 
@@ -11000,7 +11002,11 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           return;
         }
         if (!result) return;
-        _showPublishResult(result.url || result.itemUrl);
+        // Generate report URL based on current location plus report= parameter plus returned url.
+        // E.g.: http://site.com/DataLaVista.aspx?report=/sites/reports/Shared%20Documents/report1.json
+        const currentDLVUrl = new URL(window.location.href);
+        const reportUrl = new URL(currentDLVUrl.origin + currentDLVUrl.pathname + '?report=' + encodeURIComponent(result.url));
+        _showPublishResult(reportUrl.toString());
         toast('Saved to SharePoint list!', 'success');
       }
 
@@ -11010,8 +11016,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         const link = /** @type {HTMLAnchorElement|null} */ (document.getElementById('gen-publish-url'));
         if (!container || !link || !url) return;
         _lastPublishedUrl = url;
-        link.textContent = url.length > 100
-          ? url.slice(0, 45) + '\u2026' + url.slice(-52)
+        link.textContent = url.length > 86
+          ? url.slice(0, 40) + '\u2026' + url.slice(-45)
           : url;
         link.href = url;
         container.style.display = 'flex';
