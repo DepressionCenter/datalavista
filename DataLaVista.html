@@ -4291,550 +4291,785 @@ async function deriveStructureFromSample(dataArray) {
     // ============================================================
 
     /**
-     * Universal SharePoint file dialog for opening/saving files from
-     * document libraries and list items. Remembers the last used location
-     * separately for files and lists via localStorage.
-     *
-     * @example
-     *   const result = await SharePointFileDialog.show({
-     *     mode: 'open',    // 'open' | 'save'
-     *     type: 'file',    // 'file' | 'list'
-     *     defaultFileName: 'report.json',
-     *     fileContent: jsonString,
-     *     fileExtensions: ['.json'],
-     *     defaultFolders: ['/sites/foo/Shared Documents/DLV Reports'],
-     *     defaultList: 'DLV Reports'
-     *   });
-     *   // file result:  { url, serverRelativeUrl, folderName, fileName, id }
-     *   // list result:  { listName, id, itemUrl, title, folderName, fileName, url, serverRelativeUrl }
-     *
-     * Navigation priority on open:
-     *   1. Last used location saved in localStorage (dlv_spfd_last_file / dlv_spfd_last_list)
-     *   2. defaultFolders / defaultList parameter
-     *   3. Root (all document libraries / all lists)
-     */
-    const SharePointFileDialog = {
+ * @example
+ * const result = await SharePointFileDialog.show({
+ * mode: 'open',    // 'open' | 'save'
+ * type: 'file',    // 'file' | 'list'
+ * defaultFileName: 'report.json',
+ * fileContent: jsonString,
+ * fileExtensions: ['.json', '.csv'],
+ * defaultFolders: ['/sites/foo/Shared Documents/DLV Reports'],
+ * defaultList: 'DLV Reports'
+ * });
+ */
+const SharePointFileDialog = {
 
-      show(options = {}) {
-        const params = {
-          mode:             options.mode             || 'open',
-          type:             options.type             || 'file',
-          defaultFileName:  options.defaultFileName  || 'untitled.json',
-          fileContent:      options.fileContent      ?? '',
-          sqlQuery:         options.sqlQuery         ?? '',
-          fileContentField: options.fileContentField || 'FileContent',
-          sqlQueryField:    options.sqlQueryField    || 'SQLQuery',
-          fileExtensions:   options.fileExtensions   || [],
-          defaultFolders:   options.defaultFolders   || [],
-          defaultList:      options.defaultList      || ''
-        };
-        return new Promise((resolve, reject) => {
-          SharePointFileDialog._createDialog(params, resolve, reject);
+  show(options = {}) {
+    const params = {
+      mode:             options.mode             || 'open',
+      type:             options.type             || 'file',
+      defaultFileName:  options.defaultFileName  || 'untitled.json',
+      fileContent:      options.fileContent      ?? '',
+      sqlQuery:         options.sqlQuery         ?? '',
+      fileContentField: options.fileContentField || 'FileContent',
+      sqlQueryField:    options.sqlQueryField    || 'SQLQuery',
+      fileExtensions:   options.fileExtensions   || [],
+      defaultFolders:   options.defaultFolders   || [],
+      defaultList:      options.defaultList      || ''
+    };
+    return new Promise((resolve, reject) => {
+      SharePointFileDialog._createDialog(params, resolve, reject);
+    });
+  },
+
+  _createDialog(params, resolve, reject) {
+    const siteUrl = DataLaVistaState.spSiteUrl || getSpSiteUrl();
+    if (!siteUrl || !DataLaVistaState.isSpSite) { reject(new Error('SharePoint site URL not detected')); return; }
+
+    // ── Overlay ──────────────────────────────────────────
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:10200;display:flex;align-items:center;justify-content:center;';
+
+    // ── Dialog container ─────────────────────────────────
+    const dlg = document.createElement('div');
+    dlg.style.cssText = 'background:var(--surface,#fff);border-radius:var(--radius-lg,8px);box-shadow:var(--shadow-lg,0 10px 25px rgba(0,0,0,0.2));width:650px;max-width:calc(100vw - 32px);max-height:calc(100vh - 80px);display:flex;flex-direction:column;animation:popIn 180ms ease;color:var(--text,#333);';
+
+    // ── Header ───────────────────────────────────────────
+    const header = document.createElement('div');
+    header.style.cssText = 'display:flex;align-items:center;gap:8px;padding:14px 16px 12px;border-bottom:1px solid var(--border,#ddd);flex-shrink:0;';
+    const titleEl = document.createElement('h3');
+    titleEl.style.cssText = 'font-size:15px;font-weight:600;flex:1;margin:0;';
+    titleEl.textContent = `${params.mode === 'save' ? 'Save' : 'Open'} ${params.type === 'file' ? 'File' : 'List Item'}`;
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'btn btn-ghost btn-icon';
+    closeBtn.style.cssText = 'background:none;border:none;cursor:pointer;font-size:16px;';
+    closeBtn.title = 'Close';
+    closeBtn.textContent = '✕';
+    header.appendChild(titleEl);
+    header.appendChild(closeBtn);
+
+    // ── Breadcrumb ───────────────────────────────────────
+    const breadcrumbEl = document.createElement('div');
+    breadcrumbEl.style.cssText = 'padding:8px 16px;font-size:12px;color:var(--text-secondary,#555);background:var(--surface2,#f9f9f9);border-bottom:1px solid var(--border,#ddd);display:flex;align-items:center;flex-wrap:wrap;gap:4px;flex-shrink:0;min-height:32px;';
+
+    // ── List Header (Columns) ────────────────────────────
+    const listHeader = document.createElement('div');
+    listHeader.style.cssText = 'display:flex;padding:6px 16px;font-size:11px;font-weight:600;color:var(--text-secondary,#555);border-bottom:1px solid var(--border,#ddd);background:var(--surface,#fff);flex-shrink:0;';
+    listHeader.innerHTML = `<div style="flex:1">Name</div><div style="width:130px">Date modified</div><div style="width:70px;text-align:right">Size</div>`;
+
+    // ── Body ─────────────────────────────────────────────
+    const bodyEl = document.createElement('div');
+    bodyEl.style.cssText = 'flex:1;overflow-y:auto;padding:0;min-height:220px;position:relative;';
+
+    // ── Bottom Controls (Filename & Extension) ───────────
+    const bottomSection = document.createElement('div');
+    bottomSection.style.cssText = 'padding:12px 16px;border-top:1px solid var(--border,#ddd);flex-shrink:0;display:flex;flex-direction:column;gap:8px;background:var(--surface2,#f9f9f9);';
+
+    // Filename Row
+    const filenameRow = document.createElement('div');
+    filenameRow.style.cssText = 'display:flex;gap:12px;align-items:center;';
+    const lblName = document.createElement('label');
+    lblName.textContent = params.type === 'file' ? 'File name:' : 'Item name:';
+    lblName.style.cssText = 'font-size:12px;white-space:nowrap;color:var(--text-secondary,#555);width:75px;text-align:right;';
+    const filenameInput = document.createElement('input');
+    filenameInput.type = 'text';
+    filenameInput.value = params.defaultFileName;
+    filenameInput.style.cssText = 'flex:1;padding:6px 8px;border:1px solid var(--border,#ccc);border-radius:var(--radius,4px);font-size:13px;outline:none;';
+    filenameRow.appendChild(lblName);
+    filenameRow.appendChild(filenameInput);
+
+    // Type Row (Dropdown)
+    const typeRow = document.createElement('div');
+    typeRow.style.cssText = 'display:flex;gap:12px;align-items:center;';
+    const lblType = document.createElement('label');
+    lblType.textContent = 'Save as type:';
+    lblType.style.cssText = 'font-size:12px;white-space:nowrap;color:var(--text-secondary,#555);width:75px;text-align:right;';
+    const extSelect = document.createElement('select');
+    extSelect.style.cssText = 'flex:1;padding:5px 8px;border:1px solid var(--border,#ccc);border-radius:var(--radius,4px);font-size:13px;outline:none;';
+
+    if (params.type === 'file') {
+      extSelect.add(new Option('All Files (*.*)', '*.*'));
+      if (params.fileExtensions && params.fileExtensions.length > 0) {
+        params.fileExtensions.forEach(ext => {
+          const cleanExt = ext.startsWith('.') ? ext : `.${ext}`;
+          extSelect.add(new Option(`${cleanExt} Files (*${cleanExt})`, cleanExt));
         });
-      },
-
-      _createDialog(params, resolve, reject) {
-        const siteUrl = getSpSiteUrl();
-        if (!siteUrl) { reject(new Error('SharePoint site URL not detected')); return; }
-
-        // ── Overlay ──────────────────────────────────────────
-        const overlay = document.createElement('div');
-        overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:10200;display:flex;align-items:center;justify-content:center;';
-
-        // ── Dialog container ─────────────────────────────────
-        const dlg = document.createElement('div');
-        dlg.style.cssText = 'background:var(--surface);border-radius:var(--radius-lg);box-shadow:var(--shadow-lg);width:560px;max-width:calc(100vw - 32px);max-height:calc(100vh - 80px);display:flex;flex-direction:column;animation:popIn 180ms ease;';
-
-        // ── Header ───────────────────────────────────────────
-        const header = document.createElement('div');
-        header.style.cssText = 'display:flex;align-items:center;gap:8px;padding:14px 16px 12px;border-bottom:1px solid var(--border);flex-shrink:0;';
-        const titleEl = document.createElement('h3');
-        titleEl.style.cssText = 'font-size:14px;font-weight:600;flex:1;margin:0;';
-        titleEl.textContent = `${params.mode === 'save' ? 'Save' : 'Open'} ${params.type === 'file' ? 'File' : 'List Item'}`;
-        const closeBtn = document.createElement('button');
-        closeBtn.className = 'btn btn-ghost btn-icon';
-        closeBtn.title = 'Close';
-        closeBtn.textContent = '✕';
-        header.appendChild(titleEl);
-        header.appendChild(closeBtn);
-
-        // ── Filename row (save mode only) ────────────────────
-        let filenameInput = null;
-        const filenameRow = document.createElement('div');
-        if (params.mode === 'save') {
-          filenameRow.style.cssText = 'padding:10px 16px;border-bottom:1px solid var(--border);flex-shrink:0;display:flex;gap:8px;align-items:center;';
-          const lbl = document.createElement('label');
-          lbl.textContent = 'Name:';
-          lbl.style.cssText = 'font-size:12px;white-space:nowrap;color:var(--text-secondary);';
-          filenameInput = document.createElement('input');
-          filenameInput.type = 'text';
-          filenameInput.value = params.defaultFileName;
-          filenameInput.style.cssText = 'flex:1;padding:4px 8px;border:1px solid var(--border);border-radius:var(--radius);font-size:13px;background:var(--surface);color:var(--text);';
-          filenameRow.appendChild(lbl);
-          filenameRow.appendChild(filenameInput);
+        if (params.fileExtensions.length > 1) {
+          const combo = params.fileExtensions.map(e => `*${e.startsWith('.') ? e : '.' + e}`).join('; ');
+          extSelect.add(new Option(`Allowed Types (${combo})`, combo));
         }
+      }
+      typeRow.appendChild(lblType);
+      typeRow.appendChild(extSelect);
+    }
 
-        // ── Breadcrumb ───────────────────────────────────────
-        const breadcrumbEl = document.createElement('div');
-        breadcrumbEl.style.cssText = 'padding:6px 16px;font-size:11px;color:var(--text-secondary);background:var(--surface2);border-bottom:1px solid var(--border);display:flex;align-items:center;flex-wrap:wrap;gap:2px;flex-shrink:0;min-height:30px;';
+    bottomSection.appendChild(filenameRow);
+    if (params.type === 'file') bottomSection.appendChild(typeRow);
 
-        // ── Body ─────────────────────────────────────────────
-        const bodyEl = document.createElement('div');
-        bodyEl.style.cssText = 'flex:1;overflow-y:auto;padding:4px 0;min-height:160px;';
+    // ── Footer ───────────────────────────────────────────
+    const footer = document.createElement('div');
+    footer.style.cssText = 'padding:12px 16px;border-top:1px solid var(--border,#ddd);display:flex;justify-content:flex-end;gap:8px;flex-shrink:0;background:var(--surface,#fff);';
+    const cancelBtn = document.createElement('button');
+    cancelBtn.className = 'btn btn-default btn-sm';
+    cancelBtn.textContent = 'Cancel';
+    const confirmBtn = document.createElement('button');
+    confirmBtn.className = 'btn btn-primary btn-sm';
+    confirmBtn.textContent = params.mode === 'save' ? 'Save' : 'Open';
+    confirmBtn.disabled = true;
+    footer.appendChild(cancelBtn);
+    footer.appendChild(confirmBtn);
 
-        // ── Footer ───────────────────────────────────────────
-        const footer = document.createElement('div');
-        footer.style.cssText = 'padding:12px 16px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px;flex-shrink:0;';
-        const cancelBtn = document.createElement('button');
-        cancelBtn.className = 'btn btn-default btn-sm';
-        cancelBtn.textContent = 'Cancel';
-        const confirmBtn = document.createElement('button');
-        confirmBtn.className = 'btn btn-primary btn-sm';
-        confirmBtn.textContent = params.mode === 'save' ? 'Save' : 'Open';
-        confirmBtn.disabled = true;
-        footer.appendChild(cancelBtn);
-        footer.appendChild(confirmBtn);
+    // ── Assemble ─────────────────────────────────────────
+    dlg.appendChild(header);
+    dlg.appendChild(breadcrumbEl);
+    dlg.appendChild(listHeader);
+    dlg.appendChild(bodyEl);
+    dlg.appendChild(bottomSection);
+    dlg.appendChild(footer);
+    overlay.appendChild(dlg);
+    document.body.appendChild(overlay);
 
-        // ── Assemble ─────────────────────────────────────────
-        dlg.appendChild(header);
-        if (params.mode === 'save') dlg.appendChild(filenameRow);
-        dlg.appendChild(breadcrumbEl);
-        dlg.appendChild(bodyEl);
-        dlg.appendChild(footer);
-        overlay.appendChild(dlg);
-        document.body.appendChild(overlay);
+    // ── State ────────────────────────────────────────────
+    const state = {
+      siteUrl, params,
+      stack: [{ label: 'Document Libraries', serverRelUrl: null }],
+      currentList: null, cachedLists: null, selectedItem: null,
+      currentData: { folders: [], files: [], items: [] }, // Caches data for client-side filtering
+      filterPattern: '',
+      overlay, bodyEl, breadcrumbEl, confirmBtn, filenameInput, extSelect,
+      resolve, reject
+    };
 
-        // ── State ────────────────────────────────────────────
-        const state = {
-          siteUrl, params,
-          stack: [{ label: 'Document Libraries', serverRelUrl: null }],
-          currentList: null, cachedLists: null, selectedItem: null,
-          overlay, bodyEl, breadcrumbEl, confirmBtn, filenameInput,
-          resolve, reject
-        };
+    // ── Events ───────────────────────────────────────────
+    const cancel = () => { overlay.remove(); resolve(null); };
+    closeBtn.addEventListener('click', cancel);
+    cancelBtn.addEventListener('click', cancel);
+    overlay.addEventListener('click', e => { if (e.target === overlay) cancel(); });
+    confirmBtn.addEventListener('click', () => SharePointFileDialog._handleConfirm(state));
 
-        // ── Events ───────────────────────────────────────────
-        const cancel = () => { overlay.remove(); reject(new Error('Dialog cancelled')); };
-        closeBtn.addEventListener('click', cancel);
-        cancelBtn.addEventListener('click', cancel);
-        overlay.addEventListener('click', e => { if (e.target === overlay) cancel(); });
-        confirmBtn.addEventListener('click', () => SharePointFileDialog._handleConfirm(state));
+    extSelect.addEventListener('change', () => {
+      SharePointFileDialog._renderFileView(state);
+    });
 
-        // ── Initialize ───────────────────────────────────────
-        if (params.type === 'file') SharePointFileDialog._initFileBrowser(state);
-        else SharePointFileDialog._initListBrowser(state);
-      },
-
-      // ── Breadcrumb ──────────────────────────────────────────────────────────
-
-      _renderBreadcrumb(state) {
-        const bc = state.breadcrumbEl;
-        bc.innerHTML = '';
-        const isFile = state.params.type === 'file';
-        const crumbs = isFile ? state.stack :
-          state.currentList
-            ? [{ label: 'Lists', isBack: true }, { label: state.currentList.Title }]
-            : [{ label: 'Lists' }];
-
-        crumbs.forEach((crumb, i) => {
-          if (i > 0) {
-            const sep = document.createElement('span');
-            sep.className = 'sp-crumb-sep';
-            sep.textContent = ' › ';
-            bc.appendChild(sep);
-          }
-          const span = document.createElement('span');
-          span.className = 'sp-crumb';
-          span.textContent = crumb.label;
-          const isLast = i === crumbs.length - 1;
-          if (!isLast) {
-            if (isFile) {
-              span.addEventListener('click', () => {
-                state.stack = state.stack.slice(0, i + 1);
-                state.selectedItem = null;
-                state.confirmBtn.disabled = !(state.params.mode === 'save' && state.stack.length > 1);
-                SharePointFileDialog._loadFileBrowser(state);
-              });
-            } else {
-              span.addEventListener('click', () => {
-                state.currentList = null;
-                state.selectedItem = null;
-                state.confirmBtn.disabled = true;
-                SharePointFileDialog._loadListsBrowser(state);
-              });
-            }
-          } else {
-            span.style.fontWeight = '600';
-            span.style.color = 'var(--text)';
-            span.style.cursor = 'default';
-          }
-          bc.appendChild(span);
-        });
-      },
-
-      // ── File browser ────────────────────────────────────────────────────────
-
-      async _initFileBrowser(state) {
-        // Priority 1: last saved location from localStorage
-        try {
-          const saved = localStorage.getItem('dlv_spfd_last_file');
-          if (saved) {
-            const ok = await SharePointFileDialog._folderExists(state.siteUrl, saved);
-            if (ok) {
-              state.stack = SharePointFileDialog._buildFileStack(state.siteUrl, saved);
-              SharePointFileDialog._loadFileBrowser(state);
-              return;
-            }
-          }
-        } catch(e) {}
-        // Priority 2: defaultFolders parameter
-        for (const folder of state.params.defaultFolders) {
-          try {
-            const ok = await SharePointFileDialog._folderExists(state.siteUrl, folder);
-            if (ok) {
-              state.stack = SharePointFileDialog._buildFileStack(state.siteUrl, folder);
-              SharePointFileDialog._loadFileBrowser(state);
-              return;
-            }
-          } catch(e) {}
+    filenameInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        const val = filenameInput.value.trim();
+        if (val.includes('.') && params.type === 'file') {
+          extSelect.value = '*.*'; // reset extension filter if user typed one
         }
-        // Priority 3: root (all document libraries)
+        state.filterPattern = val;
+        if (params.type === 'file') SharePointFileDialog._renderFileView(state);
+        else SharePointFileDialog._renderListsView(state);
+      }
+    });
+
+    // ── Initialize ───────────────────────────────────────
+    if (params.type === 'file') SharePointFileDialog._initFileBrowser(state);
+    else SharePointFileDialog._initListBrowser(state);
+  },
+
+  // ── Render Utilities ────────────────────────────────────────────────────
+
+  _formatDate(isoString) {
+    if (!isoString) return '';
+    const d = new Date(isoString);
+    if (isNaN(d.getTime())) return '';
+    return `${d.toLocaleDateString()} ${d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
+  },
+
+  _formatSize(bytes) {
+    if (!bytes) return '';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+  },
+
+  _createRow(icon, name, count, dateStr, sizeStr, isSelectable, onClick) {
+    const row = document.createElement('div');
+    row.style.cssText = `display:flex;align-items:center;padding:8px 16px;border-bottom:1px solid var(--border-light,#f0f0f0);${isSelectable ? 'cursor:pointer;' : 'cursor:pointer;'}`;
+    
+    // Hover effects
+    row.onmouseenter = () => { if(!row.classList.contains('sp-selected')) row.style.background = 'var(--surface-hover,#f5f5f5)'; };
+    row.onmouseleave = () => { if(!row.classList.contains('sp-selected')) row.style.background = ''; };
+
+    const nameCol = document.createElement('div');
+    nameCol.style.cssText = 'flex:1;display:flex;align-items:center;gap:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;';
+    
+    const iconSpan = document.createElement('span');
+    iconSpan.style.fontSize = '16px';
+    iconSpan.textContent = icon;
+    
+    const nameSpan = document.createElement('span');
+    nameSpan.textContent = name;
+    
+    nameCol.appendChild(iconSpan);
+    nameCol.appendChild(nameSpan);
+
+    if (count != null && count !== '') {
+      const badge = document.createElement('span');
+      badge.style.cssText = 'background:#e0e0e0;color:#555;border-radius:12px;padding:2px 6px;font-size:10px;font-weight:600;margin-left:6px;line-height:1;';
+      badge.textContent = count;
+      nameCol.appendChild(badge);
+    }
+
+    const dateCol = document.createElement('div');
+    dateCol.style.cssText = 'width:130px;font-size:12px;color:var(--text-secondary,#666);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
+    dateCol.textContent = dateStr || '';
+
+    const sizeCol = document.createElement('div');
+    sizeCol.style.cssText = 'width:70px;font-size:12px;color:var(--text-secondary,#666);text-align:right;';
+    sizeCol.textContent = sizeStr || '';
+
+    row.appendChild(nameCol);
+    row.appendChild(dateCol);
+    row.appendChild(sizeCol);
+
+    if (onClick) {
+      row.addEventListener('click', () => {
+        onClick(row);
+      });
+    }
+    return row;
+  },
+
+  _matchPattern(name, pattern) {
+    if (!pattern) return true;
+    const regexStr = '^' + pattern.replace(/\./g, '\\.').replace(/\*/g, '.*') + '$';
+    try {
+      return new RegExp(regexStr, 'i').test(name);
+    } catch(e) {
+      return name.toLowerCase().includes(pattern.toLowerCase());
+    }
+  },
+
+  _matchExtension(name, extFilter) {
+    if (!extFilter || extFilter === '*.*') return true;
+    if (extFilter.includes(';')) {
+      const exts = extFilter.split(';').map(e => e.trim().replace(/\*/g, '').toLowerCase());
+      return exts.some(ext => name.toLowerCase().endsWith(ext));
+    }
+    return name.toLowerCase().endsWith(extFilter.replace(/\*/g, '').toLowerCase());
+  },
+
+  // ── Breadcrumb ──────────────────────────────────────────────────────────
+
+  _renderBreadcrumb(state) {
+    const bc = state.breadcrumbEl;
+    bc.innerHTML = '';
+    const isFile = state.params.type === 'file';
+    const crumbs = isFile ? state.stack :
+      state.currentList
+        ? [{ label: 'Lists', isBack: true }, { label: state.currentList.Title }]
+        : [{ label: 'Lists' }];
+
+    crumbs.forEach((crumb, i) => {
+      if (i > 0) {
+        const sep = document.createElement('span');
+        sep.textContent = ' › ';
+        sep.style.margin = '0 4px';
+        bc.appendChild(sep);
+      }
+      const span = document.createElement('span');
+      span.textContent = crumb.label;
+      const isLast = i === crumbs.length - 1;
+      if (!isLast) {
+        span.style.cssText = 'cursor:pointer;color:var(--primary,#0078d4);';
+        span.onmouseenter = () => span.style.textDecoration = 'underline';
+        span.onmouseleave = () => span.style.textDecoration = 'none';
+        
+        if (isFile) {
+          span.addEventListener('click', () => {
+            state.stack = state.stack.slice(0, i + 1);
+            state.selectedItem = null;
+            state.filterPattern = ''; // clear filter on navigation
+            state.confirmBtn.disabled = !(state.params.mode === 'save' && state.stack.length > 1);
+            SharePointFileDialog._loadFileBrowser(state);
+          });
+        } else {
+          span.addEventListener('click', () => {
+            state.currentList = null;
+            state.selectedItem = null;
+            state.filterPattern = '';
+            state.confirmBtn.disabled = true;
+            SharePointFileDialog._loadListsBrowser(state);
+          });
+        }
+      } else {
+        span.style.fontWeight = '600';
+        span.style.color = 'var(--text,#333)';
+      }
+      bc.appendChild(span);
+    });
+  },
+
+  // ── File browser ────────────────────────────────────────────────────────
+
+  async _initFileBrowser(state) {
+    // Extract the server-relative path of the current site (e.g., "/sites/SiteName")
+    const siteRelUrl = state.siteUrl.replace(/^https?:\/\/[^/]+/, '');
+
+    try {
+      const saved = localStorage.getItem('dlv_spfd_last_file');
+      if (saved) {
+        const ok = await SharePointFileDialog._folderExists(state.siteUrl, saved);
+        if (ok) {
+          state.stack = SharePointFileDialog._buildFileStack(state.siteUrl, saved);
+          SharePointFileDialog._loadFileBrowser(state);
+          return;
+        }
+      }
+    } catch(e) {}
+
+    // Priority 2: defaultFolders parameter
+    for (const folder of state.params.defaultFolders) {
+      try {
+        // Ensure the folder string starts with a slash
+        const normalizedFolder = folder.startsWith('/') ? folder : '/' + folder;
+        
+        // Combine the site relative URL with the provided folder path
+        const fullServerRelUrl = (siteRelUrl === '/' ? '' : siteRelUrl) + normalizedFolder;
+
+        const ok = await SharePointFileDialog._folderExists(state.siteUrl, fullServerRelUrl);
+        if (ok) {
+          state.stack = SharePointFileDialog._buildFileStack(state.siteUrl, fullServerRelUrl);
+          SharePointFileDialog._loadFileBrowser(state);
+          return;
+        }
+      } catch(e) {}
+    }
+    
+    // Priority 3: root (all document libraries)
+    SharePointFileDialog._loadFileBrowser(state);
+  },
+
+  async _loadFileBrowser(state) {
+    SharePointFileDialog._renderBreadcrumb(state);
+    state.bodyEl.innerHTML = '<div style="padding:16px;text-align:center;font-size:12px;color:var(--text-secondary)">Loading…</div>';
+    state.selectedItem = null;
+    if (state.params.mode === 'save') state.confirmBtn.disabled = state.stack.length <= 1;
+    else state.confirmBtn.disabled = true;
+
+    const current = state.stack[state.stack.length - 1];
+    state.currentData = { folders: [], files: [] }; // Reset cache
+
+    try {
+      if (current.serverRelUrl === null) {
+        // Root: list document libraries (BaseTemplate = 101)
+        const json = await spFetch(`${state.siteUrl}/_api/web/lists?$select=Title,ItemCount,LastItemModifiedDate,RootFolder/ServerRelativeUrl&$expand=RootFolder&$filter=BaseTemplate eq 101 and Hidden eq false`);
+        state.currentData.folders = extractRows(json).filter(l => l.RootFolder).sort((a, b) => (a.Title || '').localeCompare(b.Title || ''));
+      } else {
+        // Folder contents: subfolders + files
+        const enc = encodeURIComponent(current.serverRelUrl);
+        const [foldersJson, filesJson] = await Promise.all([
+          spFetch(`${state.siteUrl}/_api/web/GetFolderByServerRelativeUrl('${enc}')/Folders?$select=Name,ServerRelativeUrl,ItemCount,TimeLastModified&$filter=Name ne 'Forms'`).catch(() => ({ value: [] })),
+          spFetch(`${state.siteUrl}/_api/web/GetFolderByServerRelativeUrl('${enc}')/Files?$select=Name,ServerRelativeUrl,Length,TimeLastModified`).catch(() => ({ value: [] }))
+        ]);
+        state.currentData.folders = extractRows(foldersJson).sort((a, b) => (a.Name || '').localeCompare(b.Name || ''));
+        state.currentData.files   = extractRows(filesJson).sort((a, b) => (a.Name || '').localeCompare(b.Name || ''));
+      }
+      SharePointFileDialog._renderFileView(state);
+    } catch(e) {
+      state.bodyEl.innerHTML = `<div style="padding:16px;font-size:12px;color:var(--error,#d32f2f)">Error: ${e.message}</div>`;
+    }
+  },
+
+  _renderFileView(state) {
+    state.bodyEl.innerHTML = '';
+    const { folders, files } = state.currentData;
+    const current = state.stack[state.stack.length - 1];
+    
+    // Apply client-side filters
+    const pattern = state.filterPattern;
+    const extFilter = state.extSelect?.value || '*.*';
+
+    // Filter Folders (don't apply extension filter to folders, only text pattern)
+    const filteredFolders = folders.filter(f => SharePointFileDialog._matchPattern(f.Name || f.Title, pattern));
+    
+    // Filter Files
+    const filteredFiles = files.filter(f => 
+      SharePointFileDialog._matchPattern(f.Name, pattern) && 
+      SharePointFileDialog._matchExtension(f.Name, extFilter)
+    );
+
+    if (!filteredFolders.length && !filteredFiles.length) { 
+      state.bodyEl.innerHTML = '<div style="padding:16px;font-size:12px;text-align:center;color:var(--text-secondary)">No items match your filter.</div>'; 
+      return; 
+    }
+
+    filteredFolders.forEach(f => {
+      const name = f.Name || f.Title;
+      const count = f.ItemCount != null ? f.ItemCount : '';
+      const date = SharePointFileDialog._formatDate(f.TimeLastModified || f.LastItemModifiedDate);
+      const url = f.ServerRelativeUrl || (f.RootFolder && f.RootFolder.ServerRelativeUrl);
+      
+      const row = SharePointFileDialog._createRow('📁', name, count, date, '', false, () => {
+        state.stack.push({ label: name, serverRelUrl: url });
+        state.filterPattern = ''; // Reset filter on delve
+        if(state.filenameInput) {
+            // keep the filename input text intact so the user doesn't lose what they typed
+        }
         SharePointFileDialog._loadFileBrowser(state);
-      },
+      });
+      state.bodyEl.appendChild(row);
+    });
 
-      async _loadFileBrowser(state) {
-        SharePointFileDialog._renderBreadcrumb(state);
-        state.bodyEl.innerHTML = '<div style="padding:16px;text-align:center;font-size:12px;color:var(--text-secondary)">Loading…</div>';
-        state.selectedItem = null;
-        // In save mode, enable confirm once inside a library/folder
-        if (state.params.mode === 'save') state.confirmBtn.disabled = state.stack.length <= 1;
-        else state.confirmBtn.disabled = true;
-
-        const current = state.stack[state.stack.length - 1];
-        try {
-          if (current.serverRelUrl === null) {
-            // Root: list document libraries (BaseTemplate = 101)
-            const json = await spFetch(`${state.siteUrl}/_api/web/lists?$select=Title,RootFolder/ServerRelativeUrl&$expand=RootFolder&$filter=BaseTemplate eq 101 and Hidden eq false`);
-            const libs = extractRows(json).filter(l => l.RootFolder).sort((a, b) => (a.Title || '').localeCompare(b.Title || ''));
-            state.bodyEl.innerHTML = '';
-            if (!libs.length) { state.bodyEl.innerHTML = '<div style="padding:16px;font-size:12px;color:var(--text-secondary)">No document libraries found.</div>'; return; }
-            libs.forEach(lib => {
-              state.bodyEl.appendChild(spPickerMakeItem('📁', lib.Title, null, false, () => {
-                state.stack.push({ label: lib.Title, serverRelUrl: lib.RootFolder.ServerRelativeUrl });
-                SharePointFileDialog._loadFileBrowser(state);
-              }));
-            });
-          } else {
-            // Folder contents: subfolders + files
-            const enc = encodeURIComponent(current.serverRelUrl);
-            let filesFilter = '';
-            if (state.params.fileExtensions.length > 0) {
-              const exts = state.params.fileExtensions.flatMap(e => {
-                const base = e.replace(/^\./, '');
-                const lo = base.toLowerCase(), hi = base.toUpperCase();
-                return lo === hi
-                  ? [`substringof('.${lo}',Name)`]
-                  : [`substringof('.${lo}',Name)`, `substringof('.${hi}',Name)`];
-              });
-              filesFilter = `&$filter=(${exts.join(' or ')})`;
-            }
-            const [foldersJson, filesJson] = await Promise.all([
-              spFetch(`${state.siteUrl}/_api/web/GetFolderByServerRelativeUrl('${enc}')/Folders?$select=Name,ServerRelativeUrl&$filter=Name ne 'Forms'`).catch(() => ({ value: [] })),
-              spFetch(`${state.siteUrl}/_api/web/GetFolderByServerRelativeUrl('${enc}')/Files?$select=Name,ServerRelativeUrl,Length${filesFilter}`).catch(() => ({ value: [] }))
-            ]);
-            const folders = extractRows(foldersJson).sort((a, b) => (a.Name || '').localeCompare(b.Name || ''));
-            const files   = extractRows(filesJson).sort((a, b) => (a.Name || '').localeCompare(b.Name || ''));
-            state.bodyEl.innerHTML = '';
-            if (!folders.length && !files.length) { state.bodyEl.innerHTML = '<div style="padding:16px;font-size:12px;color:var(--text-secondary)">No items found.</div>'; return; }
-            folders.forEach(f => {
-              state.bodyEl.appendChild(spPickerMakeItem('📁', f.Name, null, false, () => {
-                state.stack.push({ label: f.Name, serverRelUrl: f.ServerRelativeUrl });
-                SharePointFileDialog._loadFileBrowser(state);
-              }));
-            });
-            files.forEach(f => {
-              const size = f.Length ? spPickerFormatSize(+f.Length) : '';
-              const ext  = f.Name.split('.').pop().toLowerCase();
-              const icon = { json: '{ }', csv: '📊', xlsx: '📗', xls: '📗' }[ext] || '📄';
-              const el = spPickerMakeItem(icon, f.Name, size, true, () => {
-                state.bodyEl.querySelectorAll('.sp-picker-item').forEach(i => i.classList.remove('sp-selected'));
-                el.classList.add('sp-selected');
-                state.selectedItem = { name: f.Name, serverRelUrl: f.ServerRelativeUrl };
-                state.confirmBtn.disabled = false;
-                if (state.filenameInput) state.filenameInput.value = f.Name;
-              }, f.Name);
-              state.bodyEl.appendChild(el);
-            });
-          }
-        } catch(e) {
-          state.bodyEl.innerHTML = `<div style="padding:16px;font-size:12px;color:var(--error)">Error: ${e.message}</div>`;
-        }
-      },
-
-      // ── List browser ────────────────────────────────────────────────────────
-
-      async _initListBrowser(state) {
-        try {
-          await SharePointFileDialog._fetchLists(state);
-          // Priority 1: last saved list
-          const saved = localStorage.getItem('dlv_spfd_last_list');
-          if (saved) {
-            const found = state.cachedLists.find(l => l.Title === saved);
-            if (found) { state.currentList = found; SharePointFileDialog._loadListItems(state); return; }
-          }
-          // Priority 2: defaultList param
-          if (state.params.defaultList) {
-            const found = state.cachedLists.find(l => l.Title === state.params.defaultList);
-            if (found) { state.currentList = found; SharePointFileDialog._loadListItems(state); return; }
-          }
-        } catch(e) {}
-        // Priority 3: root (all lists)
-        SharePointFileDialog._loadListsBrowser(state);
-      },
-
-      async _fetchLists(state) {
-        if (state.cachedLists) return;
-        const json = await spFetch(`${state.siteUrl}/_api/web/lists?$filter=Hidden eq false and BaseTemplate eq 100&$select=Title,Id&$orderby=Title`);
-        state.cachedLists = extractRows(json);
-      },
-
-      async _loadListsBrowser(state) {
-        state.currentList = null; state.selectedItem = null; state.confirmBtn.disabled = true;
-        SharePointFileDialog._renderBreadcrumb(state);
-        state.bodyEl.innerHTML = '<div style="padding:16px;text-align:center;font-size:12px;color:var(--text-secondary)">Loading…</div>';
-        try {
-          await SharePointFileDialog._fetchLists(state);
-          state.bodyEl.innerHTML = '';
-          if (!state.cachedLists.length) { state.bodyEl.innerHTML = '<div style="padding:16px;font-size:12px;color:var(--text-secondary)">No lists found.</div>'; return; }
-          state.cachedLists.forEach(list => {
-            state.bodyEl.appendChild(spPickerMakeItem('🗂', list.Title, null, false, () => {
-              state.currentList = list;
-              SharePointFileDialog._loadListItems(state);
-            }));
+    filteredFiles.forEach(f => {
+      const size = f.Length ? SharePointFileDialog._formatSize(+f.Length) : '';
+      const date = SharePointFileDialog._formatDate(f.TimeLastModified);
+      const ext = f.Name.split('.').pop().toLowerCase();
+      const icon = { json: '🗜', csv: '📊', xlsx: '📗', xls: '📗', txt: '📄' }[ext] || '📄';
+      
+      const row = SharePointFileDialog._createRow(icon, f.Name, '', date, size, true, (el) => {
+        // Deselection Logic
+        if (el.classList.contains('sp-selected')) {
+          el.classList.remove('sp-selected');
+          el.style.background = '';
+          state.selectedItem = null;
+          state.confirmBtn.disabled = state.params.mode === 'open'; // Save mode might still allow saving typed name
+        } else {
+          // Selection Logic
+          state.bodyEl.querySelectorAll('.sp-selected').forEach(i => {
+            i.classList.remove('sp-selected');
+            i.style.background = '';
           });
-        } catch(e) {
-          state.bodyEl.innerHTML = `<div style="padding:16px;font-size:12px;color:var(--error)">Error: ${e.message}</div>`;
-        }
-      },
-
-      async _loadListItems(state) {
-        SharePointFileDialog._renderBreadcrumb(state);
-        state.bodyEl.innerHTML = '<div style="padding:16px;text-align:center;font-size:12px;color:var(--text-secondary)">Loading…</div>';
-        state.selectedItem = null;
-        // In save mode, enable confirm as soon as we're inside a list
-        if (state.params.mode === 'save') state.confirmBtn.disabled = false;
-        else state.confirmBtn.disabled = true;
-        try {
-          const enc = encodeURIComponent(state.currentList.Title);
-          const json = await spFetch(`${state.siteUrl}/_api/web/lists/getbytitle('${enc}')/items?$select=ID,Title&$orderby=ID desc&$top=1000`);
-          const items = extractRows(json);
-          state.bodyEl.innerHTML = '';
-          if (!items.length) { state.bodyEl.innerHTML = '<div style="padding:16px;font-size:12px;color:var(--text-secondary)">No items found.</div>'; return; }
-          items.forEach(item => {
-            const label = `${item.Title || '(Untitled)'} (ID: ${item.ID})`;
-            const el = spPickerMakeItem('📄', label, null, true, () => {
-              state.bodyEl.querySelectorAll('.sp-picker-item').forEach(i => i.classList.remove('sp-selected'));
-              el.classList.add('sp-selected');
-              state.selectedItem = { id: item.ID, name: item.Title || '' };
-              state.confirmBtn.disabled = false;
-              if (state.filenameInput) {
-                const ext = state.params.defaultFileName.match(/\.[^.]+$/)?.[0] || '.json';
-                state.filenameInput.value = (item.Title || '') + ext;
-              }
-            }, String(item.ID));
-            state.bodyEl.appendChild(el);
-          });
-        } catch(e) {
-          state.bodyEl.innerHTML = `<div style="padding:16px;font-size:12px;color:var(--error)">Error: ${e.message}</div>`;
-        }
-      },
-
-      // ── Confirm handler ──────────────────────────────────────────────────────
-
-      async _handleConfirm(state) {
-        state.confirmBtn.disabled = true;
-        const origText = state.confirmBtn.textContent;
-        state.confirmBtn.textContent = state.params.mode === 'save' ? 'Saving…' : 'Opening…';
-        try {
-          const result = state.params.mode === 'save'
-            ? (state.params.type === 'file' ? await SharePointFileDialog._saveFile(state)     : await SharePointFileDialog._saveListItem(state))
-            : (state.params.type === 'file' ? await SharePointFileDialog._openFile(state)     : await SharePointFileDialog._openListItem(state));
-          // Persist last location to localStorage
-          try {
-            if (state.params.type === 'file') {
-              const cur = state.stack[state.stack.length - 1];
-              if (cur.serverRelUrl) localStorage.setItem('dlv_spfd_last_file', cur.serverRelUrl);
-            } else if (state.currentList) {
-              localStorage.setItem('dlv_spfd_last_list', state.currentList.Title);
-            }
-          } catch(e) {}
-          state.overlay.remove();
-          state.resolve(result);
-        } catch(e) {
-          toast(e.message, 'error');
+          el.classList.add('sp-selected');
+          el.style.background = 'var(--surface-selected,#e6f2fa)';
+          state.selectedItem = { name: f.Name, serverRelUrl: f.ServerRelativeUrl };
           state.confirmBtn.disabled = false;
-          state.confirmBtn.textContent = origText;
+          if (state.filenameInput) state.filenameInput.value = f.Name;
         }
-      },
+      });
+      state.bodyEl.appendChild(row);
+    });
+  },
 
-      // ── Save file ───────────────────────────────────────────────────────────
+  // ── List browser ────────────────────────────────────────────────────────
 
-      async _saveFile(state) {
-        let filename = state.filenameInput?.value?.trim();
-        if (!filename) throw new Error('Please enter a file name.');
-        filename = decodeURIComponent(filename);
-        const cur = state.stack[state.stack.length - 1];
-        if (!cur.serverRelUrl) throw new Error('Please navigate into a folder or library first.');
+  async _initListBrowser(state) {
+    try {
+      await SharePointFileDialog._fetchLists(state);
+      const saved = localStorage.getItem('dlv_spfd_last_list');
+      if (saved) {
+        const found = state.cachedLists.find(l => l.Title === saved);
+        if (found) { state.currentList = found; SharePointFileDialog._loadListItems(state); return; }
+      }
+      if (state.params.defaultList) {
+        const found = state.cachedLists.find(l => l.Title === state.params.defaultList);
+        if (found) { state.currentList = found; SharePointFileDialog._loadListItems(state); return; }
+      }
+    } catch(e) {}
+    SharePointFileDialog._loadListsBrowser(state);
+  },
 
-        const fileServerRelUrl = cur.serverRelUrl + '/' + filename;
-        // Check if file already exists
-        let fileExists = false;
-        try { await spFetch(`${state.siteUrl}/_api/web/GetFileByServerRelativeUrl('${encodeURIComponent(fileServerRelUrl)}')`); fileExists = true; } catch(e) {}
-        if (fileExists && !confirm(`"${filename}" already exists. Overwrite?`)) throw new Error('Save cancelled.');
+  async _fetchLists(state) {
+    if (state.cachedLists) return;
+    const json = await spFetch(`${state.siteUrl}/_api/web/lists?$filter=Hidden eq false and BaseTemplate eq 100&$select=Title,Id,ItemCount,LastItemModifiedDate&$orderby=Title`);
+    state.cachedLists = extractRows(json);
+  },
 
-        // Upload file
-        const enc = encodeURIComponent(cur.serverRelUrl);
-        const res = await spFetchWrite(
-          `${state.siteUrl}/_api/web/GetFolderByServerRelativeUrl('${enc}')/Files/add(url='${encodeURIComponent(filename)}',overwrite=true)`,
-          { method: 'POST', headers: { 'Accept': 'application/json' }, body: state.params.fileContent },
+  async _loadListsBrowser(state) {
+    state.currentList = null; state.selectedItem = null; state.confirmBtn.disabled = true;
+    SharePointFileDialog._renderBreadcrumb(state);
+    state.bodyEl.innerHTML = '<div style="padding:16px;text-align:center;font-size:12px;color:var(--text-secondary)">Loading…</div>';
+    
+    try {
+      await SharePointFileDialog._fetchLists(state);
+      state.currentData = { items: state.cachedLists }; // cache for lists root view
+      SharePointFileDialog._renderListsView(state, true);
+    } catch(e) {
+      state.bodyEl.innerHTML = `<div style="padding:16px;font-size:12px;color:var(--error,#d32f2f)">Error: ${e.message}</div>`;
+    }
+  },
+
+  async _loadListItems(state) {
+    SharePointFileDialog._renderBreadcrumb(state);
+    state.bodyEl.innerHTML = '<div style="padding:16px;text-align:center;font-size:12px;color:var(--text-secondary)">Loading…</div>';
+    state.selectedItem = null;
+    if (state.params.mode === 'save') state.confirmBtn.disabled = false;
+    else state.confirmBtn.disabled = true;
+
+    try {
+      const enc = encodeURIComponent(state.currentList.Title);
+      const json = await spFetch(`${state.siteUrl}/_api/web/lists/getbytitle('${enc}')/items?$select=ID,Title,Modified&$orderby=ID desc&$top=1000`);
+      state.currentData = { items: extractRows(json) };
+      SharePointFileDialog._renderListsView(state, false);
+    } catch(e) {
+      state.bodyEl.innerHTML = `<div style="padding:16px;font-size:12px;color:var(--error,#d32f2f)">Error: ${e.message}</div>`;
+    }
+  },
+
+  _renderListsView(state, isRoot) {
+    state.bodyEl.innerHTML = '';
+    const pattern = state.filterPattern;
+    const items = state.currentData.items.filter(item => SharePointFileDialog._matchPattern(item.Title || '', pattern));
+
+    if (!items.length) { 
+      state.bodyEl.innerHTML = '<div style="padding:16px;text-align:center;font-size:12px;color:var(--text-secondary)">No items match your filter.</div>'; 
+      return; 
+    }
+
+    if (isRoot) {
+      items.forEach(list => {
+        const count = list.ItemCount != null ? list.ItemCount : '';
+        const date = SharePointFileDialog._formatDate(list.LastItemModifiedDate);
+        const row = SharePointFileDialog._createRow('🗂', list.Title, count, date, '', false, () => {
+          state.currentList = list;
+          state.filterPattern = '';
+          SharePointFileDialog._loadListItems(state);
+        });
+        state.bodyEl.appendChild(row);
+      });
+    } else {
+      items.forEach(item => {
+        const name = item.Title || '(Untitled)';
+        const date = SharePointFileDialog._formatDate(item.Modified);
+        const row = SharePointFileDialog._createRow('📄', `${name} (ID: ${item.ID})`, '', date, '', true, (el) => {
+          // Deselection Logic
+          if (el.classList.contains('sp-selected')) {
+            el.classList.remove('sp-selected');
+            el.style.background = '';
+            state.selectedItem = null;
+            state.confirmBtn.disabled = state.params.mode === 'open';
+          } else {
+            // Selection Logic
+            state.bodyEl.querySelectorAll('.sp-selected').forEach(i => {
+              i.classList.remove('sp-selected');
+              i.style.background = '';
+            });
+            el.classList.add('sp-selected');
+            el.style.background = 'var(--surface-selected,#e6f2fa)';
+            state.selectedItem = { id: item.ID, name: item.Title || '' };
+            state.confirmBtn.disabled = false;
+            if (state.filenameInput) {
+              const ext = state.params.defaultFileName.match(/\.[^.]+$/)?.[0] || '.json';
+              state.filenameInput.value = (item.Title || '') + ext;
+            }
+          }
+        });
+        state.bodyEl.appendChild(row);
+      });
+    }
+  },
+
+  // ── Confirm handler ──────────────────────────────────────────────────────
+
+  async _handleConfirm(state) {
+    state.confirmBtn.disabled = true;
+    const origText = state.confirmBtn.textContent;
+    state.confirmBtn.textContent = state.params.mode === 'save' ? 'Saving…' : 'Opening…';
+    try {
+      const result = state.params.mode === 'save'
+        ? (state.params.type === 'file' ? await SharePointFileDialog._saveFile(state)     : await SharePointFileDialog._saveListItem(state))
+        : (state.params.type === 'file' ? await SharePointFileDialog._openFile(state)     : await SharePointFileDialog._openListItem(state));
+      
+      try {
+        if (state.params.type === 'file') {
+          const cur = state.stack[state.stack.length - 1];
+          if (cur.serverRelUrl) localStorage.setItem('dlv_spfd_last_file', cur.serverRelUrl);
+        } else if (state.currentList) {
+          localStorage.setItem('dlv_spfd_last_list', state.currentList.Title);
+        }
+      } catch(e) {}
+      
+      state.overlay.remove();
+      state.resolve(result);
+    } catch(e) {
+      // Ensure 'toast' is defined in your environment, else fallback to alert
+      if (typeof toast === 'function') toast(e.message, 'error');
+      else alert(e.message);
+      state.confirmBtn.disabled = false;
+      state.confirmBtn.textContent = origText;
+    }
+  },
+
+  // ── Save file ───────────────────────────────────────────────────────────
+
+  async _saveFile(state) {
+    let filename = state.filenameInput?.value?.trim();
+    if (!filename) throw new Error('Please enter a file name.');
+    filename = decodeURIComponent(filename);
+    const cur = state.stack[state.stack.length - 1];
+    if (!cur.serverRelUrl) throw new Error('Please navigate into a folder or library first.');
+
+    const fileServerRelUrl = cur.serverRelUrl + '/' + filename;
+    let fileExists = false;
+    try { await spFetch(`${state.siteUrl}/_api/web/GetFileByServerRelativeUrl('${encodeURIComponent(fileServerRelUrl)}')`); fileExists = true; } catch(e) {}
+    if (fileExists && !confirm(`"${filename}" already exists. Overwrite?`)) throw new Error('Save cancelled.');
+
+    const enc = encodeURIComponent(cur.serverRelUrl);
+    const res = await spFetchWrite(
+      `${state.siteUrl}/_api/web/GetFolderByServerRelativeUrl('${enc}')/Files/add(url='${encodeURIComponent(filename)}',overwrite=true)`,
+      { method: 'POST', headers: { 'Accept': 'application/json' }, body: state.params.fileContent },
+      state.siteUrl
+    );
+    if (!res.ok) { const t = await res.text(); throw new Error(`Upload failed (${res.status}): ${t}`); }
+
+    let id = null;
+    try {
+      const p = await spFetch(`${state.siteUrl}/_api/web/GetFileByServerRelativeUrl('${encodeURIComponent(fileServerRelUrl)}')?$expand=ListItemAllFields&$select=ListItemAllFields/ID`);
+      id = p?.ListItemAllFields?.ID ?? null;
+    } catch(e) {}
+
+    const origin = state.siteUrl.replace(/^(https?:\/\/[^/]+).*$/, '$1');
+    return { url: origin + fileServerRelUrl, serverRelativeUrl: fileServerRelUrl, folderName: cur.label, fileName: filename, id };
+  },
+
+  // ── Open file ───────────────────────────────────────────────────────────
+
+  async _openFile(state) {
+    // Override with Textbox Value
+    let filename = state.filenameInput.value.trim();
+    if (!filename) throw new Error('Please specify a file name.');
+    
+    const cur = state.stack[state.stack.length - 1];
+    if (!cur.serverRelUrl) throw new Error('Please navigate into a folder or library first.');
+    
+    const serverRelUrl = cur.serverRelUrl + '/' + filename;
+    const origin = state.siteUrl.replace(/^(https?:\/\/[^/]+).*$/, '$1');
+    
+    let id = null;
+    try {
+      const p = await spFetch(`${state.siteUrl}/_api/web/GetFileByServerRelativeUrl('${encodeURIComponent(serverRelUrl)}')?$expand=ListItemAllFields&$select=ListItemAllFields/ID`);
+      id = p?.ListItemAllFields?.ID ?? null;
+    } catch(e) {
+      throw new Error(`File "${filename}" not found. Please ensure the name is correct.`);
+    }
+    
+    return { url: origin + serverRelUrl, serverRelativeUrl: serverRelUrl, folderName: cur.label, fileName: filename, id };
+  },
+
+  // ── Save list item ──────────────────────────────────────────────────────
+
+  async _saveListItem(state) {
+    if (!state.currentList) throw new Error('Please navigate into a list first.');
+    let filename = state.filenameInput?.value?.trim() || state.params.defaultFileName;
+    filename = decodeURIComponent(filename);
+    const title = filename.replace(/\.[^.]+$/, '') || 'Untitled';
+    const listTitle = state.currentList.Title;
+    const enc = encodeURIComponent(listTitle);
+    const headers = { 'Accept': 'application/json', 'Content-Type': 'application/json' };
+
+    const fieldsJson = await spFetch(`${state.siteUrl}/_api/web/lists/getbytitle('${enc}')/fields?$select=InternalName`);
+    const fieldNames = extractRows(fieldsJson).map(f => f.InternalName);
+    const itemData = { Title: title };
+    if (state.params.fileContent && fieldNames.includes(state.params.fileContentField)) itemData[state.params.fileContentField] = state.params.fileContent;
+    if (state.params.sqlQuery && fieldNames.includes(state.params.sqlQueryField)) itemData[state.params.sqlQueryField] = state.params.sqlQuery;
+
+    let id;
+    // Check if what's in the text box matches the currently selected ID's known title
+    // If user changed the textbox drastically, create a NEW item instead of overwriting.
+    const isUpdatingSelected = state.selectedItem && state.filenameInput.value.includes(state.selectedItem.name);
+
+    if (isUpdatingSelected) {
+      if (!confirm(`Update existing item "${state.selectedItem.name || state.selectedItem.id}"?`)) throw new Error('Save cancelled.');
+      id = state.selectedItem.id;
+      const r = await spFetchWrite(
+        `${state.siteUrl}/_api/web/lists/getbytitle('${enc}')/items(${id})`,
+        { method: 'POST', headers: { ...headers, 'IF-MATCH': '*', 'X-HTTP-Method': 'MERGE' }, body: JSON.stringify(itemData) },
+        state.siteUrl
+      );
+      if (!r.ok) { const t = await r.text(); throw new Error(`Update failed (${r.status}): ${t}`); }
+    } else {
+      const r = await spFetchWrite(
+        `${state.siteUrl}/_api/web/lists/getbytitle('${enc}')/items`,
+        { method: 'POST', headers, body: JSON.stringify(itemData) },
+        state.siteUrl
+      );
+      if (!r.ok) { const t = await r.text(); throw new Error(`Create failed (${r.status}): ${t}`); }
+      const j = await r.json();
+      id = j.ID || j.d?.ID;
+    }
+
+    if (state.params.fileContent) {
+      const attName = decodeURIComponent(filename);
+      try {
+        await spFetchWrite(
+          `${state.siteUrl}/_api/web/lists/getbytitle('${enc}')/items(${id})/AttachmentFiles/getbyfilename('${encodeURIComponent(attName)}')`,
+          { method: 'POST', headers: { 'X-HTTP-Method': 'DELETE' } },
           state.siteUrl
         );
-        if (!res.ok) { const t = await res.text(); throw new Error(`Upload failed (${res.status}): ${t}`); }
+      } catch(e) {}
+      const ar = await spFetchWrite(
+        `${state.siteUrl}/_api/web/lists/getbytitle('${enc}')/items(${id})/AttachmentFiles/add(FileName='${encodeURIComponent(attName)}')`,
+        { method: 'POST', headers: { 'Accept': 'application/json' }, body: state.params.fileContent },
+        state.siteUrl
+      );
+      if (!ar.ok) { const t = await ar.text(); throw new Error(`Attachment failed (${ar.status}): ${t}`); }
+    }
 
-        // Retrieve the list item ID for the uploaded file
-        let id = null;
-        try {
-          const p = await spFetch(`${state.siteUrl}/_api/web/GetFileByServerRelativeUrl('${encodeURIComponent(fileServerRelUrl)}')?$expand=ListItemAllFields&$select=ListItemAllFields/ID`);
-          id = p?.ListItemAllFields?.ID ?? null;
-        } catch(e) {}
+    return { listName: listTitle, id, title, folderName: listTitle, itemUrl: `${state.siteUrl}/Lists/${listTitle}/DispForm.aspx?ID=${id}`, fileName: null, url: null, serverRelativeUrl: null };
+  },
 
-        const origin = state.siteUrl.replace(/^(https?:\/\/[^/]+).*$/, '$1');
-        return { url: origin + fileServerRelUrl, serverRelativeUrl: fileServerRelUrl, folderName: cur.label, fileName: filename, id };
-      },
+  // ── Open list item ──────────────────────────────────────────────────────
 
-      // ── Open file ───────────────────────────────────────────────────────────
+  async _openListItem(state) {
+    let filename = state.filenameInput.value.trim();
+    if (!filename) throw new Error('Please specify an item name.');
+    const title = filename.replace(/\.[^.]+$/, '') || 'Untitled';
+    
+    const listTitle = state.currentList.Title;
+    const enc = encodeURIComponent(listTitle);
+    
+    let id = state.selectedItem?.id;
+    let item;
+    
+    // If they typed a custom name without selecting, search for it
+    if (!id || (state.selectedItem && !state.filenameInput.value.includes(state.selectedItem.name))) {
+       const searchRes = await spFetch(`${state.siteUrl}/_api/web/lists/getbytitle('${enc}')/items?$filter=Title eq '${encodeURIComponent(title)}'&$top=1&$select=ID,Title&$expand=AttachmentFiles`);
+       const rows = extractRows(searchRes);
+       if (!rows.length) throw new Error(`Item "${title}" not found in list.`);
+       item = rows[0];
+       id = item.ID;
+    } else {
+       const json = await spFetch(`${state.siteUrl}/_api/web/lists/getbytitle('${enc}')/items(${id})?$select=Title&$expand=AttachmentFiles`);
+       item = json.d || json;
+    }
 
-      async _openFile(state) {
-        if (!state.selectedItem) throw new Error('Please select a file.');
-        const { name, serverRelUrl } = state.selectedItem;
-        const origin = state.siteUrl.replace(/^(https?:\/\/[^/]+).*$/, '$1');
-        let id = null;
-        try {
-          const p = await spFetch(`${state.siteUrl}/_api/web/GetFileByServerRelativeUrl('${encodeURIComponent(serverRelUrl)}')?$expand=ListItemAllFields&$select=ListItemAllFields/ID`);
-          id = p?.ListItemAllFields?.ID ?? null;
-        } catch(e) {}
-        return { url: origin + serverRelUrl, serverRelativeUrl: serverRelUrl, folderName: state.stack[state.stack.length - 1].label, fileName: name, id };
-      },
-
-      // ── Save list item ──────────────────────────────────────────────────────
-
-      async _saveListItem(state) {
-        if (!state.currentList) throw new Error('Please navigate into a list first.');
-        let filename = state.filenameInput?.value?.trim() || state.params.defaultFileName;
-        filename = decodeURIComponent(filename);
-        const title = filename.replace(/\.[^.]+$/, '') || 'Untitled';
-        const listTitle = state.currentList.Title;
-        const enc = encodeURIComponent(listTitle);
-        const headers = { 'Accept': 'application/json', 'Content-Type': 'application/json' };
-
-        // Check which custom fields exist in this list
-        const fieldsJson = await spFetch(`${state.siteUrl}/_api/web/lists/getbytitle('${enc}')/fields?$select=InternalName`);
-        const fieldNames = extractRows(fieldsJson).map(f => f.InternalName);
-        const itemData = { Title: title };
-        if (state.params.fileContent && fieldNames.includes(state.params.fileContentField)) itemData[state.params.fileContentField] = state.params.fileContent;
-        if (state.params.sqlQuery && fieldNames.includes(state.params.sqlQueryField)) itemData[state.params.sqlQueryField] = state.params.sqlQuery;
-
-        let id;
-        if (state.selectedItem?.id) {
-          // Update existing item
-          if (!confirm(`Update existing item "${state.selectedItem.name || state.selectedItem.id}"?`)) throw new Error('Save cancelled.');
-          id = state.selectedItem.id;
-          const r = await spFetchWrite(
-            `${state.siteUrl}/_api/web/lists/getbytitle('${enc}')/items(${id})`,
-            { method: 'POST', headers: { ...headers, 'IF-MATCH': '*', 'X-HTTP-Method': 'MERGE' }, body: JSON.stringify(itemData) },
-            state.siteUrl
-          );
-          if (!r.ok) { const t = await r.text(); throw new Error(`Update failed (${r.status}): ${t}`); }
-        } else {
-          // Create new item
-          const r = await spFetchWrite(
-            `${state.siteUrl}/_api/web/lists/getbytitle('${enc}')/items`,
-            { method: 'POST', headers, body: JSON.stringify(itemData) },
-            state.siteUrl
-          );
-          if (!r.ok) { const t = await r.text(); throw new Error(`Create failed (${r.status}): ${t}`); }
-          const j = await r.json();
-          id = j.ID || j.d?.ID;
-        }
-
-        // Add/replace attachment if fileContent is provided
-        if (state.params.fileContent) {
-          const attName = decodeURIComponent(filename);
-          // Delete existing attachment with same name if present
-          try {
-            await spFetchWrite(
-              `${state.siteUrl}/_api/web/lists/getbytitle('${enc}')/items(${id})/AttachmentFiles/getbyfilename('${encodeURIComponent(attName)}')`,
-              { method: 'POST', headers: { 'X-HTTP-Method': 'DELETE' } },
-              state.siteUrl
-            );
-          } catch(e) {}
-          const ar = await spFetchWrite(
-            `${state.siteUrl}/_api/web/lists/getbytitle('${enc}')/items(${id})/AttachmentFiles/add(FileName='${encodeURIComponent(attName)}')`,
-            { method: 'POST', headers: { 'Accept': 'application/json' }, body: state.params.fileContent },
-            state.siteUrl
-          );
-          if (!ar.ok) { const t = await ar.text(); throw new Error(`Attachment failed (${ar.status}): ${t}`); }
-        }
-
-        return { listName: listTitle, id, title, folderName: listTitle, itemUrl: `${state.siteUrl}/Lists/${listTitle}/DispForm.aspx?ID=${id}`, fileName: null, url: null, serverRelativeUrl: null };
-      },
-
-      // ── Open list item ──────────────────────────────────────────────────────
-
-      async _openListItem(state) {
-        if (!state.selectedItem) throw new Error('Please select an item.');
-        const { id } = state.selectedItem;
-        const listTitle = state.currentList.Title;
-        const enc = encodeURIComponent(listTitle);
-        const json = await spFetch(`${state.siteUrl}/_api/web/lists/getbytitle('${enc}')/items(${id})?$select=Title&$expand=AttachmentFiles`);
-        const item = json.d || json;
-        const attachments = extractRows(item.AttachmentFiles || null);
-        const att = attachments[0];
-        const origin = state.siteUrl.replace(/^(https?:\/\/[^/]+).*$/, '$1');
-        return {
-          listName: listTitle, id, title: item.Title, folderName: listTitle,
-          itemUrl: `${state.siteUrl}/Lists/${listTitle}/DispForm.aspx?ID=${id}`,
-          fileName: att?.FileName ?? null,
-          url: att ? origin + att.ServerRelativeUrl : null,
-          serverRelativeUrl: att?.ServerRelativeUrl ?? null
-        };
-      },
-
-      // ── Utilities ───────────────────────────────────────────────────────────
-
-      /** Check if a folder/library exists at the given server-relative URL. */
-      async _folderExists(siteUrl, serverRelUrl) {
-        try { await spFetch(`${siteUrl}/_api/web/GetFolderByServerRelativeUrl('${encodeURIComponent(serverRelUrl)}')`); return true; } catch(e) { return false; }
-      },
-
-      /**
-       * Build a breadcrumb stack from a server-relative folder URL.
-       * e.g. siteUrl='https://tenant.sharepoint.com/sites/foo', serverRelUrl='/sites/foo/Shared Documents/Reports'
-       * → [{label:'Document Libraries', serverRelUrl:null}, {label:'Shared Documents', serverRelUrl:'/sites/foo/Shared Documents'}, {label:'Reports', serverRelUrl:'/sites/foo/Shared Documents/Reports'}]
-       */
-      _buildFileStack(siteUrl, serverRelUrl) {
-        const stack = [{ label: 'Document Libraries', serverRelUrl: null }];
-        const webPath = siteUrl.replace(/^https?:\/\/[^/]+/, ''); // e.g. '/sites/foo'
-        let rel = serverRelUrl;
-        if (rel.startsWith(webPath)) rel = rel.slice(webPath.length); // strip site prefix
-        let built = webPath;
-        rel.split('/').filter(p => p).forEach(part => {
-          built += '/' + part;
-          stack.push({ label: part, serverRelUrl: built });
-        });
-        return stack;
-      }
+    const attachments = extractRows(item.AttachmentFiles || null);
+    const att = attachments[0];
+    const origin = state.siteUrl.replace(/^(https?:\/\/[^/]+).*$/, '$1');
+    return {
+      listName: listTitle, id, title: item.Title, folderName: listTitle,
+      itemUrl: `${state.siteUrl}/Lists/${listTitle}/DispForm.aspx?ID=${id}`,
+      fileName: att?.FileName ?? null,
+      url: att ? origin + att.ServerRelativeUrl : null,
+      serverRelativeUrl: att?.ServerRelativeUrl ?? null
     };
+  },
+
+  // ── Utilities ───────────────────────────────────────────────────────────
+
+async _folderExists(siteUrl, serverRelUrl) {
+    try { 
+      // Safely encode spaces and manually encode single quotes for OData literal queries
+      const encodedUrl = encodeURIComponent(serverRelUrl).replace(/'/g, "%27");
+      await spFetch(`${siteUrl}/_api/web/GetFolderByServerRelativeUrl('${encodedUrl}')`); 
+      return true; 
+    } catch(e) { 
+      return false; 
+    }
+  },
+
+_buildFileStack(siteUrl, serverRelUrl) {
+    const stack = [{ label: 'Document Libraries', serverRelUrl: null }];
+    const webPath = siteUrl.replace(/^https?:\/\/[^/]+/, ''); 
+    let rel = serverRelUrl;
+    
+    // Use toLowerCase() to prevent casing mismatches from breaking the breadcrumb root
+    if (rel.toLowerCase().startsWith(webPath.toLowerCase())) {
+      rel = rel.slice(webPath.length); 
+    }
+    
+    let built = webPath;
+    rel.split('/').filter(p => p).forEach(part => {
+      built += '/' + part;
+      stack.push({ label: part, serverRelUrl: built });
+    });
+    return stack;
+  }
+};
 
 
 /* ============================================================
