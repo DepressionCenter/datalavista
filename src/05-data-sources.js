@@ -584,6 +584,98 @@ async function loadJSONSource(url, dsName) {
   setupCodeMirror();
 }
 
+/** Load JSON from already-parsed text (e.g. local file upload).
+ *  Applies the same normalization as loadJSONSource without a network fetch.
+ */
+function loadJSONData(dsName, fileName, fileUrl, isFileUpload, text) {
+  let json;
+  try {
+    json = JSON.parse(text);
+  } catch (e) {
+    toast('JSON parse error: ' + e.message, 'error');
+    return;
+  }
+
+  const rows = extractRows(json);
+  if (!rows.length) {
+    toast('No data found in JSON — the file was empty or in an unexpected format', 'error');
+    return;
+  }
+
+  const first = rows[0];
+  const fields = Object.keys(first).map((k) => {
+    const val = first[k];
+    let type = 'text';
+    if (typeof val === 'number')                               type = 'number';
+    else if (typeof val === 'boolean')                         type = 'boolean';
+    else if (typeof val === 'string' && ISO_DATE_RE.test(val)) type = 'date';
+    return {
+      internalName: k,
+      displayName:  k,
+      alias:        toPascalCase(k) || k,
+      type,
+      displayType:  type,
+    };
+  });
+
+  const normalizedRows = rows.map((r) => {
+    const out = {};
+    for (const f of fields) {
+      let v = r[f.internalName];
+      if (f.type === 'date')                        v = normalizeDate(v);
+      else if (typeof v === 'object' && v !== null) v = normalizeObject(v);
+      out[f.alias] = v;
+    }
+    return out;
+  });
+
+  const tableKey = (dsName + '_Data').replace(/[^A-Za-z0-9_]/g, '_').replace('__', '_');
+
+  if (!DataLaVistaState.dataSources[dsName]) {
+    DataLaVistaState.dataSources[dsName] = {
+      alias: dsName,
+      auth: null,
+      description: 'This JSON file (' + (fileName || dsName + '.json') + ') was uploaded manually, and only the dashboard creator can refresh it.',
+      internalName: dsName,
+      type: 'json',
+      tables: [],
+      token: '',
+      fileName: fileName || '',
+      isFileUpload: isFileUpload,
+      url: fileUrl || fileName || dsName + '.json',
+      siteUrl: null,
+      keepRawData: isFileUpload ? true : false
+    };
+  }
+
+  DataLaVistaState.tables[tableKey] = {
+    displayName: 'Data',
+    alias: 'Data',
+    dsAlias: dsName,
+    fields,
+    data: normalizedRows,
+    loaded: true,
+    sourceType: 'json',
+    dataSource: dsName,
+    isFileUpload: isFileUpload,
+    keepRawData: isFileUpload ? true : false,
+    siteUrl: null,
+    url: fileUrl || fileName || dsName + '.json',
+    itemCount: normalizedRows.length
+  };
+
+  if (!DataLaVistaState.dataSources[dsName].tables.includes(tableKey)) {
+    DataLaVistaState.dataSources[dsName].tables.push(tableKey);
+  }
+
+  setStatus(`✅ Loaded ${normalizedRows.length} rows from JSON`);
+  if (DataLaVistaState.reportMode === 'edit') {
+    renderFieldsPanel();
+    setupCodeMirror();
+  }
+  toast(`Loaded ${normalizedRows.length} rows from JSON as "${dsName}"`, 'success');
+}
+
 // Fetch CSV text with error handling
 async function fetchCSVFromURL(url) {
       try {

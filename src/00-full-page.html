@@ -2846,13 +2846,23 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           <!-- JSON -->
           <div class="source-pane" id="src-json">
             <div class="form-group">
-              <label>JSON URL</label>
-              <input type="text" class="form-input" id="json-url" placeholder="https://example.com/api/data.json" />
+              <label>JSON URL (SharePoint library or direct link)</label>
+              <div style="display:flex;gap:6px;align-items:center">
+                <input type="text" class="form-input" id="json-url" placeholder="https://example.com/api/data.json"
+                  style="flex:1" />
+                <button class="btn btn-default btn-sm" id="btn-sp-browse-json" onclick="spBrowseJSON()"
+                  title="Browse SharePoint document libraries for a JSON file"
+                  style="display:none;white-space:nowrap;flex-shrink:0">📂 Browse SharePoint Files</button>
+              </div>
               <span class="text-xs text-muted">URL must return a JSON array or SharePoint REST format</span>
             </div>
             <div class="form-group">
               <label>Data Source Name <span style="font-weight:400;color:var(--text-disabled)">(up to 6 alphanumeric chars, default: JSON)</span></label>
               <input type="text" class="form-input" id="json-ds-name" placeholder="JSON" maxlength="6" />
+            </div>
+            <div class="form-group">
+              <label>Or upload a local JSON file</label>
+              <input type="file" class="form-input" id="json-file" accept=".json, .json5, .JSON, .js, .txt, application/json, text/javascript, text/plain" />
             </div>
           </div>
 

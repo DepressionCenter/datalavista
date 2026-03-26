@@ -270,6 +270,25 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           if (el) el.value = text;
         });
 
+        // Handle JSON upload (file input change event) for Connect popup
+        document.getElementById('json-file')?.addEventListener('change', async function () {
+          const f = this.files[0];
+          if (!f) return;
+          let text;
+          try {
+            text = await f.text();
+          } catch (e) {
+            toast('Error reading file: ' + e.message, 'error');
+            return;
+          }
+          const dsEl = document.getElementById('json-ds-name');
+          const rawDsName = (dsEl?.value || '').trim();
+          const dsName = generateDataSourceName('json', rawDsName);
+          loadJSONData(dsName || 'JSON', f.name, '', true, text);
+          updateConnectButton();
+          hideConnectPopup();
+        });
+
         // Handle CSV upload (file input change event) for Connect popup
         document.getElementById('csv-file')?.addEventListener('change', async function () {
           const f = this.files[0];

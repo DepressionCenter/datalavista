@@ -214,12 +214,14 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         selected: null,  // { name, serverRelUrl, absoluteUrl }
       };
 
-      /** Show or hide the Browse SP button depending on whether we're in SP. */
+      /** Show or hide the Browse SP buttons depending on whether we're in SP. */
       function spPickerCheckVisibility() {
-        const btn = document.getElementById('btn-sp-browse');
-        if (!btn) return;
         const url = getSpSiteUrl();
-        btn.style.display = url ? '' : 'none';
+        const display = url ? '' : 'none';
+        const btn = document.getElementById('btn-sp-browse');
+        if (btn) btn.style.display = display;
+        const btnJson = document.getElementById('btn-sp-browse-json');
+        if (btnJson) btnJson.style.display = display;
       }
 
       /** Open the file picker modal. */
@@ -259,6 +261,24 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           });
           if (!result) return;
           const urlEl = /** @type {HTMLInputElement|null} */ (document.getElementById('csv-url'));
+          if (urlEl) urlEl.value = result.url;
+          toast(`Selected: ${result.fileName}`, 'success');
+        } catch (err) {
+          if (err && err.message !== 'Dialog cancelled') toast(err.message || String(err), 'error');
+        }
+      }
+
+      /** Open SharePointFileDialog to browse for a JSON file and populate #json-url. */
+      async function spBrowseJSON() {
+        try {
+          const result = await SharePointFileDialog.show({
+            mode: 'open',
+            type: 'file',
+            fileExtensions: ['.json', '.json5', '.JSON', '.js', '.txt'],
+            defaultFolders: ['/Shared Documents/Data', '/Shared Documents', '/SiteAssets']
+          });
+          if (!result) return;
+          const urlEl = /** @type {HTMLInputElement|null} */ (document.getElementById('json-url'));
           if (urlEl) urlEl.value = result.url;
           toast(`Selected: ${result.fileName}`, 'success');
         } catch (err) {
