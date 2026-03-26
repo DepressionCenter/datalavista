@@ -248,6 +248,24 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         toast(`Selected: ${_spPicker.selected.name}`, 'success');
       }
 
+      /** Open SharePointFileDialog to browse for a CSV/TSV file and populate #csv-url. */
+      async function spBrowseCSV() {
+        try {
+          const result = await SharePointFileDialog.show({
+            mode: 'open',
+            type: 'file',
+            fileExtensions: ['.csv', '.CSV', '.tsv', '.txt'],
+            defaultFolders: ['/Shared Documents/Data', '/Shared Documents', '/SiteAssets']
+          });
+          if (!result) return;
+          const urlEl = /** @type {HTMLInputElement|null} */ (document.getElementById('csv-url'));
+          if (urlEl) urlEl.value = result.url;
+          toast(`Selected: ${result.fileName}`, 'success');
+        } catch (err) {
+          if (err && err.message !== 'Dialog cancelled') toast(err.message || String(err), 'error');
+        }
+      }
+
       /** Load the current level (root = libraries, else folder contents). */
       async function spPickerLoad() {
         const spinner = document.getElementById('sp-picker-spinner');
