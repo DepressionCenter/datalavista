@@ -265,9 +265,23 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         });
         document.getElementById('config-file')?.addEventListener('change', async function () {
           const f = this.files[0]; if (!f) return;
-          const text = await f.text();
-          const el = document.getElementById('config-json-input');
-          if (el) el.value = text;
+          let text;
+          try {
+            text = await f.text();
+          } catch (e) {
+            toast('Error reading file: ' + e.message, 'error');
+            return;
+          }
+          const parsed = safeJSONParse(text, 'Config');
+          if (!parsed) return;
+          try {
+            await loadConfig(parsed);
+            updateConnectButton();
+            /** @type {HTMLButtonElement} */ (document.getElementById('btn-save-config')).disabled = false;
+            hideConnectPopup();
+          } catch (e) {
+            toast('Failed to load dashboard: ' + e.message, 'error');
+          }
         });
 
         // Handle JSON upload (file input change event) for Connect popup

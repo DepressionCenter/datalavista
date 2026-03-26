@@ -123,13 +123,20 @@ async function doConnect() {
       await loadCSVSource(siteUrl, dsName);
       
     } else if (activeTab === 'loadconfig') {
-      /* Load Report Config Tab */
-      const jsonText = (document.getElementById('config-json-input')?.value || '').trim();
-      if (!jsonText) {
-        throw new Error('Please paste or load a config file.');
+      /* Open Dashboard Tab */
+      const configUrl = ((/** @type {HTMLInputElement|null} */ (document.getElementById('config-url')))?.value || '').trim();
+      const jsonText = ((/** @type {HTMLTextAreaElement|null} */ (document.getElementById('config-json-input')))?.value || '').trim();
+      if (!configUrl && !jsonText) {
+        throw new Error('Please provide a dashboard URL, upload a file, or paste a JSON configuration.');
       }
-      progText.textContent = 'Loading report config...';
-      const parsed = safeJSONParse(jsonText, 'Config');
+      progText.textContent = 'Loading dashboard...';
+      let parsed;
+      if (configUrl) {
+        const json = await fetchJSONWithFallbacks(configUrl);
+        parsed = json;
+      } else {
+        parsed = safeJSONParse(jsonText, 'Config');
+      }
       if (!parsed) return;
       await loadConfig(parsed);
     }

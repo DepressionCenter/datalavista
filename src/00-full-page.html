@@ -2815,7 +2815,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
               Lists</div>
             <div class="source-tab" data-src="json" onclick="switchSourceTab(this,'json')">JSON URL</div>
             <div class="source-tab" data-src="csv" onclick="switchSourceTab(this,'csv')">CSV File</div>
-            <div class="source-tab" data-src="loadconfig" onclick="switchSourceTab(this,'loadconfig')">Load Config</div>
+            <div class="source-tab" data-src="loadconfig" onclick="switchSourceTab(this,'loadconfig')">Open Dashboard</div>
           </div>
 
           <!-- SharePoint -->
@@ -2889,16 +2889,26 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
             </div>
           </div>
 
-          <!-- Load Config -->
+          <!-- Open Dashboard -->
           <div class="source-pane" id="src-loadconfig">
             <div class="form-group">
-              <label>Paste JSON Configuration</label>
-              <textarea class="form-input" id="config-json-input" rows="8"
-                placeholder='{"_license":"", "dataSources": {}, "tables":{}, "queryColumns":{}, "deisgn": {}, "sql": ""\n}'></textarea>
+              <label>Dashboard URL (SharePoint library or direct link)</label>
+              <div style="display:flex;gap:6px;align-items:center">
+                <input type="text" class="form-input" id="config-url" placeholder="https://tenant.sharepoint.com/sites/.../Shared Documents/report.json"
+                  style="flex:1" />
+                <button class="btn btn-default btn-sm" id="btn-sp-browse-config" onclick="spBrowseConfig()"
+                  title="Browse SharePoint document libraries for a dashboard JSON file"
+                  style="display:none;white-space:nowrap;flex-shrink:0">📂 Browse SharePoint Files</button>
+              </div>
             </div>
             <div class="form-group">
-              <label>Or load from file</label>
+              <label>Or upload a local dashboard file</label>
               <input type="file" class="form-input" id="config-file" accept=".json, .JSON, .json5, .JSON5, text/json, application/json" />
+            </div>
+            <div class="form-group">
+              <label>Or paste JSON configuration</label>
+              <textarea class="form-input" id="config-json-input" rows="4"
+                placeholder='{"_license":"", "dataSources": {}, "tables":{}, "queryColumns":{}, "design": {}, "sql": ""}'></textarea>
             </div>
           </div>
 

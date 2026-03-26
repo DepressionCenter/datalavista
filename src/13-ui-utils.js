@@ -218,10 +218,10 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       function spPickerCheckVisibility() {
         const url = getSpSiteUrl();
         const display = url ? '' : 'none';
-        const btn = document.getElementById('btn-sp-browse');
-        if (btn) btn.style.display = display;
-        const btnJson = document.getElementById('btn-sp-browse-json');
-        if (btnJson) btnJson.style.display = display;
+        ['btn-sp-browse', 'btn-sp-browse-json', 'btn-sp-browse-config'].forEach(id => {
+          const btn = document.getElementById(id);
+          if (btn) btn.style.display = display;
+        });
       }
 
       /** Open the file picker modal. */
@@ -279,6 +279,24 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           });
           if (!result) return;
           const urlEl = /** @type {HTMLInputElement|null} */ (document.getElementById('json-url'));
+          if (urlEl) urlEl.value = result.url;
+          toast(`Selected: ${result.fileName}`, 'success');
+        } catch (err) {
+          if (err && err.message !== 'Dialog cancelled') toast(err.message || String(err), 'error');
+        }
+      }
+
+      /** Open SharePointFileDialog to browse for a dashboard JSON file and populate #config-url. */
+      async function spBrowseConfig() {
+        try {
+          const result = await SharePointFileDialog.show({
+            mode: 'open',
+            type: 'file',
+            fileExtensions: ['.json', '.json5', '.JSON'],
+            defaultFolders: ['/Shared Documents/Dashboards', '/Shared Documents/Reports', '/Shared Documents', '/SiteAssets']
+          });
+          if (!result) return;
+          const urlEl = /** @type {HTMLInputElement|null} */ (document.getElementById('config-url'));
           if (urlEl) urlEl.value = result.url;
           toast(`Selected: ${result.fileName}`, 'success');
         } catch (err) {

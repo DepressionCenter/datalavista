@@ -2815,7 +2815,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
               Lists</div>
             <div class="source-tab" data-src="json" onclick="switchSourceTab(this,'json')">JSON URL</div>
             <div class="source-tab" data-src="csv" onclick="switchSourceTab(this,'csv')">CSV File</div>
-            <div class="source-tab" data-src="loadconfig" onclick="switchSourceTab(this,'loadconfig')">Load Config</div>
+            <div class="source-tab" data-src="loadconfig" onclick="switchSourceTab(this,'loadconfig')">Open Dashboard</div>
           </div>
 
           <!-- SharePoint -->
@@ -2889,16 +2889,26 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
             </div>
           </div>
 
-          <!-- Load Config -->
+          <!-- Open Dashboard -->
           <div class="source-pane" id="src-loadconfig">
             <div class="form-group">
-              <label>Paste JSON Configuration</label>
-              <textarea class="form-input" id="config-json-input" rows="8"
-                placeholder='{"_license":"", "dataSources": {}, "tables":{}, "queryColumns":{}, "deisgn": {}, "sql": ""\n}'></textarea>
+              <label>Dashboard URL (SharePoint library or direct link)</label>
+              <div style="display:flex;gap:6px;align-items:center">
+                <input type="text" class="form-input" id="config-url" placeholder="https://tenant.sharepoint.com/sites/.../Shared Documents/report.json"
+                  style="flex:1" />
+                <button class="btn btn-default btn-sm" id="btn-sp-browse-config" onclick="spBrowseConfig()"
+                  title="Browse SharePoint document libraries for a dashboard JSON file"
+                  style="display:none;white-space:nowrap;flex-shrink:0">📂 Browse SharePoint Files</button>
+              </div>
             </div>
             <div class="form-group">
-              <label>Or load from file</label>
+              <label>Or upload a local dashboard file</label>
               <input type="file" class="form-input" id="config-file" accept=".json, .JSON, .json5, .JSON5, text/json, application/json" />
+            </div>
+            <div class="form-group">
+              <label>Or paste JSON configuration</label>
+              <textarea class="form-input" id="config-json-input" rows="4"
+                placeholder='{"_license":"", "dataSources": {}, "tables":{}, "queryColumns":{}, "design": {}, "sql": ""}'></textarea>
             </div>
           </div>
 
@@ -5485,13 +5495,20 @@ async function doConnect() {
       await loadCSVSource(siteUrl, dsName);
       
     } else if (activeTab === 'loadconfig') {
-      /* Load Report Config Tab */
-      const jsonText = (document.getElementById('config-json-input')?.value || '').trim();
-      if (!jsonText) {
-        throw new Error('Please paste or load a config file.');
+      /* Open Dashboard Tab */
+      const configUrl = ((/** @type {HTMLInputElement|null} */ (document.getElementById('config-url')))?.value || '').trim();
+      const jsonText = ((/** @type {HTMLTextAreaElement|null} */ (document.getElementById('config-json-input')))?.value || '').trim();
+      if (!configUrl && !jsonText) {
+        throw new Error('Please provide a dashboard URL, upload a file, or paste a JSON configuration.');
       }
-      progText.textContent = 'Loading report config...';
-      const parsed = safeJSONParse(jsonText, 'Config');
+      progText.textContent = 'Loading dashboard...';
+      let parsed;
+      if (configUrl) {
+        const json = await fetchJSONWithFallbacks(configUrl);
+        parsed = json;
+      } else {
+        parsed = safeJSONParse(jsonText, 'Config');
+      }
       if (!parsed) return;
       await loadConfig(parsed);
     }
@@ -11157,10 +11174,10 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       function spPickerCheckVisibility() {
         const url = getSpSiteUrl();
         const display = url ? '' : 'none';
-        const btn = document.getElementById('btn-sp-browse');
-        if (btn) btn.style.display = display;
-        const btnJson = document.getElementById('btn-sp-browse-json');
-        if (btnJson) btnJson.style.display = display;
+        ['btn-sp-browse', 'btn-sp-browse-json', 'btn-sp-browse-config'].forEach(id => {
+          const btn = document.getElementById(id);
+          if (btn) btn.style.display = display;
+        });
       }
 
       /** Open the file picker modal. */
@@ -11218,6 +11235,24 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           });
           if (!result) return;
           const urlEl = /** @type {HTMLInputElement|null} */ (document.getElementById('json-url'));
+          if (urlEl) urlEl.value = result.url;
+          toast(`Selected: ${result.fileName}`, 'success');
+        } catch (err) {
+          if (err && err.message !== 'Dialog cancelled') toast(err.message || String(err), 'error');
+        }
+      }
+
+      /** Open SharePointFileDialog to browse for a dashboard JSON file and populate #config-url. */
+      async function spBrowseConfig() {
+        try {
+          const result = await SharePointFileDialog.show({
+            mode: 'open',
+            type: 'file',
+            fileExtensions: ['.json', '.json5', '.JSON'],
+            defaultFolders: ['/Shared Documents/Dashboards', '/Shared Documents/Reports', '/Shared Documents', '/SiteAssets']
+          });
+          if (!result) return;
+          const urlEl = /** @type {HTMLInputElement|null} */ (document.getElementById('config-url'));
           if (urlEl) urlEl.value = result.url;
           toast(`Selected: ${result.fileName}`, 'success');
         } catch (err) {
@@ -11630,9 +11665,23 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         });
         document.getElementById('config-file')?.addEventListener('change', async function () {
           const f = this.files[0]; if (!f) return;
-          const text = await f.text();
-          const el = document.getElementById('config-json-input');
-          if (el) el.value = text;
+          let text;
+          try {
+            text = await f.text();
+          } catch (e) {
+            toast('Error reading file: ' + e.message, 'error');
+            return;
+          }
+          const parsed = safeJSONParse(text, 'Config');
+          if (!parsed) return;
+          try {
+            await loadConfig(parsed);
+            updateConnectButton();
+            /** @type {HTMLButtonElement} */ (document.getElementById('btn-save-config')).disabled = false;
+            hideConnectPopup();
+          } catch (e) {
+            toast('Failed to load dashboard: ' + e.message, 'error');
+          }
         });
 
         // Handle JSON upload (file input change event) for Connect popup
@@ -11804,6 +11853,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         spPickerConfirm,
         spBrowseCSV,
         spBrowseJSON,
+        spBrowseConfig,
         spPickerCheckVisibility,
         SharePointFileDialog,
         setupCodeMirror,
