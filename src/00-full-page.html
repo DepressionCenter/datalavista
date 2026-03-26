@@ -3222,9 +3222,13 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
               <h4>Publish &amp; Save</h4>
             </div>
             <div class="gen-info-actions">
-              <button class="btn btn-primary btn-sm" disabled title="Coming soon">☁ Publish to SharePoint</button>
-              <button class="btn btn-default btn-sm" disabled title="Coming soon">📋 Save to SharePoint List</button>
-              <button class="btn btn-default btn-sm" title="Coming soon" onclick="downloadGenCode('json')">💾 Save Local Copy</button>
+              <button class="btn btn-primary btn-sm" id="btn-publish-sp" disabled onclick="publishToSharePoint()" title="Save this report to a SharePoint document library">☁ Publish to SharePoint</button>
+              <button class="btn btn-default btn-sm" id="btn-save-sp-list" disabled onclick="saveToSharePointList()" title="Save this report to a SharePoint list">📋 Save to SharePoint List</button>
+              <button class="btn btn-default btn-sm" onclick="downloadGenCode('json')">💾 Save Local Copy</button>
+            </div>
+            <div id="gen-publish-result" style="display:none;margin-top:8px;align-items:center;gap:6px;flex-wrap:wrap">
+              <a id="gen-publish-url" href="#" target="_blank" style="color:var(--primary);font-weight:700;font-size:11px;text-decoration:underline"></a>
+              <button class="btn btn-ghost btn-sm" onclick="sharePublishedUrl()" style="height:22px;padding:0 8px;font-size:11px;flex-shrink:0">🔗 Share</button>
             </div>
             <div class="gen-info-copyright">
               Copyright &copy; 2026 The Regents of the University of Michigan

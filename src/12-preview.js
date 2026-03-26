@@ -289,6 +289,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       // ============================================================
       // GENERATE REPORT
       // ============================================================
+      let _lastPublishedUrl = '';
+
       function generateReport() {
         const config = buildConfig();
         const jsonStr = JSON.stringify(config, null, 2);
@@ -314,6 +316,78 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           downloadText(area.value, DataLaVistaState.design.title + ext, mime);
         else
           downloadText(area.value, 'DataLaVista-report' + ext, mime);
+      }
+
+      async function publishToSharePoint() {
+        const config = buildConfig();
+        const jsonStr = JSON.stringify(config, null, 2);
+        const title = DataLaVistaState.design.title || 'DataLaVista-report';
+        let result;
+        try {
+          result = await SharePointFileDialog.show({
+            mode: 'save',
+            type: 'file',
+            defaultFileName: title + '.json',
+            fileContent: jsonStr,
+            fileExtensions: ['.json', '.json5', '.JSON', '.js', '.txt'],
+            defaultFolders: ['/Shared Documents/Reports', '/Shared Documents/Dashboards', '/Shared Documents', '/SiteAssets']
+          });
+        } catch (err) {
+          if (err && err.message !== 'Dialog cancelled') toast(err.message || String(err), 'error');
+          return;
+        }
+        if (!result) return;
+        _showPublishResult(result.url);
+        toast('Published to SharePoint!', 'success');
+      }
+
+      async function saveToSharePointList() {
+        const config = buildConfig();
+        const jsonStr = JSON.stringify(config, null, 2);
+        const title = DataLaVistaState.design.title || 'DataLaVista-report';
+        let result;
+        try {
+          result = await SharePointFileDialog.show({
+            mode: 'save',
+            type: 'list',
+            defaultFileName: title + '.json',
+            fileContent: jsonStr,
+            sqlQuery: '',
+            defaultList: 'Reports'
+          });
+        } catch (err) {
+          if (err && err.message !== 'Dialog cancelled') toast(err.message || String(err), 'error');
+          return;
+        }
+        if (!result) return;
+        _showPublishResult(result.url || result.itemUrl);
+        toast('Saved to SharePoint list!', 'success');
+      }
+
+      /** Display the saved-file URL and share button below the publish actions. */
+      function _showPublishResult(url) {
+        const container = document.getElementById('gen-publish-result');
+        const link = /** @type {HTMLAnchorElement|null} */ (document.getElementById('gen-publish-url'));
+        if (!container || !link || !url) return;
+        _lastPublishedUrl = url;
+        link.textContent = url.length > 100
+          ? url.slice(0, 45) + '\u2026' + url.slice(-52)
+          : url;
+        link.href = url;
+        container.style.display = 'flex';
+      }
+
+      function sharePublishedUrl() {
+        const url = _lastPublishedUrl;
+        if (!url) return;
+        if (navigator.canShare) {
+          navigator.share({
+            title: DataLaVistaState.design.title || 'DataLaVista Report',
+            text: 'Check out this report I created with DataLaVista!',
+            url
+          });
+        }
+        navigator.clipboard.writeText(url).then(() => toast('URL copied to clipboard', 'success'));
       }
 
       

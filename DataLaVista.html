@@ -3222,9 +3222,13 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
               <h4>Publish &amp; Save</h4>
             </div>
             <div class="gen-info-actions">
-              <button class="btn btn-primary btn-sm" disabled title="Coming soon">☁ Publish to SharePoint</button>
-              <button class="btn btn-default btn-sm" disabled title="Coming soon">📋 Save to SharePoint List</button>
-              <button class="btn btn-default btn-sm" title="Coming soon" onclick="downloadGenCode('json')">💾 Save Local Copy</button>
+              <button class="btn btn-primary btn-sm" id="btn-publish-sp" disabled onclick="publishToSharePoint()" title="Save this report to a SharePoint document library">☁ Publish to SharePoint</button>
+              <button class="btn btn-default btn-sm" id="btn-save-sp-list" disabled onclick="saveToSharePointList()" title="Save this report to a SharePoint list">📋 Save to SharePoint List</button>
+              <button class="btn btn-default btn-sm" onclick="downloadGenCode('json')">💾 Save Local Copy</button>
+            </div>
+            <div id="gen-publish-result" style="display:none;margin-top:8px;align-items:center;gap:6px;flex-wrap:wrap">
+              <a id="gen-publish-url" href="#" target="_blank" style="color:var(--primary);font-weight:700;font-size:11px;text-decoration:underline"></a>
+              <button class="btn btn-ghost btn-sm" onclick="sharePublishedUrl()" style="height:22px;padding:0 8px;font-size:11px;flex-shrink:0">🔗 Share</button>
             </div>
             <div class="gen-info-copyright">
               Copyright &copy; 2026 The Regents of the University of Michigan
@@ -10925,6 +10929,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       // ============================================================
       // GENERATE REPORT
       // ============================================================
+      let _lastPublishedUrl = '';
+
       function generateReport() {
         const config = buildConfig();
         const jsonStr = JSON.stringify(config, null, 2);
@@ -10950,6 +10956,78 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           downloadText(area.value, DataLaVistaState.design.title + ext, mime);
         else
           downloadText(area.value, 'DataLaVista-report' + ext, mime);
+      }
+
+      async function publishToSharePoint() {
+        const config = buildConfig();
+        const jsonStr = JSON.stringify(config, null, 2);
+        const title = DataLaVistaState.design.title || 'DataLaVista-report';
+        let result;
+        try {
+          result = await SharePointFileDialog.show({
+            mode: 'save',
+            type: 'file',
+            defaultFileName: title + '.json',
+            fileContent: jsonStr,
+            fileExtensions: ['.json', '.json5', '.JSON', '.js', '.txt'],
+            defaultFolders: ['/Shared Documents/Reports', '/Shared Documents/Dashboards', '/Shared Documents', '/SiteAssets']
+          });
+        } catch (err) {
+          if (err && err.message !== 'Dialog cancelled') toast(err.message || String(err), 'error');
+          return;
+        }
+        if (!result) return;
+        _showPublishResult(result.url);
+        toast('Published to SharePoint!', 'success');
+      }
+
+      async function saveToSharePointList() {
+        const config = buildConfig();
+        const jsonStr = JSON.stringify(config, null, 2);
+        const title = DataLaVistaState.design.title || 'DataLaVista-report';
+        let result;
+        try {
+          result = await SharePointFileDialog.show({
+            mode: 'save',
+            type: 'list',
+            defaultFileName: title + '.json',
+            fileContent: jsonStr,
+            sqlQuery: '',
+            defaultList: 'Reports'
+          });
+        } catch (err) {
+          if (err && err.message !== 'Dialog cancelled') toast(err.message || String(err), 'error');
+          return;
+        }
+        if (!result) return;
+        _showPublishResult(result.url || result.itemUrl);
+        toast('Saved to SharePoint list!', 'success');
+      }
+
+      /** Display the saved-file URL and share button below the publish actions. */
+      function _showPublishResult(url) {
+        const container = document.getElementById('gen-publish-result');
+        const link = /** @type {HTMLAnchorElement|null} */ (document.getElementById('gen-publish-url'));
+        if (!container || !link || !url) return;
+        _lastPublishedUrl = url;
+        link.textContent = url.length > 100
+          ? url.slice(0, 45) + '\u2026' + url.slice(-52)
+          : url;
+        link.href = url;
+        container.style.display = 'flex';
+      }
+
+      function sharePublishedUrl() {
+        const url = _lastPublishedUrl;
+        if (!url) return;
+        if (navigator.canShare) {
+          navigator.share({
+            title: DataLaVistaState.design.title || 'DataLaVista Report',
+            text: 'Check out this report I created with DataLaVista!',
+            url
+          });
+        }
+        navigator.clipboard.writeText(url).then(() => toast('URL copied to clipboard', 'success'));
       }
 
       
@@ -11170,13 +11248,17 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         selected: null,  // { name, serverRelUrl, absoluteUrl }
       };
 
-      /** Show or hide the Browse SP buttons depending on whether we're in SP. */
+      /** Show or hide the Browse SP buttons, and enable/disable SP publish buttons, based on SP detection. */
       function spPickerCheckVisibility() {
         const url = getSpSiteUrl();
         const display = url ? '' : 'none';
         ['btn-sp-browse', 'btn-sp-browse-json', 'btn-sp-browse-config'].forEach(id => {
           const btn = document.getElementById(id);
           if (btn) btn.style.display = display;
+        });
+        ['btn-publish-sp', 'btn-save-sp-list'].forEach(id => {
+          const btn = /** @type {HTMLButtonElement|null} */ (document.getElementById(id));
+          if (btn) btn.disabled = !url;
         });
       }
 
@@ -11997,6 +12079,9 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         generateReport,
         copyGenCode,
         downloadGenCode,
+        publishToSharePoint,
+        saveToSharePointList,
+        sharePublishedUrl,
         initResizers,
         makeColResizer,
         makeRowResizer,

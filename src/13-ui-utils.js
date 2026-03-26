@@ -214,13 +214,17 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         selected: null,  // { name, serverRelUrl, absoluteUrl }
       };
 
-      /** Show or hide the Browse SP buttons depending on whether we're in SP. */
+      /** Show or hide the Browse SP buttons, and enable/disable SP publish buttons, based on SP detection. */
       function spPickerCheckVisibility() {
         const url = getSpSiteUrl();
         const display = url ? '' : 'none';
         ['btn-sp-browse', 'btn-sp-browse-json', 'btn-sp-browse-config'].forEach(id => {
           const btn = document.getElementById(id);
           if (btn) btn.style.display = display;
+        });
+        ['btn-publish-sp', 'btn-save-sp-list'].forEach(id => {
+          const btn = /** @type {HTMLButtonElement|null} */ (document.getElementById(id));
+          if (btn) btn.disabled = !url;
         });
       }
 
