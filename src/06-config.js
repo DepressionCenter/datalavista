@@ -364,7 +364,7 @@ async function loadConfig(cfg) {
           dsHeader.className = 'ds-group-header';
           dsHeader.title = dsTitle;
           dsHeader.innerHTML = `
-            <span class="ds-group-toggle" id="ds-toggle-${CSS.escape(dsName)}">▶</span>
+            <span class="ds-group-toggle open" id="ds-toggle-${CSS.escape(dsName)}">▶</span>
             <span class="ds-group-name" id="ds-label-${CSS.escape(dsName)}">${dsAlias}</span>
             <span style="font-size:10px;color:var(--text-disabled);margin-left:2px">${tableKeys.length}</span>
           `;
@@ -381,11 +381,10 @@ async function loadConfig(cfg) {
 
           dsGroup.appendChild(dsHeader);
 
-          // Tables container (collapsed by default)
+          // Tables container (DS groups expanded, table fields collapsed by default)
           const tablesWrap = document.createElement('div');
           tablesWrap.className = 'ds-group-tables';
           tablesWrap.id = 'ds-tables-' + CSS.escape(dsName);
-          tablesWrap.style.display = 'none';
 
           for (const tkey of tableKeys) {
             const t = DataLaVistaState.tables[tkey];
@@ -476,21 +475,43 @@ async function loadConfig(cfg) {
       }
 
       function expandAllTables() {
-        Object.keys(DataLaVistaState.tables).forEach(t => {
-          document.getElementById('fields-' + CSS.escape(t))?.classList.remove('hidden');
-          document.getElementById('arrow-' + CSS.escape(t))?.classList.add('open');
-        });
-        Object.keys(DataLaVistaState.dataSources).forEach(ds => {
+        // First click: expand DS groups only. Second click (all DS already expanded): also expand table fields.
+        const allDsExpanded = Object.keys(DataLaVistaState.dataSources).every(ds => {
           const wrap = document.getElementById('ds-tables-' + CSS.escape(ds));
-          const toggle = document.getElementById('ds-toggle-' + CSS.escape(ds));
-          if (wrap) wrap.style.display = '';
-          if (toggle) toggle.classList.add('open');
+          return !wrap || wrap.style.display !== 'none';
         });
+        if (!allDsExpanded) {
+          Object.keys(DataLaVistaState.dataSources).forEach(ds => {
+            const wrap = document.getElementById('ds-tables-' + CSS.escape(ds));
+            const toggle = document.getElementById('ds-toggle-' + CSS.escape(ds));
+            if (wrap) wrap.style.display = '';
+            if (toggle) toggle.classList.add('open');
+          });
+        } else {
+          Object.keys(DataLaVistaState.tables).forEach(t => {
+            document.getElementById('fields-' + CSS.escape(t))?.classList.remove('hidden');
+            document.getElementById('arrow-' + CSS.escape(t))?.classList.add('open');
+          });
+        }
       }
       function collapseAllTables() {
-        Object.keys(DataLaVistaState.tables).forEach(t => {
-          document.getElementById('fields-' + CSS.escape(t))?.classList.add('hidden');
-          document.getElementById('arrow-' + CSS.escape(t))?.classList.remove('open');
+        // First click: collapse table fields only. Second click (all fields already collapsed): also collapse DS groups.
+        const anyFieldExpanded = Object.keys(DataLaVistaState.tables).some(t => {
+          const el = document.getElementById('fields-' + CSS.escape(t));
+          return el && !el.classList.contains('hidden');
         });
+        if (anyFieldExpanded) {
+          Object.keys(DataLaVistaState.tables).forEach(t => {
+            document.getElementById('fields-' + CSS.escape(t))?.classList.add('hidden');
+            document.getElementById('arrow-' + CSS.escape(t))?.classList.remove('open');
+          });
+        } else {
+          Object.keys(DataLaVistaState.dataSources).forEach(ds => {
+            const wrap = document.getElementById('ds-tables-' + CSS.escape(ds));
+            const toggle = document.getElementById('ds-toggle-' + CSS.escape(ds));
+            if (wrap) wrap.style.display = 'none';
+            if (toggle) toggle.classList.remove('open');
+          });
+        }
       }
 

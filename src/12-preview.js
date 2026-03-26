@@ -292,6 +292,9 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       let _lastPublishedUrl = '';
 
       function generateReport() {
+        // TODO: get rid of the text area but keep the copy and download buttons.
+        // The window freezes if you try to display >1MB of JSON in the text area, which happens with larger reports. Instead, we can just generate the JSON and enable the copy/download buttons, and they can copy/download directly from the config object instead of the text area.
+        // Or find a more efficient way to display it...
         const config = buildConfig();
         const jsonStr = JSON.stringify(config, null, 2);
         const genJsonArea = document.getElementById('gen-json-area');
