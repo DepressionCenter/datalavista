@@ -6386,18 +6386,20 @@ function buildConfig() {
       url: ds ? (ds.url || '') : ''  // for CSV/JSON standalone fetching
     };
 
-    // Only include row data for tables that were loaded from uploaded files, to keep config lightweight and avoid sharing sensitive data from connected sources
-    try{
-      if(t.loaded && t.keepRawData && t.data && t.data.length>0) {
-        tablesMeta[name].data = t.data; // Only include row data for tables that were loaded from uploaded files
-        tablesMeta[name].loaded = true; // Mark as loaded since we have the data in the config
+    // Only include row data for tables that were explicitly uploaded from a local file
+    try {
+      const shouldKeepData = t.isFileUpload === true && t.keepRawData === true;
+      if (shouldKeepData && Array.isArray(t.data) && t.data.length > 0) {
+        tablesMeta[name].data = t.data;
+        tablesMeta[name].loaded = true;
       } else {
-        tablesMeta[name].data = []; // For other tables, we don't include row data in the config to keep it lightweight
-        tablesMeta.loaded = false;
+        tablesMeta[name].data = [];
+        tablesMeta[name].loaded = false;
       }
     } catch(e) {
       console.warn(`Error including data for uploaded file, table ${name}, in config:`, e);
-      tablesMeta[name].data = []; // On error, don't include data
+      tablesMeta[name].data = [];
+      tablesMeta[name].loaded = false;
     }
   }
 
@@ -6457,8 +6459,8 @@ function buildConfig() {
     qmTab: DataLaVistaState.qmTab || 'dataPreview',
     queryColumns: Array.isArray(DataLaVistaState.queryColumns) ? [...DataLaVistaState.queryColumns] : [],    
     queryMode: (DataLaVistaState.queryMode && DataLaVistaState.queryMode != null && DataLaVistaState.queryMode != undefined && DataLaVistaState.queryMode != '') ? DataLaVistaState.queryMode : 'sql',
-    queryResults: Array.isArray(DataLaVistaState.queryResults) ? [...DataLaVistaState.queryResults] : [],
-    queryResultsReady: DataLaVistaState.queryResultsReady || false,
+    queryResults: [], // never persisted — query re-runs on load against restored table data or remote source
+    queryResultsReady: false,
     sql: DataLaVistaState.sql || '',
     sqlLocked: DataLaVistaState.sqlLocked || false,
     tables: tablesMeta
@@ -6588,7 +6590,7 @@ async function loadConfig(cfg) {
           dsHeader.className = 'ds-group-header';
           dsHeader.title = dsTitle;
           dsHeader.innerHTML = `
-            <span class="ds-group-toggle open" id="ds-toggle-${CSS.escape(dsName)}">▶</span>
+            <span class="ds-group-toggle" id="ds-toggle-${CSS.escape(dsName)}">▶</span>
             <span class="ds-group-name" id="ds-label-${CSS.escape(dsName)}">${dsAlias}</span>
             <span style="font-size:10px;color:var(--text-disabled);margin-left:2px">${tableKeys.length}</span>
           `;
@@ -6605,10 +6607,11 @@ async function loadConfig(cfg) {
 
           dsGroup.appendChild(dsHeader);
 
-          // Tables container
+          // Tables container (collapsed by default)
           const tablesWrap = document.createElement('div');
           tablesWrap.className = 'ds-group-tables';
           tablesWrap.id = 'ds-tables-' + CSS.escape(dsName);
+          tablesWrap.style.display = 'none';
 
           for (const tkey of tableKeys) {
             const t = DataLaVistaState.tables[tkey];
@@ -6668,10 +6671,7 @@ async function loadConfig(cfg) {
               flist.appendChild(fitem);
             }
 
-            // Auto-expand tables by default
-            flist.classList.remove('hidden');
-            const arrow = node.querySelector('.toggle-arrow');
-            if (arrow) arrow.classList.add('open');
+            // Tables start collapsed by default
 
             tablesWrap.appendChild(node);
           }
