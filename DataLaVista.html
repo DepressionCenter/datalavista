@@ -2848,7 +2848,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
             <div class="form-group">
               <label>JSON URL (SharePoint library or direct link)</label>
               <div style="display:flex;gap:6px;align-items:center">
-                <input type="text" class="form-input" id="json-url" placeholder="https://example.com/api/data.json"
+                <input type="text" class="form-input" id="json-url" placeholder="https://code.depressioncenter.org/datalavista/samples/sample-data/sample-data.json"
                   style="flex:1" />
                 <button class="btn btn-default btn-sm" id="btn-sp-browse-json" onclick="spBrowseJSON()"
                   title="Browse SharePoint document libraries for a JSON file"
@@ -2872,7 +2872,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
               <label>CSV URL (SharePoint library or direct link)</label>
               <div style="display:flex;gap:6px;align-items:center">
                 <input type="text" class="form-input" id="csv-url"
-                  placeholder="https://tenant.sharepoint.com/sites/.../Shared Documents/data.csv"
+                  placeholder="https://code.depressioncenter.org/datalavista/samples/sample-data/sample-data.csv"
                   style="flex:1" />
                 <button class="btn btn-default btn-sm" id="btn-sp-browse" onclick="spBrowseCSV()"
                   title="Browse SharePoint document libraries for a CSV or TSV file"
@@ -11678,7 +11678,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
   /* *** INIT FUNCTION *** */
   // Main initialization function to set up event listeners, resizers, and default states.
   async function init() {
-    console.log('ENTERED INIT()');
     if (DataLaVistaState && DataLaVistaState._initialized) return;
     //window.DataLaVistaState = new Proxy(dlvRawState, dlvStateHandler);
     console.log('Initializing...');

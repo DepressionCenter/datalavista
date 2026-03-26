@@ -40,13 +40,11 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 
 ***DataLaVista*** is a lightweight, client-side reporting and dashboard toolkit. It brings the full power of SQL directly to your browser, allowing you to build high-performance visualizations without the need for expensive server-side licenses or complex backend infrastructure.
 
-<img src="images/datalavista-screenshot-1.png" 
+<a href="https://code.depressioncenter.org/datalavista/DataLaVista.html" title="Click to try it live!" target="_blank"><img src="images/datalavista-screenshot-1.png" 
     alt="Screenshot of Data La Vista in action, terminating a data silo, displaying a SQL query with auto-completion dropdown menu and a dashboard designer with a table and pie chart with filters." 
-    style="max-width:800px; width:100%; display:block; margin:auto;" />
+    style="max-width:800px; width:100%; display:block; margin:auto;" /></a>
 
 While it was initially designed to dominate SharePoint List items with pure JavaScript widgets that run directly in the browser, Data La Vista is built to be a universal survivor. It aims to be framework-agnostic and designed to plug into any webpage to terminate data silos across REST services, JSON, Excel, and CSV files.
-
-Status: alpha — SharePoint adapters first; extensible adapters at later time ruptures.
 
 ### Come with me if you want to query
 Most enterprise data is trapped behind bloated frameworks or expensive BI tools. Data La Vista terminates them to free your data:
@@ -88,7 +86,6 @@ Data La Vista does not aim to replace other BI tools completly. This tool is mea
 ## Contributing
 ***I'll be back... with a better report.***
 The mission is far from over. Future updates will include:
-+ Full support for SharePoint Lists out of the box
 + Advanced REST Integration: Seamlessly fetch and join data from multiple API endpoints
 + Excel/CSV Drag-and-Drop: Instant dashboards from local spreadsheets
 + The "Skynet" UI Kit: A library of aggressive, high-contrast dashboard components

@@ -166,7 +166,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
   /* *** INIT FUNCTION *** */
   // Main initialization function to set up event listeners, resizers, and default states.
   async function init() {
-    console.log('ENTERED INIT()');
     if (DataLaVistaState && DataLaVistaState._initialized) return;
     //window.DataLaVistaState = new Proxy(dlvRawState, dlvStateHandler);
     console.log('Initializing...');
