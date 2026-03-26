@@ -24,19 +24,17 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       // PREVIEW TAB
       // ============================================================
       async function refreshDashboardPreview() {
-        console.log('DEBUG: Entered refreshDashboardPreview()');
-        console.log('DEBUG: Refreshing dashboard preview with SQL:', state.sql);
-        if (!state.sql.trim()) { toast('Please build a query first', 'error'); return; }
-        if(!state.reportMode) setStatus('⏳ Loading preview data...');
+        if (!DataLaVistaState.sql.trim()) { toast('Please build a query first', 'error'); return; }
+        if(DataLaVistaState.reportMode != 'view') setStatus('⏳ Loading preview data...');
 
         try {
-          const referencedTables = findReferencedTables(state.sql);
+          const referencedTables = findReferencedTables(DataLaVistaState.sql);
           for (const tname of referencedTables) {
             await ensureTableData(tname, true); // Load all rows
           }
           console.log("DEBUG: looping through tables to DROP and CREATE in alasql:", referencedTables);
           for (const tname of referencedTables) {
-            const t = state.tables[tname];
+            const t = DataLaVistaState.tables[tname];
             if (!t || !t.data.length) continue;
             console.log(`DEBUG: Dropping table if it exists: ${tname}`);
             alasql(`DROP TABLE IF EXISTS [${tname}]`);
@@ -58,7 +56,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           }
 
           console.log("DEBUG: Tables loaded into alasql. Preprocessing query...");
-          const processedSQL = preprocessSQL(state.sql);
+          const processedSQL = preprocessSQL(DataLaVistaState.sql);
           console.log("DEBUG: Processed SQL:", processedSQL);
           console.log("DEBUG: Executing query in alasql...");
           let results;
@@ -72,20 +70,20 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 
           console.log("DEBUG: refreshDashboardPreview -> results size: ", results.length);
           
-          console.log("DEBUG: refreshDashboardPreview -> state.previewResults");
-          state.previewResults = results;
-          console.log("DEBUG: refreshDashboardPreview -> state.queryColumns");
-          state.queryResults = results;
-          console.log("DEBUG: refreshDashboardPreview -> state.queryColumns");
-          state.queryColumns = results.length ? Object.keys(results[0]) : state.queryColumns;
+          console.log("DEBUG: refreshDashboardPreview -> DataLaVistaState.previewResults");
+          DataLaVistaState.previewResults = results;
+          console.log("DEBUG: refreshDashboardPreview -> DataLaVistaState.queryColumns");
+          DataLaVistaState.queryResults = results;
+          console.log("DEBUG: refreshDashboardPreview -> DataLaVistaState.queryColumns");
+          DataLaVistaState.queryColumns = results.length ? Object.keys(results[0]) : DataLaVistaState.queryColumns;
 
           console.log("DEBUG: refreshDashboardPreview -> renderPreviewTab: Rendering preview tab with results...");
           renderPreviewTab();
           console.log("DEBUG: refreshDashboardPreview -> renderPreviewTab: Preview tab rendered.");
           
-          if(!state.reportMode) setStatus(`✅ Preview: ${results.length} rows`);
+          if(DataLaVistaState.reportMode !== 'view') setStatus(`✅ Preview: ${results.length} rows`);
         } catch (err) {
-          if(!state.reportMode) {
+          if(DataLaVistaState.reportMode !== 'view') {
           toast('Preview error: ' + err.message, 'error');
           setStatus('❌ Preview error');
           } else {
@@ -96,18 +94,21 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 
       function renderPreviewTab() {
         console.log('DEBUG: Entered renderPreviewTab()');
-        if(!state.reportMode) document.getElementById('preview-toolbar').classList.remove('hidden');
-        document.getElementById('preview-title-bar').textContent = state.design.title || 'DataLaVista Report';
+        if(DataLaVistaState.reportMode == 'edit') {
+          document.getElementById('preview-toolbar').classList.remove('hidden');
+        } else {
+          document.getElementById('preview-toolbar').classList.add('hidden');
+        }
+        document.getElementById('preview-title-bar').textContent = DataLaVistaState.design.title || 'DataLaVista Report';
         document.getElementById('preview-title-bar').classList.remove('hidden');
         // Filter bar
-        console.log('DEBUG: Rendering filter bar with filters:', state.design.filters);
         const filterBar = document.getElementById('preview-filter-bar');
         filterBar.innerHTML = '';
-        const barFilters = state.design.filters.filter(f => f.position === 'bar' || !f.position);
+        const barFilters = DataLaVistaState.design.filters.filter(f => f.position === 'bar' || !f.position);
         if (barFilters.length) {
           filterBar.classList.remove('hidden');
           for (const filter of barFilters) {
-            const values = ['(All)', ...(state.previewResults ? [...new Set(state.previewResults.map(r => r[filter.field]).filter(v => v != null))].sort() : [])];
+            const values = ['(All)', ...(DataLaVistaState.previewResults ? [...new Set(DataLaVistaState.previewResults.map(r => r[filter.field]).filter(v => v != null))].sort() : [])];
             const wrap = document.createElement('div');
             wrap.className = 'filter-chip';
             wrap.innerHTML = `<span style="font-size:11px;font-weight:600">${filter.label}:</span>
@@ -119,19 +120,17 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         } else filterBar.classList.add('hidden');
 
         // Canvas
-        console.log('DEBUG: Rendering design canvas with widgets');
         const canvas = document.getElementById('preview-canvas');
         canvas.innerHTML = '';
 
         // Destroy old preview charts
-        console.log('DEBUG: Disposing old preview charts');
-        for (const [id, chart] of Object.entries(state.charts)) {
-          if (id.startsWith('prev_')) { try { chart.dispose(); } catch (e) { } delete state.charts[id]; }
+        for (const [id, chart] of Object.entries(DataLaVistaState.charts)) {
+          if (id.startsWith('prev_')) { try { chart.dispose(); } catch (e) { } delete DataLaVistaState.charts[id]; }
         }
 
-        const results = state.previewResults || [];
+        const results = DataLaVistaState.previewResults || [];
 
-        for (const w of state.design.widgets) {
+        for (const w of DataLaVistaState.design.widgets) {
           const el = document.createElement('div');
           el.className = 'widget';
           el.style.cssText = `width:${w.widthPct}%;height:${w.heightVh}vh;min-height:120px;border-color:${w.borderColor};border-width:${w.borderSize}px`;
@@ -144,9 +143,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           canvas.appendChild(el);
         }
 
-        console.log('DEBUG: Widget elements created. Rendering charts if any... requestAnimationFrame()');
         requestAnimationFrame(() => {
-          for (const w of state.design.widgets) {
+          for (const w of DataLaVistaState.design.widgets) {
             if (['bar', 'line', 'pie', 'scatter'].includes(w.type)) {
               console.log(`DEBUG: Rendering preview chart for widget ${w.id} of type ${w.type}`);
               renderPreviewChart(w, results);
@@ -164,6 +162,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         return '';
       }
 
+      // TODO: .fields may need to be .xField/.yField for charts, and it should support aggregates
+      // TODO: Check if we are using apache-echarts correctly. Do we need to preprocess data or just feed it directly?
       function renderPrevKPI(w, results) {
         let value = '—', label = w.fields[0] || '';
         if (results.length && label) {
@@ -191,9 +191,9 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         const chartEl = document.getElementById('prevchart-' + w.id);
         if (!chartEl) return;
         const id = 'prev_' + w.id;
-        if (state.charts[id]) { try { state.charts[id].dispose(); } catch (e) { } }
+        if (DataLaVistaState.charts[id]) { try { DataLaVistaState.charts[id].dispose(); } catch (e) { } }
         const chart = echarts.init(chartEl);
-        state.charts[id] = chart;
+        DataLaVistaState.charts[id] = chart;
 
         if (!results.length) { chart.setOption({ title: { text: 'No data', left: 'center', top: 'middle', textStyle: { color: '#a19f9d' } } }); return; }
 
@@ -214,18 +214,18 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       }
 
       function applyPreviewFilterAndRender(field, value) {
-        if (value === '(All)') delete state.previewFilters[field];
-        else state.previewFilters[field] = value;
+        if (value === '(All)') delete DataLaVistaState.previewFilters[field];
+        else DataLaVistaState.previewFilters[field] = value;
 
-        let filtered = state.previewResults || [];
-        for (const [f, v] of Object.entries(state.previewFilters)) {
+        let filtered = DataLaVistaState.previewResults || [];
+        for (const [f, v] of Object.entries(DataLaVistaState.previewFilters)) {
           filtered = filtered.filter(r => String(r[f]) === String(v));
         }
 
         // Re-render canvas with filtered data
         const canvas = document.getElementById('preview-canvas');
         canvas.querySelectorAll('.widget').forEach((el, i) => {
-          const w = state.design.widgets[i];
+          const w = DataLaVistaState.design.widgets[i];
           if (!w) return;
           const content = el.querySelector('.widget-content');
           content.innerHTML = getPrevWidgetContent(w, filtered);
@@ -239,38 +239,43 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       // DOWNLOAD CSV
       // ============================================================
       async function downloadCSV() {
-        let results = state.previewResults || state.queryResults;
+        let results = DataLaVistaState.previewResults || DataLaVistaState.queryResults;
         if (!results) {
           // Try to run query and get all rows
-          if (!state.sql.trim()) { toast('Run a query first', 'error'); return; }
-          const refs = findReferencedTables(state.sql);
+          if (!DataLaVistaState.sql.trim()) { toast('Run a query first', 'error'); return; }
+          const refs = findReferencedTables(DataLaVistaState.sql);
           for (const t of refs) await ensureTableData(t, true);
           for (const t of refs) {
             alasql(`DROP TABLE IF EXISTS [${t}]`);
             alasql(`CREATE TABLE [${t}]`);
-            alasql.tables[t].data = state.tables[t].data;
+            alasql.tables[t].data = DataLaVistaState.tables[t].data;
           }
-          results = alasql(preprocessSQL(state.sql));
+          results = alasql(preprocessSQL(DataLaVistaState.sql));
         }
-        if (!results || !results.length) { toast('No data to export', 'error'); return; }
+        if (!results || !results.length) { toast('No data to export', 'warning'); return; }
         const cols = Object.keys(results[0]);
         const csv = [cols.join(','), ...results.map(r => cols.map(c => { const v = r[c]; return typeof v === 'string' && (v.includes(',') || v.includes('"') || v.includes('\n')) ? `"${v.replace(/"/g, '""')}"` : v ?? ''; }).join(','))].join('\n');
-        downloadText(csv, 'DataLaVista-export.csv', 'text/csv');
+        if(DataLaVistaState.design.title) {
+          downloadText(csv, DataLaVistaState.design.title + '.csv', 'text/csv');
+        } else {
+          downloadText(csv, 'DataLaVista-export.csv', 'text/csv');
+        }
         toast(`Exported ${results.length} rows`, 'success');
       }
 
       async function printReport() {
-          if (!state.sql.trim()) { toast('Please build a query first', 'error'); return; }
+          if (!DataLaVistaState.sql.trim()) { toast('Please build a query first', 'error'); return; }
         setTimeout(() => {
           window.print();
         }, 500);
       }
 
+      // TODO: fix shareLiveReport to work with report URL from param, or on its own.
       async function shareLiveReport() {
         try{
           if(navigator.canShare) {
             navigator.share({
-              title: state.design.title || 'DataLaVista Report',
+              title: DataLaVistaState.design.title || 'DataLaVista Report',
               text: 'Check out this report I created with DataLaVista!',
               url: window.location.href
             });
@@ -296,16 +301,19 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         toast('Report generated!', 'success');
       }
 
-      function copyGenCode(type) {
-        const area = document.getElementById(type === 'html' ? 'gen-code-area' : 'gen-json-area');
+      function copyGenCode() {
+        const area = document.getElementById('gen-json-area');
         navigator.clipboard.writeText(area.value).then(() => toast('Copied to clipboard', 'success'));
       }
 
-      function downloadGenCode(type) {
-        const area = document.getElementById(type === 'html' ? 'gen-code-area' : 'gen-json-area');
-        const ext = type === 'html' ? '.html' : '.json';
-        const mime = type === 'html' ? 'text/html' : 'application/json';
-        downloadText(area.value, 'DataLaVista-report' + ext, mime);
+      function downloadGenCode() {
+        const area = document.getElementById('gen-json-area');
+        const ext = '.json';
+        const mime = 'application/json';
+        if(DataLaVistaState.design.title)
+          downloadText(area.value, DataLaVistaState.design.title + ext, mime);
+        else
+          downloadText(area.value, 'DataLaVista-report' + ext, mime);
       }
 
       

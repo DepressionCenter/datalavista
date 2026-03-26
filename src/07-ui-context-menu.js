@@ -62,11 +62,11 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         if (!_ctxTarget) return;
         let url = '';
         if (_ctxTarget.level === 'ds') {
-          const ds = state.dataSources[_ctxTarget.dsName];
+          const ds = DataLaVistaState.dataSources[_ctxTarget.dsName];
           url = ds ? (ds.url || '') : '';
         } else if (_ctxTarget.level === 'table') {
-          const t = state.tables[_ctxTarget.tableKey];
-          const ds = t ? state.dataSources[t.dataSource] : null;
+          const t = DataLaVistaState.tables[_ctxTarget.tableKey];
+          const ds = t ? DataLaVistaState.dataSources[t.dataSource] : null;
           url = ds ? (ds.url || '') : '';
         }
         if (url) {
@@ -86,7 +86,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         if (level === 'ds') {
           const labelEl = document.getElementById('ds-label-' + CSS.escape(dsName));
           if (!labelEl) return;
-          const currentVal = state.dataSources[dsName].alias || dsName;
+          const currentVal = DataLaVistaState.dataSources[dsName].alias || dsName;
           const inp = document.createElement('input');
           inp.className = 'ds-group-name-input';
           inp.value = currentVal;
@@ -107,7 +107,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         } else if (level === 'table') {
           const labelEl = document.getElementById('tlabel-' + CSS.escape(tableKey));
           if (!labelEl) return;
-          const t = state.tables[tableKey];
+          const t = DataLaVistaState.tables[tableKey];
           const currentVal = t.alias || t.displayName || tableKey;
           const inp = document.createElement('input');
           inp.className = 'dlv-rename-input';
@@ -128,7 +128,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         } else if (level === 'field') {
           const labelEl = document.getElementById('flabel-' + CSS.escape(tableKey) + '-' + CSS.escape(fieldAlias));
           if (!labelEl) return;
-          const t = state.tables[tableKey];
+          const t = DataLaVistaState.tables[tableKey];
           const f = t && t.fields.find(x => x.alias === fieldAlias);
           if (!f) return;
           const currentVal = f.alias;
@@ -156,12 +156,12 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         const { level, dsName, tableKey } = _ctxTarget;
 
         if (level === 'ds') {
-          const ds = state.dataSources[dsName];
+          const ds = DataLaVistaState.dataSources[dsName];
           const label = ds ? (ds.alias || dsName) : dsName;
           if (!confirm(`Delete data source "${label}" and all its tables? This cannot be undone.`)) return;
           deleteDatasource(dsName);
         } else if (level === 'table') {
-          const t = state.tables[tableKey];
+          const t = DataLaVistaState.tables[tableKey];
           const label = t ? (t.alias || t.displayName || tableKey) : tableKey;
           if (!confirm(`Delete table "${label}"? This cannot be undone.`)) return;
           deleteTable(tableKey);
@@ -181,20 +181,20 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         const re = new RegExp('(\\[)' + escaped + '(\\])|\\b' + escaped + '\\b', 'gi');
         const updated = cur.replace(re, (m, lb, rb) => lb ? '[' + newQName + ']' : newQName);
         if (updated !== cur) window._cmEditor.setValue(updated);
-        state.sql = window._cmEditor.getValue();
+        DataLaVistaState.sql = window._cmEditor.getValue();
       }
 
       function renameDatasource(dsName, newAlias) {
         newAlias = (newAlias || '').replace(/[^A-Za-z0-9]/g, '').slice(0, 6);
         if (!newAlias) { renderFieldsPanel(); return; }
-        const ds = state.dataSources[dsName];
+        const ds = DataLaVistaState.dataSources[dsName];
         if (!ds) return;
         const oldDsAlias = ds.alias;
         if (newAlias === oldDsAlias) { renderFieldsPanel(); return; }
 
         // For each table: update SQL editor (alias appears in FROM [key] [oldAlias_TableAlias])
         (ds.tables || []).forEach(tableKey => {
-          const t = state.tables[tableKey];
+          const t = DataLaVistaState.tables[tableKey];
           if (!t) return;
           const oldQName = oldDsAlias + '_' + t.alias;
           const newQName = newAlias + '_' + t.alias;
@@ -204,18 +204,18 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         // Commit alias change and propagate to child tables
         ds.alias = newAlias;
         (ds.tables || []).forEach(tableKey => {
-          const t = state.tables[tableKey];
+          const t = DataLaVistaState.tables[tableKey];
           if (t) t.dsAlias = newAlias;
         });
 
         // Rebuild QB SQL so FROM clauses use the new alias
-        if (state.basicQB.tableName) {
-          const t = state.tables[state.basicQB.tableName];
+        if (DataLaVistaState.basicQB.tableName) {
+          const t = DataLaVistaState.tables[DataLaVistaState.basicQB.tableName];
           if (t && t.dataSource === dsName) rebuildBasicSQL();
         }
-        if (Object.keys(state.advancedQB.nodes || {}).length) {
-          const anyFromDs = Object.values(state.advancedQB.nodes).some(nd => {
-            const t = state.tables[nd.tableName];
+        if (Object.keys(DataLaVistaState.advancedQB.nodes || {}).length) {
+          const anyFromDs = Object.values(DataLaVistaState.advancedQB.nodes).some(nd => {
+            const t = DataLaVistaState.tables[nd.tableName];
             return t && t.dataSource === dsName;
           });
           if (anyFromDs) rebuildAdvancedSQL();
@@ -227,7 +227,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       }
 
       function renameTable(tableKey, newAlias) {
-        const t = state.tables[tableKey];
+        const t = DataLaVistaState.tables[tableKey];
         if (!t) return;
         const oldQName = getTableQueryName(tableKey);
         t.alias = newAlias;
@@ -237,13 +237,13 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         updateSQLEditorName(oldQName, newQName);
 
         // Update advanced QB node alias if present
-        for (const nd of Object.values(state.advancedQB.nodes || {})) {
+        for (const nd of Object.values(DataLaVistaState.advancedQB.nodes || {})) {
           if (nd.tableName === tableKey) { nd.alias = newAlias; }
         }
 
         // Rebuild QB SQL to use new alias in FROM clause
-        if (state.basicQB.tableName === tableKey) rebuildBasicSQL();
-        if (Object.keys(state.advancedQB.nodes || {}).length) rebuildAdvancedSQL();
+        if (DataLaVistaState.basicQB.tableName === tableKey) rebuildBasicSQL();
+        if (Object.keys(DataLaVistaState.advancedQB.nodes || {}).length) rebuildAdvancedSQL();
 
         renderFieldsPanel();
         setupCodeMirror();
@@ -251,7 +251,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       }
 
       function renameField(tableKey, oldAlias, newAlias) {
-        const t = state.tables[tableKey];
+        const t = DataLaVistaState.tables[tableKey];
         if (!t) return;
         const f = t.fields.find(x => x.alias === oldAlias);
         if (!f) return;
@@ -260,20 +260,20 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         // The AS alias in generated SQL is what produces the output column name.
 
         // Update basicQB selectedFields (which track aliases)
-        const sfIdx = state.basicQB.selectedFields.indexOf(oldAlias);
-        if (sfIdx !== -1) { state.basicQB.selectedFields[sfIdx] = newAlias; rebuildBasicSQL(); }
+        const sfIdx = DataLaVistaState.basicQB.selectedFields.indexOf(oldAlias);
+        if (sfIdx !== -1) { DataLaVistaState.basicQB.selectedFields[sfIdx] = newAlias; rebuildBasicSQL(); }
 
         // Update advanced QB selectedFields in nodes
-        for (const nd of Object.values(state.advancedQB.nodes || {})) {
+        for (const nd of Object.values(DataLaVistaState.advancedQB.nodes || {})) {
           if (nd.tableName === tableKey) {
             const fi = nd.selectedFields.indexOf(oldAlias);
             if (fi !== -1) nd.selectedFields[fi] = newAlias;
           }
         }
-        if (Object.keys(state.advancedQB.nodes || {}).length) rebuildAdvancedSQL();
+        if (Object.keys(DataLaVistaState.advancedQB.nodes || {}).length) rebuildAdvancedSQL();
 
         // Update design widgets
-        (state.design.widgets || []).forEach(w => {
+        (DataLaVistaState.design.widgets || []).forEach(w => {
           if (Array.isArray(w.fields)) {
             const fi = w.fields.indexOf(oldAlias);
             if (fi !== -1) w.fields[fi] = newAlias;
@@ -289,11 +289,11 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       }
 
       function deleteDatasource(dsName) {
-        const ds = state.dataSources[dsName];
+        const ds = DataLaVistaState.dataSources[dsName];
         if (!ds) return;
         // Remove all tables
         (ds.tables || []).forEach(tk => deleteTable(tk, true));
-        delete state.dataSources[dsName];
+        delete DataLaVistaState.dataSources[dsName];
         renderFieldsPanel();
         setupCodeMirror();
         updateConnectButton();
@@ -301,41 +301,41 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       }
 
       function deleteTable(tableKey, silent = false) {
-        const t = state.tables[tableKey];
+        const t = DataLaVistaState.tables[tableKey];
         if (!t) return;
 
         // Remove from data source table list
-        const ds = t.dataSource ? state.dataSources[t.dataSource] : null;
+        const ds = t.dataSource ? DataLaVistaState.dataSources[t.dataSource] : null;
         if (ds && ds.tables) {
           ds.tables = ds.tables.filter(k => k !== tableKey);
         }
         // Drop from AlaSQL by table key
         dropTableFromAlaSQL(tableKey);
         // Remove from basicQB if active
-        if (state.basicQB.tableName === tableKey) {
-          state.basicQB = { tableName: null, selectedFields: [], fieldAggs: {}, conditions: [], sorts: [], groupBy: [], rowLimit: 500 };
+        if (DataLaVistaState.basicQB.tableName === tableKey) {
+          DataLaVistaState.basicQB = { tableName: null, selectedFields: [], fieldAggs: {}, conditions: [], sorts: [], groupBy: [], rowLimit: 500 };
           renderBasicQB();
         }
         // Remove from advanced QB nodes
-        for (const [id, nd] of Object.entries(state.advancedQB.nodes || {})) {
+        for (const [id, nd] of Object.entries(DataLaVistaState.advancedQB.nodes || {})) {
           if (nd.tableName === tableKey) {
-            delete state.advancedQB.nodes[id];
+            delete DataLaVistaState.advancedQB.nodes[id];
           }
         }
-        state.advancedQB.joins = (state.advancedQB.joins || []).filter(j => {
-          const fromNd = state.advancedQB.nodes[j.from];
-          const toNd = state.advancedQB.nodes[j.to];
+        DataLaVistaState.advancedQB.joins = (DataLaVistaState.advancedQB.joins || []).filter(j => {
+          const fromNd = DataLaVistaState.advancedQB.nodes[j.from];
+          const toNd = DataLaVistaState.advancedQB.nodes[j.to];
           return fromNd && toNd;
         });
         // Remove from design widgets
-        state.design.widgets = (state.design.widgets || []).filter(w => {
+        DataLaVistaState.design.widgets = (DataLaVistaState.design.widgets || []).filter(w => {
           if (w.sqlTable === tableKey) return false;
           return true;
         });
         // Remove from design filters
-        state.design.filters = (state.design.filters || []);
+        DataLaVistaState.design.filters = (DataLaVistaState.design.filters || []);
 
-        delete state.tables[tableKey];
+        delete DataLaVistaState.tables[tableKey];
 
         if (!silent) {
           renderFieldsPanel();
@@ -374,7 +374,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           cmWrapper.addEventListener('drop', onDropToSQLEditor, true); // capture drop
 
           cm.on('change', (inst) => {
-            state.sql = inst.getValue();
+            DataLaVistaState.sql = inst.getValue();
             hideUseInDesign();
           });
           window._cmEditor = cm;
@@ -401,7 +401,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           const fieldPrefix = dotMatch[2];
           const completions = [];
 
-          for (const [tkey, t] of Object.entries(state.tables)) {
+          for (const [tkey, t] of Object.entries(DataLaVistaState.tables)) {
             const qname = getTableQueryName(tkey);
             // Match against either the tableKey or the live alias form
             if (tkey.toUpperCase() === tableRef.toUpperCase() ||
@@ -442,7 +442,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 
         // Add table keys (immutable, always queryable) and their fully-qualified field names.
         // Also add the live alias-based name so the user sees what the QB generates.
-        for (const [tkey, t] of Object.entries(state.tables)) {
+        for (const [tkey, t] of Object.entries(DataLaVistaState.tables)) {
           const qname = getTableQueryName(tkey);   // DSAlias_TableAlias (used in FROM clause)
           // Primary suggestion: the tableKey (what goes in FROM [tableKey])
           allKeywords.push(tkey);
@@ -474,11 +474,11 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 
       // Call this to refresh hints when tables/fields change, e.g. after loading new data or switching query builder modes
       function updateCMHints() {
-        // Just trigger a no-op — hints auto-update from state.tables
+        // Just trigger a no-op — hints auto-update from DataLaVistaState.tables
       }
 
       function unlockSQL() {
-        state.sqlLocked = false;
+        DataLaVistaState.sqlLocked = false;
         document.getElementById('btn-sql-locked').style.display = 'none';
         toast('SQL editor unlocked — query builder changes will update SQL', 'success');
       }

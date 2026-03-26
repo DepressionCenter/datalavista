@@ -21,6 +21,7 @@ You should have received a copy of the GNU General Public License along
 with this program. If not, see <https://www.gnu.org/licenses/>.
 ================================================================ */
       window.dlv = {
+        DataLaVistaCore,
         safeDragParse,
         safeDragSet,
         safeJSONParse,
@@ -65,7 +66,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         saveConfig,
         buildConfig,
         generateWidgetSQL,
-        swapDesignReportModes,
+        swapReportMode,
         loadConfig,
         renderFieldsPanel,
         getTableIcon,
@@ -249,16 +250,3 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         init,
         loadReportFromUrl
       };
-
-      
-
-      // Self-init
-(function startDataLaVista() {
-    console.log("*** Starting DataLaVista ***");
-    try {      
-      init();
-    } catch (e) {
-      console.error('DataLaVista init crashed:', e);
-    }
-  }
-  )();

@@ -111,7 +111,7 @@ function buildConfig() {
   // Save dataSources
   let dataSourcesMeta = {};
   let uploadedFilesDsNames = [];
-  for (const [dsName, ds] of Object.entries(state.dataSources)) {
+  for (const [dsName, ds] of Object.entries(DataLaVistaState.dataSources)) {
     dataSourcesMeta[dsName] = {
       alias: ds.alias || dsName,
       auth: ds.auth || 'current',
@@ -133,14 +133,14 @@ function buildConfig() {
   // Bring over preview/flat table data if the source contains an uploaded file
   let previewResults = [];
   // TODO: Do we need to load preview data, or just re-run SQL when report loads?
-//  if(uploadedFilesDsNames && uploadedFilesDsNames.length>0 && state.previewResults && state.previewResults.length>0) {
-    //previewResults = state.previewResults || []; // Since we found files that were uploaded, we preserve the flat table data
+//  if(uploadedFilesDsNames && uploadedFilesDsNames.length>0 && DataLaVistaState.previewResults && DataLaVistaState.previewResults.length>0) {
+    //previewResults = DataLaVistaState.previewResults || []; // Since we found files that were uploaded, we preserve the flat table data
 //  }
 
   // Save tables (and row data if the files were uploaded)
   const tablesMeta = {};
-  for (const [name, t] of Object.entries(state.tables)) {
-    const ds = t.dataSource ? state.dataSources[t.dataSource] : null;
+  for (const [name, t] of Object.entries(DataLaVistaState.tables)) {
+    const ds = t.dataSource ? DataLaVistaState.dataSources[t.dataSource] : null;
     tablesMeta[name] = {
       alias: t.alias || name,
       dataSource: t.dataSource || '',
@@ -175,7 +175,7 @@ function buildConfig() {
     }
   }
 
-  const cleanWidgets = (state.design.widgets || []).map(w => ({
+  const cleanWidgets = (DataLaVistaState.design.widgets || []).map(w => ({
     id: w.id,
     type: w.type,
     title: w.title || '',
@@ -202,39 +202,39 @@ function buildConfig() {
   }));
 
   const cleanDesign = {
-    title: state.design.title || '',
+    title: DataLaVistaState.design.title || '',
     widgets: cleanWidgets,
-    filters: (state.design.filters || []).map(f => ({
+    filters: (DataLaVistaState.design.filters || []).map(f => ({
       field: f.field || '',
       label: f.label || f.field || '',
       position: f.position || 'bar'
     })),
-    conditions: (state.design.conditions || []).map(c => ({ conj: c.conj || 'AND', field: c.field || '', op: c.op || '=', value: c.value || '' })),
-    sorts: (state.design.sorts || []).map(s => ({ field: s.field || '', dir: s.dir || 'ASC' })),
-    groupBy: (state.design.groupBy || []).filter(g => g),
-    fieldAggs: Object.assign({}, state.design.fieldAggs || {})
+    conditions: (DataLaVistaState.design.conditions || []).map(c => ({ conj: c.conj || 'AND', field: c.field || '', op: c.op || '=', value: c.value || '' })),
+    sorts: (DataLaVistaState.design.sorts || []).map(s => ({ field: s.field || '', dir: s.dir || 'ASC' })),
+    groupBy: (DataLaVistaState.design.groupBy || []).filter(g => g),
+    fieldAggs: Object.assign({}, DataLaVistaState.design.fieldAggs || {})
   };
 
   return {
     _license: 'This file is part of DataLaVista. This is a configuration script for a report designed in DataLaVista. Copyright © 2026 The Regents of the University of Michigan. This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version. This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details. You should have received a copy of the GNU General Public License along with this program. If not, see https://www.gnu.org/licenses.',
-    activeTab: (state.reportMode) ? 'dashboardPreview' : 'design',
-    advancedQB: state.advancedQB || {},
-    basicQB: state.basicQB || {},
-    charts: state.charts || {},
-    currentWidgetId: state.currentWidgetId || null,
+    activeTab: (DataLaVistaState.reportMode === 'view') ? 'dashboardPreview' : 'design',
+    advancedQB: DataLaVistaState.advancedQB || {},
+    basicQB: DataLaVistaState.basicQB || {},
+    charts: DataLaVistaState.charts || {},
+    currentWidgetId: DataLaVistaState.currentWidgetId || null,
     dataSources: dataSourcesMeta,
     design: cleanDesign,
-    previewFilters: state.previewFilters || {},
+    previewFilters: DataLaVistaState.previewFilters || {},
     previewResults: Array.isArray(previewResults) ? [...previewResults] : [],
-    qbCollapsed: state.qbCollapsed || false,
-    qbSectionHeight: state.qbSectionHeight || 60,
-    qmTab: state.qmTab || 'dataPreview',
-    queryColumns: Array.isArray(state.queryColumns) ? [...state.queryColumns] : [],    
-    queryMode: (state.queryMode && state.queryMode != null && state.queryMode != undefined && state.queryMode != '') ? state.queryMode : 'sql',
-    queryResults: Array.isArray(state.queryResults) ? [...state.queryResults] : [],
-    queryResultsReady: state.queryResultsReady || false,
-    sql: state.sql || '',
-    sqlLocked: state.sqlLocked || false,
+    qbCollapsed: DataLaVistaState.qbCollapsed || false,
+    qbSectionHeight: DataLaVistaState.qbSectionHeight || 60,
+    qmTab: DataLaVistaState.qmTab || 'dataPreview',
+    queryColumns: Array.isArray(DataLaVistaState.queryColumns) ? [...DataLaVistaState.queryColumns] : [],    
+    queryMode: (DataLaVistaState.queryMode && DataLaVistaState.queryMode != null && DataLaVistaState.queryMode != undefined && DataLaVistaState.queryMode != '') ? DataLaVistaState.queryMode : 'sql',
+    queryResults: Array.isArray(DataLaVistaState.queryResults) ? [...DataLaVistaState.queryResults] : [],
+    queryResultsReady: DataLaVistaState.queryResultsReady || false,
+    sql: DataLaVistaState.sql || '',
+    sqlLocked: DataLaVistaState.sqlLocked || false,
     tables: tablesMeta
   };
 }
@@ -261,17 +261,17 @@ async function loadConfig(cfg) {
     // At this point, cfg should be an object. If it's not, throw an error.
     if (cfg && typeof cfg !== 'object') throw new Error('Invalid report config — no report JSON detected.');
 
-  console.log("DEBUG: Config object validated, proceeding to load state.");
+  console.log("DEBUG: Config object validated, proceeding to load DataLaVistaState.");
   // Basic validation passed — now clear the existing state and load the config values
   //{ ...cfg.dataSource } || { type: 'sharepoint', url: '', auth: 'current' };
-  state.activeTab = (state.reportMode)?'dataPreview':'design';
-  state.advancedQB = cfg.advancedQB || {};
-  state.basicQB = cfg.basicQB || {};
-  state.charts = cfg.charts || {};
-  state.currentWidgetId = null;
-  state.dataSources = cfg.dataSources || {};
+  DataLaVistaState.activeTab = (DataLaVistaState.reportMode==='view')?'dataPreview':'design';
+  DataLaVistaState.advancedQB = cfg.advancedQB || {};
+  DataLaVistaState.basicQB = cfg.basicQB || {};
+  DataLaVistaState.charts = cfg.charts || {};
+  DataLaVistaState.currentWidgetId = null;
+  DataLaVistaState.dataSources = cfg.dataSources || {};
   const loadedDesign = cfg.design || {};
-  state.design = {
+  DataLaVistaState.design = {
     title: loadedDesign.title || 'DataLaVista Report',
     widgets: loadedDesign.widgets || [],
     filters: loadedDesign.filters || [],
@@ -281,32 +281,30 @@ async function loadConfig(cfg) {
     fieldAggs: loadedDesign.fieldAggs || {},
     transformedResults: null
   };
-  state.previewFilters = cfg.previewFilters || {};
-  state.previewResults = Array.isArray(cfg.previewResults) ? [...cfg.previewResults] : [];
-  state.qmTab = cfg.qmTab || 'previewData';
-  state.queryColumns = Array.isArray(cfg.queryColumns) ? [...cfg.queryColumns] : [];
-  state.queryMode = (cfg.queryMode && cfg.queryMode != null && cfg.queryMode != undefined && cfg.queryMode != '') ? cfg.queryMode : 'sql';
-  state.queryResults = Array.isArray(cfg.queryResults) ? [...cfg.queryResults] : [];
-  state.queryResultsReady = cfg.queryResultsReady || false;
+  DataLaVistaState.previewFilters = cfg.previewFilters || {};
+  DataLaVistaState.previewResults = Array.isArray(cfg.previewResults) ? [...cfg.previewResults] : [];
+  DataLaVistaState.qmTab = cfg.qmTab || 'previewData';
+  DataLaVistaState.queryColumns = Array.isArray(cfg.queryColumns) ? [...cfg.queryColumns] : [];
+  DataLaVistaState.queryMode = (cfg.queryMode && cfg.queryMode != null && cfg.queryMode != undefined && cfg.queryMode != '') ? cfg.queryMode : 'sql';
+  DataLaVistaState.queryResults = Array.isArray(cfg.queryResults) ? [...cfg.queryResults] : [];
+  DataLaVistaState.queryResultsReady = cfg.queryResultsReady || false;
   // Don't load reportMode or reportUrl from config - it's handled by init()
-  state.sql = cfg.sql || '';
-  state.sqlLocked = cfg.sqlLocked || false;
-  state.tables = cfg.tables || {};
+  DataLaVistaState.sql = cfg.sql || '';
+  DataLaVistaState.sqlLocked = cfg.sqlLocked || false;
+  DataLaVistaState.tables = cfg.tables || {};
 
   // Background fetch for referenced tables
-  if (state.sql) {
-    const referencedTables = findReferencedTables(state.sql);
+  if (DataLaVistaState.sql) {
+    const referencedTables = findReferencedTables(DataLaVistaState.sql);
     console.log('==== loadConfig->referencedTables ====');
     for (const tname of referencedTables) {
       console.log('>>>>>>>   loadConfig->referencedTables->loop->ensureTAbleData. Table: ', tname);
       await ensureTableData(tname, true)
     }
   }
-
-  console.log("DEBUG: Finished runninng ensureTableData. Still inside loadConfig. Proceeding to update UI.");
   
-  if (state.sql && window._cmEditor) {
-    window._cmEditor.setValue(state.sql);
+  if (DataLaVistaState.sql && window._cmEditor) {
+    window._cmEditor.setValue(DataLaVistaState.sql);
   }
 
   updateConnectButton();
@@ -314,18 +312,15 @@ async function loadConfig(cfg) {
 
   console.log('DEBUG: loadConfig -> renderFilterBar');
   renderFilterBar();
-  if(!state.reportMode) {
-    console.log('DEBUG: loadConfig -> reportMode is false, rendering design canvas and fields panel.');
+  if(DataLaVistaState.reportMode !== 'view') {
     const titleInput = document.getElementById('title-input');
-    if (titleInput) titleInput.value = state.design.title || '';
+    if (titleInput) titleInput.value = DataLaVistaState.design.title || '';
     renderDesignCanvas();
     renderFieldsPanel();
     setStatus('✅ Config loaded');
     toast('Config loaded successfully', 'success');
   }
     
-
-  console.log("+++++++   DEBUG: Finished loadConfig() at: " + new Date().toISOString() + ". ++++++++++++++");
 }
 
 
@@ -335,7 +330,7 @@ async function loadConfig(cfg) {
       function renderFieldsPanel() {
         const body = document.getElementById('fields-panel-body');
         body.innerHTML = '';
-        const dsNames = Object.keys(state.dataSources).sort((a, b) => a.localeCompare(b));
+        const dsNames = Object.keys(DataLaVistaState.dataSources).sort((a, b) => a.localeCompare(b));
         if (!dsNames.length) {
           body.innerHTML = '<div class="text-muted text-sm" style="padding:12px 10px">No tables loaded</div>';
           renderDesignFieldsPanel();
@@ -343,7 +338,7 @@ async function loadConfig(cfg) {
         }
 
         for (const dsName of dsNames) {
-          const ds = state.dataSources[dsName];
+          const ds = DataLaVistaState.dataSources[dsName];
           const dsAlias = ds.alias || dsName;
 
           // Determine tooltip for DS header
@@ -351,10 +346,10 @@ async function loadConfig(cfg) {
 
           // Sort tables alphabetically
           const tableKeys = (ds.tables || [])
-            .filter(k => state.tables[k])
+            .filter(k => DataLaVistaState.tables[k])
             .sort((a, b) => {
-              const da = state.tables[a].alias || state.tables[a].displayName || a;
-              const db = state.tables[b].alias || state.tables[b].displayName || b;
+              const da = DataLaVistaState.tables[a].alias || DataLaVistaState.tables[a].displayName || a;
+              const db = DataLaVistaState.tables[b].alias || DataLaVistaState.tables[b].displayName || b;
               return da.localeCompare(db);
             });
 
@@ -390,7 +385,7 @@ async function loadConfig(cfg) {
           tablesWrap.id = 'ds-tables-' + CSS.escape(dsName);
 
           for (const tkey of tableKeys) {
-            const t = state.tables[tkey];
+            const t = DataLaVistaState.tables[tkey];
             // Strip the DS prefix for display (users already see it in the group header)
             const tAlias = t.alias || t.displayName || tkey;
             const tIcon = getTableIcon(t);
@@ -426,7 +421,7 @@ async function loadConfig(cfg) {
               //TODO: removed this from above .sort:  .filter(f => !f.isAutoId)
 
             for (const f of sortedFields) {
-              const ti = FIELD_TYPE_ICONS[f.displayType] || FIELD_TYPE_ICONS.default;
+              const ti = DataLaVistaCore.FIELD_TYPE_ICONS[f.displayType] || DataLaVistaCore.FIELD_TYPE_ICONS.default;
               const fitem = document.createElement('div');
               fitem.className = 'field-item';
               fitem.draggable = true;
@@ -481,11 +476,11 @@ async function loadConfig(cfg) {
       }
 
       function expandAllTables() {
-        Object.keys(state.tables).forEach(t => {
+        Object.keys(DataLaVistaState.tables).forEach(t => {
           document.getElementById('fields-' + CSS.escape(t))?.classList.remove('hidden');
           document.getElementById('arrow-' + CSS.escape(t))?.classList.add('open');
         });
-        Object.keys(state.dataSources).forEach(ds => {
+        Object.keys(DataLaVistaState.dataSources).forEach(ds => {
           const wrap = document.getElementById('ds-tables-' + CSS.escape(ds));
           const toggle = document.getElementById('ds-toggle-' + CSS.escape(ds));
           if (wrap) wrap.style.display = '';
@@ -493,7 +488,7 @@ async function loadConfig(cfg) {
         });
       }
       function collapseAllTables() {
-        Object.keys(state.tables).forEach(t => {
+        Object.keys(DataLaVistaState.tables).forEach(t => {
           document.getElementById('fields-' + CSS.escape(t))?.classList.add('hidden');
           document.getElementById('arrow-' + CSS.escape(t))?.classList.remove('open');
         });

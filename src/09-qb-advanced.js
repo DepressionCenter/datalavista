@@ -37,7 +37,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         canvas.querySelectorAll('.qb-table-node').forEach(n => n.remove());
         document.getElementById('qb-svg').innerHTML = '';
 
-        for (const [id, nd] of Object.entries(state.advancedQB.nodes)) {
+        for (const [id, nd] of Object.entries(DataLaVistaState.advancedQB.nodes)) {
           createAdvNode(id, nd);
         }
         redrawJoins();
@@ -49,7 +49,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           if (e.target === canvas || e.target === document.getElementById('qb-svg')) {
             document.querySelectorAll('.qb-table-node').forEach(n => n.classList.remove('selected'));
             selectedNode = null;
-            state.advancedQB.activeJoinIdx = -1;
+            DataLaVistaState.advancedQB.activeJoinIdx = -1;
             renderAdvOptionsPanel(null, null);
           }
         };
@@ -92,8 +92,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
               const nr = nodeEl.getBoundingClientRect();
               shootLightning(tx, ty, nr.left + nr.width/2, nr.top + nr.height/2, () => {
                 poofAndRemove(nodeEl, () => {
-                  delete state.advancedQB.nodes[nodeId];
-                  state.advancedQB.joins = state.advancedQB.joins.filter(j => j.fromNode !== nodeId && j.toNode !== nodeId);
+                  delete DataLaVistaState.advancedQB.nodes[nodeId];
+                  DataLaVistaState.advancedQB.joins = DataLaVistaState.advancedQB.joins.filter(j => j.fromNode !== nodeId && j.toNode !== nodeId);
                   redrawJoins(); rebuildAdvancedSQL(); renderAdvOptionsPanel(null, null);
                 });
               });
@@ -112,9 +112,9 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           } else if (data.type === 'adv-join-trash') {
             const idx = data.idx;
             const doRemoveJoin = () => {
-              if (idx != null && idx >= 0 && idx < state.advancedQB.joins.length) {
-                state.advancedQB.joins.splice(idx, 1);
-                if (state.advancedQB.activeJoinIdx === idx) state.advancedQB.activeJoinIdx = -1;
+              if (idx != null && idx >= 0 && idx < DataLaVistaState.advancedQB.joins.length) {
+                DataLaVistaState.advancedQB.joins.splice(idx, 1);
+                if (DataLaVistaState.advancedQB.activeJoinIdx === idx) DataLaVistaState.advancedQB.activeJoinIdx = -1;
                 redrawJoins(); rebuildAdvancedSQL(); renderAdvOptionsPanel(null, null);
               }
             };
@@ -127,21 +127,21 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
               doRemoveJoin();
             }
           } else if (data.type === 'adv-node-cond') {
-            const nd = state.advancedQB.nodes[data.nodeId];
+            const nd = DataLaVistaState.advancedQB.nodes[data.nodeId];
             if (nd && nd.conditions) {
               nd.conditions.splice(data.idx, 1);
               rebuildAdvancedSQL();
               if (selectedNode === data.nodeId) renderAdvOptionsPanel('node', data.nodeId);
             }
           } else if (data.type === 'adv-node-sort') {
-            const nd = state.advancedQB.nodes[data.nodeId];
+            const nd = DataLaVistaState.advancedQB.nodes[data.nodeId];
             if (nd && nd.sorts) {
               nd.sorts.splice(data.idx, 1);
               rebuildAdvancedSQL();
               if (selectedNode === data.nodeId) renderAdvOptionsPanel('node', data.nodeId);
             }
           } else if (data.type === 'adv-node-gb') {
-            const nd = state.advancedQB.nodes[data.nodeId];
+            const nd = DataLaVistaState.advancedQB.nodes[data.nodeId];
             if (nd && nd.groupBy) {
               nd.groupBy.splice(data.idx, 1);
               rebuildAdvancedSQL();
@@ -153,7 +153,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 
       function clearSQLEditor() {
         if (window._cmEditor) window._cmEditor.setValue('');
-        state.sql = '';
+        DataLaVistaState.sql = '';
         hideUseInDesign();
       }
 
@@ -177,7 +177,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           const targetNodeEl = event.target?.closest('.qb-table-node');
           if (targetNodeEl) {
             const nodeId = targetNodeEl.id.replace(/^adv-/, '');
-            const nd = state.advancedQB.nodes[nodeId];
+            const nd = DataLaVistaState.advancedQB.nodes[nodeId];
             // Only add if field belongs to this exact table
             if (nd && nd.tableName === data.table) {
               if (!nd.selectedFields.includes(data.field)) {
@@ -197,7 +197,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 
       function addAdvNode(tableName, x, y, preselectedField) {
         const id = 'node_' + (++advNodeCounter);
-        const t = state.tables[tableName];
+        const t = DataLaVistaState.tables[tableName];
         if (!t) return;
 
         let defaultFields = [];
@@ -222,7 +222,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           }
         }
 
-        state.advancedQB.nodes[id] = {
+        DataLaVistaState.advancedQB.nodes[id] = {
           tableName, x, y,
           selectedFields: defaultFields,
           alias: t.alias || tableName,
@@ -231,20 +231,20 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           groupBy: [],
           fieldAggs: {}
         };
-        createAdvNode(id, state.advancedQB.nodes[id]);
+        createAdvNode(id, DataLaVistaState.advancedQB.nodes[id]);
         ensureTableData(tableName);
         rebuildAdvancedSQL();
         selectAdvNode(id);
       }
 
       function getAllFieldAliases(tableName) {
-        const t = state.tables[tableName];
+        const t = DataLaVistaState.tables[tableName];
         if (!t) return [];
         return t.fields.filter(f => !f.isAutoId).map(f => f.alias);
       }
 
       function createAdvNode(id, nd) {
-        const t = state.tables[nd.tableName];
+        const t = DataLaVistaState.tables[nd.tableName];
         if (!t) return;
         const canvas = document.getElementById('qb-canvas');
 
@@ -319,7 +319,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 
       function startNodeDrag(e, id, el) {
         e.preventDefault();
-        const nd = state.advancedQB.nodes[id];
+        const nd = DataLaVistaState.advancedQB.nodes[id];
         const startX = e.clientX - nd.x;
         const startY = e.clientY - nd.y;
 
@@ -336,7 +336,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       }
 
       function toggleAdvField(nodeId, field, el) {
-        const nd = state.advancedQB.nodes[nodeId];
+        const nd = DataLaVistaState.advancedQB.nodes[nodeId];
         if (!nd) return;
         const idx = nd.selectedFields.indexOf(field);
         if (idx >= 0) { nd.selectedFields.splice(idx, 1); el && el.classList.remove('selected'); }
@@ -457,7 +457,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 
       // ── Rebuild the pills display for one node ────────────────────────────────
       function updateAdvNodePills(nodeId) {
-        const nd = state.advancedQB.nodes[nodeId];
+        const nd = DataLaVistaState.advancedQB.nodes[nodeId];
         const pillsEl = document.getElementById('adv-pills-' + nodeId);
         if (!nd || !pillsEl) return;
         const fieldAggs = nd.fieldAggs || {};
@@ -501,7 +501,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 
       // ── Toggle a field's selected state on a node (pill-based) ───────────────
       function advNodeToggleField(nodeId, field) {
-        const nd = state.advancedQB.nodes[nodeId];
+        const nd = DataLaVistaState.advancedQB.nodes[nodeId];
         if (!nd) return;
         const idx = nd.selectedFields.indexOf(field);
         if (idx >= 0) {
@@ -517,7 +517,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 
       // ── Set (or clear) an aggregate for a field on a node ────────────────────
       function setAdvNodeFieldAgg(nodeId, field, agg) {
-        const nd = state.advancedQB.nodes[nodeId];
+        const nd = DataLaVistaState.advancedQB.nodes[nodeId];
         if (!nd) return;
         if (!nd.fieldAggs) nd.fieldAggs = {};
         if (!agg) delete nd.fieldAggs[field]; else nd.fieldAggs[field] = agg;
@@ -529,9 +529,9 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       // ── Show a small aggregate-picker popup near a button ────────────────────
       function showAdvAggPopup(nodeId, field, btn) {
         document.querySelectorAll('.adv-agg-popup').forEach(p => p.remove());
-        const nd = state.advancedQB.nodes[nodeId];
+        const nd = DataLaVistaState.advancedQB.nodes[nodeId];
         if (!nd) return;
-        const t = state.tables[nd.tableName];
+        const t = DataLaVistaState.tables[nd.tableName];
         const fm = t ? t.fields.find(f => f.alias === field) : null;
         const aggs = aggsForType(fm ? fm.displayType : 'text');
         const current = (nd.fieldAggs || {})[field] || '';
@@ -559,7 +559,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         const crect  = canvas.getBoundingClientRect();
         const el = document.getElementById('adv-' + nodeId);
         if (!el) return;
-        const nd = state.advancedQB.nodes[nodeId];
+        const nd = DataLaVistaState.advancedQB.nodes[nodeId];
         const startX = nd.x + el.offsetWidth / 2;
         const startY = nd.y;
         drawingJoin = { fromNode: nodeId, fromSide: 'top', startX, startY };
@@ -597,7 +597,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         e.preventDefault();
         const startMouseX = e.clientX;
         const startW = el.offsetWidth;
-        const nd = state.advancedQB.nodes[nodeId];
+        const nd = DataLaVistaState.advancedQB.nodes[nodeId];
         const startNdX = nd.x;
 
         const onMove = mv => {
@@ -624,8 +624,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       }
 
       function removeAdvNode(id) {
-        delete state.advancedQB.nodes[id];
-        state.advancedQB.joins = state.advancedQB.joins.filter(j => j.fromNode !== id && j.toNode !== id);
+        delete DataLaVistaState.advancedQB.nodes[id];
+        DataLaVistaState.advancedQB.joins = DataLaVistaState.advancedQB.joins.filter(j => j.fromNode !== id && j.toNode !== id);
         document.getElementById('adv-' + id)?.remove();
         redrawJoins();
         rebuildAdvancedSQL();
@@ -637,14 +637,14 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         document.querySelectorAll('.qb-table-node').forEach(n => n.classList.remove('selected'));
         if (selectedNode !== id) _advOptsFieldsExpanded = false; // reset expand on new node
         selectedNode = id;
-        state.advancedQB.activeJoinIdx = -1;
+        DataLaVistaState.advancedQB.activeJoinIdx = -1;
         renderAdvOptionsPanel('node', id);
       }
 
       function showNodeProps(nodeId) {
-        const nd = state.advancedQB.nodes[nodeId];
+        const nd = DataLaVistaState.advancedQB.nodes[nodeId];
         if (!nd) return;
-        const t = state.tables[nd.tableName];
+        const t = DataLaVistaState.tables[nd.tableName];
         const props = document.getElementById('node-props');
         const el = document.getElementById('adv-' + nodeId);
         if (!el) return;
@@ -660,7 +660,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         body.innerHTML = `
     <div class="form-group">
       <label>Alias</label>
-      <input type="text" class="form-input" style="height:28px" value="${nd.alias}" oninput="state.advancedQB.nodes['${nodeId}'].alias=this.value; rebuildAdvancedSQL()"/>
+      <input type="text" class="form-input" style="height:28px" value="${nd.alias}" oninput="DataLaVistaState.advancedQB.nodes['${nodeId}'].alias=this.value; rebuildAdvancedSQL()"/>
     </div>
     <div>
       <div style="font-size:11px;font-weight:700;color:var(--text-disabled);text-transform:uppercase;margin-bottom:4px">Fields — click to toggle</div>
@@ -700,8 +700,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
             <div class="adv-node-section">
               <div class="adv-node-section-hdr">ROW COUNT (LIMIT)</div>
               <input type="number" class="form-input" style="height:28px;width:100%"
-                min="1" max="100000" value="${state.advancedQB.rowLimit || 500}"
-                oninput="state.advancedQB.rowLimit=parseInt(this.value)||500; rebuildAdvancedSQL()"/>
+                min="1" max="100000" value="${DataLaVistaState.advancedQB.rowLimit || 500}"
+                oninput="DataLaVistaState.advancedQB.rowLimit=parseInt(this.value)||500; rebuildAdvancedSQL()"/>
               <div style="font-size:11px;color:var(--text-disabled);margin-top:4px">Applies LIMIT to the full query.</div>
             </div>`;
           return;
@@ -709,12 +709,12 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 
         // ── JOIN SELECTION ────────────────────────────────────────
         if (mode === 'join') {
-          const j = state.advancedQB.joins[id];
+          const j = DataLaVistaState.advancedQB.joins[id];
           if (!j) return;
-          const fromND = state.advancedQB.nodes[j.fromNode];
-          const toND   = state.advancedQB.nodes[j.toNode];
-          const fromT  = state.tables[fromND?.tableName];
-          const toT    = state.tables[toND?.tableName];
+          const fromND = DataLaVistaState.advancedQB.nodes[j.fromNode];
+          const toND   = DataLaVistaState.advancedQB.nodes[j.toNode];
+          const fromT  = DataLaVistaState.tables[fromND?.tableName];
+          const toT    = DataLaVistaState.tables[toND?.tableName];
           const fromAlias = fromND?.alias || fromND?.tableName || '';
           const toAlias   = toND?.alias   || toND?.tableName   || '';
 
@@ -740,7 +740,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
                 <div class="form-group">
                   <label>Alias</label>
                   <input type="text" class="form-input" style="height:26px" value="${fromAlias}"
-                    oninput="if(state.advancedQB.nodes['${j.fromNode}']) { state.advancedQB.nodes['${j.fromNode}'].alias=this.value; rebuildAdvancedSQL(); }"/>
+                    oninput="if(DataLaVistaState.advancedQB.nodes['${j.fromNode}']) { DataLaVistaState.advancedQB.nodes['${j.fromNode}'].alias=this.value; rebuildAdvancedSQL(); }"/>
                 </div>
                 <div class="form-group">
                   <label>Key Field</label>
@@ -757,7 +757,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
                 <div class="form-group">
                   <label>Alias</label>
                   <input type="text" class="form-input" style="height:26px" value="${toAlias}"
-                    oninput="if(state.advancedQB.nodes['${j.toNode}']) { state.advancedQB.nodes['${j.toNode}'].alias=this.value; rebuildAdvancedSQL(); }"/>
+                    oninput="if(DataLaVistaState.advancedQB.nodes['${j.toNode}']) { DataLaVistaState.advancedQB.nodes['${j.toNode}'].alias=this.value; rebuildAdvancedSQL(); }"/>
                 </div>
                 <div class="form-group">
                   <label>Key Field</label>
@@ -787,9 +787,9 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 
         // ── NODE (TABLE) SELECTION ────────────────────────────────
         if (mode === 'node') {
-          const nd = state.advancedQB.nodes[id];
+          const nd = DataLaVistaState.advancedQB.nodes[id];
           if (!nd) return;
-          const t = state.tables[nd.tableName];
+          const t = DataLaVistaState.tables[nd.tableName];
           if (!t) return;
           const fields = t.fields.filter(f => !f.isAutoId);
 
@@ -802,7 +802,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           // ── FIELDS section ───────────────────────────────────────
           const FIELDS_COLLAPSED_COUNT = 5;
           const renderFieldRow = f => {
-            const ti  = FIELD_TYPE_ICONS[f.displayType] || FIELD_TYPE_ICONS.default;
+            const ti  = DataLaVistaCore.FIELD_TYPE_ICONS[f.displayType] || DataLaVistaCore.FIELD_TYPE_ICONS.default;
             const sel = nd.selectedFields.includes(f.alias);
             const agg = nd.fieldAggs[f.alias] || '';
             const aggActive = agg !== '';
@@ -840,9 +840,9 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
             return nd.conditions.map((c, ci) => {
               const fieldMeta = fields.find(f => f.alias === c.field);
               const isDate = fieldMeta?.displayType === 'date';
-              const ops = isDate ? [...QB_OPS, ...DATE_MACRO_OPS] : QB_OPS;
-              const isMacro = DATE_MACRO_VALS.has(c.op);
-              const macroMeta = DATE_MACRO_OPS.find(o => o.val === c.op);
+              const ops = isDate ? [...QB_OPS, ...DataLaVistaCore.DATE_MACRO_OPS] : QB_OPS;
+              const isMacro = DataLaVistaCore.DATE_MACRO_VALS.has(c.op);
+              const macroMeta = DataLaVistaCore.DATE_MACRO_OPS.find(o => o.val === c.op);
               const needsValue = c.op !== 'NULL' && c.op !== 'NOTNULL' && !(isMacro && !macroMeta?.hasInput);
               return `<div class="qb-condition-row" draggable="true"
                   ondragstart="event.stopPropagation();safeDragSet(event,{type:'adv-node-cond',nodeId:'${id}',idx:${ci}})">
@@ -981,16 +981,16 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 
       // ── Helpers for per-node conditions / sorts / groupby ─────────────────────────
       function advNodeCond(nodeId, idx, prop, val) {
-        const nd = state.advancedQB.nodes[nodeId];
+        const nd = DataLaVistaState.advancedQB.nodes[nodeId];
         if (!nd || !nd.conditions[idx]) return;
         nd.conditions[idx][prop] = val;
         rebuildAdvancedSQL();
         renderAdvOptionsPanel('node', nodeId);
       }
       function advNodeAddCond(nodeId) {
-        const nd = state.advancedQB.nodes[nodeId];
+        const nd = DataLaVistaState.advancedQB.nodes[nodeId];
         if (!nd) return;
-        const t = state.tables[nd.tableName];
+        const t = DataLaVistaState.tables[nd.tableName];
         const fields = t ? t.fields.filter(f => !f.isAutoId) : [];
         if (!nd.conditions) nd.conditions = [];
         nd.conditions.push({ conj: 'AND', field: fields[0]?.alias || '', op: '=', value: '' });
@@ -998,23 +998,23 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         renderAdvOptionsPanel('node', nodeId);
       }
       function advNodeRemoveCond(nodeId, idx) {
-        const nd = state.advancedQB.nodes[nodeId];
+        const nd = DataLaVistaState.advancedQB.nodes[nodeId];
         if (!nd) return;
         nd.conditions.splice(idx, 1);
         rebuildAdvancedSQL();
         renderAdvOptionsPanel('node', nodeId);
       }
       function advNodeSort(nodeId, idx, prop, val) {
-        const nd = state.advancedQB.nodes[nodeId];
+        const nd = DataLaVistaState.advancedQB.nodes[nodeId];
         if (!nd || !nd.sorts[idx]) return;
         nd.sorts[idx][prop] = val;
         rebuildAdvancedSQL();
         renderAdvOptionsPanel('node', nodeId);
       }
       function advNodeAddSort(nodeId) {
-        const nd = state.advancedQB.nodes[nodeId];
+        const nd = DataLaVistaState.advancedQB.nodes[nodeId];
         if (!nd) return;
-        const t = state.tables[nd.tableName];
+        const t = DataLaVistaState.tables[nd.tableName];
         const fields = t ? t.fields.filter(f => !f.isAutoId) : [];
         if (!nd.sorts) nd.sorts = [];
         nd.sorts.push({ field: fields[0]?.alias || '', dir: 'ASC' });
@@ -1022,23 +1022,23 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         renderAdvOptionsPanel('node', nodeId);
       }
       function advNodeRemoveSort(nodeId, idx) {
-        const nd = state.advancedQB.nodes[nodeId];
+        const nd = DataLaVistaState.advancedQB.nodes[nodeId];
         if (!nd) return;
         nd.sorts.splice(idx, 1);
         rebuildAdvancedSQL();
         renderAdvOptionsPanel('node', nodeId);
       }
       function advNodeGB(nodeId, idx, val) {
-        const nd = state.advancedQB.nodes[nodeId];
+        const nd = DataLaVistaState.advancedQB.nodes[nodeId];
         if (!nd) return;
         nd.groupBy[idx] = val;
         rebuildAdvancedSQL();
         renderAdvOptionsPanel('node', nodeId);
       }
       function advNodeAddGB(nodeId) {
-        const nd = state.advancedQB.nodes[nodeId];
+        const nd = DataLaVistaState.advancedQB.nodes[nodeId];
         if (!nd) return;
-        const t = state.tables[nd.tableName];
+        const t = DataLaVistaState.tables[nd.tableName];
         const fields = t ? t.fields.filter(f => !f.isAutoId) : [];
         if (!nd.groupBy) nd.groupBy = [];
         nd.groupBy.push(fields[0]?.alias || '');
@@ -1046,7 +1046,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         renderAdvOptionsPanel('node', nodeId);
       }
       function advNodeRemoveGB(nodeId, idx) {
-        const nd = state.advancedQB.nodes[nodeId];
+        const nd = DataLaVistaState.advancedQB.nodes[nodeId];
         if (!nd) return;
         nd.groupBy.splice(idx, 1);
         rebuildAdvancedSQL();
@@ -1092,15 +1092,15 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       }
 
       function addJoin(fromNode, fromSide, toNode, toSide) {
-        const fromT = state.tables[state.advancedQB.nodes[fromNode]?.tableName];
-        const toT = state.tables[state.advancedQB.nodes[toNode]?.tableName];
+        const fromT = DataLaVistaState.tables[DataLaVistaState.advancedQB.nodes[fromNode]?.tableName];
+        const toT = DataLaVistaState.tables[DataLaVistaState.advancedQB.nodes[toNode]?.tableName];
         if (!fromT || !toT) return;
 
         // Smart key detection
         let fromKey = 'ID', toKey = 'ID';
         // Check if toT has a field like fromTName + Id
-        const fromAlias = state.advancedQB.nodes[fromNode]?.alias || state.advancedQB.nodes[fromNode]?.tableName;
-        const toAlias = state.advancedQB.nodes[toNode]?.alias || state.advancedQB.nodes[toNode]?.tableName;
+        const fromAlias = DataLaVistaState.advancedQB.nodes[fromNode]?.alias || DataLaVistaState.advancedQB.nodes[fromNode]?.tableName;
+        const toAlias = DataLaVistaState.advancedQB.nodes[toNode]?.alias || DataLaVistaState.advancedQB.nodes[toNode]?.tableName;
         for (const f of toT.fields) {
           if (f.alias.toLowerCase() === fromAlias.toLowerCase() + 'id' || f.alias.toLowerCase() === fromAlias.toLowerCase().replace(/s$/, '') + 'id') {
             toKey = f.alias; fromKey = 'ID'; break;
@@ -1112,12 +1112,12 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           }
         }
 
-        state.advancedQB.joins.push({ fromNode, fromSide, toNode, toSide, fromKey, toKey, type: 'LEFT' });
+        DataLaVistaState.advancedQB.joins.push({ fromNode, fromSide, toNode, toSide, fromKey, toKey, type: 'LEFT' });
         redrawJoins();
         rebuildAdvancedSQL();
         // Auto-select the new join to show its options panel
-        const newIdx = state.advancedQB.joins.length - 1;
-        state.advancedQB.activeJoinIdx = newIdx;
+        const newIdx = DataLaVistaState.advancedQB.joins.length - 1;
+        DataLaVistaState.advancedQB.activeJoinIdx = newIdx;
         selectedNode = null;
         document.querySelectorAll('.qb-table-node').forEach(n => n.classList.remove('selected'));
         renderAdvOptionsPanel('join', newIdx);
@@ -1126,7 +1126,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       function getSnapPoint(nodeId, side) {
         const el = document.getElementById('adv-' + nodeId);
         if (!el) return { x: 0, y: 0 };
-        const nd = state.advancedQB.nodes[nodeId];
+        const nd = DataLaVistaState.advancedQB.nodes[nodeId];
         const r = el.getBoundingClientRect();
         const canvas = document.getElementById('qb-canvas');
         const cr = canvas.getBoundingClientRect();
@@ -1146,8 +1146,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
   </marker>`;
         svg.appendChild(defs);
 
-        for (let ji = 0; ji < state.advancedQB.joins.length; ji++) {
-          const j = state.advancedQB.joins[ji];
+        for (let ji = 0; ji < DataLaVistaState.advancedQB.joins.length; ji++) {
+          const j = DataLaVistaState.advancedQB.joins[ji];
           const from = getSnapPoint(j.fromNode, j.fromSide);
           const to   = getSnapPoint(j.toNode,   j.toSide);
           const dx   = (to.x - from.x) * 0.5;
@@ -1208,9 +1208,9 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 
       function selectJoin(joinObj, from, to) {
         // Store reference by index so inline handlers can reach it safely
-        const joinIdx = state.advancedQB.joins.indexOf(joinObj);
+        const joinIdx = DataLaVistaState.advancedQB.joins.indexOf(joinObj);
         if (joinIdx < 0) return;
-        state.advancedQB.activeJoinIdx = joinIdx;
+        DataLaVistaState.advancedQB.activeJoinIdx = joinIdx;
         selectedNode = null;
         document.querySelectorAll('.qb-table-node').forEach(n => n.classList.remove('selected'));
         renderAdvOptionsPanel('join', joinIdx);
@@ -1218,9 +1218,9 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 
       /** Called by inline onchange handlers inside the join props popup */
       function setActiveJoinProp(prop, value) {
-        const idx = state.advancedQB.activeJoinIdx;
+        const idx = DataLaVistaState.advancedQB.activeJoinIdx;
         if (idx == null || idx < 0) return;
-        const j = state.advancedQB.joins[idx];
+        const j = DataLaVistaState.advancedQB.joins[idx];
         if (!j) return;
         j[prop] = value;
         redrawJoins();
@@ -1230,10 +1230,10 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 
       /** Called by the Remove Join button inside the join props popup */
       function removeActiveJoin() {
-        const idx = state.advancedQB.activeJoinIdx;
+        const idx = DataLaVistaState.advancedQB.activeJoinIdx;
         if (idx == null || idx < 0) return;
-        state.advancedQB.joins.splice(idx, 1);
-        state.advancedQB.activeJoinIdx = -1;
+        DataLaVistaState.advancedQB.joins.splice(idx, 1);
+        DataLaVistaState.advancedQB.activeJoinIdx = -1;
         redrawJoins();
         rebuildAdvancedSQL();
         renderAdvOptionsPanel(null, null);
@@ -1253,11 +1253,11 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       }
 
       function rebuildAdvancedSQL() {
-        if (state.sqlLocked) return;
-        const nodes = Object.entries(state.advancedQB.nodes);
+        if (DataLaVistaState.sqlLocked) return;
+        const nodes = Object.entries(DataLaVistaState.advancedQB.nodes);
         if (!nodes.length) { if (window._cmEditor) window._cmEditor.setValue(''); return; }
 
-        const joins = state.advancedQB.joins;
+        const joins = DataLaVistaState.advancedQB.joins;
         const multiNode = nodes.length > 1;
 
         // ── Multiple tables (with or without joins) → disable Design/Preview/Generate ──
@@ -1269,7 +1269,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 
         // Helper: field alias → internalName for SQL column refs
         const getInternal = (tableName, fieldAlias) => {
-          const t = state.tables[tableName];
+          const t = DataLaVistaState.tables[tableName];
           if (!t) return fieldAlias;
           const f = t.fields.find(f => f.alias === fieldAlias);
           return f ? (f.internalName || fieldAlias) : fieldAlias;
@@ -1331,18 +1331,18 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           let sql = '';
           for (let i = 0; i < parts.length; i++) {
             if (i === 0) { sql = parts[0].sql; continue; }
-            const j = joins.find(j => j.toNode === Object.keys(state.advancedQB.nodes)[i]);
+            const j = joins.find(j => j.toNode === Object.keys(DataLaVistaState.advancedQB.nodes)[i]);
             sql += `\n${j ? j.type : 'UNION'}\n` + parts[i].sql;
           }
-          sql += `\nLIMIT ${state.advancedQB.rowLimit || 500}`;
-          state.sql = sql; if (window._cmEditor) window._cmEditor.setValue(sql); return;
+          sql += `\nLIMIT ${DataLaVistaState.advancedQB.rowLimit || 500}`;
+          DataLaVistaState.sql = sql; if (window._cmEditor) window._cmEditor.setValue(sql); return;
         }
 
         let sql = `SELECT\n${selects.join(',\n')}\nFROM [${mainKey}]`;
 
         for (const j of joins) {
-          const fromNd = state.advancedQB.nodes[j.fromNode];
-          const toNd   = state.advancedQB.nodes[j.toNode];
+          const fromNd = DataLaVistaState.advancedQB.nodes[j.fromNode];
+          const toNd   = DataLaVistaState.advancedQB.nodes[j.toNode];
           if (!fromNd || !toNd) continue;
           const fromKey   = fromNd.tableName;
           const toKey     = toNd.tableName;
@@ -1378,14 +1378,14 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         }
         if (allOrder.length) sql += `\nORDER BY ${allOrder.join(', ')}`;
 
-        sql += `\nLIMIT ${state.advancedQB.rowLimit || 500}`;
-        state.sql = sql; if (window._cmEditor) window._cmEditor.setValue(sql); hideUseInDesign();
+        sql += `\nLIMIT ${DataLaVistaState.advancedQB.rowLimit || 500}`;
+        DataLaVistaState.sql = sql; if (window._cmEditor) window._cmEditor.setValue(sql); hideUseInDesign();
       }
 
       // buildNodeWhere: tableKey is passed as the table prefix; resolves field alias → internalName
       function buildNodeWhere(nd, tableKey) {
         if (!nd.conditions || !nd.conditions.length) return '';
-        const t = tableKey ? state.tables[tableKey] : null;
+        const t = tableKey ? DataLaVistaState.tables[tableKey] : null;
         const getInternal = (alias) => {
           if (!t) return alias;
           const f = t.fields.find(f => f.alias === alias);
@@ -1397,7 +1397,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           const col = `${prefix}[${getInternal(c.field)}]`;
           if (c.op === 'NULL')    return conj + `${col} IS NULL`;
           if (c.op === 'NOTNULL') return conj + `${col} IS NOT NULL`;
-          if (DATE_MACRO_VALS.has(c.op)) return conj + dateMacroToSQL(c.op, c.value, col);
+          if (DataLaVistaCore.DATE_MACRO_VALS.has(c.op)) return conj + dateMacroToSQL(c.op, c.value, col);
           if (c.op === 'LIKE') return conj + `${col} LIKE '%${c.value}%'`;
           const raw = c.value || '';
           const val = (raw !== '' && !isNaN(raw)) ? raw : `'${raw.replace(/'/g, "''")}'`;
@@ -1407,15 +1407,15 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       function clearQueryBuilder() {
         if(document.getElementById('qmt-sql').classList.contains('active')) {
           if (window._cmEditor) window._cmEditor.setValue('');
-          state.sql = '';
+          DataLaVistaState.sql = '';
           hideUseInDesign();
         } else {
-          state.basicQB = { tableName: null, selectedFields: [], filters: [] };
-          state.advancedQB = { nodes: {}, joins: [], activeJoinIdx: -1 };
+          DataLaVistaState.basicQB = { tableName: null, selectedFields: [], filters: [] };
+          DataLaVistaState.advancedQB = { nodes: {}, joins: [], activeJoinIdx: -1 };
           if (window._cmEditor) window._cmEditor.setValue('');
-          state.sql = '';
+          DataLaVistaState.sql = '';
           renderBasicQB();
-          if (state.queryMode === 'advanced') renderAdvancedQB();
+          if (DataLaVistaState.queryMode === 'advanced') renderAdvancedQB();
         }
       }
 

@@ -78,7 +78,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
               sqlSec.style.height = newH + 'px';
               // Ensure editor-open class is present so min-height applies
               sqlSec.classList.add('editor-open');
-              if (!state.sqlEditorCollapsed) {
+              if (!DataLaVistaState.sqlEditorCollapsed) {
                 const wrap = document.getElementById('sql-editor-wrap');
                 if (wrap) wrap.classList.remove('collapsed');
               }
@@ -98,24 +98,23 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       // TABS
       // ============================================================
       function switchTab(tab) {
-        let oldTab = state.activeTab;
-        console.log('DEBUG: Switching from tab:', oldTab, 'to tab:', tab);
-        state.activeTab = tab;
+        let oldTab = DataLaVistaState.activeTab;
+        DataLaVistaState.activeTab = tab;
         document.querySelectorAll('.tb-tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
         document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === 'tab-' + tab));
 
-        if (tab === 'dashboardPreview') { console.log('DEBUG: inside switchtab, calling refreshDashboardPreview.'); refreshDashboardPreview(); }
+        if (tab === 'dashboardPreview') { refreshDashboardPreview(); }
         if (tab === 'generate') { generateReport(); }
-        if (tab === 'design' && !state.reportMode) {
+        if (tab === 'design' && DataLaVistaState.reportMode !== 'view') {
           renderDesignCanvas(); renderFilterBar(); renderDesignFieldsPanel();
-          requestAnimationFrame(() => { for (const c of Object.values(state.charts)) { try { c.resize(); } catch (e) { } } });
+          requestAnimationFrame(() => { for (const c of Object.values(DataLaVistaState.charts)) { try { c.resize(); } catch (e) { } } });
         }
         if (tab === 'query' && window._cmEditor) { setTimeout(() => window._cmEditor.refresh(), 50); }
       }
 
       // ── Query-main panel tab switcher ─────────────────────────────────────────────
       function switchQMTab(tab) {
-        state.qmTab = tab;
+        DataLaVistaState.qmTab = tab;
         ['qb','sql','dataPreview'].forEach(t => {
           document.getElementById('qmt-' + t)?.classList.toggle('active', t === tab);
           document.getElementById('qm-panel-' + t)?.classList.toggle('active', t === tab);
@@ -125,9 +124,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         if (subtabs) subtabs.style.display = tab === 'qb' ? '' : 'none';
         if (tab === 'sql' && window._cmEditor) setTimeout(() => window._cmEditor.refresh(), 50);
         // Switching to SQL editor lifts the advanced-QB join restriction
-        if (tab === 'sql' && state.queryMode === 'advanced') setDesignTabsEnabled(true);
+        if (tab === 'sql' && DataLaVistaState.queryMode === 'advanced') setDesignTabsEnabled(true);
         if (tab === 'dataPreview') {
-          runQuery();
           document.getElementById('btn-clear-query').disabled = true;
           document.getElementById('btn-run-query').disabled = true;
 
@@ -196,7 +194,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         } catch(e) {}
         // Fallback: check if current URL looks like SharePoint
         const m = window.location.href.match(/^(https?:\/\/[^/]+(?:\/sites\/[^/]+|\/teams\/[^/]+)?)/);
-        if (m && (window.location.hostname.toLowerCase().includes('sharepoint.com') ||
+        if (m && !siteUrl && (window.location.hostname.toLowerCase().includes('sharepoint.com') ||
                   window.location.hostname.toLowerCase().includes('.sharepoint.')) &&
                   window.location.pathname.startsWith('/sites/') ||
                   window.location.pathname.startsWith('/teams/')) {

@@ -24,9 +24,9 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       // RUN QUERY
       // ============================================================
       async function runQuery() {
-        const sql = window._cmEditor ? window._cmEditor.getValue() : state.sql;
+        const sql = window._cmEditor ? window._cmEditor.getValue() : DataLaVistaState.sql;
         if (!sql.trim()) { toast('Please enter a SQL query', 'error'); return; }
-        state.sql = sql;
+        DataLaVistaState.sql = sql;
 
         setStatus('⏳ Running query...');
 
@@ -42,7 +42,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           // Register each referenced table in AlaSQL under its live query name (DSAlias_TableAlias)
           // TODO shouldnt this be internal names? Can we use alasql aliases?
           for (const tname of referencedTables) {
-            const t = state.tables[tname];
+            const t = DataLaVistaState.tables[tname];
             if (!t || !t.data) continue;
             registerTableInAlaSQL(tname);
           }
@@ -52,13 +52,13 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           const results = alasql(processedSQL);
 
           if (!Array.isArray(results)) throw new Error('Query returned no results');
-          state.queryResults = results;
-          state.queryColumns = results.length ? Object.keys(results[0]) : [];
+          DataLaVistaState.queryResults = results;
+          DataLaVistaState.queryColumns = results.length ? Object.keys(results[0]) : [];
 
           // Show preview
           showQueryPreview(results);
           // Reset design transforms when new query results arrive
-          state.design.transformedResults = null;
+          DataLaVistaState.design.transformedResults = null;
           applyDesignTransforms();
           renderDesignFieldsPanel();
           setStatus(`✅ Query returned ${results.length} rows`);
@@ -73,7 +73,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 
       function findReferencedTables(sql) {
         const found = [];
-        for (const [tkey] of Object.entries(state.tables)) {
+        for (const [tkey] of Object.entries(DataLaVistaState.tables)) {
           // Match by the immutable table key only (e.g. SP_EngagementHistory)
           // The alias form (SP_Contacts) appears in SQL as a FROM alias, not a table name
           const esc = tkey.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -108,12 +108,12 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       function showUseInDesign() {
         const btn = document.getElementById('btn-use-in-design');
         if (btn) btn.style.display = '';
-        state.queryResultsReady = true;
+        DataLaVistaState.queryResultsReady = true;
       }
       function hideUseInDesign() {
         const btn = document.getElementById('btn-use-in-design');
         if (btn) btn.style.display = 'none';
-        state.queryResultsReady = false;
+        DataLaVistaState.queryResultsReady = false;
       }
 
       function toggleAdvOptionsPanel() {
@@ -135,14 +135,14 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
   // This will probably break if two tables have the a field with the same alias but different types
   function sniffType(col) {
     const typeMap = {};
-    for (const t of Object.values(state.tables)) {
+    for (const t of Object.values(DataLaVistaState.tables)) {
       for (const f of (t.fields || [])) {
         if (f.alias && f.displayType) typeMap[f.alias] = f.displayType;
       }
     }
     if (typeMap[col]) return typeMap[col];
     // Fallback: sniff type from first result row value
-    const firstRow = (state.queryResults && state.queryResults[0]) || null;
+    const firstRow = (DataLaVistaState.queryResults && DataLaVistaState.queryResults[0]) || null;
     if (!firstRow) return 'default';
     const v = firstRow[col];
     if (Array.isArray(v)) return 'array';

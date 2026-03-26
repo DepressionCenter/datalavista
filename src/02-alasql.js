@@ -198,8 +198,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         }
 
         if (isUser && !isMulti && typeof value === 'object' && !Array.isArray(value)) {
-          const _siteBase = (state.tables[tableName] && state.tables[tableName].siteUrl)
-            ? state.tables[tableName].siteUrl.replace(/\/$/, '')
+          const _siteBase = (DataLaVistaState.tables[tableName] && DataLaVistaState.tables[tableName].siteUrl)
+            ? DataLaVistaState.tables[tableName].siteUrl.replace(/\/$/, '')
             : '..';
           mapped[outKey]              = value.Title || value.Name || JSON.stringify(value);
           mapped[outKey + 'Id']       = value.Id;

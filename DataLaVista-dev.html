@@ -3083,7 +3083,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           <div id="title-bar">
             <span class="bar-label">Title</span>
             <input type="text" id="title-input" placeholder="Enter report title..."
-              oninput="state.design.title=this.value" />
+              oninput="DataLaVistaState.design.title=this.value" />
           </div>
           <div id="filter-bar">
             <span class="bar-label">Filters</span>
@@ -3159,9 +3159,9 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
             <div class="generate-col-label">
               <span>⚙ Report Config (JSON)</span>
               <div class="gen-actions">
-                <button class="btn btn-default btn-sm" id="btn-copy-json" onclick="copyGenCode('json')" disabled>📋
+                <button class="btn btn-default btn-sm" id="btn-copy-json" onclick="copyGenCode()" disabled>📋
                   Copy</button>
-                <button class="btn btn-default btn-sm" id="btn-dl-json" onclick="downloadGenCode('json')" disabled>⬇
+                <button class="btn btn-default btn-sm" id="btn-dl-json" onclick="downloadGenCode()" disabled>⬇
                   Download .json</button>
               </div>
             </div>
@@ -3239,4 +3239,5 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
   <script src="src/13-ui-utils.js"></script>
   <script src="src/14-init.js"></script>
   <script src="src/15-public-api.js"></script>
+  <script src="src/99-start-datalavista.js"></script>
 </body>

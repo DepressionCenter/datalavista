@@ -24,7 +24,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       // QUERY BUILDER — BASIC MODE
       // ============================================================
       function setQBMode(mode) {
-        state.queryMode = mode;
+        DataLaVistaState.queryMode = mode;
         document.getElementById('qb-basic').style.display = mode === 'basic' ? 'flex' : 'none';
         document.getElementById('qb-advanced').style.display = mode === 'advanced' ? 'flex' : 'none';
         document.getElementById('qb-basic-btn').classList.toggle('active', mode === 'basic');
@@ -67,7 +67,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
                 cm.replaceSelection(text);
             }
         } else if (data.type === 'table') {
-          const t = state.tables[data.table];
+          const t = DataLaVistaState.tables[data.table];
           if (!t) return;
           if (isQueryEmpty) {
             // Switch to basic QB, load table, select default fields
@@ -78,25 +78,25 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
             selectAllBasicFields();
             rebuildBasicSQL();
           } else {
-            // Insert alias name at cursor
-            if (cm) cm.replaceSelection(`[${t.alias || data.table}]`);
+            // Insert table name at cursor
+            if (cm) cm.replaceSelection(`[${data.table}]`);
           }
         } else if (data.type === 'field') {
-          const t = state.tables[data.table];
+          const t = DataLaVistaState.tables[data.table];
           if (!t) return;
           if (isQueryEmpty) {
             // Switch to basic QB, load table, select only this field
             setQBMode('basic');
             addTableToBasicQB(data.table);
-            state.basicQB.selectedFields = [data.field];
+            DataLaVistaState.basicQB.selectedFields = [data.field];
             // Sync checkboxes if already rendered
             document.querySelectorAll('#basic-fields-grid input[type=checkbox]').forEach(cb => {
               cb.checked = cb.id === 'bfchk-' + data.field;
             });
             rebuildBasicSQL();
           } else {
-            // Insert alias.field at cursor
-            if (cm) cm.replaceSelection(`[${t.alias || data.table}].[${data.field}]`);
+            // Insert field at cursor
+            if (cm) cm.replaceSelection(`[${data.field}]`);
           }
         } else {
           // Unknown custom data type — just ignore and don't insert anything
@@ -114,17 +114,17 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       }
 
       function addTableToBasicQB(tableName) {
-        const t = state.tables[tableName];
+        const t = DataLaVistaState.tables[tableName];
         if (!t) return;
 
         // Always reset fully when a new table is dropped — even if same table
-        state.basicQB.tableName = tableName;
-        state.basicQB.selectedFields = [];
-        state.basicQB.fieldAggs = {};
-        state.basicQB.conditions = [];
-        state.basicQB.sorts = [];
-        state.basicQB.groupBy = [];
-        state.basicQB.rowLimit = 500;
+        DataLaVistaState.basicQB.tableName = tableName;
+        DataLaVistaState.basicQB.selectedFields = [];
+        DataLaVistaState.basicQB.fieldAggs = {};
+        DataLaVistaState.basicQB.conditions = [];
+        DataLaVistaState.basicQB.sorts = [];
+        DataLaVistaState.basicQB.groupBy = [];
+        DataLaVistaState.basicQB.rowLimit = 500;
 
         // Auto-select all fields by default
         selectAllBasicFields();
@@ -133,9 +133,9 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       }
 
       function basicQBSelectField(tableName, fieldAlias) {
-        if (state.basicQB.tableName !== tableName) return;
-        if (!state.basicQB.selectedFields.includes(fieldAlias)) {
-          state.basicQB.selectedFields.push(fieldAlias);
+        if (DataLaVistaState.basicQB.tableName !== tableName) return;
+        if (!DataLaVistaState.basicQB.selectedFields.includes(fieldAlias)) {
+          DataLaVistaState.basicQB.selectedFields.push(fieldAlias);
           renderBasicQB();
         }
       }
@@ -276,8 +276,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       //       Column refs use [tableKey].[internalName].
       //       AS clause adds the user-facing field alias as the result column name.
       function buildBasicSQL(formatted = false) {
-        const tkey = state.basicQB.tableName;
-        const t = tkey ? state.tables[tkey] : null;
+        const tkey = DataLaVistaState.basicQB.tableName;
+        const t = tkey ? DataLaVistaState.tables[tkey] : null;
         if (!t) return '';
 
         // Helper: resolve a field alias → internalName for SQL column references
@@ -286,11 +286,11 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           return f ? (f.internalName || alias) : alias;
         };
 
-        const selectedAliases = state.basicQB.selectedFields;
-        const aggs   = state.basicQB.fieldAggs || {};
-        const conds  = state.basicQB.conditions.filter(c => c.field);
-        const sorts  = state.basicQB.sorts.filter(s => s.field);
-        const limit  = state.basicQB.rowLimit || 500;
+        const selectedAliases = DataLaVistaState.basicQB.selectedFields;
+        const aggs   = DataLaVistaState.basicQB.fieldAggs || {};
+        const conds  = DataLaVistaState.basicQB.conditions.filter(c => c.field);
+        const sorts  = DataLaVistaState.basicQB.sorts.filter(s => s.field);
+        const limit  = DataLaVistaState.basicQB.rowLimit || 500;
         const anyAgg = selectedAliases.some(a => aggs[a]);
 
         // SELECT [tkey].[internalName] AS [fieldAlias]
@@ -307,7 +307,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           ? selectedAliases.filter(a => !aggs[a]).map(a => `[${tkey}].[${getInternal(a)}]`)
           : [];
         const manualGroups = !anyAgg
-          ? (state.basicQB.groupBy || []).filter(g => g).map(g => `[${tkey}].[${getInternal(g)}]`)
+          ? (DataLaVistaState.basicQB.groupBy || []).filter(g => g).map(g => `[${tkey}].[${getInternal(g)}]`)
           : [];
         const groupParts = anyAgg ? autoGroups : manualGroups;
 
@@ -316,7 +316,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           const col  = `[${tkey}].[${getInternal(c.field)}]`;
           if (c.op === 'NULL')    return conj + `${col} IS NULL`;
           if (c.op === 'NOTNULL') return conj + `${col} IS NOT NULL`;
-          if (DATE_MACRO_VALS.has(c.op)) {
+          if (DataLaVistaCore.DATE_MACRO_VALS.has(c.op)) {
             const expr = dateMacroToSQL(c.op, c.value, col);
             return expr ? conj + expr : conj + `${col} IS NOT NULL`;
           }
@@ -348,8 +348,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 
       // ── QB: render the full basic QB UI ──────────────────────────────────────────
       function renderBasicQB() {
-        const tname = state.basicQB.tableName;
-        const t = tname ? state.tables[tname] : null;
+        const tname = DataLaVistaState.basicQB.tableName;
+        const t = tname ? DataLaVistaState.tables[tname] : null;
         const content = document.getElementById('qb-basic-content');
         const dropZone = document.getElementById('qb-basic-drop');
 
@@ -417,8 +417,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         <div class="qb-section-header"><span>ROW LIMIT</span></div>
         <div style="padding:4px 0">
           <input type="number" class="form-input" style="height:28px;font-size:12px;width:120px"
-            min="1" max="50000" value="${state.basicQB.rowLimit || 500}"
-            onchange="state.basicQB.rowLimit = Math.min(50000, Math.max(1, +this.value||500)); rebuildBasicSQL()"/>
+            min="1" max="50000" value="${DataLaVistaState.basicQB.rowLimit || 500}"
+            onchange="DataLaVistaState.basicQB.rowLimit = Math.min(50000, Math.max(1, +this.value||500)); rebuildBasicSQL()"/>
         </div>
       </div>
     </div>
@@ -426,11 +426,11 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 
         // Render field checkboxes with aggregate dropdown
         const grid = document.getElementById('basic-fields-grid');
-        const aggs = state.basicQB.fieldAggs || {};
+        const aggs = DataLaVistaState.basicQB.fieldAggs || {};
         for (const f of rows) {
-          const checked = state.basicQB.selectedFields.includes(f.alias);
+          const checked = DataLaVistaState.basicQB.selectedFields.includes(f.alias);
           const currentAgg = aggs[f.alias] || '';
-          const ti = FIELD_TYPE_ICONS[f.displayType] || FIELD_TYPE_ICONS.default;
+          const ti = DataLaVistaCore.FIELD_TYPE_ICONS[f.displayType] || DataLaVistaCore.FIELD_TYPE_ICONS.default;
           const availableAggs = aggsForType(f.displayType);
           const aggOpts = availableAggs.map(a => `<option value="${a.val}" ${a.val === currentAgg ? 'selected' : ''}>${a.label}</option>`).join('');
           const div = document.createElement('div');
@@ -454,26 +454,26 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 
       function toggleBasicField(alias, checked) {
         if (checked) {
-          if (!state.basicQB.selectedFields.includes(alias)) state.basicQB.selectedFields.push(alias);
+          if (!DataLaVistaState.basicQB.selectedFields.includes(alias)) DataLaVistaState.basicQB.selectedFields.push(alias);
         } else {
-          state.basicQB.selectedFields = state.basicQB.selectedFields.filter(f => f !== alias);
-          if (state.basicQB.fieldAggs) delete state.basicQB.fieldAggs[alias];
+          DataLaVistaState.basicQB.selectedFields = DataLaVistaState.basicQB.selectedFields.filter(f => f !== alias);
+          if (DataLaVistaState.basicQB.fieldAggs) delete DataLaVistaState.basicQB.fieldAggs[alias];
         }
         // Re-render to show/hide agg dropdown and update GROUP BY section
         renderBasicQB();
       }
 
       function setFieldAgg(alias, agg) {
-        if (!state.basicQB.fieldAggs) state.basicQB.fieldAggs = {};
-        if (agg) state.basicQB.fieldAggs[alias] = agg;
-        else delete state.basicQB.fieldAggs[alias];
+        if (!DataLaVistaState.basicQB.fieldAggs) DataLaVistaState.basicQB.fieldAggs = {};
+        if (agg) DataLaVistaState.basicQB.fieldAggs[alias] = agg;
+        else delete DataLaVistaState.basicQB.fieldAggs[alias];
         syncGroupBySection();
         rebuildBasicSQL();
       }
 
       // Show/hide the manual GROUP BY section & its add button based on whether aggs are active
       function syncGroupBySection() {
-        const anyAgg = state.basicQB.selectedFields.some(f => (state.basicQB.fieldAggs || {})[f]);
+        const anyAgg = DataLaVistaState.basicQB.selectedFields.some(f => (DataLaVistaState.basicQB.fieldAggs || {})[f]);
         const label = document.getElementById('groupby-section-label');
         const addBtn = document.getElementById('groupby-add-btn');
         if (label) label.textContent = anyAgg ? 'GROUP BY (auto)' : 'GROUP BY';
@@ -482,7 +482,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           // Clear manual group-by entries and show auto message
           const area = document.getElementById('basic-groupby-area');
           if (area) {
-            const nonAggFields = state.basicQB.selectedFields.filter(f => !(state.basicQB.fieldAggs || {})[f]);
+            const nonAggFields = DataLaVistaState.basicQB.selectedFields.filter(f => !(DataLaVistaState.basicQB.fieldAggs || {})[f]);
             area.innerHTML = nonAggFields.length
               ? `<div style="font-size:11px;color:var(--text-disabled);padding:2px 0">Auto: ${nonAggFields.join(', ')}</div>`
               : `<div style="font-size:11px;color:var(--text-disabled);padding:2px 0">All fields aggregated — no GROUP BY needed</div>`;
@@ -493,14 +493,14 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       }
 
       function selectAllBasicFields() {
-        const t = state.tables[state.basicQB.tableName];
+        const t = DataLaVistaState.tables[DataLaVistaState.basicQB.tableName];
         if (!t) return;
-        state.basicQB.selectedFields = t.fields.filter(f => !f.isAutoId).map(f => f.alias);
+        DataLaVistaState.basicQB.selectedFields = t.fields.filter(f => !f.isAutoId).map(f => f.alias);
         renderBasicQB();
       }
-      function clearBasicFields() { state.basicQB.selectedFields = []; renderBasicQB(); }
+      function clearBasicFields() { DataLaVistaState.basicQB.selectedFields = []; renderBasicQB(); }
       function clearBasicQB() {
-        state.basicQB = { tableName: null, selectedFields: [], fieldAggs: {}, conditions: [], sorts: [], groupBy: [], rowLimit: 500 };
+        DataLaVistaState.basicQB = { tableName: null, selectedFields: [], fieldAggs: {}, conditions: [], sorts: [], groupBy: [], rowLimit: 500 };
         renderBasicQB();
         document.getElementById('qb-basic-drop').style.display = 'flex';
       }
@@ -519,15 +519,15 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       ];
 
       function addBasicCondition() {
-        const t = state.tables[state.basicQB.tableName];
+        const t = DataLaVistaState.tables[DataLaVistaState.basicQB.tableName];
         if (!t) return;
         const fields = t.fields.filter(f => !f.isAutoId);
-        state.basicQB.conditions.push({ conj: 'AND', field: fields[0]?.alias || '', op: '=', value: '' });
+        DataLaVistaState.basicQB.conditions.push({ conj: 'AND', field: fields[0]?.alias || '', op: '=', value: '' });
         renderBasicConditions();
       }
 
       function removeBasicCondition(i) {
-        state.basicQB.conditions.splice(i, 1);
+        DataLaVistaState.basicQB.conditions.splice(i, 1);
         renderBasicConditions();
         rebuildBasicSQL();
       }
@@ -535,25 +535,25 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       function renderBasicConditions() {
         const area = document.getElementById('basic-conditions-area');
         if (!area) return;
-        const t = state.tables[state.basicQB.tableName];
+        const t = DataLaVistaState.tables[DataLaVistaState.basicQB.tableName];
         if (!t) return;
         const fields = t.fields.filter(f => !f.isAutoId);
         const fieldOpts = fields.map(f => `<option value="${f.alias}">${f.alias}</option>`).join('');
 
         area.innerHTML = '';
-        if (!state.basicQB.conditions.length) {
+        if (!DataLaVistaState.basicQB.conditions.length) {
           area.innerHTML = '<div style="font-size:11px;color:var(--text-disabled);padding:2px 0">No filters — click + Add</div>';
           return;
         }
 
-        state.basicQB.conditions.forEach((c, i) => {
+        DataLaVistaState.basicQB.conditions.forEach((c, i) => {
           // Determine if the selected field is a date type
           const fieldMeta = fields.find(f => f.alias === c.field);
           const isDate = fieldMeta && fieldMeta.displayType === 'date';
-          const ops = isDate ? [...QB_OPS, ...DATE_MACRO_OPS] : QB_OPS;
+          const ops = isDate ? [...QB_OPS, ...DataLaVistaCore.DATE_MACRO_OPS] : QB_OPS;
           // A date macro has no free-text value; only NULL/NOTNULL/macros hide the input
-          const isMacro = DATE_MACRO_VALS.has(c.op);
-          const macroMeta = DATE_MACRO_OPS.find(o => o.val === c.op);
+          const isMacro = DataLaVistaCore.DATE_MACRO_VALS.has(c.op);
+          const macroMeta = DataLaVistaCore.DATE_MACRO_OPS.find(o => o.val === c.op);
           const needsValue = c.op !== 'NULL' && c.op !== 'NOTNULL' && !(isMacro && !macroMeta?.hasInput);
           const valPlaceholder = isMacro && macroMeta?.hasInput ? 'e.g. 3' : 'value';
 
@@ -562,21 +562,21 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           row.innerHTML = `
       ${i === 0
               ? `<span class="qb-where-badge">WHERE</span>`
-              : `<select class="form-input qb-conj-select" onchange="state.basicQB.conditions[${i}].conj=this.value; rebuildBasicSQL()">
+              : `<select class="form-input qb-conj-select" onchange="DataLaVistaState.basicQB.conditions[${i}].conj=this.value; rebuildBasicSQL()">
             <option ${c.conj === 'AND' ? 'selected' : ''}>AND</option>
             <option ${c.conj === 'OR' ? 'selected' : ''}>OR</option>
            </select>`
             }
-      <select class="form-input qb-field-select" onchange="state.basicQB.conditions[${i}].field=this.value; renderBasicConditions(); rebuildBasicSQL()">
+      <select class="form-input qb-field-select" onchange="DataLaVistaState.basicQB.conditions[${i}].field=this.value; renderBasicConditions(); rebuildBasicSQL()">
         ${fields.map(f => `<option value="${f.alias}" ${f.alias === c.field ? 'selected' : ''}>${f.alias}</option>`).join('')}
       </select>
-      <select class="form-input qb-op-select" style="width:${isDate ? '150px' : '112px'} !important" onchange="state.basicQB.conditions[${i}].op=this.value; renderBasicConditions(); rebuildBasicSQL()">
+      <select class="form-input qb-op-select" style="width:${isDate ? '150px' : '112px'} !important" onchange="DataLaVistaState.basicQB.conditions[${i}].op=this.value; renderBasicConditions(); rebuildBasicSQL()">
         ${ops.map(o => `<option value="${o.val}" ${o.val === c.op ? 'selected' : ''}>${o.label}</option>`).join('')}
       </select>
       ${needsValue
               ? `<input type="${isMacro ? 'number' : 'text'}" class="form-input qb-val-input" placeholder="${valPlaceholder}"
              min="1" value="${(c.value || '').replace(/"/g, '&quot;')}"
-             oninput="state.basicQB.conditions[${i}].value=this.value; rebuildBasicSQL()"/>`
+             oninput="DataLaVistaState.basicQB.conditions[${i}].value=this.value; rebuildBasicSQL()"/>`
               : `<span class="qb-val-blank"></span>`
             }
       <button class="btn btn-ghost btn-sm btn-icon qb-remove-btn" onclick="removeBasicCondition(${i})">✕</button>
@@ -587,15 +587,15 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 
       // ── Sorts ─────────────────────────────────────────────────────────────────────
       function addBasicSort() {
-        const t = state.tables[state.basicQB.tableName];
+        const t = DataLaVistaState.tables[DataLaVistaState.basicQB.tableName];
         if (!t) return;
         const fields = t.fields.filter(f => !f.isAutoId);
-        state.basicQB.sorts.push({ field: fields[0]?.alias || '', dir: 'ASC' });
+        DataLaVistaState.basicQB.sorts.push({ field: fields[0]?.alias || '', dir: 'ASC' });
         renderBasicSorts();
       }
 
       function removeBasicSort(i) {
-        state.basicQB.sorts.splice(i, 1);
+        DataLaVistaState.basicQB.sorts.splice(i, 1);
         renderBasicSorts();
         rebuildBasicSQL();
       }
@@ -603,24 +603,24 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       function renderBasicSorts() {
         const area = document.getElementById('basic-sorts-area');
         if (!area) return;
-        const t = state.tables[state.basicQB.tableName];
+        const t = DataLaVistaState.tables[DataLaVistaState.basicQB.tableName];
         if (!t) return;
         const fields = t.fields.filter(f => !f.isAutoId);
 
         area.innerHTML = '';
-        if (!state.basicQB.sorts.length) {
+        if (!DataLaVistaState.basicQB.sorts.length) {
           area.innerHTML = '<div style="font-size:11px;color:var(--text-disabled);padding:2px 0">No sorts — click + Add</div>';
           return;
         }
 
-        state.basicQB.sorts.forEach((s, i) => {
+        DataLaVistaState.basicQB.sorts.forEach((s, i) => {
           const row = document.createElement('div');
           row.className = 'qb-sort-row';
           row.innerHTML = `
-      <select class="form-input qb-field-select" onchange="state.basicQB.sorts[${i}].field=this.value; rebuildBasicSQL()">
+      <select class="form-input qb-field-select" onchange="DataLaVistaState.basicQB.sorts[${i}].field=this.value; rebuildBasicSQL()">
         ${fields.map(f => `<option value="${f.alias}" ${f.alias === s.field ? 'selected' : ''}>${f.alias}</option>`).join('')}
       </select>
-      <select class="form-input qb-dir-select" onchange="state.basicQB.sorts[${i}].dir=this.value; rebuildBasicSQL()">
+      <select class="form-input qb-dir-select" onchange="DataLaVistaState.basicQB.sorts[${i}].dir=this.value; rebuildBasicSQL()">
         <option ${s.dir === 'ASC' ? 'selected' : ''}>ASC</option>
         <option ${s.dir === 'DESC' ? 'selected' : ''}>DESC</option>
       </select>
@@ -632,27 +632,27 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 
       // ── Rebuild SQL and push to editor ────────────────────────────────────────────
       function rebuildBasicSQL() {
-        if (state.sqlLocked) return;
+        if (DataLaVistaState.sqlLocked) return;
         const compact = buildBasicSQL(false);
         const formatted = buildBasicSQL(true);
-        state.sql = compact;
+        DataLaVistaState.sql = compact;
         if (window._cmEditor && formatted) window._cmEditor.setValue(formatted);
         hideUseInDesign();
       }
 
       // ── Group By ─────────────────────────────────────────────────────────────────
       function addBasicGroupBy() {
-        const t = state.tables[state.basicQB.tableName];
+        const t = DataLaVistaState.tables[DataLaVistaState.basicQB.tableName];
         if (!t) return;
         const fields = t.fields.filter(f => !f.isAutoId);
-        if (!state.basicQB.groupBy) state.basicQB.groupBy = [];
-        state.basicQB.groupBy.push(fields[0]?.alias || '');
+        if (!DataLaVistaState.basicQB.groupBy) DataLaVistaState.basicQB.groupBy = [];
+        DataLaVistaState.basicQB.groupBy.push(fields[0]?.alias || '');
         renderBasicGroupBy();
         rebuildBasicSQL();
       }
 
       function removeBasicGroupBy(i) {
-        state.basicQB.groupBy.splice(i, 1);
+        DataLaVistaState.basicQB.groupBy.splice(i, 1);
         renderBasicGroupBy();
         rebuildBasicSQL();
       }
@@ -660,10 +660,10 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       function renderBasicGroupBy() {
         const area = document.getElementById('basic-groupby-area');
         if (!area) return;
-        const t = state.tables[state.basicQB.tableName];
+        const t = DataLaVistaState.tables[DataLaVistaState.basicQB.tableName];
         if (!t) return;
         const fields = t.fields.filter(f => !f.isAutoId);
-        const groups = state.basicQB.groupBy || [];
+        const groups = DataLaVistaState.basicQB.groupBy || [];
 
         area.innerHTML = '';
         if (!groups.length) {
@@ -674,7 +674,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           const row = document.createElement('div');
           row.className = 'qb-sort-row';
           row.innerHTML = `
-      <select class="form-input qb-field-select" onchange="state.basicQB.groupBy[${i}]=this.value; rebuildBasicSQL()">
+      <select class="form-input qb-field-select" onchange="DataLaVistaState.basicQB.groupBy[${i}]=this.value; rebuildBasicSQL()">
         ${fields.map(f => `<option value="${f.alias}" ${f.alias === g ? 'selected' : ''}>${f.alias}</option>`).join('')}
       </select>
       <button class="btn btn-ghost btn-sm btn-icon qb-remove-btn" onclick="removeBasicGroupBy(${i})">✕</button>

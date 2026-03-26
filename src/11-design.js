@@ -25,19 +25,19 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
   // ============================================================
   function renderDesignFieldsPanel() {
     const body = document.getElementById('design-fields-body');
-    if (!state.queryColumns.length) {
+    if (!DataLaVistaState.queryColumns.length) {
       body.innerHTML = '<div class="text-muted text-sm" style="padding:12px 10px">Run a query first</div>';
       return;
     }
 
     // Ensure design transform arrays exist
-    if (!state.design.conditions) state.design.conditions = [];
-    if (!state.design.sorts)      state.design.sorts = [];
-    if (!state.design.groupBy)    state.design.groupBy = [];
-    if (!state.design.fieldAggs)  state.design.fieldAggs = {};
+    if (!DataLaVistaState.design.conditions) DataLaVistaState.design.conditions = [];
+    if (!DataLaVistaState.design.sorts)      DataLaVistaState.design.sorts = [];
+    if (!DataLaVistaState.design.groupBy)    DataLaVistaState.design.groupBy = [];
+    if (!DataLaVistaState.design.fieldAggs)  DataLaVistaState.design.fieldAggs = {};
 
-    const cols = state.queryColumns;
-    const fieldAggs = state.design.fieldAggs;
+    const cols = DataLaVistaState.queryColumns;
+    const fieldAggs = DataLaVistaState.design.fieldAggs;
 
     body.innerHTML = '';
 
@@ -49,7 +49,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 
     for (const col of cols) {
       const dt = sniffType(col);
-      const ti = FIELD_TYPE_ICONS[dt] || FIELD_TYPE_ICONS.default;
+      const ti = DataLaVistaCore.FIELD_TYPE_ICONS[dt] || DataLaVistaCore.FIELD_TYPE_ICONS.default;
       const availAggs = aggsForType(dt);
       const curAgg = fieldAggs[col] || '';
       const aggOpts = availAggs.map(a =>
@@ -120,30 +120,30 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 
   /** Returns design-transformed data if transforms are active, otherwise raw query results. */
   function getDesignData() {
-    return state.design.transformedResults || state.queryResults || [];
+    return DataLaVistaState.design.transformedResults || DataLaVistaState.queryResults || [];
   }
 
-  /** Re-runs the design-level AlaSQL transform on state.queryResults and
-   *  stores the result in state.design.transformedResults, then re-renders widgets. */
+  /** Re-runs the design-level AlaSQL transform on DataLaVistaState.queryResults and
+   *  stores the result in DataLaVistaState.design.transformedResults, then re-renders widgets. */
   function applyDesignTransforms() {
-    if (!state.queryResults || !state.queryResults.length) {
-      state.design.transformedResults = null;
+    if (!DataLaVistaState.queryResults || !DataLaVistaState.queryResults.length) {
+      DataLaVistaState.design.transformedResults = null;
       renderDesignCanvas();
       return;
     }
 
-    const cols = state.queryColumns;
-    if (!cols.length) { state.design.transformedResults = null; renderDesignCanvas(); return; }
+    const cols = DataLaVistaState.queryColumns;
+    if (!cols.length) { DataLaVistaState.design.transformedResults = null; renderDesignCanvas(); return; }
 
-    const conditions = (state.design.conditions || []).filter(c => c.field);
-    const sorts      = (state.design.sorts      || []).filter(s => s.field);
-    const groups     = state.design.groupBy || [];
-    const fieldAggs  = state.design.fieldAggs || {};
+    const conditions = (DataLaVistaState.design.conditions || []).filter(c => c.field);
+    const sorts      = (DataLaVistaState.design.sorts      || []).filter(s => s.field);
+    const groups     = DataLaVistaState.design.groupBy || [];
+    const fieldAggs  = DataLaVistaState.design.fieldAggs || {};
     const anyAgg     = cols.some(c => fieldAggs[c]);
 
     // No transforms at all → clear cache and use raw data
     if (!conditions.length && !sorts.length && !groups.length && !anyAgg) {
-      state.design.transformedResults = null;
+      DataLaVistaState.design.transformedResults = null;
       renderDesignCanvas();
       renderDesignFieldsPanel();
       return;
@@ -163,7 +163,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       const col  = `[${c.field}]`;
       if (c.op === 'NULL')    return conj + `${col} IS NULL`;
       if (c.op === 'NOTNULL') return conj + `${col} IS NOT NULL`;
-      if (DATE_MACRO_VALS.has(c.op)) {
+      if (DataLaVistaCore.DATE_MACRO_VALS.has(c.op)) {
         const expr = dateMacroToSQL(c.op, c.value, col);
         return expr ? conj + expr : conj + `${col} IS NOT NULL`;
       }
@@ -190,13 +190,13 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
     if (orderParts.length) sql += ` ORDER BY ${orderParts.join(', ')}`;
 
     try {
-      const results = alasql(sql, [state.queryResults]);
-      state.design.transformedResults = Array.isArray(results) ? results : null;
-      const rowCount = state.design.transformedResults ? state.design.transformedResults.length : 0;
+      const results = alasql(sql, [DataLaVistaState.queryResults]);
+      DataLaVistaState.design.transformedResults = Array.isArray(results) ? results : null;
+      const rowCount = DataLaVistaState.design.transformedResults ? DataLaVistaState.design.transformedResults.length : 0;
       toast(`Design transform applied — ${rowCount} rows`, 'success');
     } catch (e) {
       console.error('Design transform error:', e);
-      state.design.transformedResults = null;
+      DataLaVistaState.design.transformedResults = null;
       toast('Design transform error: ' + e.message, 'error');
     }
 
@@ -206,9 +206,9 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 
   // ── Design aggregate dropdown ─────────────────────────────────────────────
   function setDesignFieldAgg(col, agg) {
-    if (!state.design.fieldAggs) state.design.fieldAggs = {};
-    if (agg) state.design.fieldAggs[col] = agg;
-    else delete state.design.fieldAggs[col];
+    if (!DataLaVistaState.design.fieldAggs) DataLaVistaState.design.fieldAggs = {};
+    if (agg) DataLaVistaState.design.fieldAggs[col] = agg;
+    else delete DataLaVistaState.design.fieldAggs[col];
     syncDesignGroupBySection();
     // Update the select's active styling inline without full re-render
     const sel = document.querySelector(`.design-agg-select`);
@@ -218,22 +218,22 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 
   // ── Design conditions ─────────────────────────────────────────────────────
   function addDesignCondition() {
-    if (!state.queryColumns.length) return;
-    if (!state.design.conditions) state.design.conditions = [];
-    state.design.conditions.push({ conj: 'AND', field: state.queryColumns[0], op: '=', value: '' });
+    if (!DataLaVistaState.queryColumns.length) return;
+    if (!DataLaVistaState.design.conditions) DataLaVistaState.design.conditions = [];
+    DataLaVistaState.design.conditions.push({ conj: 'AND', field: DataLaVistaState.queryColumns[0], op: '=', value: '' });
     renderDesignConditions();
   }
 
   function removeDesignCondition(i) {
-    state.design.conditions.splice(i, 1);
+    DataLaVistaState.design.conditions.splice(i, 1);
     renderDesignConditions();
   }
 
   function renderDesignConditions() {
     const area = document.getElementById('design-conditions-area');
     if (!area) return;
-    const cols = state.queryColumns;
-    const conds = state.design.conditions || [];
+    const cols = DataLaVistaState.queryColumns;
+    const conds = DataLaVistaState.design.conditions || [];
 
     area.innerHTML = '';
     if (!conds.length) {
@@ -246,9 +246,9 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
     conds.forEach((c, i) => {
       const dt = sniffType(c.field);
       const isDate = dt === 'date';
-      const ops = isDate ? [...QB_OPS, ...DATE_MACRO_OPS] : QB_OPS;
-      const isMacro = DATE_MACRO_VALS.has(c.op);
-      const macroMeta = DATE_MACRO_OPS.find(o => o.val === c.op);
+      const ops = isDate ? [...QB_OPS, ...DataLaVistaCore.DATE_MACRO_OPS] : QB_OPS;
+      const isMacro = DataLaVistaCore.DATE_MACRO_VALS.has(c.op);
+      const macroMeta = DataLaVistaCore.DATE_MACRO_OPS.find(o => o.val === c.op);
       const needsValue = c.op !== 'NULL' && c.op !== 'NOTNULL' && !(isMacro && !macroMeta?.hasInput);
       const valPlaceholder = isMacro && macroMeta?.hasInput ? 'e.g. 3' : 'value';
 
@@ -257,23 +257,23 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       row.innerHTML = `
         ${i === 0
           ? `<span class="qb-where-badge">WHERE</span>`
-          : `<select class="form-input qb-conj-select" onchange="state.design.conditions[${i}].conj=this.value">
+          : `<select class="form-input qb-conj-select" onchange="DataLaVistaState.design.conditions[${i}].conj=this.value">
                <option ${c.conj==='AND'?'selected':''}>AND</option>
                <option ${c.conj==='OR'?'selected':''}>OR</option>
              </select>`}
         <select class="form-input qb-field-select"
-          onchange="state.design.conditions[${i}].field=this.value; renderDesignConditions()">
+          onchange="DataLaVistaState.design.conditions[${i}].field=this.value; renderDesignConditions()">
           ${cols.map(f=>`<option value="${f}" ${f===c.field?'selected':''}>${f}</option>`).join('')}
         </select>
         <select class="form-input qb-op-select" style="width:${isDate?'150px':'112px'}!important"
-          onchange="state.design.conditions[${i}].op=this.value; renderDesignConditions()">
+          onchange="DataLaVistaState.design.conditions[${i}].op=this.value; renderDesignConditions()">
           ${ops.map(o=>`<option value="${o.val}" ${o.val===c.op?'selected':''}>${o.label}</option>`).join('')}
         </select>
         ${needsValue
           ? `<input type="${isMacro?'number':'text'}" class="form-input qb-val-input"
                placeholder="${valPlaceholder}" min="1"
                value="${(c.value||'').replace(/"/g,'&quot;')}"
-               oninput="state.design.conditions[${i}].value=this.value"/>`
+               oninput="DataLaVistaState.design.conditions[${i}].value=this.value"/>`
           : `<span class="qb-val-blank"></span>`}
         <button class="btn btn-ghost btn-sm btn-icon qb-remove-btn" onclick="removeDesignCondition(${i})">✕</button>
       `;
@@ -283,22 +283,22 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 
   // ── Design sorts ──────────────────────────────────────────────────────────
   function addDesignSort() {
-    if (!state.queryColumns.length) return;
-    if (!state.design.sorts) state.design.sorts = [];
-    state.design.sorts.push({ field: state.queryColumns[0], dir: 'ASC' });
+    if (!DataLaVistaState.queryColumns.length) return;
+    if (!DataLaVistaState.design.sorts) DataLaVistaState.design.sorts = [];
+    DataLaVistaState.design.sorts.push({ field: DataLaVistaState.queryColumns[0], dir: 'ASC' });
     renderDesignSorts();
   }
 
   function removeDesignSort(i) {
-    state.design.sorts.splice(i, 1);
+    DataLaVistaState.design.sorts.splice(i, 1);
     renderDesignSorts();
   }
 
   function renderDesignSorts() {
     const area = document.getElementById('design-sorts-area');
     if (!area) return;
-    const cols = state.queryColumns;
-    const sorts = state.design.sorts || [];
+    const cols = DataLaVistaState.queryColumns;
+    const sorts = DataLaVistaState.design.sorts || [];
 
     area.innerHTML = '';
     if (!sorts.length) {
@@ -310,10 +310,10 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       const row = document.createElement('div');
       row.className = 'qb-sort-row';
       row.innerHTML = `
-        <select class="form-input qb-field-select" onchange="state.design.sorts[${i}].field=this.value">
+        <select class="form-input qb-field-select" onchange="DataLaVistaState.design.sorts[${i}].field=this.value">
           ${cols.map(f=>`<option value="${f}" ${f===s.field?'selected':''}>${f}</option>`).join('')}
         </select>
-        <select class="form-input qb-dir-select" onchange="state.design.sorts[${i}].dir=this.value">
+        <select class="form-input qb-dir-select" onchange="DataLaVistaState.design.sorts[${i}].dir=this.value">
           <option ${s.dir==='ASC'?'selected':''}>ASC</option>
           <option ${s.dir==='DESC'?'selected':''}>DESC</option>
         </select>
@@ -325,22 +325,22 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 
   // ── Design group by ───────────────────────────────────────────────────────
   function addDesignGroupBy() {
-    if (!state.queryColumns.length) return;
-    if (!state.design.groupBy) state.design.groupBy = [];
-    state.design.groupBy.push(state.queryColumns[0]);
+    if (!DataLaVistaState.queryColumns.length) return;
+    if (!DataLaVistaState.design.groupBy) DataLaVistaState.design.groupBy = [];
+    DataLaVistaState.design.groupBy.push(DataLaVistaState.queryColumns[0]);
     syncDesignGroupBySection();
   }
 
   function removeDesignGroupBy(i) {
-    state.design.groupBy.splice(i, 1);
+    DataLaVistaState.design.groupBy.splice(i, 1);
     syncDesignGroupBySection();
   }
 
   function renderDesignGroupBy() {
     const area = document.getElementById('design-groupby-area');
     if (!area) return;
-    const cols = state.queryColumns;
-    const groups = state.design.groupBy || [];
+    const cols = DataLaVistaState.queryColumns;
+    const groups = DataLaVistaState.design.groupBy || [];
 
     area.innerHTML = '';
     if (!groups.length) {
@@ -352,7 +352,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       const row = document.createElement('div');
       row.className = 'qb-sort-row';
       row.innerHTML = `
-        <select class="form-input qb-field-select" onchange="state.design.groupBy[${i}]=this.value">
+        <select class="form-input qb-field-select" onchange="DataLaVistaState.design.groupBy[${i}]=this.value">
           ${cols.map(f=>`<option value="${f}" ${f===g?'selected':''}>${f}</option>`).join('')}
         </select>
         <button class="btn btn-ghost btn-sm btn-icon qb-remove-btn" onclick="removeDesignGroupBy(${i})">✕</button>
@@ -363,7 +363,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 
   /** Shows/hides the manual GROUP BY add-button when aggregates are active (auto-group then). */
   function syncDesignGroupBySection() {
-    const anyAgg = state.queryColumns.some(c => (state.design.fieldAggs || {})[c]);
+    const anyAgg = DataLaVistaState.queryColumns.some(c => (DataLaVistaState.design.fieldAggs || {})[c]);
     const label  = document.getElementById('design-groupby-label');
     const addBtn = document.getElementById('design-groupby-add-btn');
     if (label)  label.textContent = anyAgg ? 'GROUP BY (auto)' : 'GROUP BY';
@@ -371,7 +371,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
     if (anyAgg) {
       const area = document.getElementById('design-groupby-area');
       if (area) {
-        const nonAgg = state.queryColumns.filter(c => !(state.design.fieldAggs || {})[c]);
+        const nonAgg = DataLaVistaState.queryColumns.filter(c => !(DataLaVistaState.design.fieldAggs || {})[c]);
         area.innerHTML = nonAgg.length
           ? `<div style="font-size:11px;color:var(--text-disabled);padding:2px 0">Auto: ${nonAgg.join(', ')}</div>`
           : `<div style="font-size:11px;color:var(--text-disabled);padding:2px 0">All fields aggregated — no GROUP BY needed</div>`;
@@ -439,12 +439,12 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         if(data.type === 'result-field' || data.type === 'field') {
           switch (data.dataType) {
             case 'number':
-              addWidgetToCanvas('bar', [...(state.queryColumns.filter(c => c !== data.field && sniffType(c) === 'text')[0] || data.field), data.field], null);
+              addWidgetToCanvas('bar', [...(DataLaVistaState.queryColumns.filter(c => c !== data.field && sniffType(c) === 'text')[0] || data.field), data.field], null);
               break;
             case 'date':
-              addWidgetToCanvas('line', [data.field, ...state.queryColumns.filter(c => c !== data.field && sniffType(c) === 'number')], null); break;
+              addWidgetToCanvas('line', [data.field, ...DataLaVistaState.queryColumns.filter(c => c !== data.field && sniffType(c) === 'number')], null); break;
             case 'boolean':
-              addWidgetToCanvas('pie', [data.field, ...state.queryColumns.filter(c => c !== data.field && sniffType(c) === 'number')], null); break;
+              addWidgetToCanvas('pie', [data.field, ...DataLaVistaState.queryColumns.filter(c => c !== data.field && sniffType(c) === 'number')], null); break;
             default:
               addWidgetToCanvas('table', [data.field], null);
           }
@@ -463,8 +463,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       }
 
       function addFilterToBar(field) {
-        if (state.design.filters.find(f => f.field === field)) { toast('Filter for ' + field + ' already added', 'warning'); return; }
-        state.design.filters.push({ field, label: field, position: 'bar' });
+        if (DataLaVistaState.design.filters.find(f => f.field === field)) { toast('Filter for ' + field + ' already added', 'warning'); return; }
+        DataLaVistaState.design.filters.push({ field, label: field, position: 'bar' });
         renderFilterBar();
       }
 
@@ -476,9 +476,9 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           title: getDefaultTitle(widgetType),
           widthPct: 45,
           heightVh: 30,
-          fields: fields || (state.queryColumns.length ? (widgetType === 'kpi' ? [state.queryColumns[0]] : state.queryColumns.slice(0, 8)) : []),
-          xField: (fields && fields.length>0) ? fields[0] : state.queryColumns[0] || '', // TODO: guess x and y based on dataType
-          yField: (fields && fields.length>1) ? fields[1] : state.queryColumns[1] || '',
+          fields: fields || (DataLaVistaState.queryColumns.length ? (widgetType === 'kpi' ? [DataLaVistaState.queryColumns[0]] : DataLaVistaState.queryColumns.slice(0, 8)) : []),
+          xField: (fields && fields.length>0) ? fields[0] : DataLaVistaState.queryColumns[0] || '', // TODO: guess x and y based on dataType
+          yField: (fields && fields.length>1) ? fields[1] : DataLaVistaState.queryColumns[1] || '',
           aggregation: '',
           fillColor: '#0078d4',
           borderColor: '#edebe9',
@@ -490,11 +490,11 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           filters: []
         };
 
-        if (tableName && state.tables[tableName]) {
-          widget.fields = state.tables[tableName].fields.filter(f => !f.isAutoId).map(f => f.alias).slice(0, 8);
+        if (tableName && DataLaVistaState.tables[tableName]) {
+          widget.fields = DataLaVistaState.tables[tableName].fields.filter(f => !f.isAutoId).map(f => f.alias).slice(0, 8);
         }
 
-        state.design.widgets.push(widget);
+        DataLaVistaState.design.widgets.push(widget);
         renderDesignCanvas();
         selectWidget(id);
         document.getElementById('canvas-empty-hint').style.display = 'none';
@@ -516,25 +516,25 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         canvas.querySelectorAll('.widget').forEach(w => w.remove());
 
         // Destroy old chart instances
-        for (const [id, chart] of Object.entries(state.charts)) {
+        for (const [id, chart] of Object.entries(DataLaVistaState.charts)) {
           try { chart.dispose(); } catch (e) { }
         }
-        state.charts = {};
+        DataLaVistaState.charts = {};
 
-        if (!state.design.widgets.length) {
+        if (!DataLaVistaState.design.widgets.length) {
           hint.style.display = 'flex';
           return;
         }
         hint.style.display = 'none';
 
-        for (const w of state.design.widgets) {
+        for (const w of DataLaVistaState.design.widgets) {
           const el = createWidgetElement(w);
           canvas.appendChild(el);
         }
 
         // Render charts after DOM
         requestAnimationFrame(() => {
-          for (const w of state.design.widgets) {
+          for (const w of DataLaVistaState.design.widgets) {
             if (['bar', 'line', 'pie', 'scatter'].includes(w.type)) {
               renderChart(w);
             }
@@ -685,7 +685,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         if (!tableData || !tableData.length) {
           return '<div class="text-muted text-sm" style="padding:12px">No data — run a query first</div>';
         }
-        const allCols = tableData.length ? Object.keys(tableData[0]) : state.queryColumns;
+        const allCols = tableData.length ? Object.keys(tableData[0]) : DataLaVistaState.queryColumns;
         const cols = w.fields.filter(f => allCols.includes(f));
         if (!cols.length) return '<div class="text-muted text-sm" style="padding:12px">No fields selected</div>';
         const rows = tableData;
@@ -700,10 +700,10 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       function renderChart(w) {
         const chartEl = document.getElementById('chart-' + w.id);
         if (!chartEl) return;
-        if (state.charts[w.id]) { try { state.charts[w.id].dispose(); } catch (e) { } }
+        if (DataLaVistaState.charts[w.id]) { try { DataLaVistaState.charts[w.id].dispose(); } catch (e) { } }
 
         const chart = echarts.init(chartEl);
-        state.charts[w.id] = chart;
+        DataLaVistaState.charts[w.id] = chart;
 
         const chartData = getDesignData();
         if (!chartData || !chartData.length) {
@@ -711,7 +711,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           return;
         }
 
-        const allChartCols = chartData.length ? Object.keys(chartData[0]) : state.queryColumns;
+        const allChartCols = chartData.length ? Object.keys(chartData[0]) : DataLaVistaState.queryColumns;
         const xField = w.xField || (allChartCols[0] || '');
         const yField = w.yField || (allChartCols[1] || allChartCols[0] || '');
         const data = chartData;
@@ -759,7 +759,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 
       // Resize charts on window resize
       window.addEventListener('resize', () => {
-        for (const chart of Object.values(state.charts)) {
+        for (const chart of Object.values(DataLaVistaState.charts)) {
           try { chart.resize(); } catch (e) { }
         }
       });
@@ -767,7 +767,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       function startWidgetResize(e, wid, el) {
         e.preventDefault();
         e.stopPropagation();
-        const w = state.design.widgets.find(x => x.id === wid);
+        const w = DataLaVistaState.design.widgets.find(x => x.id === wid);
         if (!w) return;
         const startX = e.clientX, startY = e.clientY;
         const startW = el.offsetWidth, startH = el.offsetHeight;
@@ -779,7 +779,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           w.heightVh = Math.max(10, (startH + dy) / window.innerHeight * 100);
           el.style.width = w.widthPct + '%';
           el.style.height = w.heightVh + 'vh';
-          if (state.charts[wid]) state.charts[wid].resize();
+          if (DataLaVistaState.charts[wid]) DataLaVistaState.charts[wid].resize();
         };
         const onUp = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp); };
         document.addEventListener('mousemove', onMove);
@@ -787,29 +787,29 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       }
 
       function selectWidget(wid) {
-        state.currentWidgetId = wid;
+        DataLaVistaState.currentWidgetId = wid;
         document.querySelectorAll('.widget').forEach(w => w.classList.remove('selected'));
         document.getElementById('widget-' + wid)?.classList.add('selected');
         renderWidgetProperties(wid);
       }
 
       function deleteWidget(wid) {
-        state.design.widgets = state.design.widgets.filter(w => w.id !== wid);
-        if (state.charts[wid]) { try { state.charts[wid].dispose(); } catch (e) { } delete state.charts[wid]; }
+        DataLaVistaState.design.widgets = DataLaVistaState.design.widgets.filter(w => w.id !== wid);
+        if (DataLaVistaState.charts[wid]) { try { DataLaVistaState.charts[wid].dispose(); } catch (e) { } delete DataLaVistaState.charts[wid]; }
         document.getElementById('widget-' + wid)?.remove();
-        if (state.currentWidgetId === wid) {
-          state.currentWidgetId = null;
+        if (DataLaVistaState.currentWidgetId === wid) {
+          DataLaVistaState.currentWidgetId = null;
           document.getElementById('props-section').innerHTML = '<div class="props-empty">Click a widget to edit its properties</div>';
         }
-        if (!state.design.widgets.length) document.getElementById('canvas-empty-hint').style.display = 'flex';
+        if (!DataLaVistaState.design.widgets.length) document.getElementById('canvas-empty-hint').style.display = 'flex';
       }
 
       function moveWidget(wid, dir) {
-        const idx = state.design.widgets.findIndex(w => w.id === wid);
+        const idx = DataLaVistaState.design.widgets.findIndex(w => w.id === wid);
         if (idx < 0) return;
         const newIdx = idx + dir;
-        if (newIdx < 0 || newIdx >= state.design.widgets.length) return;
-        [state.design.widgets[idx], state.design.widgets[newIdx]] = [state.design.widgets[newIdx], state.design.widgets[idx]];
+        if (newIdx < 0 || newIdx >= DataLaVistaState.design.widgets.length) return;
+        [DataLaVistaState.design.widgets[idx], DataLaVistaState.design.widgets[newIdx]] = [DataLaVistaState.design.widgets[newIdx], DataLaVistaState.design.widgets[idx]];
         renderDesignCanvas();
         selectWidget(wid);
       }
@@ -818,7 +818,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       // WIDGET PROPERTIES
       // ============================================================
       function renderWidgetProperties(wid) {
-        const w = state.design.widgets.find(x => x.id === wid);
+        const w = DataLaVistaState.design.widgets.find(x => x.id === wid);
         if (!w) return;
         const section = document.getElementById('props-section');
 
@@ -891,20 +891,20 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       <div class="props-row">
         <label>X / Label</label>
         <select class="form-input" onchange="updateWidgetProp('${wid}','xField',this.value)">
-          ${state.queryColumns.map(c => `<option ${c === w.xField ? 'selected' : ''}>${c}</option>`).join('')}
+          ${DataLaVistaState.queryColumns.map(c => `<option ${c === w.xField ? 'selected' : ''}>${c}</option>`).join('')}
         </select>
       </div>
       <div class="props-row">
         <label>Y / Value</label>
         <select class="form-input" onchange="updateWidgetProp('${wid}','yField',this.value)">
-          ${state.queryColumns.map(c => `<option ${c === w.yField ? 'selected' : ''}>${c}</option>`).join('')}
+          ${DataLaVistaState.queryColumns.map(c => `<option ${c === w.yField ? 'selected' : ''}>${c}</option>`).join('')}
         </select>
       </div>` : ''}
       ${isKPI ? `
       <div class="props-row">
         <label>Field</label>
         <select class="form-input" onchange="updateWidgetProp('${wid}','fields',[this.value])">
-          ${state.queryColumns.map(c => `<option ${w.fields[0] === c ? 'selected' : ''}>${c}</option>`).join('')}
+          ${DataLaVistaState.queryColumns.map(c => `<option ${w.fields[0] === c ? 'selected' : ''}>${c}</option>`).join('')}
         </select>
       </div>
       <div class="props-row">
@@ -943,7 +943,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       }
 
       function updateWidgetProp(wid, prop, value) {
-        const w = state.design.widgets.find(x => x.id === wid);
+        const w = DataLaVistaState.design.widgets.find(x => x.id === wid);
         if (!w) return;
         w[prop] = value;
         // Live-update element
@@ -951,7 +951,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         if (!el) return;
         if (prop === 'title') el.querySelector('.widget-title').textContent = value;
         if (prop === 'widthPct') el.style.width = value + '%';
-        if (prop === 'heightVh') { el.style.height = value + 'vh'; if (state.charts[wid]) state.charts[wid].resize(); }
+        if (prop === 'heightVh') { el.style.height = value + 'vh'; if (DataLaVistaState.charts[wid]) DataLaVistaState.charts[wid].resize(); }
         if (prop === 'borderColor') el.style.borderColor = value;
         if (prop === 'borderSize') el.style.borderWidth = value + 'px';
         if (prop === 'textContent' && w.type === 'text') el.querySelector('.text-widget').innerHTML = value;
@@ -962,7 +962,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       }
 
       function changeWidgetType(wid, newType) {
-        const w = state.design.widgets.find(x => x.id === wid);
+        const w = DataLaVistaState.design.widgets.find(x => x.id === wid);
         if (!w) return;
         w.type = newType;
         // Refresh the widget
@@ -970,14 +970,14 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         if (!el) return;
         const content = el.querySelector('.widget-content');
         content.innerHTML = getWidgetContentHTML(w);
-        if (state.charts[wid]) { try { state.charts[wid].dispose(); } catch (e) { } delete state.charts[wid]; }
+        if (DataLaVistaState.charts[wid]) { try { DataLaVistaState.charts[wid].dispose(); } catch (e) { } delete DataLaVistaState.charts[wid]; }
         if (['bar', 'line', 'pie', 'scatter'].includes(newType)) {
           requestAnimationFrame(() => renderChart(w));
         }
       }
 
       function removeWidgetField(wid, idx) {
-        const w = state.design.widgets.find(x => x.id === wid);
+        const w = DataLaVistaState.design.widgets.find(x => x.id === wid);
         if (!w) return;
         w.fields.splice(idx, 1);
         renderWidgetProperties(wid);
@@ -985,7 +985,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       }
 
       function removeWidgetFilter(wid, idx) {
-        const w = state.design.widgets.find(x => x.id === wid);
+        const w = DataLaVistaState.design.widgets.find(x => x.id === wid);
         if (!w) return;
         w.filters.splice(idx, 1);
         renderWidgetProperties(wid);
@@ -998,7 +998,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         if (!data) return;
         const field = data.field || data.alias;
         if (field) {
-          const w = state.design.widgets.find(x => x.id === wid);
+          const w = DataLaVistaState.design.widgets.find(x => x.id === wid);
           if (w && !w.fields.includes(field)) { w.fields.push(field); renderWidgetProperties(wid); updateWidgetContent(wid); }
         }
       }
@@ -1010,13 +1010,13 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         if (!data) return;
         const field = data.field || data.alias;
         if (field) {
-          const w = state.design.widgets.find(x => x.id === wid);
+          const w = DataLaVistaState.design.widgets.find(x => x.id === wid);
           if (w && !w.filters.find(f => f.field === field)) { w.filters.push({ field, position: 'widget' }); renderWidgetProperties(wid); }
         }
       }
 
       function updateWidgetContent(wid) {
-        const w = state.design.widgets.find(x => x.id === wid);
+        const w = DataLaVistaState.design.widgets.find(x => x.id === wid);
         if (!w) return;
         const el = document.getElementById('wcontent-' + wid);
         if (!el) return;
@@ -1032,15 +1032,15 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         if (!bar) return;
         bar.innerHTML = '';
 
-        if (state.design.filters.length === 0) {
+        if (DataLaVistaState.design.filters.length === 0) {
           bar.innerHTML = '<div class="text-muted text-sm" style="padding:4px 8px;">Drag fields here to filter dashboard</div>';
           return;
         }
 
-        state.design.filters.forEach(f => {
+        DataLaVistaState.design.filters.forEach(f => {
           let uniqueVals = [];
-          if (state.queryResults) {
-            uniqueVals = [...new Set(state.queryResults.map(r => r[f.field]).filter(v => v !== null && v !== undefined))].sort();
+          if (DataLaVistaState.queryResults) {
+            uniqueVals = [...new Set(DataLaVistaState.queryResults.map(r => r[f.field]).filter(v => v !== null && v !== undefined))].sort();
           }
 
           const wrap = document.createElement('div');
@@ -1065,10 +1065,10 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           sel.innerHTML = `<option value="(All)">(All)</option>` +
             uniqueVals.map(v => `<option value="${v}">${v}</option>`).join('');
 
-          sel.value = state.previewFilters[f.field] || '(All)';
+          sel.value = DataLaVistaState.previewFilters[f.field] || '(All)';
           sel.onchange = (e) => {
-            if (e.target.value === '(All)') delete state.previewFilters[f.field];
-            else state.previewFilters[f.field] = e.target.value;
+            if (e.target.value === '(All)') delete DataLaVistaState.previewFilters[f.field];
+            else DataLaVistaState.previewFilters[f.field] = e.target.value;
             refreshWidgets();
           };
 
@@ -1084,25 +1084,25 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       }
 
       function removeFilterFromBar(field) {
-        state.design.filters = state.design.filters.filter(f => f.field !== field);
+        DataLaVistaState.design.filters = DataLaVistaState.design.filters.filter(f => f.field !== field);
         renderFilterBar();
       }
 
       function applyPreviewFilter(field, value) {
-        if (value === '(All)') delete state.previewFilters[field];
-        else state.previewFilters[field] = value;
+        if (value === '(All)') delete DataLaVistaState.previewFilters[field];
+        else DataLaVistaState.previewFilters[field] = value;
         refreshWidgets();
       }
 
       function refreshWidgets() {
-        let filtered = state.queryResults || [];
-        for (const [field, value] of Object.entries(state.previewFilters)) {
+        let filtered = DataLaVistaState.queryResults || [];
+        for (const [field, value] of Object.entries(DataLaVistaState.previewFilters)) {
           // Basic equals filter matching
           filtered = filtered.filter(r => String(r[field]) === String(value));
         }
 
         // Re-render chart/KPI elements based on filtered subset
-        state.design.widgets.forEach(w => {
+        DataLaVistaState.design.widgets.forEach(w => {
           const el = document.getElementById('wcontent-' + w.id);
           if (el) {
             el.innerHTML = getWidgetContentHTML(w, filtered);

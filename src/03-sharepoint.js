@@ -26,8 +26,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
     // Rule 1: Use application/json instead of verbose
     async function spFetch(url, dsName) {
       const headers = { 'Accept': 'application/json' };
-      if (state.dataSources[dsName] && state.dataSources[dsName].auth === 'token' && state.dataSources[dsName].token) {
-        headers['Authorization'] = 'Bearer ' + state.dataSources[dsName].token;
+      if (DataLaVistaState.dataSources[dsName] && DataLaVistaState.dataSources[dsName].auth === 'token' && DataLaVistaState.dataSources[dsName].token) {
+        headers['Authorization'] = 'Bearer ' + DataLaVistaState.dataSources[dsName].token;
       }
       const res = await fetch(url, { headers, credentials: 'include' });
       if (!res.ok) {
@@ -53,7 +53,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
     function generateDataSourceName(type, preferredBase) {
       const bases = { sharepoint: 'SP', json: 'JSON', csv: 'CSV' };
       const base = normalizeDataSourceName(preferredBase) || bases[type] || 'Table';
-      const existing = Object.keys(state.dataSources);
+      const existing = Object.keys(DataLaVistaState.dataSources);
       if (!existing.includes(base)) return base;
       for (let i = 1; i < 100; i++) {
         const candidate = (base + i).slice(0, 6);
@@ -66,14 +66,14 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
     function updateConnectButton() {
       const btn = document.getElementById('btn-connect');
       if (!btn) return;
-      const count = Object.keys(state.dataSources).length;
+      const count = Object.keys(DataLaVistaState.dataSources).length;
       btn.innerHTML = count > 0 ? '➕ Get More Data' : '⚡ Connect + Load';
       btn.disabled = false;
     }
 
     /** Return the data source internal key for a given table key. */
     function getDataSourceForTable(tableKey) {
-      for (const [dsName, ds] of Object.entries(state.dataSources)) {
+      for (const [dsName, ds] of Object.entries(DataLaVistaState.dataSources)) {
         if (ds.tables && ds.tables.includes(tableKey)) return dsName;
       }
       return null;
@@ -85,9 +85,9 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
      * instead of using the raw tableKey in SQL/AlaSQL.
      */
     function getTableQueryName(tableKey) {
-      const t = state.tables[tableKey];
+      const t = DataLaVistaState.tables[tableKey];
       if (!t) return tableKey;
-      const ds = state.dataSources[t.dataSource];
+      const ds = DataLaVistaState.dataSources[t.dataSource];
       const dsAlias = (ds && ds.alias) || t.dataSource || '';
       const tAlias = t.alias || t.internalName || tableKey;
       return dsAlias ? dsAlias + '_' + tAlias : tAlias; // TODO: Check if this works after renaming a data source
@@ -99,7 +99,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
      *  — AlaSQL resolves column refs through that alias without a separate table registration.
      */
     function registerTableInAlaSQL(tableKey) {
-      const t = state.tables[tableKey];
+      const t = DataLaVistaState.tables[tableKey];
       if (!t || !t.data) return;
       alasql(`DROP TABLE IF EXISTS [${tableKey}]`);
       alasql(`CREATE TABLE [${tableKey}]`); // TODO: store table alises in alasql
@@ -275,7 +275,7 @@ async function fetchSPItemsWithRetry(siteUrl, listGuid, selectStr, expandStr, to
 // Fetch Table Data with intelligent retry and pagination logic, plus promise tracking to prevent duplicate fetches
 async function fetchTableData(tableName, fetchAll = false) {
   console.log('DEBUG: fetchTableData called for', tableName, 'fetchAll:', fetchAll);
-  const t = state.tables[tableName];
+  const t = DataLaVistaState.tables[tableName];
   if (!t) return;
   const limit = fetchAll ? 50000 : 10;
 
@@ -304,7 +304,7 @@ async function fetchTableData(tableName, fetchAll = false) {
       
       if (t.sourceType === 'sharepoint') {
         console.log('DEBUG: Fetching SharePoint data for', tableName);
-        const spSiteUrl = t.url || t.siteUrl || (state.dataSources[t.dataSource] && state.dataSources[t.dataSource].siteUrl);
+        const spSiteUrl = t.url || t.siteUrl || (DataLaVistaState.dataSources[t.dataSource] && DataLaVistaState.dataSources[t.dataSource].siteUrl);
         const baseSelect = new Set(['ID', 'Title', 'Created', 'Modified', 'Author/Id', 'Author/Title', 'Author/Name', 'Editor/Id', 'Editor/Title', 'Editor/Name']);
         const baseExpand = new Set(['Author', 'Editor']);
         
@@ -345,7 +345,7 @@ async function fetchTableData(tableName, fetchAll = false) {
         console.log('DEBUG: Done loading SharePoint list data for', tableName, '— raw data length:', rawData.length);
       } else if(t.sourceType === 'json') {
         console.log('DEBUG: Fetching JSON data for', tableName);
-        const jsonUrl = t.url || (state.dataSources[t.dataSource] && state.dataSources[t.dataSource].url);
+        const jsonUrl = t.url || (DataLaVistaState.dataSources[t.dataSource] && DataLaVistaState.dataSources[t.dataSource].url);
         if (!jsonUrl) {
           console.log('DEBUG: No URL found for JSON source in', tableName, '— skipping fetch.');
           return;
@@ -359,7 +359,7 @@ async function fetchTableData(tableName, fetchAll = false) {
         rawData = extractRows(json);
       } else if(t.sourceType === 'csv') {
         console.log('DEBUG: Fetching CSV data for', tableName);
-        let csvUrl = (state.tables[tableName] && state.tables[tableName].url) || (state.dataSources[t.dataSource] && state.dataSources[t.dataSource].url);
+        let csvUrl = (DataLaVistaState.tables[tableName] && DataLaVistaState.tables[tableName].url) || (DataLaVistaState.dataSources[t.dataSource] && DataLaVistaState.dataSources[t.dataSource].url);
         csvUrl = encodeURI(csvUrl);
         console.log('DEBUG: CSV URL resolved to: ' + csvUrl);
         if (!csvUrl) {
@@ -383,9 +383,9 @@ async function fetchTableData(tableName, fetchAll = false) {
         loadCSVData(t.dataSource||'CSV', tableName||'', fileName, csvUrl, false, text); // Create new DS for this CSV file, with isUploadedFile=false
         console.log('DEBUG: fetchTableData -> loadCSVData completed, now extracting raw data from state for', tableName);
 
-        rawData = state.tables[tableName] && state.tables[tableName].data ? state.tables[tableName].data : [];
+        rawData = DataLaVistaState.tables[tableName] && DataLaVistaState.tables[tableName].data ? DataLaVistaState.tables[tableName].data : [];
       } else if(t.sourceType === 'api') {
-        const apiUrl = t.url || (state.dataSources[t.dataSource] && state.dataSources[t.dataSource].url);
+        const apiUrl = t.url || (DataLaVistaState.dataSources[t.dataSource] && DataLaVistaState.dataSources[t.dataSource].url);
         // TODO: Add support for API sources (fetch with headers, auth, etc) — currently just a placeholder
       } else {
         console.log('DEBUG: Unsupported source type for', tableName, '— skipping fetch.');
@@ -431,18 +431,51 @@ async function fetchTableData(tableName, fetchAll = false) {
   return t.fetchPromise;
 }
 
-// Rule 4 & 5: Structure guessing fallback (For JSON, CSV, API)
+
+// TODO: Use this data type sample testing in JSON and Excel sources too.
 async function deriveStructureFromSample(dataArray) {
   if (!dataArray || dataArray.length === 0) return [];
-  const sample = dataArray.slice(0, 2);
+
+  const sample = dataArray.slice(0, 10);
   const keys = new Set();
   sample.forEach(row => Object.keys(row).forEach(k => keys.add(k)));
 
-  return Array.from(keys).map(k => ({
-    InternalName: k,
-    Title: k,
-    TypeAsString: typeof sample[0][k]
-  }));
+  // Simple regex for common date formats: MM/DD/YYYY, YYYY-MM-DD, etc.
+  const dateRegex = /^\d{1,4}[-/]\d{1,2}[-/]\d{1,4}(?:\s\d{1,2}:\d{2}(?::\d{2})?)?$/;
+
+  return Array.from(keys).map(k => {
+    const firstValidRow = sample.find(row => row[k] !== null && row[k] !== undefined && row[k] !== '');
+    const val = firstValidRow ? firstValidRow[k] : null;
+    
+    let detectedType = 'text';
+    const jsType = typeof val;
+
+    if (jsType === 'number') {
+      detectedType = 'number';
+    } else if (jsType === 'boolean') {
+      detectedType = 'boolean';
+    } else if (val instanceof Date) {
+      detectedType = 'date';
+    } else if (jsType === 'string' && dateRegex.test(val.trim())) {
+      // If it looks like a date string, try parsing it to be sure
+      const d = new Date(val);
+      if (!isNaN(d.getTime())) {
+        detectedType = 'date';
+      }
+    } else if (Array.isArray(val)) {
+      detectedType = 'array';
+    } else if (jsType === 'object' && val !== null) {
+      detectedType = 'lookup';
+    }
+
+    return {
+      internalName: k.replace(/[^A-Za-z0-9_]/g, '_').replace('__', '_'),
+      displayName: toPascalCase(k) || k,
+      alias: toPascalCase(k) || k,
+      type: detectedType,
+      displayType: detectedType
+    };
+  });
 }
 
 

@@ -214,19 +214,7 @@ function validateURL(url) {
   return parsed;
 }
 
-// ─── Safe JSON Parse ──────────────────────────────────────────────────────────
-// Uses a reviver to strip dangerous keys by their actual key name,
-// NOT by string-searching the serialized text (avoids false positives
-// on values like "Senior Constructor Engineer" or "my_prototype_field").
 
-function safeJSONParse(text) {
-  return JSON.parse(text, (key, value) => {
-    if (key === "__proto__" || key === "constructor" || key === "prototype") {
-      return undefined; // Drop the key silently
-    }
-    return value;
-  });
-}
 
 // ─── Fetch Helper ─────────────────────────────────────────────────────────────
 // - AbortController-backed timeout
@@ -272,12 +260,11 @@ async function fetchWithTimeout(url, opts = {}, ms = FETCH_TIMEOUT_MS, returnTex
   }
 }
 
-// ─── JSONP Helper ─────────────────────────────────────────────────────────────
+    
 // - Non-guessable callback name (timestamp + random)
 // - settled flag prevents double resolution
 // - Always cleans up script tag and window callback
 // - Runs safeJSONParse via stringify round-trip to strip pollution keys
-
 function tryJSONP(url) {
   return new Promise((resolve, reject) => {
     const callbackName =
@@ -340,8 +327,8 @@ async function loadSharePointListsSource(siteUrl, dsName, newAuth='current', new
   setStatus('⏳ Loading SharePoint lists from ' + siteUrl + '...');
 
   // dsName is the immutable internal key; alias = user-entered name from connect popup
-  if (!state.dataSources[dsName]) {
-    state.dataSources[dsName] = {
+  if (!DataLaVistaState.dataSources[dsName]) {
+    DataLaVistaState.dataSources[dsName] = {
       type: 'sharepoint',
       url: siteUrl,
       siteUrl: siteUrl,
@@ -376,7 +363,7 @@ async function loadSharePointListsSource(siteUrl, dsName, newAuth='current', new
       // User-facing alias: PascalCase of Title (no "List" suffix)
       const tableAlias = toPascalCase(list.Title || entityTypeName);
 
-      state.tables[tableKey] = {
+      DataLaVistaState.tables[tableKey] = {
         internalName: entityTypeName,
         displayName: list.Title || tableAlias || entityTypeName,
         description: list.Description || '',
@@ -396,18 +383,19 @@ async function loadSharePointListsSource(siteUrl, dsName, newAuth='current', new
         keepRawData: false
       };
 
-      if (!state.dataSources[dsName].tables.includes(tableKey)) {
-        state.dataSources[dsName].tables.push(tableKey);
+      if (!DataLaVistaState.dataSources[dsName].tables.includes(tableKey)) {
+        DataLaVistaState.dataSources[dsName].tables.push(tableKey);
       }
       loadedCount++;
     } catch (e) {
       console.warn('[loadSharePointListsSource] Skipped list:', list.Title, e.message);
     }
   }
-  renderFieldsPanel();
+  
 
-  if(!state.reportMode) {
+  if(DataLaVistaState.reportMode !== 'view') {
     setStatus(`✅ Loaded ${loadedCount} lists from SharePoint (${dsName})`);
+    renderFieldsPanel();
     setupCodeMirror();
     toast(`Connected to SharePoint as "${dsName}" — ${loadedCount} lists`, 'success');
   }
@@ -468,15 +456,7 @@ async function fetchJSONWithFallbacks(url) {
 }
 
 // Fetch raw CSV text from a URL trying multiple strategies.
-// Skips JSONP (JSON-only) and skips external proxies for same-origin URLs.
 async function fetchCSVWithFallbacks(url) {
-  if (window.location.protocol === 'file:') {
-    throw new Error(
-      'Cannot fetch external URLs when running from a local file. ' +
-      'Open the page from a web server instead (e.g. a local server, or host it on SharePoint).'
-    );
-  }
-
   const encodedUrl = encodeURIComponent(url);
 
   const isSameOrigin = (() => {
@@ -562,8 +542,8 @@ async function loadJSONSource(url, dsName) {
   const tableKey = dsName + '_Data'; // TODO: where is ds created for JSON url downloads?
 
   // Register data source
-  if (!state.dataSources[dsName]) {
-    state.dataSources[dsName] = {
+  if (!DataLaVistaState.dataSources[dsName]) {
+    DataLaVistaState.dataSources[dsName] = {
       alias: dsName,
       auth: null,
       description: '',
@@ -578,7 +558,7 @@ async function loadJSONSource(url, dsName) {
     };
   }
 
-  state.tables[tableKey] = {
+  DataLaVistaState.tables[tableKey] = {
     displayName: 'Data',
     alias: 'Data',
     dsAlias: dsName,
@@ -595,8 +575,8 @@ async function loadJSONSource(url, dsName) {
     itemCount: normalizedRows.length || 0
   };
 
-  if (!state.dataSources[dsName].tables.includes(tableKey)) {
-    state.dataSources[dsName].tables.push(tableKey);
+  if (!DataLaVistaState.dataSources[dsName].tables.includes(tableKey)) {
+    DataLaVistaState.dataSources[dsName].tables.push(tableKey);
   }
 
   setStatus(`✅ Loaded ${normalizedRows.length} rows from JSON`);
@@ -624,21 +604,36 @@ async function loadCSVSource(url, dsName, fileName) {
 
   // Strategy 1: alasql built-in CSV fetch+parse
   try {
-    const rows = await alasql.promise('SELECT * FROM CSV(?)', [url]);
+    let rows;
+    try { rows = await alasql.promise('SELECT * FROM CSV("' + url + '", {headers:true, columnTypes:true})'); }
+    catch (e) {
+      try { rows = await alasql.promise('SELECT * FROM CSV("' + url + '", {headers:false, columnTypes:true})'); }
+      catch (e2) { rows = await alasql.promise('SELECT * FROM CSV("' + url + '")'); }
+    }
     if (rows && rows.length > 0) {
       console.log('[DLV CSV] alasql strategy succeeded:', rows.length, 'rows');
-      // alasql returns parsed row objects — register directly, skipping text parsing
+      
+      // alasql returns parsed row objects — register directly, skipping text parsing      
       const headers = Object.keys(rows[0]);
       const tableKey = (dsName + '_Data').replace(/[^A-Za-z0-9_]/g, '_').replace('__', '_');
-      const fields = headers.map(h => ({
-        internalName: h.replace(/[^A-Za-z0-9_]/g, '_').replace('__', '_'),
-        displayName: toPascalCase(h) || h,
-        alias: toPascalCase(h) || h,
-        type: 'text',
-        displayType: 'text'
-      }));
-      if (!state.dataSources[dsName]) {
-        state.dataSources[dsName] = {
+      let fields;
+      try{
+        fields = await deriveStructureFromSample(rows);
+        console.log('DEBUG: Derived fields from sample using deriveStructureFromSample:', fields);
+      }
+      catch(e) {
+        console.warn('[DLV CSV] deriveStructureFromSample failed, falling back to basic text fields. ', e.message);
+        fields = headers.map(h => ({
+          internalName: h.replace(/[^A-Za-z0-9_]/g, '_').replace('__', '_'),
+          displayName: toPascalCase(h) || h,
+          alias: toPascalCase(h) || h,
+          type: 'text',
+          displayType: 'text'
+        }));
+      }
+
+      if (!DataLaVistaState.dataSources[dsName]) {
+        DataLaVistaState.dataSources[dsName] = {
           alias: 'Data', auth: null,
           description: 'This CSV file (' + (fileName || dsName + '.csv') + ') was loaded from a URL.',
           internalName: dsName, tables: [], token: null, type: 'csv',
@@ -646,23 +641,25 @@ async function loadCSVSource(url, dsName, fileName) {
           url: url, keepRawData: false
         };
       }
-      state.tables[tableKey] = {
+      DataLaVistaState.tables[tableKey] = {
         alias: tableKey, data: rows, dataSource: dsName,
         description: 'This table was created from a CSV file (' + (fileName || dsName + '.csv') + ').',
-        displayName: 'Data', dsAlias: dsName, fields,
+        displayName: 'Data',
+        dsAlias: dsName,
+        fields: fields,
         internalName: tableKey, itemCount: rows.length,
         siteUrl: null, url: url, loaded: true,
         sourceType: 'csv', isFileUpload: false, keepRawData: false
       };
-      if (!state.dataSources[dsName].tables.includes(tableKey)) state.dataSources[dsName].tables.push(tableKey);
-      setStatus(`✅ Loaded ${rows.length} rows from CSV`);
-      if (!state.reportMode) { renderFieldsPanel(); setupCodeMirror(); }
+      if (!DataLaVistaState.dataSources[dsName].tables.includes(tableKey)) DataLaVistaState.dataSources[dsName].tables.push(tableKey);
+      setStatus(`Loaded ${rows.length} rows from CSV`, 'success');
+      if (DataLaVistaState.reportMode === 'edit') { renderFieldsPanel(); setupCodeMirror(); }
       toast(`Loaded ${rows.length} rows from CSV as "${dsName}"`, 'success');
       return;
     }
     console.warn('[DLV CSV] alasql returned empty result, falling back');
   } catch (e) {
-    console.warn('[DLV CSV] alasql strategy failed, falling back:', e.message);
+    console.warn('[DLV CSV] alasql strategy failed, falling back. ', e.message);
   }
 
   // Strategy 2: multi-strategy fetch + loadCSVData
@@ -699,8 +696,8 @@ function loadCSVData(dsName, tableKey = '', fileName = '', fileUrl = '', isFileU
   if(!tableKey) tableKey = (dsName + '_Data').replace(/[^A-Za-z0-9_]/g, '_').replace('__','_'); // Ensure tableKey is a valid identifier
 
 // Register data source
-  if (!state.dataSources[dsName]) { 
-    state.dataSources[dsName] = {
+  if (!DataLaVistaState.dataSources[dsName]) { 
+    DataLaVistaState.dataSources[dsName] = {
       alias: 'Data',
       auth: null,
       description: 'This CSV file (' + (fileName || dsName + '.csv') + ') was uploaded manually, and only the dashboard creator can refresh it.',
@@ -715,7 +712,7 @@ function loadCSVData(dsName, tableKey = '', fileName = '', fileUrl = '', isFileU
     };
   }
 
-  state.tables[tableKey] = {
+  DataLaVistaState.tables[tableKey] = {
     alias: tableKey,
     data: rows || [],
     dataSource: dsName,
@@ -733,14 +730,14 @@ function loadCSVData(dsName, tableKey = '', fileName = '', fileUrl = '', isFileU
     keepRawData: (isFileUpload) ? true : false // if loaded from file, keep raw data
   };
 
-  if (!state.dataSources[dsName].tables.includes(tableKey)) {
-    state.dataSources[dsName].tables.push(tableKey);
+  if (!DataLaVistaState.dataSources[dsName].tables.includes(tableKey)) {
+    DataLaVistaState.dataSources[dsName].tables.push(tableKey);
   }
 
   setStatus(`✅ Loaded ${rows.length} rows from CSV`);
-  if(!state.reportMode) {
-  renderFieldsPanel();
-  setupCodeMirror();
+  if(DataLaVistaState.reportMode === 'edit') {
+    renderFieldsPanel();
+    setupCodeMirror();
   }
   toast(`Loaded ${rows.length} rows from CSV as "${dsName}"`, 'success');
 }

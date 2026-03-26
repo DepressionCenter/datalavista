@@ -149,7 +149,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
     function fieldDisplayType(type) {
       if (['number'].includes(type)) return 'number';
       if (['date'].includes(type)) return 'date';
-      if (['bool'].includes(type)) return 'bool';
+      if (['bool'].includes(type)) return 'boolean';
+      if (['boolean'].includes(type)) return 'boolean';
       if (['lookup', 'lookup-multi', 'user', 'user-multi', 'taxkeyword'].includes(type)) return 'lookup';
       if (['choice', 'choice-multi'].includes(type)) return 'array';
       return 'text';
