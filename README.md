@@ -36,7 +36,10 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 # 🕶️ Data La Vista
 
 ## Description
+<div style="display: flex; justify-content: flex-end;" align="right"><a href="https://doi.org/10.5281/zenodo.19245606" title="DOI" target="_blank" style="align: right;"><img src="https://zenodo.org/badge/1177965725.svg" alt="DOI" title="DOI" align="right" /></a></div>
+
 ***🕶️ Tell your expensive BI tools: "Data la vista, baby!"***
+
 
 ***DataLaVista*** is a lightweight, client-side reporting and dashboard toolkit. It brings the full power of SQL directly to your browser, allowing you to build high-performance visualizations without the need for expensive server-side licenses or complex backend infrastructure.
 
@@ -153,8 +156,8 @@ Free Documentation License". If not, see <https://www.gnu.org/licenses/fdl-1.3-s
 If you find this repository, code or paper useful for your research, please cite it.
 
 #### Citation Example:
->_Mongefranco, Gabriel (2026). DataLaVista. University of Michigan. Software. https://github.com/DepressionCenter/datalavista_  
-​​​​​​​     _DOI: [pending](https://doi.org/)_
+>_Mongefranco, Gabriel; Gluskin, Jeremy; Boa, Shelley (2026). DataLaVista. University of Michigan. Software. https://github.com/DepressionCenter/datalavista_  
+​​​​​​​     _DOI: [https://doi.org/10.5281/zenodo.19245606](https://doi.org/10.5281/zenodo.19245606)_
 
 
 ----
