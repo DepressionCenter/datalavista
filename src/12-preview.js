@@ -32,26 +32,17 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           for (const tname of referencedTables) {
             await ensureTableData(tname, true); // Load all rows
           }
-          console.log("DEBUG: looping through tables to DROP and CREATE in alasql:", referencedTables);
           for (const tname of referencedTables) {
             const t = DataLaVistaState.tables[tname];
             if (!t || !t.data.length) continue;
-            console.log(`DEBUG: Dropping table if it exists: ${tname}`);
             alasql(`DROP TABLE IF EXISTS [${tname}]`);
-            console.log('DEBUG: Creating table:', tname);
             alasql(`CREATE TABLE [${tname}]`);
-            console.log(`DEBUG: Inserting data into table ${tname}. Row count: ${t.data.length}`);
             alasql.tables[tname].data = t.data;
             // Also register by alias so QB-generated SQL (FROM alias) works in preview
-            console.log('DEBUG: Checking for alias for table:', tname, 'Alias:', t.alias);
             if (t.alias && t.alias !== tname) {
-              console.log(`DEBUG: Dropping alias table if it exists: ${t.alias}`);
               alasql(`DROP TABLE IF EXISTS [${t.alias}]`);
-              console.log('DEBUG: Creating alias table:', t.alias);
               alasql(`CREATE TABLE [${t.alias}]`);
-              console.log('DEBUG: Inserting data into alias table:', t.alias, 'Row count:', t.data.length);
               alasql.tables[t.alias].data = t.data;
-              console.log(`DEBUG: Table ${tname} also registered as alias ${t.alias} in alasql.`);
             }
           }
 
@@ -69,9 +60,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           DataLaVistaState.design.previewFilteredData = null;
           DataLaVistaState.queryColumns = results.length ? Object.keys(results[0]) : DataLaVistaState.queryColumns;
 
-          console.log("DEBUG: refreshDashboardPreview -> renderPreviewTab: Rendering preview tab with results...");
           renderPreviewTab();
-          console.log("DEBUG: refreshDashboardPreview -> renderPreviewTab: Preview tab rendered.");
           
           if(DataLaVistaState.reportMode !== 'view') setStatus(`✅ Preview: ${results.length} rows`);
         } catch (err) {
@@ -85,7 +74,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       }
 
       function renderPreviewTab() {
-        console.log('DEBUG: Entered renderPreviewTab()');
         if(DataLaVistaState.reportMode == 'edit') {
           document.getElementById('preview-toolbar').classList.remove('hidden');
         } else {
@@ -140,7 +128,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         requestAnimationFrame(() => {
           for (const w of DataLaVistaState.design.widgets) {
             if (['bar', 'line', 'pie', 'scatter'].includes(w.type)) {
-              console.log(`DEBUG: Rendering preview chart for widget ${w.id} of type ${w.type}`);
               renderPreviewChart(w);
             }
           }

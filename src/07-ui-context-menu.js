@@ -512,19 +512,5 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           return text;
       }
 
-      // Create a plain text snippet from raw HTML for widget titles and KPI labels, with a max length and ellipsis if too long.
-      function createTextSnippet(rawHtml, maxLength = 254) {
-      let text = stripHtml(rawHtml);
-      
-      // Condense multiple spaces/newlines into a single space
-      text = text.replace(/\s+/g, ' ').trim();
-      
-      // Truncate and add ellipsis if too long
-      if (text.length > maxLength) {
-          return text.substring(0, maxLength) + '...';
-      }
-      
-      return text;
-  }
 
 

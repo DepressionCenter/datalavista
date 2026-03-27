@@ -710,7 +710,6 @@ async function loadCSVSource(url, dsName, fileName) {
       catch (e2) { rows = await alasql.promise('SELECT * FROM CSV("' + url + '")'); }
     }
     if (rows && rows.length > 0) {
-      console.log('[DLV CSV] alasql strategy succeeded:', rows.length, 'rows');
       
       // alasql returns parsed row objects — register directly, skipping text parsing      
       const headers = Object.keys(rows[0]);
@@ -718,7 +717,6 @@ async function loadCSVSource(url, dsName, fileName) {
       let fields;
       try{
         fields = await deriveStructureFromSample(rows);
-        console.log('DEBUG: Derived fields from sample using deriveStructureFromSample:', fields);
       }
       catch(e) {
         console.warn('[DLV CSV] deriveStructureFromSample failed, falling back to basic text fields. ', e.message);
@@ -769,7 +767,6 @@ async function loadCSVSource(url, dsName, fileName) {
 
 // Simple CSV parser and loader
 function loadCSVData(dsName, tableKey = '', fileName = '', fileUrl = '', isFileUpload = false, text = '') {
-  console.log('DEBUG: Entered loadCSVData with:', { dsName, tableKey, fileName, fileUrl, isFileUpload, textLength: text.length });
   let parsed;
   try {
     parsed = parseCSV(text);

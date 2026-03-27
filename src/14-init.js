@@ -62,7 +62,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
     setStatus('⏳ Loading report…');
 
     try {
-      console.log("DEBUG: Fetching report config from URL: " + reportUrl);
       // ── Step 1: Fetch the config JSON ──────────────────────────────
       const cfg = await fetchJSONWithFallbacks(reportUrl);
 
@@ -75,7 +74,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         showLoadingPopup('⚠ Unable to load report data.');
         throw new Error('Report config contains no SQL query.');
       }
-      console.log("DEBUG: Running SQL query to get data for preview - refreshDashboardPreview()...");
       await refreshDashboardPreview();
 
       // ── Step 4: Switch to preview and maximise ─────────────────────

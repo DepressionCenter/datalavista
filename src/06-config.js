@@ -252,7 +252,6 @@ async function loadConfig(cfg) {
     // At this point, cfg should be an object. If it's not, throw an error.
     if (cfg && typeof cfg !== 'object') throw new Error('Invalid report config — no report JSON detected.');
 
-  console.log("DEBUG: Config object validated, proceeding to load DataLaVistaState.");
   // Basic validation passed — now clear the existing state and load the config values
   //{ ...cfg.dataSource } || { type: 'sharepoint', url: '', auth: 'current' };
   DataLaVistaState.activeTab = (DataLaVistaState.reportMode==='view')?'dataPreview':'design';
@@ -297,7 +296,6 @@ async function loadConfig(cfg) {
   updateConnectButton();
   document.getElementById('btn-save-config').disabled = false;
 
-  console.log('DEBUG: loadConfig -> renderFilterBar');
   renderFilterBar();
   if(DataLaVistaState.reportMode !== 'view') {
     const titleInput = document.getElementById('title-input');

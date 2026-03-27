@@ -274,18 +274,14 @@ async function fetchSPItemsWithRetry(siteUrl, listGuid, selectStr, expandStr, to
 
 // Fetch Table Data with intelligent retry and pagination logic, plus promise tracking to prevent duplicate fetches
 async function fetchTableData(tableName, fetchAll = false) {
-  console.log('DEBUG: fetchTableData called for', tableName, 'fetchAll:', fetchAll);
   const t = DataLaVistaState.tables[tableName];
   if (!t) return;
   const limit = fetchAll ? 50000 : 10;
 
   // Skip if we already have enough data
-  console.log('DEBUG: Current table state upon entering fetchDataTable:', { loaded: t.loaded, dataLength: t.data ? t.data.length : 0 });
   if (fetchAll && t.loaded && t.data && t.data.length > 10) return; 
-  console.log('DEBUG: Data load needed for', tableName, '— proceeding with checks.');
   if (!fetchAll && t.data && t.data.length >= 10) return;          
 
-  console.log('*** DEBUG: Need to fetch data for', tableName, '— proceeding with fetch sequence. ***');
   // *** PROMISE TRACKER: If a fetch is already running, return its promise ***
   if (t.fetchPromise) {
     return t.fetchPromise; 
@@ -337,34 +333,26 @@ async function fetchTableData(tableName, fetchAll = false) {
           Array.from(baseExpand).join(','),
           limit
         );
-        console.log('DEBUG: Done loading SharePoint list data for', tableName, '— raw data length:', rawData.length);
       } else if(t.sourceType === 'json') {
-        console.log('DEBUG: Fetching JSON data for', tableName);
         const jsonUrl = t.url || (DataLaVistaState.dataSources[t.dataSource] && DataLaVistaState.dataSources[t.dataSource].url);
         if (!jsonUrl) {
-          console.log('DEBUG: No URL found for JSON source in', tableName, '— skipping fetch.');
           return;
         }
         const res = await fetch(jsonUrl);
         if (!res.ok) {
-          console.log('DEBUG: Failed to fetch JSON data for', tableName, '— HTTP status:', res.status);
           return;
         }
         const json = await res.json();
         rawData = extractRows(json);
       } else if(t.sourceType === 'csv') {
-        console.log('DEBUG: Fetching CSV data for', tableName);
         let csvUrl = (DataLaVistaState.tables[tableName] && DataLaVistaState.tables[tableName].url) || (DataLaVistaState.dataSources[t.dataSource] && DataLaVistaState.dataSources[t.dataSource].url);
         csvUrl = encodeURI(csvUrl);
-        console.log('DEBUG: CSV URL resolved to: ' + csvUrl);
         if (!csvUrl) {
-          console.log('DEBUG: No URL found for CSV source in table: ' + tableName);
           return;
         }
         setStatus(`Loading CSV... (${csvUrl.length > 50 ? '...' + csvUrl.slice(-47) : csvUrl})`);
 
         let text;
-        console.log('DEBUG: fetchTableData -> calling fetchCSVFromUrl');
         try{
           text = await fetchCSVFromURL(csvUrl);
         } catch (e) {
@@ -374,21 +362,16 @@ async function fetchTableData(tableName, fetchAll = false) {
         if (!text.trim()) throw new Error('CSV file appears to be empty');
         const fileName = csvUrl.split('/').pop();
         
-        console.log('DEBUG: fetchTableData -> calling loadCSVData...');
         loadCSVData(t.dataSource||'CSV', tableName||'', fileName, csvUrl, false, text); // Create new DS for this CSV file, with isUploadedFile=false
-        console.log('DEBUG: fetchTableData -> loadCSVData completed, now extracting raw data from state for', tableName);
 
         rawData = DataLaVistaState.tables[tableName] && DataLaVistaState.tables[tableName].data ? DataLaVistaState.tables[tableName].data : [];
       } else if(t.sourceType === 'api') {
         const apiUrl = t.url || (DataLaVistaState.dataSources[t.dataSource] && DataLaVistaState.dataSources[t.dataSource].url);
         // TODO: Add support for API sources (fetch with headers, auth, etc) — currently just a placeholder
       } else {
-        console.log('DEBUG: Unsupported source type for', tableName, '— skipping fetch.');
         return;
       
       }
-      console.log('DEBUG: Raw data fetched for', tableName);
-      console.log('DEBUG: Mapping data rows for', tableName);
       t.data = rawData.map(row => mapDataRow(tableName, row, spFields)); 
       t.loaded = fetchAll;
       
