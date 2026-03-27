@@ -84,10 +84,13 @@ function generateWidgetSQL(w, tableRef = '_results') {
 }
 
 
+// TODO: If running in SharePoint and we already have a report URL (via param + edit mode or after publishing),
+// we should save the config back to that same URL instead of downloading a new file.
+// This will allow for true in-place editing without needing to re-upload a new file each time. We can detect this scenario by checking if the current URL has a valid SharePoint file reference and if we're in edit mode, then use the SharePoint REST API to update the file content instead of triggering a download.
 function saveConfig() {
   const config = buildConfig();
   const json = JSON.stringify(config, null, 2);
-  downloadText(json, 'DataLaVista-config.json', 'application/json');
+  downloadText(json, (DataLaVistaState.design.title ? DataLaVistaState.design.title : 'DataLaVista-config') + '.json', 'application/json');
 }
 
 // Build a clean, minimal config object from the current state, suitable for saving or sharing
@@ -282,9 +285,7 @@ async function loadConfig(cfg) {
   // Background fetch for referenced tables
   if (DataLaVistaState.sql) {
     const referencedTables = findReferencedTables(DataLaVistaState.sql);
-    console.log('==== loadConfig->referencedTables ====');
     for (const tname of referencedTables) {
-      console.log('>>>>>>>   loadConfig->referencedTables->loop->ensureTAbleData. Table: ', tname);
       await ensureTableData(tname, true)
     }
   }

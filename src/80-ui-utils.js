@@ -104,7 +104,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === 'tab-' + tab));
 
         if (tab === 'dashboardPreview') { refreshDashboardPreview(); }
-        if (tab === 'generate') { generateReport(); }
+        if (tab === 'generate') { setTimeout(() => generateReport(), 0); }
         if (tab === 'design' && DataLaVistaState.reportMode !== 'view') {
           renderDesignCanvas(); renderFilterBar(); renderDesignFieldsPanel();
           requestAnimationFrame(() => { for (const c of Object.values(DataLaVistaState.charts)) { try { c.resize(); } catch (e) { } } });

@@ -2365,6 +2365,114 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
     }
 
     /* ============================================================
+   RICH-TEXT TOOLTIP (SPEECH BUBBLE)
+   ============================================================ */
+    #dlv-tooltip {
+      position: fixed;
+      z-index: 10500;
+      display: none;
+      pointer-events: none; /* allow mouse through by default */
+      max-width: 280px;
+    }
+
+    /* enable pointer-events when tip contains interactive content */
+    #dlv-tooltip:has(a),
+    #dlv-tooltip:has(button) {
+      pointer-events: auto;
+    }
+
+    .dlv-tooltip-body {
+      background: var(--text);
+      color: var(--text-inverse);
+      font-family: var(--font);
+      font-size: 12px;
+      line-height: 1.5;
+      border-radius: var(--radius-lg);
+      padding: 8px 12px;
+      box-shadow: var(--shadow-lg);
+      word-break: break-word;
+      transition: opacity 150ms ease, transform 150ms ease;
+      opacity: 0;
+      transform: scale(0.95);
+    }
+
+    .dlv-tip-visible .dlv-tooltip-body {
+      opacity: 1;
+      transform: scale(1);
+    }
+
+    /* ---- theme variants ---- */
+    .dlv-tip-theme-info    .dlv-tooltip-body { background: var(--primary); }
+    .dlv-tip-theme-success .dlv-tooltip-body { background: var(--success); }
+    .dlv-tip-theme-warning .dlv-tooltip-body { background: var(--warning); color: #fff; }
+    .dlv-tip-theme-error   .dlv-tooltip-body { background: var(--error); }
+
+    /* ---- arrow / tail ---- */
+    .dlv-tooltip-arrow {
+      position: absolute;
+      width: 0;
+      height: 0;
+      pointer-events: none;
+    }
+
+    /* top arrow → points down (triangle below bubble body) */
+    .dlv-tip-top .dlv-tooltip-arrow {
+      bottom: -7px;
+      border-left: 8px solid transparent;
+      border-right: 8px solid transparent;
+      border-top: 8px solid var(--text);
+    }
+    .dlv-tip-theme-info.dlv-tip-top    .dlv-tooltip-arrow { border-top-color: var(--primary); }
+    .dlv-tip-theme-success.dlv-tip-top .dlv-tooltip-arrow { border-top-color: var(--success); }
+    .dlv-tip-theme-warning.dlv-tip-top .dlv-tooltip-arrow { border-top-color: var(--warning); }
+    .dlv-tip-theme-error.dlv-tip-top   .dlv-tooltip-arrow { border-top-color: var(--error);   }
+
+    /* bottom arrow → points up */
+    .dlv-tip-bottom .dlv-tooltip-arrow {
+      top: -7px;
+      border-left: 8px solid transparent;
+      border-right: 8px solid transparent;
+      border-bottom: 8px solid var(--text);
+    }
+    .dlv-tip-theme-info.dlv-tip-bottom    .dlv-tooltip-arrow { border-bottom-color: var(--primary); }
+    .dlv-tip-theme-success.dlv-tip-bottom .dlv-tooltip-arrow { border-bottom-color: var(--success); }
+    .dlv-tip-theme-warning.dlv-tip-bottom .dlv-tooltip-arrow { border-bottom-color: var(--warning); }
+    .dlv-tip-theme-error.dlv-tip-bottom   .dlv-tooltip-arrow { border-bottom-color: var(--error);   }
+
+    /* left arrow → points right */
+    .dlv-tip-left .dlv-tooltip-arrow {
+      right: -7px;
+      border-top: 8px solid transparent;
+      border-bottom: 8px solid transparent;
+      border-left: 8px solid var(--text);
+    }
+    .dlv-tip-theme-info.dlv-tip-left    .dlv-tooltip-arrow { border-left-color: var(--primary); }
+    .dlv-tip-theme-success.dlv-tip-left .dlv-tooltip-arrow { border-left-color: var(--success); }
+    .dlv-tip-theme-warning.dlv-tip-left .dlv-tooltip-arrow { border-left-color: var(--warning); }
+    .dlv-tip-theme-error.dlv-tip-left   .dlv-tooltip-arrow { border-left-color: var(--error);   }
+
+    /* right arrow → points left */
+    .dlv-tip-right .dlv-tooltip-arrow {
+      left: -7px;
+      border-top: 8px solid transparent;
+      border-bottom: 8px solid transparent;
+      border-right: 8px solid var(--text);
+    }
+    .dlv-tip-theme-info.dlv-tip-right    .dlv-tooltip-arrow { border-right-color: var(--primary); }
+    .dlv-tip-theme-success.dlv-tip-right .dlv-tooltip-arrow { border-right-color: var(--success); }
+    .dlv-tip-theme-warning.dlv-tip-right .dlv-tooltip-arrow { border-right-color: var(--warning); }
+    .dlv-tip-theme-error.dlv-tip-right   .dlv-tooltip-arrow { border-right-color: var(--error);   }
+
+    /* ---- rich content helpers inside the tooltip ---- */
+    .dlv-tooltip-body strong { font-weight: 600; }
+    .dlv-tooltip-body em     { opacity: 0.85; font-style: italic; }
+    .dlv-tooltip-body hr     { border: none; border-top: 1px solid rgba(255,255,255,.25); margin: 6px 0; }
+    .dlv-tooltip-body code   { font-family: var(--font-mono); font-size: 11px; background: rgba(0,0,0,.25); border-radius: 3px; padding: 0 4px; }
+    .dlv-tooltip-body .dlv-tip-label { display: block; font-size: 10px; text-transform: uppercase; letter-spacing: .06em; opacity: .7; margin-bottom: 2px; }
+    .dlv-tooltip-body .dlv-tip-row   { display: flex; gap: 6px; justify-content: space-between; }
+    .dlv-tooltip-body a      { color: #9dc8f0; text-decoration: underline; }
+
+    /* ============================================================
    MISC UTILITIES
    ============================================================ */
     .text-muted {
@@ -3172,22 +3280,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           <button class="btn btn-primary" onclick="generateReport()">⚙ Generate</button>
         </div>
         <div id="generate-body">
-          <div class="generate-col">
-            <div class="generate-col-label">
-              <span>⚙ Report Config (JSON)</span>
-              <div class="gen-actions">
-                <button class="btn btn-default btn-sm" id="btn-copy-json" onclick="copyGenCode()" disabled>📋
-                  Copy</button>
-                <button class="btn btn-default btn-sm" id="btn-dl-json" onclick="downloadGenCode()" disabled>⬇
-                  Download .json</button>
-              </div>
-            </div>
-            <textarea id="gen-json-area"
-              placeholder="Click Generate to produce the report configuration JSON..."></textarea>
-          </div>
-          
-          <div class="gen-info-panel">
-
+          <div id="gen-info-panel-publish" class="gen-info-panel">
             <div class="gen-info-logo"><pre style="font-family: monospace; line-height: 1;">
        /|____________|\
       ||  /--------\  ||    ___       _          _            _    _ _     _
@@ -3197,17 +3290,49 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
        \  |_|_|_|_|  / 
         \___________/         🕶️ "The BI Terminator" 🕶️
       </pre></div>
-
             <div class="gen-info-section">
+              <h4>About</h4>
+              <p><strong>Created by <a href="https://gabriel.mongefranco.com" target="_blank">Gabriel Mongefranco</a>, <a href="https://www.linkedin.com/in/jeremy-gluskin-16980623/" target="_blank">Jeremy Gluskin</a>, and <a href="https://www.linkedin.com/in/shelleyboa/" target="_blank">Shelley Boa.</a></strong></p>
+              <p>&nbsp;</p>
+              <p>Contributions by the <a href="https://github.com/DepressionCenter/AutomatorsAnonymous" target="_blank">Automators Anonymous</a> community of practice at Michigan Medicine.</p>
+              <p>DataLaVista is brought to you and maintained by the <a href="https://depressioncenter.org/mobiletech" target="_blank">Mobile Technologies Core</a> at the <a href="https://depressioncenter.org" target="_blank">Eisenberg Family Depression Center</a>.</p>
+            </div>
+            <div><p>&nbsp;</p></div>
+            <div class="gen-info-section">
+              <h4>Links</h4>
+              <p>
+              <span aria-label="website">🌐</span>&nbsp;<a href="https://github.com/DepressionCenter/datalavista" target="_blank">https://code.depressioncenter.org/datalavista</a><br />
+              <span aria-label="code">💻</span>&nbsp;<a href="https://github.com/DepressionCenter/datalavista" target="_blank">https://github.com/DepressionCenter/datalavista</a><br />
+              <span aria-label="documentation">📖</span>&nbsp;<a href="https://github.com/DepressionCenter/datalavista" target="_blank">https://michmed.org/efdc-kb</a><br />
+              </p>
+            </div>
+            <div><p>&nbsp;</p></div>
+            <div class="gen-info-section" 
+            data-dlv-tip="<strong>Copyright © 2026 The Regents of the University of Michigan</strong><br /><br />
+<code>This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or any later version.
+This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details. You should have received a copy of the GNU General Public License along with this program. If not, see https://www.gnu.org/licenses/. </code>" 
+              data-dlv-tip-maxWidth="540px" data-dlv-theme="info">
               <h4>License</h4>
-              DataLaVista is free software. Licensed under <a href="https://www.gnu.org/licenses/" target="_blank">GNU GPL v3 or later.</a>
+              ⚖️ DataLaVista is free software. Licensed under <a href="https://www.gnu.org/licenses/" target="_blank">GNU GPL v3 or later.</a>
             </div>
 
-            <div class="gen-info-section">
-              <h4>Source &amp; Documentation</h4>
-              <a href="https://github.com/DepressionCenter/datalavista" target="_blank">https://github.com/DepressionCenter/datalavista</a>
+            <div class="gen-info-copyright">
+              Copyright &copy; 2026 The Regents of the <a href="https://umich.edu" target="_blank"></a>University of Michigan</a>
+              &nbsp;|&nbsp;
+              <a href="https://depressioncenter.org" target="_blank">Eisenberg Family Depression Center</a>
             </div>
+          </div>
 
+          <div id="gen-info-panel-about" class="gen-info-panel">
+            <div class="generate-col-label">
+              <span>⚙ Report Config (JSON)</span>
+              <div class="gen-actions">
+                <button class="btn btn-default btn-sm" id="btn-copy-json" onclick="copyGenCode()" disabled>📋
+                  Copy</button>
+                <button class="btn btn-default btn-sm" id="btn-dl-json" onclick="downloadGenCode()" disabled>⬇
+                  Download .json</button>
+              </div>
+            </div>
             <div class="gen-info-section">
               <h4>Viewing a Report</h4>
               After generating a report configuration (JSON), publish it to a URL-accessible location,
@@ -3216,7 +3341,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
             </div>
 
             <div class="gen-info-section">
-              <h4>Publish &amp; Save</h4>
+              <h4>Save &amp; Publish</h4>
             </div>
             <div class="gen-info-actions">
               <button class="btn btn-primary btn-sm" id="btn-publish-sp" disabled onclick="publishToSharePoint()" title="Save this report to a SharePoint document library">☁ Publish to SharePoint</button>
@@ -3227,14 +3352,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
               <a id="gen-publish-url" href="#" target="_blank" style="color:var(--primary);font-weight:700;font-size:11px;text-decoration:underline"></a>
               <button class="btn btn-ghost btn-sm" onclick="sharePublishedUrl()" style="height:22px;padding:0 8px;font-size:11px;flex-shrink:0">🔗 Share</button>
             </div>
-            <div class="gen-info-copyright">
-              Copyright &copy; 2026 The Regents of the University of Michigan
-              &nbsp;|&nbsp;
-              <a href="https://depressioncenter.org" target="_blank">Eisenberg Family Depression Center</a>
-            </div>
-
           </div>
-          
         </div>
       </div>
 

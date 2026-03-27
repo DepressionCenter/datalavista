@@ -2365,6 +2365,114 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
     }
 
     /* ============================================================
+   RICH-TEXT TOOLTIP (SPEECH BUBBLE)
+   ============================================================ */
+    #dlv-tooltip {
+      position: fixed;
+      z-index: 10500;
+      display: none;
+      pointer-events: none; /* allow mouse through by default */
+      max-width: 280px;
+    }
+
+    /* enable pointer-events when tip contains interactive content */
+    #dlv-tooltip:has(a),
+    #dlv-tooltip:has(button) {
+      pointer-events: auto;
+    }
+
+    .dlv-tooltip-body {
+      background: var(--text);
+      color: var(--text-inverse);
+      font-family: var(--font);
+      font-size: 12px;
+      line-height: 1.5;
+      border-radius: var(--radius-lg);
+      padding: 8px 12px;
+      box-shadow: var(--shadow-lg);
+      word-break: break-word;
+      transition: opacity 150ms ease, transform 150ms ease;
+      opacity: 0;
+      transform: scale(0.95);
+    }
+
+    .dlv-tip-visible .dlv-tooltip-body {
+      opacity: 1;
+      transform: scale(1);
+    }
+
+    /* ---- theme variants ---- */
+    .dlv-tip-theme-info    .dlv-tooltip-body { background: var(--primary); }
+    .dlv-tip-theme-success .dlv-tooltip-body { background: var(--success); }
+    .dlv-tip-theme-warning .dlv-tooltip-body { background: var(--warning); color: #fff; }
+    .dlv-tip-theme-error   .dlv-tooltip-body { background: var(--error); }
+
+    /* ---- arrow / tail ---- */
+    .dlv-tooltip-arrow {
+      position: absolute;
+      width: 0;
+      height: 0;
+      pointer-events: none;
+    }
+
+    /* top arrow → points down (triangle below bubble body) */
+    .dlv-tip-top .dlv-tooltip-arrow {
+      bottom: -7px;
+      border-left: 8px solid transparent;
+      border-right: 8px solid transparent;
+      border-top: 8px solid var(--text);
+    }
+    .dlv-tip-theme-info.dlv-tip-top    .dlv-tooltip-arrow { border-top-color: var(--primary); }
+    .dlv-tip-theme-success.dlv-tip-top .dlv-tooltip-arrow { border-top-color: var(--success); }
+    .dlv-tip-theme-warning.dlv-tip-top .dlv-tooltip-arrow { border-top-color: var(--warning); }
+    .dlv-tip-theme-error.dlv-tip-top   .dlv-tooltip-arrow { border-top-color: var(--error);   }
+
+    /* bottom arrow → points up */
+    .dlv-tip-bottom .dlv-tooltip-arrow {
+      top: -7px;
+      border-left: 8px solid transparent;
+      border-right: 8px solid transparent;
+      border-bottom: 8px solid var(--text);
+    }
+    .dlv-tip-theme-info.dlv-tip-bottom    .dlv-tooltip-arrow { border-bottom-color: var(--primary); }
+    .dlv-tip-theme-success.dlv-tip-bottom .dlv-tooltip-arrow { border-bottom-color: var(--success); }
+    .dlv-tip-theme-warning.dlv-tip-bottom .dlv-tooltip-arrow { border-bottom-color: var(--warning); }
+    .dlv-tip-theme-error.dlv-tip-bottom   .dlv-tooltip-arrow { border-bottom-color: var(--error);   }
+
+    /* left arrow → points right */
+    .dlv-tip-left .dlv-tooltip-arrow {
+      right: -7px;
+      border-top: 8px solid transparent;
+      border-bottom: 8px solid transparent;
+      border-left: 8px solid var(--text);
+    }
+    .dlv-tip-theme-info.dlv-tip-left    .dlv-tooltip-arrow { border-left-color: var(--primary); }
+    .dlv-tip-theme-success.dlv-tip-left .dlv-tooltip-arrow { border-left-color: var(--success); }
+    .dlv-tip-theme-warning.dlv-tip-left .dlv-tooltip-arrow { border-left-color: var(--warning); }
+    .dlv-tip-theme-error.dlv-tip-left   .dlv-tooltip-arrow { border-left-color: var(--error);   }
+
+    /* right arrow → points left */
+    .dlv-tip-right .dlv-tooltip-arrow {
+      left: -7px;
+      border-top: 8px solid transparent;
+      border-bottom: 8px solid transparent;
+      border-right: 8px solid var(--text);
+    }
+    .dlv-tip-theme-info.dlv-tip-right    .dlv-tooltip-arrow { border-right-color: var(--primary); }
+    .dlv-tip-theme-success.dlv-tip-right .dlv-tooltip-arrow { border-right-color: var(--success); }
+    .dlv-tip-theme-warning.dlv-tip-right .dlv-tooltip-arrow { border-right-color: var(--warning); }
+    .dlv-tip-theme-error.dlv-tip-right   .dlv-tooltip-arrow { border-right-color: var(--error);   }
+
+    /* ---- rich content helpers inside the tooltip ---- */
+    .dlv-tooltip-body strong { font-weight: 600; }
+    .dlv-tooltip-body em     { opacity: 0.85; font-style: italic; }
+    .dlv-tooltip-body hr     { border: none; border-top: 1px solid rgba(255,255,255,.25); margin: 6px 0; }
+    .dlv-tooltip-body code   { font-family: var(--font-mono); font-size: 11px; background: rgba(0,0,0,.25); border-radius: 3px; padding: 0 4px; }
+    .dlv-tooltip-body .dlv-tip-label { display: block; font-size: 10px; text-transform: uppercase; letter-spacing: .06em; opacity: .7; margin-bottom: 2px; }
+    .dlv-tooltip-body .dlv-tip-row   { display: flex; gap: 6px; justify-content: space-between; }
+    .dlv-tooltip-body a      { color: #9dc8f0; text-decoration: underline; }
+
+    /* ============================================================
    MISC UTILITIES
    ============================================================ */
     .text-muted {
@@ -3172,22 +3280,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           <button class="btn btn-primary" onclick="generateReport()">⚙ Generate</button>
         </div>
         <div id="generate-body">
-          <div class="generate-col">
-            <div class="generate-col-label">
-              <span>⚙ Report Config (JSON)</span>
-              <div class="gen-actions">
-                <button class="btn btn-default btn-sm" id="btn-copy-json" onclick="copyGenCode()" disabled>📋
-                  Copy</button>
-                <button class="btn btn-default btn-sm" id="btn-dl-json" onclick="downloadGenCode()" disabled>⬇
-                  Download .json</button>
-              </div>
-            </div>
-            <textarea id="gen-json-area"
-              placeholder="Click Generate to produce the report configuration JSON..."></textarea>
-          </div>
-          
-          <div class="gen-info-panel">
-
+          <div id="gen-info-panel-publish" class="gen-info-panel">
             <div class="gen-info-logo"><pre style="font-family: monospace; line-height: 1;">
        /|____________|\
       ||  /--------\  ||    ___       _          _            _    _ _     _
@@ -3197,17 +3290,49 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
        \  |_|_|_|_|  / 
         \___________/         🕶️ "The BI Terminator" 🕶️
       </pre></div>
-
             <div class="gen-info-section">
+              <h4>About</h4>
+              <p><strong>Created by <a href="https://gabriel.mongefranco.com" target="_blank">Gabriel Mongefranco</a>, <a href="https://www.linkedin.com/in/jeremy-gluskin-16980623/" target="_blank">Jeremy Gluskin</a>, and <a href="https://www.linkedin.com/in/shelleyboa/" target="_blank">Shelley Boa.</a></strong></p>
+              <p>&nbsp;</p>
+              <p>Contributions by the <a href="https://github.com/DepressionCenter/AutomatorsAnonymous" target="_blank">Automators Anonymous</a> community of practice at Michigan Medicine.</p>
+              <p>DataLaVista is brought to you and maintained by the <a href="https://depressioncenter.org/mobiletech" target="_blank">Mobile Technologies Core</a> at the <a href="https://depressioncenter.org" target="_blank">Eisenberg Family Depression Center</a>.</p>
+            </div>
+            <div><p>&nbsp;</p></div>
+            <div class="gen-info-section">
+              <h4>Links</h4>
+              <p>
+              <span aria-label="website">🌐</span>&nbsp;<a href="https://github.com/DepressionCenter/datalavista" target="_blank">https://code.depressioncenter.org/datalavista</a><br />
+              <span aria-label="code">💻</span>&nbsp;<a href="https://github.com/DepressionCenter/datalavista" target="_blank">https://github.com/DepressionCenter/datalavista</a><br />
+              <span aria-label="documentation">📖</span>&nbsp;<a href="https://github.com/DepressionCenter/datalavista" target="_blank">https://michmed.org/efdc-kb</a><br />
+              </p>
+            </div>
+            <div><p>&nbsp;</p></div>
+            <div class="gen-info-section" 
+            data-dlv-tip="<strong>Copyright © 2026 The Regents of the University of Michigan</strong><br /><br />
+<code>This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or any later version.
+This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details. You should have received a copy of the GNU General Public License along with this program. If not, see https://www.gnu.org/licenses/. </code>" 
+              data-dlv-tip-maxWidth="540px" data-dlv-theme="info">
               <h4>License</h4>
-              DataLaVista is free software. Licensed under <a href="https://www.gnu.org/licenses/" target="_blank">GNU GPL v3 or later.</a>
+              ⚖️ DataLaVista is free software. Licensed under <a href="https://www.gnu.org/licenses/" target="_blank">GNU GPL v3 or later.</a>
             </div>
 
-            <div class="gen-info-section">
-              <h4>Source &amp; Documentation</h4>
-              <a href="https://github.com/DepressionCenter/datalavista" target="_blank">https://github.com/DepressionCenter/datalavista</a>
+            <div class="gen-info-copyright">
+              Copyright &copy; 2026 The Regents of the <a href="https://umich.edu" target="_blank"></a>University of Michigan</a>
+              &nbsp;|&nbsp;
+              <a href="https://depressioncenter.org" target="_blank">Eisenberg Family Depression Center</a>
             </div>
+          </div>
 
+          <div id="gen-info-panel-about" class="gen-info-panel">
+            <div class="generate-col-label">
+              <span>⚙ Report Config (JSON)</span>
+              <div class="gen-actions">
+                <button class="btn btn-default btn-sm" id="btn-copy-json" onclick="copyGenCode()" disabled>📋
+                  Copy</button>
+                <button class="btn btn-default btn-sm" id="btn-dl-json" onclick="downloadGenCode()" disabled>⬇
+                  Download .json</button>
+              </div>
+            </div>
             <div class="gen-info-section">
               <h4>Viewing a Report</h4>
               After generating a report configuration (JSON), publish it to a URL-accessible location,
@@ -3216,7 +3341,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
             </div>
 
             <div class="gen-info-section">
-              <h4>Publish &amp; Save</h4>
+              <h4>Save &amp; Publish</h4>
             </div>
             <div class="gen-info-actions">
               <button class="btn btn-primary btn-sm" id="btn-publish-sp" disabled onclick="publishToSharePoint()" title="Save this report to a SharePoint document library">☁ Publish to SharePoint</button>
@@ -3227,14 +3352,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
               <a id="gen-publish-url" href="#" target="_blank" style="color:var(--primary);font-weight:700;font-size:11px;text-decoration:underline"></a>
               <button class="btn btn-ghost btn-sm" onclick="sharePublishedUrl()" style="height:22px;padding:0 8px;font-size:11px;flex-shrink:0">🔗 Share</button>
             </div>
-            <div class="gen-info-copyright">
-              Copyright &copy; 2026 The Regents of the University of Michigan
-              &nbsp;|&nbsp;
-              <a href="https://depressioncenter.org" target="_blank">Eisenberg Family Depression Center</a>
-            </div>
-
           </div>
-          
         </div>
       </div>
 
@@ -3246,6 +3364,269 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 
       <!-- DataLaVista Scripts -->
          <script>
+/*
+  DataLaVista — Rich-Text Tooltip (Speech Bubble) Helper
+  -------------------------------------------------------
+  Universal tooltip helper that renders a styled speech-bubble tooltip
+  with support for arbitrary HTML content.
+
+  Usage:
+    // 1. Attach to any element imperatively:
+    dlvTooltip.attach(element, '<strong>Hello</strong> world');
+
+    // 2. Or declaratively via data attributes in HTML:
+    <button data-dlv-tip="<b>Add widget</b><br>Drag to canvas">+ Add</button>
+
+    // 3. Or via helper shortcuts:
+    dlvTooltip.attachTree(tableOrFieldEl, htmlContent);
+    dlvTooltip.attachWidget(widgetEl, htmlContent);
+    dlvTooltip.attachButton(buttonEl, htmlContent);
+
+  Options (third argument object):
+    placement   'top' | 'bottom' | 'left' | 'right' | 'auto'  (default 'auto')
+    delay       number in ms before showing  (default 500)
+    maxWidth    CSS string  (default '280px')
+    theme       'default' | 'info' | 'success' | 'warning' | 'error'
+*/
+
+/* ------------------------------------------------------------------ */
+/*  Singleton tooltip element                                           */
+/* ------------------------------------------------------------------ */
+const dlvTooltip = (() => {
+  let _tip = null;         // the DOM bubble
+  let _arrow = null;       // the tail/arrow div
+  let _showTimer = null;
+  let _hideTimer = null;
+  let _currentEl = null;
+
+  const SHOW_DELAY = 500;  // ms
+  const HIDE_DELAY = 100;  // ms
+  const GAP = 10;          // px gap between anchor and bubble
+
+  /* ---------- create the singleton DOM node once ---------- */
+  function _ensureTip() {
+    if (_tip) return;
+    _tip = document.createElement('div');
+    _tip.id = 'dlv-tooltip';
+    _tip.setAttribute('role', 'tooltip');
+
+    _arrow = document.createElement('div');
+    _arrow.className = 'dlv-tooltip-arrow';
+    _tip.appendChild(_arrow);
+
+    const _body = document.createElement('div');
+    _body.className = 'dlv-tooltip-body';
+    _tip.appendChild(_body);
+
+    document.body.appendChild(_tip);
+
+    // Hide when mouse enters the tip itself (keeps it open for links)
+    _tip.addEventListener('mouseenter', () => clearTimeout(_hideTimer));
+    _tip.addEventListener('mouseleave', () => _scheduleHide());
+  }
+
+  /* ---------- position the bubble relative to an anchor ---------- */
+  function _position(anchor, placement) {
+    const aRect = anchor.getBoundingClientRect();
+    const tRect = _tip.getBoundingClientRect();
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+
+    // resolve 'auto' placement
+    if (placement === 'auto') {
+      const spaceAbove = aRect.top;
+      const spaceBelow = vh - aRect.bottom;
+      const spaceRight = vw - aRect.right;
+      const spaceLeft  = aRect.left;
+      if (spaceAbove >= tRect.height + GAP + 20) placement = 'top';
+      else if (spaceBelow >= tRect.height + GAP + 20) placement = 'bottom';
+      else if (spaceRight >= tRect.width  + GAP + 20) placement = 'right';
+      else if (spaceLeft  >= tRect.width  + GAP + 20) placement = 'left';
+      else placement = 'top'; // fallback
+    }
+
+    let top, left;
+
+    if (placement === 'top') {
+      top  = aRect.top  - tRect.height - GAP;
+      left = aRect.left + aRect.width / 2 - tRect.width / 2;
+    } else if (placement === 'bottom') {
+      top  = aRect.bottom + GAP;
+      left = aRect.left + aRect.width / 2 - tRect.width / 2;
+    } else if (placement === 'left') {
+      top  = aRect.top + aRect.height / 2 - tRect.height / 2;
+      left = aRect.left - tRect.width - GAP;
+    } else { // right
+      top  = aRect.top + aRect.height / 2 - tRect.height / 2;
+      left = aRect.right + GAP;
+    }
+
+    // clamp to viewport with 8px margin
+    left = Math.max(8, Math.min(left, vw - tRect.width - 8));
+    top  = Math.max(8, Math.min(top,  vh - tRect.height - 8));
+
+    _tip.style.left = left + 'px';
+    _tip.style.top  = top  + 'px';
+
+    // arrow position & direction class
+    _tip.className = 'dlv-tooltip dlv-tip-' + placement + (_tip.dataset.theme ? ' dlv-tip-theme-' + _tip.dataset.theme : '');
+
+    // re-center arrow along the edge it points from
+    if (placement === 'top' || placement === 'bottom') {
+      const anchorCenterX = aRect.left + aRect.width / 2;
+      const arrowLeft = Math.max(12, Math.min(anchorCenterX - left - 8, tRect.width - 28));
+      _arrow.style.left = arrowLeft + 'px';
+      _arrow.style.top  = '';
+    } else {
+      const anchorCenterY = aRect.top + aRect.height / 2;
+      const arrowTop = Math.max(8, Math.min(anchorCenterY - top - 8, tRect.height - 24));
+      _arrow.style.top  = arrowTop + 'px';
+      _arrow.style.left = '';
+    }
+  }
+
+  /* ---------- show ---------- */
+  function _show(anchor, html, opts = {}) {
+    _ensureTip();
+    clearTimeout(_hideTimer);
+    clearTimeout(_showTimer);
+
+    const delay = opts.delay != null ? opts.delay : SHOW_DELAY;
+    _showTimer = setTimeout(() => {
+      const body = _tip.querySelector('.dlv-tooltip-body');
+      body.innerHTML = html;
+      _tip.style.maxWidth = opts.maxWidth || '280px';
+      _tip.dataset.theme = opts.theme || '';
+      _tip.className = 'dlv-tooltip'; // reset before measuring
+      _tip.classList.add('dlv-tip-measuring');
+      _tip.style.visibility = 'hidden';
+      _tip.style.display = 'block';
+
+      // measure then position
+      requestAnimationFrame(() => {
+        _position(anchor, opts.placement || 'auto');
+        _tip.style.visibility = '';
+        _tip.classList.remove('dlv-tip-measuring');
+        _tip.classList.add('dlv-tip-visible');
+        anchor.setAttribute('aria-describedby', 'dlv-tooltip');
+      });
+    }, delay);
+  }
+
+  /* ---------- hide ---------- */
+  function _scheduleHide() {
+    clearTimeout(_showTimer);
+    _hideTimer = setTimeout(() => {
+      if (_currentEl) _currentEl.removeAttribute('aria-describedby');
+      if (_tip) {
+        _tip.classList.remove('dlv-tip-visible');
+        // wait for CSS transition, then display:none
+        setTimeout(() => {
+          if (_tip && !_tip.classList.contains('dlv-tip-visible')) {
+            _tip.style.display = 'none';
+          }
+        }, 160);
+      }
+      _currentEl = null;
+    }, HIDE_DELAY);
+  }
+
+  /* ---------- attach events to an element ---------- */
+  function attach(el, html, opts = {}) {
+    if (!el) return;
+    // avoid double-binding
+    if (el._dlvTipBound) {
+      el._dlvTipHtml = html;
+      el._dlvTipOpts = opts;
+      return;
+    }
+    el._dlvTipHtml = html;
+    el._dlvTipOpts = opts;
+    el._dlvTipBound = true;
+
+    el.addEventListener('mouseenter', () => {
+      _currentEl = el;
+      _show(el, el._dlvTipHtml, el._dlvTipOpts);
+    });
+    el.addEventListener('mouseleave', () => {
+      if (_currentEl === el) _scheduleHide();
+    });
+    el.addEventListener('focus', () => {
+      _currentEl = el;
+      _show(el, el._dlvTipHtml, { ...(el._dlvTipOpts), delay: 0 });
+    });
+    el.addEventListener('blur', () => {
+      if (_currentEl === el) _scheduleHide();
+    });
+  }
+
+  /* ---------- convenience shorthands ---------- */
+  function attachTree(el, html, opts = {})   { attach(el, html, { placement: 'right', ...opts }); }
+  function attachWidget(el, html, opts = {}) { attach(el, html, { placement: 'top',   ...opts }); }
+  function attachButton(el, html, opts = {}) { attach(el, html, { placement: 'bottom',...opts }); }
+
+  /* ---------- scan DOM for data-dlv-tip attributes ---------- */
+  function scanDOM(root = document) {
+    root.querySelectorAll('[data-dlv-tip]').forEach(el => {
+      if (el._dlvTipBound) return;
+      const html = el.getAttribute('data-dlv-tip');
+      const placement = el.getAttribute('data-dlv-tip-placement') || 'auto';
+      const theme     = el.getAttribute('data-dlv-tip-theme')     || '';
+      const maxWidth  = el.getAttribute('data-dlv-tip-maxwidth')  || '';
+      attach(el, html, { placement, theme, maxWidth: maxWidth || undefined });
+    });
+  }
+
+  /* ---------- update content for an already-attached element ---------- */
+  function update(el, html, opts) {
+    if (!el) return;
+    el._dlvTipHtml = html;
+    if (opts) el._dlvTipOpts = { ...el._dlvTipOpts, ...opts };
+  }
+
+  /* ---------- detach ---------- */
+  function detach(el) {
+    if (!el || !el._dlvTipBound) return;
+    // Replace element with a shallow clone to drop all listeners
+    const clone = el.cloneNode(true);
+    el.parentNode?.replaceChild(clone, el);
+    clone._dlvTipBound = false;
+  }
+
+  /* ---------- hide immediately ---------- */
+  function hide() {
+    clearTimeout(_showTimer);
+    clearTimeout(_hideTimer);
+    if (_currentEl) _currentEl.removeAttribute('aria-describedby');
+    if (_tip) {
+      _tip.classList.remove('dlv-tip-visible');
+      _tip.style.display = 'none';
+    }
+    _currentEl = null;
+  }
+
+  /* ---------- auto-scan on DOMContentLoaded + MutationObserver ---------- */
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => scanDOM());
+  } else {
+    scanDOM();
+  }
+
+  // Watch for new nodes added dynamically
+  new MutationObserver(mutations => {
+    for (const m of mutations) {
+      for (const node of m.addedNodes) {
+        if (node.nodeType === 1) {
+          if (node.hasAttribute?.('data-dlv-tip')) scanDOM(node.parentElement || document);
+          else if (node.querySelector?.('[data-dlv-tip]')) scanDOM(node);
+        }
+      }
+    }
+  }).observe(document.body || document.documentElement, { childList: true, subtree: true });
+
+  return { attach, attachTree, attachWidget, attachButton, scanDOM, update, detach, hide };
+})();
+
 /* ============================================================
 This file is part of DataLaVista
 01-constants.js: Constants, state object, and core DataLaVista objects.
@@ -6285,10 +6666,13 @@ function generateWidgetSQL(w, tableRef = '_results') {
 }
 
 
+// TODO: If running in SharePoint and we already have a report URL (via param + edit mode or after publishing),
+// we should save the config back to that same URL instead of downloading a new file.
+// This will allow for true in-place editing without needing to re-upload a new file each time. We can detect this scenario by checking if the current URL has a valid SharePoint file reference and if we're in edit mode, then use the SharePoint REST API to update the file content instead of triggering a download.
 function saveConfig() {
   const config = buildConfig();
   const json = JSON.stringify(config, null, 2);
-  downloadText(json, 'DataLaVista-config.json', 'application/json');
+  downloadText(json, (DataLaVistaState.design.title ? DataLaVistaState.design.title : 'DataLaVista-config') + '.json', 'application/json');
 }
 
 // Build a clean, minimal config object from the current state, suitable for saving or sharing
@@ -6483,9 +6867,7 @@ async function loadConfig(cfg) {
   // Background fetch for referenced tables
   if (DataLaVistaState.sql) {
     const referencedTables = findReferencedTables(DataLaVistaState.sql);
-    console.log('==== loadConfig->referencedTables ====');
     for (const tname of referencedTables) {
-      console.log('>>>>>>>   loadConfig->referencedTables->loop->ensureTAbleData. Table: ', tname);
       await ensureTableData(tname, true)
     }
   }
@@ -11019,40 +11401,40 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       // GENERATE REPORT
       // ============================================================
       let _lastPublishedUrl = '';
+      let _lastGeneratedJson = null;   // cached JSON string from last generateReport() call
 
-      function generateReport() {
-        // TODO: get rid of the text area but keep the copy and download buttons.
-        // The window freezes if you try to display >1MB of JSON in the text area, which happens with larger reports. Instead, we can just generate the JSON and enable the copy/download buttons, and they can copy/download directly from the config object instead of the text area.
-        // Or find a more efficient way to display it...
-        const config = buildConfig();
-        const jsonStr = JSON.stringify(config, null, 2);
-        const genJsonArea = document.getElementById('gen-json-area');
-        if (genJsonArea) genJsonArea.value = jsonStr;
+      async function generateReport() {
+        setStatus('Generating report config…', 'loading');
+        toast('Generating report, please wait…', 'info');
 
-        document.getElementById('btn-copy-json').disabled = false;
-        document.getElementById('btn-dl-json').disabled = false;
-        
+        // Yield to the browser so the tab switch and toast paint before the heavy work
+        await new Promise(resolve => setTimeout(resolve, 0));
+
+        _lastGeneratedJson = JSON.stringify(buildConfig(), null, 2);
+
+        /** @type {HTMLButtonElement} */ (document.getElementById('btn-copy-json')).disabled = false;
+        /** @type {HTMLButtonElement} */ (document.getElementById('btn-dl-json')).disabled = false;
+
+        setStatus('Report config ready.', 'success');
         toast('Report generated!', 'success');
       }
 
       function copyGenCode() {
-        const area = document.getElementById('gen-json-area');
-        navigator.clipboard.writeText(area.value).then(() => toast('Copied to clipboard', 'success'));
+        if (!_lastGeneratedJson) { toast('Generate the report first.', 'warning'); return; }
+        navigator.clipboard.writeText(_lastGeneratedJson).then(() => toast('Copied to clipboard', 'success'));
       }
 
       function downloadGenCode() {
-        const area = document.getElementById('gen-json-area');
+        if (!_lastGeneratedJson) { toast('Generate the report first.', 'warning'); return; }
         const ext = '.json';
         const mime = 'application/json';
-        if(DataLaVistaState.design.title)
-          downloadText(area.value, DataLaVistaState.design.title + ext, mime);
-        else
-          downloadText(area.value, 'DataLaVista-report' + ext, mime);
+        const title = DataLaVistaState.design.title || 'DataLaVista-report';
+        downloadText(_lastGeneratedJson, title + ext, mime);
       }
 
       async function publishToSharePoint() {
-        const config = buildConfig();
-        const jsonStr = JSON.stringify(config, null, 2);
+        if (!_lastGeneratedJson) { toast('Generate the report first.', 'warning'); return; }
+        const jsonStr = _lastGeneratedJson;
         const title = DataLaVistaState.design.title || 'DataLaVista-report';
         let result;
         try {
@@ -11076,8 +11458,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       }
 
       async function saveToSharePointList() {
-        const config = buildConfig();
-        const jsonStr = JSON.stringify(config, null, 2);
+        if (!_lastGeneratedJson) { toast('Generate the report first.', 'warning'); return; }
+        const jsonStr = _lastGeneratedJson;
         const title = DataLaVistaState.design.title || 'DataLaVista-report';
         let result;
         try {
@@ -11236,7 +11618,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === 'tab-' + tab));
 
         if (tab === 'dashboardPreview') { refreshDashboardPreview(); }
-        if (tab === 'generate') { generateReport(); }
+        if (tab === 'generate') { setTimeout(() => generateReport(), 0); }
         if (tab === 'design' && DataLaVistaState.reportMode !== 'view') {
           renderDesignCanvas(); renderFilterBar(); renderDesignFieldsPanel();
           requestAnimationFrame(() => { for (const c of Object.values(DataLaVistaState.charts)) { try { c.resize(); } catch (e) { } } });

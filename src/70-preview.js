@@ -269,40 +269,40 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       // GENERATE REPORT
       // ============================================================
       let _lastPublishedUrl = '';
+      let _lastGeneratedJson = null;   // cached JSON string from last generateReport() call
 
-      function generateReport() {
-        // TODO: get rid of the text area but keep the copy and download buttons.
-        // The window freezes if you try to display >1MB of JSON in the text area, which happens with larger reports. Instead, we can just generate the JSON and enable the copy/download buttons, and they can copy/download directly from the config object instead of the text area.
-        // Or find a more efficient way to display it...
-        const config = buildConfig();
-        const jsonStr = JSON.stringify(config, null, 2);
-        const genJsonArea = document.getElementById('gen-json-area');
-        if (genJsonArea) genJsonArea.value = jsonStr;
+      async function generateReport() {
+        setStatus('Generating report config…', 'loading');
+        toast('Generating report, please wait…', 'info');
 
-        document.getElementById('btn-copy-json').disabled = false;
-        document.getElementById('btn-dl-json').disabled = false;
-        
+        // Yield to the browser so the tab switch and toast paint before the heavy work
+        await new Promise(resolve => setTimeout(resolve, 0));
+
+        _lastGeneratedJson = JSON.stringify(buildConfig(), null, 2);
+
+        /** @type {HTMLButtonElement} */ (document.getElementById('btn-copy-json')).disabled = false;
+        /** @type {HTMLButtonElement} */ (document.getElementById('btn-dl-json')).disabled = false;
+
+        setStatus('Report config ready.', 'success');
         toast('Report generated!', 'success');
       }
 
       function copyGenCode() {
-        const area = document.getElementById('gen-json-area');
-        navigator.clipboard.writeText(area.value).then(() => toast('Copied to clipboard', 'success'));
+        if (!_lastGeneratedJson) { toast('Generate the report first.', 'warning'); return; }
+        navigator.clipboard.writeText(_lastGeneratedJson).then(() => toast('Copied to clipboard', 'success'));
       }
 
       function downloadGenCode() {
-        const area = document.getElementById('gen-json-area');
+        if (!_lastGeneratedJson) { toast('Generate the report first.', 'warning'); return; }
         const ext = '.json';
         const mime = 'application/json';
-        if(DataLaVistaState.design.title)
-          downloadText(area.value, DataLaVistaState.design.title + ext, mime);
-        else
-          downloadText(area.value, 'DataLaVista-report' + ext, mime);
+        const title = DataLaVistaState.design.title || 'DataLaVista-report';
+        downloadText(_lastGeneratedJson, title + ext, mime);
       }
 
       async function publishToSharePoint() {
-        const config = buildConfig();
-        const jsonStr = JSON.stringify(config, null, 2);
+        if (!_lastGeneratedJson) { toast('Generate the report first.', 'warning'); return; }
+        const jsonStr = _lastGeneratedJson;
         const title = DataLaVistaState.design.title || 'DataLaVista-report';
         let result;
         try {
@@ -326,8 +326,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       }
 
       async function saveToSharePointList() {
-        const config = buildConfig();
-        const jsonStr = JSON.stringify(config, null, 2);
+        if (!_lastGeneratedJson) { toast('Generate the report first.', 'warning'); return; }
+        const jsonStr = _lastGeneratedJson;
         const title = DataLaVistaState.design.title || 'DataLaVista-report';
         let result;
         try {
