@@ -130,13 +130,6 @@ function buildConfig() {
     }
   }
 
-  // Bring over preview/flat table data if the source contains an uploaded file
-  let previewResults = [];
-  // TODO: Do we need to load preview data, or just re-run SQL when report loads?
-//  if(uploadedFilesDsNames && uploadedFilesDsNames.length>0 && DataLaVistaState.previewResults && DataLaVistaState.previewResults.length>0) {
-    //previewResults = DataLaVistaState.previewResults || []; // Since we found files that were uploaded, we preserve the flat table data
-//  }
-
   // Save tables (and row data if the files were uploaded)
   const tablesMeta = {};
   for (const [name, t] of Object.entries(DataLaVistaState.tables)) {
@@ -222,19 +215,15 @@ function buildConfig() {
     activeTab: (DataLaVistaState.reportMode === 'view') ? 'dashboardPreview' : 'design',
     advancedQB: DataLaVistaState.advancedQB || {},
     basicQB: DataLaVistaState.basicQB || {},
-    charts: DataLaVistaState.charts || {},
     currentWidgetId: DataLaVistaState.currentWidgetId || null,
     dataSources: dataSourcesMeta,
     design: cleanDesign,
     previewFilters: DataLaVistaState.previewFilters || {},
-    previewResults: Array.isArray(previewResults) ? [...previewResults] : [],
     qbCollapsed: DataLaVistaState.qbCollapsed || false,
     qbSectionHeight: DataLaVistaState.qbSectionHeight || 60,
     qmTab: DataLaVistaState.qmTab || 'dataPreview',
-    queryColumns: Array.isArray(DataLaVistaState.queryColumns) ? [...DataLaVistaState.queryColumns] : [],    
+    queryColumns: Array.isArray(DataLaVistaState.queryColumns) ? [...DataLaVistaState.queryColumns] : [],
     queryMode: (DataLaVistaState.queryMode && DataLaVistaState.queryMode != null && DataLaVistaState.queryMode != undefined && DataLaVistaState.queryMode != '') ? DataLaVistaState.queryMode : 'sql',
-    queryResults: [], // never persisted — query re-runs on load against restored table data or remote source
-    queryResultsReady: false,
     sql: DataLaVistaState.sql || '',
     sqlLocked: DataLaVistaState.sqlLocked || false,
     tables: tablesMeta
@@ -269,7 +258,6 @@ async function loadConfig(cfg) {
   DataLaVistaState.activeTab = (DataLaVistaState.reportMode==='view')?'dataPreview':'design';
   DataLaVistaState.advancedQB = cfg.advancedQB || {};
   DataLaVistaState.basicQB = cfg.basicQB || {};
-  DataLaVistaState.charts = cfg.charts || {};
   DataLaVistaState.currentWidgetId = null;
   DataLaVistaState.dataSources = cfg.dataSources || {};
   const loadedDesign = cfg.design || {};
@@ -284,12 +272,9 @@ async function loadConfig(cfg) {
     transformedResults: null
   };
   DataLaVistaState.previewFilters = cfg.previewFilters || {};
-  DataLaVistaState.previewResults = Array.isArray(cfg.previewResults) ? [...cfg.previewResults] : [];
   DataLaVistaState.qmTab = cfg.qmTab || 'previewData';
   DataLaVistaState.queryColumns = Array.isArray(cfg.queryColumns) ? [...cfg.queryColumns] : [];
   DataLaVistaState.queryMode = (cfg.queryMode && cfg.queryMode != null && cfg.queryMode != undefined && cfg.queryMode != '') ? cfg.queryMode : 'sql';
-  DataLaVistaState.queryResults = Array.isArray(cfg.queryResults) ? [...cfg.queryResults] : [];
-  DataLaVistaState.queryResultsReady = cfg.queryResultsReady || false;
   // Don't load reportMode or reportUrl from config - it's handled by init()
   DataLaVistaState.sql = cfg.sql || '';
   DataLaVistaState.sqlLocked = cfg.sqlLocked || false;

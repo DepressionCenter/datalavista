@@ -47,22 +47,29 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
             registerTableInAlaSQL(tname);
           }
 
-          // Execute SQL with preprocessing
+          // Execute SQL once, then store results in a named AlaSQL table so
+          // per-widget queries scan a materialized dataset instead of re-running joins.
           const processedSQL = preprocessSQL(sql);
-          const results = alasql(processedSQL);
+          const sampleRows = alasql(processedSQL);
+          if (!Array.isArray(sampleRows)) throw new Error('Query returned no results');
 
-          if (!Array.isArray(results)) throw new Error('Query returned no results');
-          DataLaVistaState.queryResults = results;
-          DataLaVistaState.queryColumns = results.length ? Object.keys(results[0]) : [];
+          alasql('DROP TABLE IF EXISTS [dlv_results]');
+          alasql('DROP VIEW  IF EXISTS [dlv_active]');
+          alasql('CREATE TABLE [dlv_results]');
+          alasql.tables['dlv_results'].data = sampleRows;   // O(1) reference assignment
+          alasql('CREATE VIEW [dlv_active] AS SELECT * FROM [dlv_results]');
+          DataLaVistaState.previewFilters = {};
+          DataLaVistaState.design.previewFilteredData = null;
+          DataLaVistaState.queryColumns = sampleRows.length ? Object.keys(sampleRows[0]) : [];
 
-          // Show preview
-          showQueryPreview(results);
-          // Reset design transforms when new query results arrive
+          // Show QB preview table
+          showQueryPreview(sampleRows);
+          // Reset design transforms when a new view arrives
           DataLaVistaState.design.transformedResults = null;
           applyDesignTransforms();
           renderDesignFieldsPanel();
-          setStatus(`✅ Query returned ${results.length} rows`);
-          toast(`Query returned ${results.length} rows`, 'success');
+          setStatus(`✅ Query returned ${sampleRows.length} rows`);
+          toast(`Query returned ${sampleRows.length} rows`, 'success');
         } catch (err) {
           console.error(err);
           toast('Query error: ' + err.message, 'error');
@@ -141,8 +148,13 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       }
     }
     if (typeMap[col]) return typeMap[col];
-    // Fallback: sniff type from first result row value
-    const firstRow = (DataLaVistaState.queryResults && DataLaVistaState.queryResults[0]) || null;
+    // Fallback: sniff type from first row of the materialized results table
+    const firstRow = (() => {
+      if (alasql.tables && alasql.tables['dlv_results']) {
+        try { return alasql('SELECT * FROM [dlv_results]')[0] || null; } catch (_) { return null; }
+      }
+      return null;
+    })();
     if (!firstRow) return 'default';
     const v = firstRow[col];
     if (Array.isArray(v)) return 'array';

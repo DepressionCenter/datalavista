@@ -3084,13 +3084,10 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       <!-- ======================== TAB 2: DESIGN ======================== -->
       <div class="tab-panel" id="tab-design">
 
-        <!-- Left: data shaping panel (fields + filter/sort/group) -->
+        <!-- Left: fields panel (drag to canvas; per-widget options are in the right properties panel) -->
         <div class="panel" id="design-fields-panel" style="width:260px">
           <div class="panel-header">
             <span>Data</span>
-            <div class="panel-actions">
-              <button class="btn btn-ghost btn-sm btn-icon" id="btn-apply-design-transform" title="Apply filters / sorts / grouping to canvas" onclick="applyDesignTransforms()" style="font-size:14px">▶</button>
-            </div>
           </div>
           <div class="panel-body" id="design-fields-body">
             <div class="text-muted text-sm" style="padding:12px 10px">Run a query first to see fields</div>
@@ -3372,7 +3369,6 @@ const DataLaVistaState = {
   },
   sql: '',
   sqlLocked: false,
-  queryResults: null,  // array of row objects
   queryColumns: [],
   design: {
     title: '',
@@ -3385,7 +3381,6 @@ const DataLaVistaState = {
     transformedResults: null  // cached result of applyDesignTransforms()
   },
   currentWidgetId: null,
-  previewResults: null,
   previewFilters: {},  // field -> value
   activeTab: 'query',
   qbCollapsed: false,
@@ -6356,13 +6351,6 @@ function buildConfig() {
     }
   }
 
-  // Bring over preview/flat table data if the source contains an uploaded file
-  let previewResults = [];
-  // TODO: Do we need to load preview data, or just re-run SQL when report loads?
-//  if(uploadedFilesDsNames && uploadedFilesDsNames.length>0 && DataLaVistaState.previewResults && DataLaVistaState.previewResults.length>0) {
-    //previewResults = DataLaVistaState.previewResults || []; // Since we found files that were uploaded, we preserve the flat table data
-//  }
-
   // Save tables (and row data if the files were uploaded)
   const tablesMeta = {};
   for (const [name, t] of Object.entries(DataLaVistaState.tables)) {
@@ -6448,19 +6436,15 @@ function buildConfig() {
     activeTab: (DataLaVistaState.reportMode === 'view') ? 'dashboardPreview' : 'design',
     advancedQB: DataLaVistaState.advancedQB || {},
     basicQB: DataLaVistaState.basicQB || {},
-    charts: DataLaVistaState.charts || {},
     currentWidgetId: DataLaVistaState.currentWidgetId || null,
     dataSources: dataSourcesMeta,
     design: cleanDesign,
     previewFilters: DataLaVistaState.previewFilters || {},
-    previewResults: Array.isArray(previewResults) ? [...previewResults] : [],
     qbCollapsed: DataLaVistaState.qbCollapsed || false,
     qbSectionHeight: DataLaVistaState.qbSectionHeight || 60,
     qmTab: DataLaVistaState.qmTab || 'dataPreview',
-    queryColumns: Array.isArray(DataLaVistaState.queryColumns) ? [...DataLaVistaState.queryColumns] : [],    
+    queryColumns: Array.isArray(DataLaVistaState.queryColumns) ? [...DataLaVistaState.queryColumns] : [],
     queryMode: (DataLaVistaState.queryMode && DataLaVistaState.queryMode != null && DataLaVistaState.queryMode != undefined && DataLaVistaState.queryMode != '') ? DataLaVistaState.queryMode : 'sql',
-    queryResults: [], // never persisted — query re-runs on load against restored table data or remote source
-    queryResultsReady: false,
     sql: DataLaVistaState.sql || '',
     sqlLocked: DataLaVistaState.sqlLocked || false,
     tables: tablesMeta
@@ -6495,7 +6479,6 @@ async function loadConfig(cfg) {
   DataLaVistaState.activeTab = (DataLaVistaState.reportMode==='view')?'dataPreview':'design';
   DataLaVistaState.advancedQB = cfg.advancedQB || {};
   DataLaVistaState.basicQB = cfg.basicQB || {};
-  DataLaVistaState.charts = cfg.charts || {};
   DataLaVistaState.currentWidgetId = null;
   DataLaVistaState.dataSources = cfg.dataSources || {};
   const loadedDesign = cfg.design || {};
@@ -6510,12 +6493,9 @@ async function loadConfig(cfg) {
     transformedResults: null
   };
   DataLaVistaState.previewFilters = cfg.previewFilters || {};
-  DataLaVistaState.previewResults = Array.isArray(cfg.previewResults) ? [...cfg.previewResults] : [];
   DataLaVistaState.qmTab = cfg.qmTab || 'previewData';
   DataLaVistaState.queryColumns = Array.isArray(cfg.queryColumns) ? [...cfg.queryColumns] : [];
   DataLaVistaState.queryMode = (cfg.queryMode && cfg.queryMode != null && cfg.queryMode != undefined && cfg.queryMode != '') ? cfg.queryMode : 'sql';
-  DataLaVistaState.queryResults = Array.isArray(cfg.queryResults) ? [...cfg.queryResults] : [];
-  DataLaVistaState.queryResultsReady = cfg.queryResultsReady || false;
   // Don't load reportMode or reportUrl from config - it's handled by init()
   DataLaVistaState.sql = cfg.sql || '';
   DataLaVistaState.sqlLocked = cfg.sqlLocked || false;
@@ -9436,22 +9416,29 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
             registerTableInAlaSQL(tname);
           }
 
-          // Execute SQL with preprocessing
+          // Execute SQL once, then store results in a named AlaSQL table so
+          // per-widget queries scan a materialized dataset instead of re-running joins.
           const processedSQL = preprocessSQL(sql);
-          const results = alasql(processedSQL);
+          const sampleRows = alasql(processedSQL);
+          if (!Array.isArray(sampleRows)) throw new Error('Query returned no results');
 
-          if (!Array.isArray(results)) throw new Error('Query returned no results');
-          DataLaVistaState.queryResults = results;
-          DataLaVistaState.queryColumns = results.length ? Object.keys(results[0]) : [];
+          alasql('DROP TABLE IF EXISTS [dlv_results]');
+          alasql('DROP VIEW  IF EXISTS [dlv_active]');
+          alasql('CREATE TABLE [dlv_results]');
+          alasql.tables['dlv_results'].data = sampleRows;   // O(1) reference assignment
+          alasql('CREATE VIEW [dlv_active] AS SELECT * FROM [dlv_results]');
+          DataLaVistaState.previewFilters = {};
+          DataLaVistaState.design.previewFilteredData = null;
+          DataLaVistaState.queryColumns = sampleRows.length ? Object.keys(sampleRows[0]) : [];
 
-          // Show preview
-          showQueryPreview(results);
-          // Reset design transforms when new query results arrive
+          // Show QB preview table
+          showQueryPreview(sampleRows);
+          // Reset design transforms when a new view arrives
           DataLaVistaState.design.transformedResults = null;
           applyDesignTransforms();
           renderDesignFieldsPanel();
-          setStatus(`✅ Query returned ${results.length} rows`);
-          toast(`Query returned ${results.length} rows`, 'success');
+          setStatus(`✅ Query returned ${sampleRows.length} rows`);
+          toast(`Query returned ${sampleRows.length} rows`, 'success');
         } catch (err) {
           console.error(err);
           toast('Query error: ' + err.message, 'error');
@@ -9530,8 +9517,13 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       }
     }
     if (typeMap[col]) return typeMap[col];
-    // Fallback: sniff type from first result row value
-    const firstRow = (DataLaVistaState.queryResults && DataLaVistaState.queryResults[0]) || null;
+    // Fallback: sniff type from first row of the materialized results table
+    const firstRow = (() => {
+      if (alasql.tables && alasql.tables['dlv_results']) {
+        try { return alasql('SELECT * FROM [dlv_results]')[0] || null; } catch (_) { return null; }
+      }
+      return null;
+    })();
     if (!firstRow) return 'default';
     const v = firstRow[col];
     if (Array.isArray(v)) return 'array';
@@ -9575,17 +9567,11 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       return;
     }
 
-    // Ensure design transform arrays exist
-    if (!DataLaVistaState.design.conditions) DataLaVistaState.design.conditions = [];
-    if (!DataLaVistaState.design.sorts)      DataLaVistaState.design.sorts = [];
-    if (!DataLaVistaState.design.groupBy)    DataLaVistaState.design.groupBy = [];
-    if (!DataLaVistaState.design.fieldAggs)  DataLaVistaState.design.fieldAggs = {};
-
     const cols = DataLaVistaState.queryColumns;
 
     body.innerHTML = '';
 
-    // ── 1. FIELDS section ──────────────────────────────────────────────────
+    // ── FIELDS section (drag → canvas / widget) ────────────────────────────
     const secFields = document.createElement('div');
     secFields.className = 'qb-section';
     secFields.style.borderTop = 'none';
@@ -9608,44 +9594,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       secFields.appendChild(row);
     }
     body.appendChild(secFields);
-
-    // ── 2. FILTER CONDITIONS section ───────────────────────────────────────
-    const secFilters = document.createElement('div');
-    secFilters.className = 'qb-section';
-    secFilters.innerHTML = `
-      <div class="qb-section-header">
-        <span>FILTER CONDITIONS</span>
-        <button class="btn btn-ghost btn-sm" onclick="addDesignCondition()">+ Add</button>
-      </div>
-      <div id="design-conditions-area"></div>`;
-    body.appendChild(secFilters);
-
-    // ── 3. SORT ORDER section ──────────────────────────────────────────────
-    const secSorts = document.createElement('div');
-    secSorts.className = 'qb-section';
-    secSorts.innerHTML = `
-      <div class="qb-section-header">
-        <span>SORT ORDER</span>
-        <button class="btn btn-ghost btn-sm" onclick="addDesignSort()">+ Add</button>
-      </div>
-      <div id="design-sorts-area"></div>`;
-    body.appendChild(secSorts);
-
-    // ── 4. GROUP BY section ────────────────────────────────────────────────
-    const secGroup = document.createElement('div');
-    secGroup.className = 'qb-section';
-    secGroup.innerHTML = `
-      <div class="qb-section-header">
-        <span id="design-groupby-label">GROUP BY</span>
-        <button class="btn btn-ghost btn-sm" id="design-groupby-add-btn" onclick="addDesignGroupBy()">+ Add</button>
-      </div>
-      <div id="design-groupby-area"></div>`;
-    body.appendChild(secGroup);
-
-    // Render the sub-sections
-    renderDesignConditions();
-    renderDesignSorts();
-    syncDesignGroupBySection();
   }
 
   // ============================================================
@@ -9654,15 +9602,20 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
   // as the Query Builder so the UI is identical.
   // ============================================================
 
-  /** Returns design-transformed data if transforms are active, otherwise raw query results. */
+  /** Returns the most-specific base dataset available.
+   *  Priority: previewFilteredData → transformedResults → [dlv_active] view → queryResults fallback. */
   function getDesignData() {
-    return DataLaVistaState.design.transformedResults || DataLaVistaState.queryResults || [];
+    if (DataLaVistaState.design.previewFilteredData)  return DataLaVistaState.design.previewFilteredData;
+    if (DataLaVistaState.design.transformedResults)   return DataLaVistaState.design.transformedResults;
+    if (alasql.tables && alasql.tables['dlv_active']) return alasql('SELECT * FROM [dlv_active]');
+    return [];
   }
 
-  /** Re-runs the design-level AlaSQL transform on DataLaVistaState.queryResults and
-   *  stores the result in DataLaVistaState.design.transformedResults, then re-renders widgets. */
+  /** Re-runs the design-level AlaSQL transform against [dlv_results] (or queryResults fallback)
+   *  and stores the result in DataLaVistaState.design.transformedResults, then re-renders widgets. */
   function applyDesignTransforms() {
-    if (!DataLaVistaState.queryResults || !DataLaVistaState.queryResults.length) {
+    const hasView = !!(alasql.tables && alasql.tables['dlv_results']);
+    if (!hasView) {
       DataLaVistaState.design.transformedResults = null;
       renderDesignCanvas();
       return;
@@ -9720,13 +9673,14 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 
     const orderParts = sorts.map(s => `[${s.field}] ${s.dir || 'ASC'}`);
 
-    let sql = `SELECT ${selParts.join(', ')} FROM ?`;
+    const fromSrc = hasView ? '[dlv_results]' : '?';
+    let sql = `SELECT ${selParts.join(', ')} FROM ${fromSrc}`;
     if (whereParts.length) sql += ` WHERE ${whereParts.join(' ')}`;
     if (groupParts.length) sql += ` GROUP BY ${groupParts.join(', ')}`;
     if (orderParts.length) sql += ` ORDER BY ${orderParts.join(', ')}`;
 
     try {
-      const results = alasql(sql, [DataLaVistaState.queryResults]);
+      const results = alasql(sql);
       DataLaVistaState.design.transformedResults = Array.isArray(results) ? results : null;
       const rowCount = DataLaVistaState.design.transformedResults ? DataLaVistaState.design.transformedResults.length : 0;
       toast(`Design transform applied — ${rowCount} rows`, 'success');
@@ -10016,6 +9970,9 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           xField: (fields && fields.length>0) ? fields[0] : DataLaVistaState.queryColumns[0] || '', // TODO: guess x and y based on dataType
           yField: (fields && fields.length>1) ? fields[1] : DataLaVistaState.queryColumns[1] || '',
           aggregation: '',
+          fieldAggs: {},     // per-field aggregate: { [col]: 'SUM' | 'AVG' | ... }
+          conditions: [],    // per-widget WHERE: [{ conj, field, op, value }]
+          sorts: [],         // per-widget ORDER BY: [{ field, dir }]
           fillColor: '#0078d4',
           borderColor: '#edebe9',
           borderSize: 1,
@@ -10201,32 +10158,128 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         });
       }
 
-      function renderKPIContent(w, data) {
-        let value = '—', label = w.fields[0] || '';
-        const kpiData = data || getDesignData();
-        if (kpiData && kpiData.length && label) {
-          const field = label;
-          const agg = w.aggregation || 'SUM';
-          const vals = kpiData.map(r => parseFloat(r[field]) || 0);
-          if (agg === 'COUNT') value = kpiData.length;
-          else if (agg === 'SUM') value = vals.reduce((a, b) => a + b, 0).toLocaleString();
-          else if (agg === 'AVG') value = vals.length ? (vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(2) : '—';
-          else value = kpiData[0][field] ?? '—';
+      // ============================================================
+      // PER-WIDGET DATA BUILDER
+      // Applies widget-level fieldAggs, conditions, and sorts via AlaSQL
+      // on top of the (possibly globally-transformed) base dataset.
+      // ============================================================
+      function buildWidgetData(w) {
+        // Prefer a named AlaSQL view if one was registered by the preview runner.
+        // [dlv_active] exists when a global filter bar filter is active (sits on top
+        // of [dlv_results]); [dlv_results] is the base view wrapping the user's SQL.
+        // Falling back to the in-memory array keeps the Design tab working before any
+        // preview run has been executed.
+        const hasActive  = !!(alasql.tables && alasql.tables['dlv_active']);
+        const hasResults = !!(alasql.tables && alasql.tables['dlv_results']);
+        const fromSrc    = hasActive ? '[dlv_active]' : hasResults ? '[dlv_results]' : null;
+
+        const base = getDesignData();
+        if (!fromSrc && (!base || !base.length)) return [];
+
+        // Determine the set of columns this widget cares about.
+        // When using a named view we don't have a base[0] to introspect, so we
+        // rely on the widget's own field config (cols will be validated by SQL).
+        let cols;
+        if (w.type === 'table') {
+          cols = fromSrc
+            ? (w.fields || [])
+            : (w.fields || []).filter(f => Object.prototype.hasOwnProperty.call(base[0], f));
+        } else if (['bar', 'line', 'pie', 'scatter'].includes(w.type)) {
+          cols = [...new Set([w.xField, w.yField].filter(Boolean))];
+        } else if (w.type === 'kpi') {
+          cols = (w.fields || []).slice(0, 1);
+        } else {
+          return base;
         }
-        return `<div class="kpi-card"><div class="kpi-value" style="color:${w.fillColor}">${value}</div><div class="kpi-label">${label}</div></div>`;
+        if (!cols.length) return base;
+
+        // Ensure state arrays exist (handles widgets created before this version)
+        const fieldAggs  = w.fieldAggs  || {};
+        const conditions = (w.conditions || []).filter(c => c.field);
+        const sorts      = (w.sorts     || []).filter(s => s.field);
+        const anyAgg     = cols.some(c => fieldAggs[c]);
+
+        if (!conditions.length && !sorts.length && !anyAgg) return base;
+
+        // SELECT — preserve column name via AS so downstream code keeps working
+        const selParts = cols.map(col => {
+          const agg = fieldAggs[col];
+          if (!agg) return `[${col}]`;
+          if (agg === 'COUNT_DISTINCT') return `COUNT(DISTINCT [${col}]) AS [${col}]`;
+          return `${agg}([${col}]) AS [${col}]`;
+        });
+
+        // WHERE — same logic as applyDesignTransforms / AQB node conditions
+        const whereParts = conditions.map((c, i) => {
+          const conj = i === 0 ? '' : (c.conj || 'AND') + ' ';
+          const col  = `[${c.field}]`;
+          if (c.op === 'NULL')    return conj + `${col} IS NULL`;
+          if (c.op === 'NOTNULL') return conj + `${col} IS NOT NULL`;
+          if (DataLaVistaCore.DATE_MACRO_VALS.has(c.op)) {
+            const expr = dateMacroToSQL(c.op, c.value, col);
+            return expr ? conj + expr : conj + `${col} IS NOT NULL`;
+          }
+          const raw = c.value || '';
+          const val = c.op === 'LIKE'
+            ? `'%${raw}%'`
+            : (raw !== '' && !isNaN(raw) ? raw : `'${raw.replace(/'/g, "''")}'`);
+          return conj + `${col} ${c.op} ${val}`;
+        });
+
+        // GROUP BY — auto-derived from non-aggregated columns when any agg is active
+        const groupParts = anyAgg ? cols.filter(c => !fieldAggs[c]).map(c => `[${c}]`) : [];
+
+        // ORDER BY
+        const orderParts = sorts.map(s => `[${s.field}] ${s.dir || 'ASC'}`);
+
+        // Use named view when available (no array binding needed); fall back to ?
+        const from = fromSrc || '?';
+        let sql = `SELECT ${selParts.join(', ')} FROM ${from}`;
+        if (whereParts.length) sql += ` WHERE ${whereParts.join(' ')}`;
+        if (groupParts.length) sql += ` GROUP BY ${groupParts.join(', ')}`;
+        if (orderParts.length) sql += ` ORDER BY ${orderParts.join(', ')}`;
+
+        try {
+          const result = fromSrc ? alasql(sql) : alasql(sql, [base]);
+          return Array.isArray(result) ? result : base;
+        } catch (e) {
+          console.warn('buildWidgetData error:', e.message, '|', sql);
+          return base;
+        }
+      }
+
+      function renderKPIContent(w) {
+        let value = '—';
+        const field = w.fields[0] || '';
+        const kpiData = buildWidgetData(w);
+        if (kpiData && kpiData.length && field) {
+          const fieldAgg = (w.fieldAggs || {})[field];
+          if (fieldAgg) {
+            // buildWidgetData ran SQL aggregation — first row has the result
+            value = kpiData[0][field] ?? '—';
+          } else {
+            // No per-field agg set — fall back to legacy w.aggregation JS aggregation
+            const agg = w.aggregation || 'SUM';
+            const vals = kpiData.map(r => parseFloat(r[field]) || 0);
+            if (agg === 'COUNT') value = kpiData.length;
+            else if (agg === 'SUM') value = vals.reduce((a, b) => a + b, 0).toLocaleString();
+            else if (agg === 'AVG') value = vals.length ? (vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(2) : '—';
+            else value = kpiData[0][field] ?? '—';
+          }
+        }
+        return `<div class="kpi-card"><div class="kpi-value" style="color:${w.fillColor}">${value}</div><div class="kpi-label">${field}</div></div>`;
       }
 
       function renderTableContent(w) {
-        const tableData = getDesignData();
+        const tableData = buildWidgetData(w);
         if (!tableData || !tableData.length) {
           return '<div class="text-muted text-sm" style="padding:12px">No data — run a query first</div>';
         }
-        const allCols = tableData.length ? Object.keys(tableData[0]) : DataLaVistaState.queryColumns;
+        const allCols = Object.keys(tableData[0]);
         const cols = w.fields.filter(f => allCols.includes(f));
-        if (!cols.length) return '<div class="text-muted text-sm" style="padding:12px">No fields selected</div>';
-        const rows = tableData;
+        if (!cols.length) return '<div class="text-muted text-sm" style="padding:12px">No fields selected — add columns in the properties panel</div>';
         let html = '<div style="overflow:auto;max-height:100%"><table class="widget-table"><thead><tr>' + cols.map(c => `<th>${c}</th>`).join('') + '</tr></thead><tbody>';
-        for (const row of rows) {
+        for (const row of tableData) {
           html += '<tr>' + cols.map(c => `<td>${row[c] ?? ''}</td>`).join('') + '</tr>';
         }
         html += '</tbody></table></div>';
@@ -10241,7 +10294,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         const chart = echarts.init(chartEl);
         DataLaVistaState.charts[w.id] = chart;
 
-        const chartData = aggregateDataForWidget(w);
+        const chartData = buildWidgetData(w);
         if (!chartData || !chartData.length) {
           chart.setOption({ title: { text: 'No data', left: 'center', top: 'middle', textStyle: { color: '#a19f9d', fontSize: 13 } } });
           return;
@@ -10353,136 +10406,290 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       // ============================================================
       // WIDGET PROPERTIES
       // ============================================================
+      // ============================================================
+      // PER-WIDGET PROPERTY HANDLERS
+      // Mirror the AQB advNode* functions, scoped to a widget.
+      // ============================================================
+
+      /** Re-renders both the properties panel and the widget canvas content. */
+      function _widgetRefresh(wid) {
+        renderWidgetProperties(wid);
+        updateWidgetContent(wid);
+      }
+
+      /** Opens an aggregate-picker popup anchored to btn, for a specific widget field. */
+      function showWidgetFieldAggPopup(wid, field, btn) {
+        document.querySelectorAll('.adv-agg-popup').forEach(p => p.remove());
+        const dt = sniffType(field);
+        const aggs = aggsForType(dt);
+        const w = DataLaVistaState.design.widgets.find(x => x.id === wid);
+        const current = w ? ((w.fieldAggs || {})[field] || '') : '';
+        const popup = document.createElement('div');
+        popup.className = 'adv-agg-popup';
+        popup.innerHTML = aggs.map(a =>
+          `<div class="agg-opt${a.val === current ? ' selected' : ''}"
+            onclick="setWidgetFieldAgg('${wid}','${field.replace(/'/g,"\\'")}','${a.val}');document.querySelectorAll('.adv-agg-popup').forEach(p=>p.remove())">${a.label}</div>`
+        ).join('');
+        document.body.appendChild(popup);
+        const rect = btn.getBoundingClientRect();
+        popup.style.top  = (rect.bottom + 2) + 'px';
+        popup.style.left = Math.max(0, rect.left - popup.offsetWidth + rect.width) + 'px';
+        setTimeout(() => {
+          document.addEventListener('click', function close(e) {
+            if (!popup.contains(e.target)) { popup.remove(); document.removeEventListener('click', close); }
+          });
+        }, 10);
+      }
+
+      /** Sets (or clears) a per-field aggregate on a widget, then refreshes. */
+      function setWidgetFieldAgg(wid, field, agg) {
+        const w = DataLaVistaState.design.widgets.find(x => x.id === wid);
+        if (!w) return;
+        if (!w.fieldAggs) w.fieldAggs = {};
+        if (agg) w.fieldAggs[field] = agg;
+        else delete w.fieldAggs[field];
+        _widgetRefresh(wid);
+      }
+
+      // ── Per-widget conditions ────────────────────────────────────────────
+
+      function widgetAddCond(wid) {
+        const w = DataLaVistaState.design.widgets.find(x => x.id === wid);
+        if (!w || !DataLaVistaState.queryColumns.length) return;
+        if (!w.conditions) w.conditions = [];
+        w.conditions.push({ conj: 'AND', field: DataLaVistaState.queryColumns[0], op: '=', value: '' });
+        renderWidgetProperties(wid);
+      }
+
+      function widgetRemoveCond(wid, idx) {
+        const w = DataLaVistaState.design.widgets.find(x => x.id === wid);
+        if (!w) return;
+        w.conditions.splice(idx, 1);
+        _widgetRefresh(wid);
+      }
+
+      function widgetUpdateCond(wid, idx, prop, val) {
+        const w = DataLaVistaState.design.widgets.find(x => x.id === wid);
+        if (!w || !w.conditions[idx]) return;
+        w.conditions[idx][prop] = val;
+        if (prop === 'op') renderWidgetProperties(wid); // re-render to toggle value input
+        else updateWidgetContent(wid);
+      }
+
+      // ── Per-widget sorts ─────────────────────────────────────────────────
+
+      function widgetAddSort(wid) {
+        const w = DataLaVistaState.design.widgets.find(x => x.id === wid);
+        if (!w || !DataLaVistaState.queryColumns.length) return;
+        if (!w.sorts) w.sorts = [];
+        w.sorts.push({ field: DataLaVistaState.queryColumns[0], dir: 'ASC' });
+        renderWidgetProperties(wid);
+      }
+
+      function widgetRemoveSort(wid, idx) {
+        const w = DataLaVistaState.design.widgets.find(x => x.id === wid);
+        if (!w) return;
+        w.sorts.splice(idx, 1);
+        _widgetRefresh(wid);
+      }
+
+      function widgetUpdateSort(wid, idx, prop, val) {
+        const w = DataLaVistaState.design.widgets.find(x => x.id === wid);
+        if (!w || !w.sorts[idx]) return;
+        w.sorts[idx][prop] = val;
+        updateWidgetContent(wid);
+      }
+
       function renderWidgetProperties(wid) {
         const w = DataLaVistaState.design.widgets.find(x => x.id === wid);
         if (!w) return;
         const section = document.getElementById('props-section');
 
         const isChart = ['bar', 'line', 'pie', 'scatter'].includes(w.type);
-        const isKPI = w.type === 'kpi';
+        const isKPI   = w.type === 'kpi';
         const isTable = w.type === 'table';
-        const isText = w.type === 'text';
+        const isText  = w.type === 'text';
+        const isData  = isChart || isKPI || isTable;
+
+        const cols       = DataLaVistaState.queryColumns;
+        const fieldAggs  = w.fieldAggs  || {};
+        const conditions = w.conditions || [];
+        const sorts      = w.sorts      || [];
+
+        // ── Field row: type-icon + label + field-selector + ∑ agg button ──
+        const fieldRow = (roleLabel, fieldVal, onChangeExpr) => {
+          const dt  = sniffType(fieldVal || '');
+          const ti  = DataLaVistaCore.FIELD_TYPE_ICONS[dt] || DataLaVistaCore.FIELD_TYPE_ICONS.default;
+          const agg = fieldAggs[fieldVal] || '';
+          return `
+            <div class="adv-field-row selected">
+              <span class="field-type-icon ${ti.cls}">${ti.icon}</span>
+              <span style="font-size:11px;color:var(--text-disabled);flex-shrink:0;min-width:16px">${roleLabel}</span>
+              <select class="form-input" style="flex:1;height:22px;font-size:11px" onchange="${onChangeExpr}">
+                ${cols.map(c => `<option value="${c}" ${c === fieldVal ? 'selected' : ''}>${c}</option>`).join('')}
+              </select>
+              <button class="adv-agg-btn${agg ? ' has-agg' : ''}" title="${agg || 'No aggregate'}"
+                onclick="event.stopPropagation();showWidgetFieldAggPopup('${wid}','${(fieldVal||'').replace(/'/g,"\\'")}',this)">${agg ? getAggIcon(agg) : '∑'}</button>
+            </div>`;
+        };
+
+        // ── Table column row: type-icon + name + ∑ agg button + remove ──
+        const tableFieldRow = (fieldName, idx) => {
+          const dt  = sniffType(fieldName);
+          const ti  = DataLaVistaCore.FIELD_TYPE_ICONS[dt] || DataLaVistaCore.FIELD_TYPE_ICONS.default;
+          const agg = fieldAggs[fieldName] || '';
+          return `
+            <div class="adv-field-row selected">
+              <span class="field-type-icon ${ti.cls}">${ti.icon}</span>
+              <span class="field-name" style="flex:1">${fieldName}</span>
+              <button class="adv-agg-btn${agg ? ' has-agg' : ''}" title="${agg || 'No aggregate'}"
+                onclick="event.stopPropagation();showWidgetFieldAggPopup('${wid}','${fieldName.replace(/'/g,"\\'")}',this)">${agg ? getAggIcon(agg) : '∑'}</button>
+              <button class="btn btn-ghost btn-sm btn-icon" style="padding:0 4px" onclick="removeWidgetField('${wid}',${idx})">✕</button>
+            </div>`;
+        };
+
+        // ── Filter conditions ────────────────────────────────────────────
+        const renderConditions = () => {
+          if (!conditions.length)
+            return '<div style="font-size:11px;color:var(--text-disabled);padding:2px 0">No filters — click + Add</div>';
+          return conditions.map((c, ci) => {
+            const isDate = sniffType(c.field) === 'date';
+            const ops    = isDate ? [...QB_OPS, ...DataLaVistaCore.DATE_MACRO_OPS] : QB_OPS;
+            const isMacro    = DataLaVistaCore.DATE_MACRO_VALS.has(c.op);
+            const macroMeta  = DataLaVistaCore.DATE_MACRO_OPS.find(o => o.val === c.op);
+            const needsValue = c.op !== 'NULL' && c.op !== 'NOTNULL' && !(isMacro && !macroMeta?.hasInput);
+            return `<div class="qb-condition-row">
+              ${ci === 0
+                ? `<span class="qb-where-badge">WHERE</span>`
+                : `<select class="form-input qb-conj-select" onchange="widgetUpdateCond('${wid}',${ci},'conj',this.value)">
+                    <option ${c.conj==='AND'?'selected':''}>AND</option>
+                    <option ${c.conj==='OR'?'selected':''}>OR</option></select>`}
+              <select class="form-input qb-field-select" onchange="widgetUpdateCond('${wid}',${ci},'field',this.value)">
+                ${cols.map(col=>`<option value="${col}" ${col===c.field?'selected':''}>${col}</option>`).join('')}
+              </select>
+              <select class="form-input qb-op-select" style="width:${isDate?'150px':'112px'}!important"
+                onchange="widgetUpdateCond('${wid}',${ci},'op',this.value)">
+                ${ops.map(o=>`<option value="${o.val}" ${o.val===c.op?'selected':''}>${o.label}</option>`).join('')}
+              </select>
+              ${needsValue
+                ? `<input type="${isMacro?'number':'text'}" class="form-input qb-val-input" value="${(c.value||'').replace(/"/g,'&quot;')}"
+                     oninput="widgetUpdateCond('${wid}',${ci},'value',this.value)"/>`
+                : `<span class="qb-val-blank"></span>`}
+              <button class="btn btn-ghost btn-sm btn-icon qb-remove-btn" onclick="widgetRemoveCond('${wid}',${ci})">✕</button>
+            </div>`;
+          }).join('');
+        };
+
+        // ── Sort rows ────────────────────────────────────────────────────
+        const renderSorts = () => {
+          if (!sorts.length)
+            return '<div style="font-size:11px;color:var(--text-disabled);padding:2px 0">No sorts — click + Add</div>';
+          return sorts.map((s, si) => `
+            <div class="qb-sort-row">
+              <select class="form-input qb-field-select" onchange="widgetUpdateSort('${wid}',${si},'field',this.value)">
+                ${cols.map(col=>`<option value="${col}" ${col===s.field?'selected':''}>${col}</option>`).join('')}
+              </select>
+              <select class="form-input qb-dir-select" onchange="widgetUpdateSort('${wid}',${si},'dir',this.value)">
+                <option ${s.dir==='ASC'?'selected':''}>ASC</option>
+                <option ${s.dir==='DESC'?'selected':''}>DESC</option>
+              </select>
+              <button class="btn btn-ghost btn-sm btn-icon" onclick="widgetRemoveSort('${wid}',${si})">✕</button>
+            </div>`).join('');
+        };
+
+        // ── Group-by (auto-derived, read-only display) ───────────────────
+        const activeCols  = isChart ? [w.xField, w.yField].filter(Boolean) : (w.fields || []);
+        const anyAgg      = activeCols.some(f => fieldAggs[f]);
+        const nonAggCols  = activeCols.filter(f => !fieldAggs[f]);
+        const renderGroupBy = () => {
+          if (!anyAgg) return '<div style="font-size:11px;color:var(--text-disabled);padding:2px 0">Set aggregates on fields above to enable grouping</div>';
+          if (!nonAggCols.length) return '<div style="font-size:11px;color:var(--text-disabled);padding:2px 0">All fields aggregated — no GROUP BY needed</div>';
+          return `<div style="font-size:11px;color:var(--text-disabled);padding:2px 0">Auto: ${nonAggCols.join(', ')}</div>`;
+        };
 
         section.innerHTML = `
-    <div class="props-group">
-      <div class="props-group-label">General</div>
-      <div class="props-row">
-        <label>Title</label>
-        <input type="text" class="form-input" value="${w.title}" oninput="updateWidgetProp('${wid}','title',this.value)"/>
-      </div>
-      <div class="props-row">
-        <label>Type</label>
-        <select class="form-input" onchange="changeWidgetType('${wid}', this.value)">
-          ${WIDGET_TYPES.map(t => `<option value="${t.id}" ${t.id === w.type ? 'selected' : ''}>${t.label}</option>`).join('')}
-        </select>
-      </div>
-      <div class="props-row">
-        <label>Width %</label>
-        <input type="number" class="form-input" min="10" max="100" value="${w.widthPct}" oninput="updateWidgetProp('${wid}','widthPct',+this.value)"/>
-      </div>
-      <div class="props-row">
-        <label>Height vh</label>
-        <input type="number" class="form-input" min="5" max="100" value="${w.heightVh}" oninput="updateWidgetProp('${wid}','heightVh',+this.value)"/>
-      </div>
-    </div>
+          <div class="adv-node-section">
+            <div class="adv-node-section-hdr">GENERAL</div>
+            <div class="props-row"><label>Title</label>
+              <input type="text" class="form-input" value="${w.title.replace(/"/g,'&quot;')}" oninput="updateWidgetProp('${wid}','title',this.value)"/></div>
+            <div class="props-row"><label>Type</label>
+              <select class="form-input" onchange="changeWidgetType('${wid}',this.value)">
+                ${WIDGET_TYPES.map(t=>`<option value="${t.id}" ${t.id===w.type?'selected':''}>${t.label}</option>`).join('')}
+              </select></div>
+            <div class="props-row"><label>Width %</label>
+              <input type="number" class="form-input" min="10" max="100" value="${w.widthPct}" oninput="updateWidgetProp('${wid}','widthPct',+this.value)"/></div>
+            <div class="props-row"><label>Height vh</label>
+              <input type="number" class="form-input" min="5" max="100" value="${w.heightVh}" oninput="updateWidgetProp('${wid}','heightVh',+this.value)"/></div>
+          </div>
 
-    <div class="props-group">
-      <div class="props-group-label">Appearance</div>
-      <div class="props-row">
-        <label>Fill/Accent</label>
-        <div class="color-input-wrap">
-          <input type="color" value="${w.fillColor}" oninput="updateWidgetProp('${wid}','fillColor',this.value)"/>
-          <input type="text" class="form-input" value="${w.fillColor}" oninput="updateWidgetProp('${wid}','fillColor',this.value)"/>
-        </div>
-      </div>
-      <div class="props-row">
-        <label>Border</label>
-        <div class="color-input-wrap">
-          <input type="color" value="${w.borderColor}" oninput="updateWidgetProp('${wid}','borderColor',this.value)"/>
-          <input type="number" class="form-input" value="${w.borderSize}" min="0" max="10" oninput="updateWidgetProp('${wid}','borderSize',+this.value)" style="width:50px"/>
-        </div>
-      </div>
-      ${isText ? `
-      <div class="props-row">
-        <label>Font size</label>
-        <input type="number" class="form-input" min="8" max="72" value="${w.fontSize}" oninput="updateWidgetProp('${wid}','fontSize',+this.value)"/>
-      </div>
-      <div class="props-row">
-        <label>Font color</label>
-        <div class="color-input-wrap">
-          <input type="color" value="${w.fontColor}" oninput="updateWidgetProp('${wid}','fontColor',this.value)"/>
-          <input type="text" class="form-input" value="${w.fontColor}" oninput="updateWidgetProp('${wid}','fontColor',this.value)"/>
-        </div>
-      </div>
-      <div class="props-row" style="flex-direction:column;align-items:flex-start">
-        <label>Content</label>
-        <textarea class="form-input" rows="4" oninput="updateWidgetProp('${wid}','textContent',this.value)">${w.textContent}</textarea>
-      </div>` : ''}
-    </div>
+          <div class="adv-node-section">
+            <div class="adv-node-section-hdr">APPEARANCE</div>
+            <div class="props-row"><label>Fill/Accent</label>
+              <div class="color-input-wrap">
+                <input type="color" value="${w.fillColor}" oninput="updateWidgetProp('${wid}','fillColor',this.value)"/>
+                <input type="text" class="form-input" value="${w.fillColor}" oninput="updateWidgetProp('${wid}','fillColor',this.value)"/>
+              </div></div>
+            <div class="props-row"><label>Border</label>
+              <div class="color-input-wrap">
+                <input type="color" value="${w.borderColor}" oninput="updateWidgetProp('${wid}','borderColor',this.value)"/>
+                <input type="number" class="form-input" value="${w.borderSize}" min="0" max="10" oninput="updateWidgetProp('${wid}','borderSize',+this.value)" style="width:50px"/>
+              </div></div>
+            ${isText ? `
+            <div class="props-row"><label>Font size</label>
+              <input type="number" class="form-input" min="8" max="72" value="${w.fontSize}" oninput="updateWidgetProp('${wid}','fontSize',+this.value)"/></div>
+            <div class="props-row"><label>Font color</label>
+              <div class="color-input-wrap">
+                <input type="color" value="${w.fontColor}" oninput="updateWidgetProp('${wid}','fontColor',this.value)"/>
+                <input type="text" class="form-input" value="${w.fontColor}" oninput="updateWidgetProp('${wid}','fontColor',this.value)"/>
+              </div></div>
+            <div class="props-row" style="flex-direction:column;align-items:flex-start"><label>Content</label>
+              <textarea class="form-input" rows="4" oninput="updateWidgetProp('${wid}','textContent',this.value)">${w.textContent}</textarea></div>
+            ` : ''}
+          </div>
 
-    ${(isChart || isKPI) ? `
-    <div class="props-group">
-      <div class="props-group-label">Data Binding</div>
-      ${isChart ? `
-      <div class="props-row">
-        <label>X / Label</label>
-        <select class="form-input" onchange="updateWidgetProp('${wid}','xField',this.value)">
-          ${DataLaVistaState.queryColumns.map(c => `<option ${c === w.xField ? 'selected' : ''}>${c}</option>`).join('')}
-        </select>
-      </div>
-      <div class="props-row">
-        <label>Y / Value</label>
-        <select class="form-input" onchange="updateWidgetProp('${wid}','yField',this.value)">
-          ${DataLaVistaState.queryColumns.map(c => `<option ${c === w.yField ? 'selected' : ''}>${c}</option>`).join('')}
-        </select>
-      </div>
-      <div class="props-row">
-        <label>Aggregation</label>
-        <select class="form-input" onchange="updateWidgetProp('${wid}','aggregation',this.value)">
-          ${[{val:'',label:'— none (raw) —'},{val:'SUM',label:'SUM'},{val:'COUNT',label:'COUNT'},{val:'AVG',label:'AVG (Average)'},{val:'MIN',label:'MIN'},{val:'MAX',label:'MAX'},{val:'FIRST',label:'FIRST'},{val:'LAST',label:'LAST'}]
-            .map(a => `<option value="${a.val}" ${a.val === (w.aggregation||'') ? 'selected' : ''}>${a.label}</option>`).join('')}
-        </select>
-      </div>` : ''}
-      ${isKPI ? `
-      <div class="props-row">
-        <label>Field</label>
-        <select class="form-input" onchange="updateWidgetProp('${wid}','fields',[this.value])">
-          ${DataLaVistaState.queryColumns.map(c => `<option ${w.fields[0] === c ? 'selected' : ''}>${c}</option>`).join('')}
-        </select>
-      </div>
-      <div class="props-row">
-        <label>Aggregation</label>
-        <select class="form-input" onchange="updateWidgetProp('${wid}','aggregation',this.value)">
-          ${['SUM', 'COUNT', 'AVG', 'FIRST', 'LAST', 'MIN', 'MAX'].map(a => `<option ${a === w.aggregation ? 'selected' : ''}>${a}</option>`).join('')}
-        </select>
-      </div>` : ''}
-    </div>` : ''}
+          ${isData ? `
+          <div class="adv-node-section">
+            <div class="adv-node-section-hdr">
+              <span>FIELDS</span>
+            </div>
+            ${isChart ? `
+              ${fieldRow('X', w.xField, `updateWidgetProp('${wid}','xField',this.value);renderWidgetProperties('${wid}')`)}
+              ${fieldRow('Y', w.yField, `updateWidgetProp('${wid}','yField',this.value);renderWidgetProperties('${wid}')`)}
+            ` : ''}
+            ${isKPI ? fieldRow('', w.fields[0] || cols[0] || '', `updateWidgetProp('${wid}','fields',[this.value]);renderWidgetProperties('${wid}')`) : ''}
+            ${isTable ? (w.fields.length
+                ? w.fields.map((f,i) => tableFieldRow(f,i)).join('')
+                : `<div style="font-size:11px;color:var(--text-disabled);padding:4px 0">Drop fields from the left panel</div>`) : ''}
+            ${isTable ? `
+            <div class="adv-drop-zone" style="margin-top:4px;text-align:center;padding:5px;font-size:11px"
+              ondragover="event.preventDefault();this.classList.add('drag-over')"
+              ondragleave="this.classList.remove('drag-over')"
+              ondrop="onDropFieldToWidget('${wid}',event)">Drop field to add column</div>
+            ` : ''}
+          </div>
 
-    ${isTable ? `
-    <div class="props-group">
-      <div class="props-group-label">Columns</div>
-      <div id="table-fields-list" class="field-assign-list">
-        ${w.fields.map((f, i) => `
-          <div class="field-assign-item">
-            <span style="flex:1">${f}</span>
-            <span class="remove" onclick="removeWidgetField('${wid}',${i})">✕</span>
-          </div>`).join('')}
-      </div>
-      <div class="field-drop-zone" style="margin-top:4px" ondragover="event.preventDefault();this.classList.add('drag-over')" ondragleave="this.classList.remove('drag-over')" ondrop="onDropFieldToWidget('${wid}',event)">
-        Drop fields here
-      </div>
-    </div>` : ''}
+          <div class="adv-node-section">
+            <div class="adv-node-section-hdr">
+              <span>FILTER CONDITIONS</span>
+              <button class="btn btn-ghost btn-sm" onclick="widgetAddCond('${wid}')">+ Add</button>
+            </div>
+            <div>${renderConditions()}</div>
+          </div>
 
-    <div class="props-group">
-      <div class="props-group-label">Widget Filters</div>
-      <div id="widget-filters-list">
-        ${w.filters.map((f, i) => `<div class="field-assign-item"><span style="flex:1">${f.field}</span><span class="remove" onclick="removeWidgetFilter('${wid}',${i})">✕</span></div>`).join('')}
-      </div>
-      <div class="field-drop-zone" style="margin-top:4px" ondragover="event.preventDefault();this.classList.add('drag-over')" ondragleave="this.classList.remove('drag-over')" ondrop="onDropFilterToWidget('${wid}',event)">
-        Drop fields for widget filter
-      </div>
-    </div>
-  `;
+          <div class="adv-node-section">
+            <div class="adv-node-section-hdr">
+              <span>SORT ORDER</span>
+              <button class="btn btn-ghost btn-sm" onclick="widgetAddSort('${wid}')">+ Add</button>
+            </div>
+            <div>${renderSorts()}</div>
+          </div>
+
+          <div class="adv-node-section">
+            <div class="adv-node-section-hdr"><span>GROUP BY</span></div>
+            <div>${renderGroupBy()}</div>
+          </div>
+          ` : ''}
+        `;
       }
 
       function updateWidgetProp(wid, prop, value) {
@@ -10500,8 +10707,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         if (prop === 'textContent' && w.type === 'text') el.querySelector('.text-widget').innerHTML = value;
         if (prop === 'fontSize' && w.type === 'text') el.querySelector('.text-widget').style.fontSize = value + 'px';
         if (prop === 'fontColor' && w.type === 'text') el.querySelector('.text-widget').style.color = value;
-        if (['xField', 'yField', 'aggregation', 'fillColor', 'fields'].includes(prop) && ['bar', 'line', 'pie', 'scatter'].includes(w.type)) renderChart(w);
-        if (['xField', 'yField', 'aggregation', 'fillColor', 'fields'].includes(prop) && w.type === 'kpi') el.querySelector('.widget-content').innerHTML = renderKPIContent(w);
+        if (['xField', 'yField', 'aggregation', 'fieldAggs', 'fillColor', 'fields'].includes(prop) && ['bar', 'line', 'pie', 'scatter'].includes(w.type)) renderChart(w);
+        if (['xField', 'yField', 'aggregation', 'fieldAggs', 'fillColor', 'fields'].includes(prop) && w.type === 'kpi') el.querySelector('.widget-content').innerHTML = renderKPIContent(w);
       }
 
       function changeWidgetType(wid, newType) {
@@ -10582,8 +10789,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 
         DataLaVistaState.design.filters.forEach(f => {
           let uniqueVals = [];
-          if (DataLaVistaState.queryResults) {
-            uniqueVals = [...new Set(DataLaVistaState.queryResults.map(r => r[f.field]).filter(v => v !== null && v !== undefined))].sort();
+          if (alasql.tables && alasql.tables['dlv_results']) {
+            uniqueVals = [...new Set(alasql('SELECT * FROM [dlv_results]').map(r => r[f.field]).filter(v => v !== null && v !== undefined))].sort();
           }
 
           const wrap = document.createElement('div');
@@ -10638,22 +10845,20 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       }
 
       function refreshWidgets() {
-        let filtered = DataLaVistaState.queryResults || [];
-        for (const [field, value] of Object.entries(DataLaVistaState.previewFilters)) {
-          // Basic equals filter matching
-          filtered = filtered.filter(r => String(r[field]) === String(value));
+        // Rebuild [dlv_active] as a filtered view on top of [dlv_results] (view path),
+        // or fall back to JS-filtered array when no view exists (design tab before first run).
+        const hasView = !!(alasql.tables && alasql.tables['dlv_results']);
+        const whereClauses = Object.entries(DataLaVistaState.previewFilters)
+          .map(([f, v]) => `[${f}] = '${String(v).replace(/'/g, "''")}'`);
+        if (hasView) {
+          alasql('DROP VIEW IF EXISTS [dlv_active]');
+          const where = whereClauses.length ? ` WHERE ${whereClauses.join(' AND ')}` : '';
+          alasql(`CREATE VIEW [dlv_active] AS SELECT * FROM [dlv_results]${where}`);
+          DataLaVistaState.design.previewFilteredData = null; // view handles filtering
+        } else {
+          DataLaVistaState.design.previewFilteredData = null;
         }
-
-        // Re-render chart/KPI elements based on filtered subset
-        DataLaVistaState.design.widgets.forEach(w => {
-          const el = document.getElementById('wcontent-' + w.id);
-          if (el) {
-            el.innerHTML = getWidgetContentHTML(w, filtered);
-            if (['bar', 'line', 'pie', 'scatter'].includes(w.type)) {
-              requestAnimationFrame(() => renderChart(w, filtered));
-            }
-          }
-        });
+        DataLaVistaState.design.widgets.forEach(w => updateWidgetContent(w.id));
       }
 
 
@@ -10714,26 +10919,18 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
             }
           }
 
-          console.log("DEBUG: Tables loaded into alasql. Preprocessing query...");
+          // Execute SQL once with full data, then materialize into a named table.
+          // Per-widget SQL scans [dlv_active] (a view on the materialized table) — fast.
           const processedSQL = preprocessSQL(DataLaVistaState.sql);
-          console.log("DEBUG: Processed SQL:", processedSQL);
-          console.log("DEBUG: Executing query in alasql...");
-          let results;
-          try{
-            results = alasql(processedSQL);
-            console.log("DEBUG: refreshDashboardPreview -> Query executed successfully.");
-          } catch (err) {
-            console.error("DEBUG: Query execution error:", err);
-            throw err;
-          }
+          const results = alasql(processedSQL);
 
-          console.log("DEBUG: refreshDashboardPreview -> results size: ", results.length);
-          
-          console.log("DEBUG: refreshDashboardPreview -> DataLaVistaState.previewResults");
-          DataLaVistaState.previewResults = results;
-          console.log("DEBUG: refreshDashboardPreview -> DataLaVistaState.queryColumns");
-          DataLaVistaState.queryResults = results;
-          console.log("DEBUG: refreshDashboardPreview -> DataLaVistaState.queryColumns");
+          alasql('DROP TABLE IF EXISTS [dlv_results]');
+          alasql('DROP VIEW  IF EXISTS [dlv_active]');
+          alasql('CREATE TABLE [dlv_results]');
+          alasql.tables['dlv_results'].data = results;     // O(1) reference assignment
+          alasql('CREATE VIEW [dlv_active] AS SELECT * FROM [dlv_results]');
+          DataLaVistaState.previewFilters = {};
+          DataLaVistaState.design.previewFilteredData = null;
           DataLaVistaState.queryColumns = results.length ? Object.keys(results[0]) : DataLaVistaState.queryColumns;
 
           console.log("DEBUG: refreshDashboardPreview -> renderPreviewTab: Rendering preview tab with results...");
@@ -10767,7 +10964,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         if (barFilters.length) {
           filterBar.classList.remove('hidden');
           for (const filter of barFilters) {
-            const values = ['(All)', ...(DataLaVistaState.previewResults ? [...new Set(DataLaVistaState.previewResults.map(r => r[filter.field]).filter(v => v != null))].sort() : [])];
+            const _fRows = (alasql.tables && alasql.tables['dlv_results']) ? alasql('SELECT * FROM [dlv_results]') : [];
+            const values = ['(All)', ...[...new Set(_fRows.map(r => r[filter.field]).filter(v => v != null))].sort()];
             const wrap = document.createElement('div');
             wrap.className = 'filter-chip';
             wrap.innerHTML = `<span style="font-size:11px;font-weight:600">${filter.label}:</span>
@@ -10778,6 +10976,9 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           }
         } else filterBar.classList.add('hidden');
 
+        // Reset per-widget filter so buildWidgetData uses raw queryResults as base
+        DataLaVistaState.design.previewFilteredData = null;
+
         // Canvas
         const canvas = document.getElementById('preview-canvas');
         canvas.innerHTML = '';
@@ -10787,8 +10988,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           if (id.startsWith('prev_')) { try { chart.dispose(); } catch (e) { } delete DataLaVistaState.charts[id]; }
         }
 
-        const results = DataLaVistaState.previewResults || [];
-
         for (const w of DataLaVistaState.design.widgets) {
           const el = document.createElement('div');
           el.className = 'widget';
@@ -10796,7 +10995,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           el.innerHTML = `
             <div class="widget-header"><span class="widget-title">${w.title}</span></div>
             <div class="widget-content" id="prev-wcontent-${w.id}">
-              ${getPrevWidgetContent(w, results)}
+              ${getPrevWidgetContent(w)}
             </div>
           `;
           canvas.appendChild(el);
@@ -10806,47 +11005,32 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           for (const w of DataLaVistaState.design.widgets) {
             if (['bar', 'line', 'pie', 'scatter'].includes(w.type)) {
               console.log(`DEBUG: Rendering preview chart for widget ${w.id} of type ${w.type}`);
-              renderPreviewChart(w, results);
+              renderPreviewChart(w);
             }
           }
         });
       }
 
-      function getPrevWidgetContent(w, results) {
+      function getPrevWidgetContent(w) {
         if (w.type === 'text') return `<div class="text-widget" style="font-size:${w.fontSize}px;color:${w.fontColor}">${w.textContent}</div>`;
         if (w.type === 'placeholder') return '';
-        if (w.type === 'kpi') return renderPrevKPI(w, results);
-        if (w.type === 'table') return renderPrevTable(w, results);
+        if (w.type === 'kpi') return renderPrevKPI(w);
+        if (w.type === 'table') return renderPrevTable(w);
         if (['bar', 'line', 'pie', 'scatter'].includes(w.type)) return `<div id="prevchart-${w.id}" style="width:100%;height:100%;min-height:200px"></div>`;
         return '';
       }
 
-      // TODO: .fields may need to be .xField/.yField for charts, and it should support aggregates
-      // TODO: Check if we are using apache-echarts correctly. Do we need to preprocess data or just feed it directly?
-      function renderPrevKPI(w, results) {
-        let value = '—', label = w.fields[0] || '';
-        if (results.length && label) {
-          const vals = results.map(r => parseFloat(r[label]) || 0);
-          const agg = w.aggregation || 'SUM';
-          if (agg === 'COUNT') value = results.length.toLocaleString();
-          else if (agg === 'SUM') value = vals.reduce((a, b) => a + b, 0).toLocaleString();
-          else if (agg === 'AVG') value = vals.length ? (vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(2) : '—';
-          else value = results[0][label] ?? '—';
-        }
-        return `<div class="kpi-card"><div class="kpi-value" style="color:${w.fillColor}">${value}</div><div class="kpi-label">${label}</div></div>`;
+      function renderPrevKPI(w) {
+        // Delegate to the same logic as the design tab (uses buildWidgetData internally)
+        return renderKPIContent(w);
       }
 
-      function renderPrevTable(w, results) {
-        if (!results.length) return '<div class="text-muted text-sm" style="padding:12px">No data</div>';
-        const cols = w.fields.length ? w.fields.filter(f => results[0].hasOwnProperty(f)) : Object.keys(results[0]).slice(0, 8);
-        if (!cols.length) return '<div class="text-muted text-sm" style="padding:12px">No columns configured</div>';
-        let html = '<div style="overflow:auto;max-height:100%"><table class="widget-table"><thead><tr>' + cols.map(c => `<th>${c}</th>`).join('') + '</tr></thead><tbody>';
-        for (const row of results) html += '<tr>' + cols.map(c => `<td>${row[c] ?? ''}</td>`).join('') + '</tr>';
-        html += '</tbody></table></div>';
-        return html;
+      function renderPrevTable(w) {
+        // Delegate to the same logic as the design tab (uses buildWidgetData internally)
+        return renderTableContent(w);
       }
 
-      function renderPreviewChart(w, results) {
+      function renderPreviewChart(w) {
         const chartEl = document.getElementById('prevchart-' + w.id);
         if (!chartEl) return;
         const id = 'prev_' + w.id;
@@ -10854,20 +11038,25 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         const chart = echarts.init(chartEl);
         DataLaVistaState.charts[id] = chart;
 
-        if (!results.length) { chart.setOption({ title: { text: 'No data', left: 'center', top: 'middle', textStyle: { color: '#a19f9d' } } }); return; }
+        const chartData = buildWidgetData(w);
+        if (!chartData || !chartData.length) {
+          chart.setOption({ title: { text: 'No data', left: 'center', top: 'middle', textStyle: { color: '#a19f9d', fontSize: 13 } } });
+          return;
+        }
 
-        const xField = w.xField || Object.keys(results[0])[0];
-        const yField = w.yField || Object.keys(results[0])[1] || xField;
+        const allCols = Object.keys(chartData[0]);
+        const xField = w.xField || allCols[0];
+        const yField = w.yField || allCols[1] || allCols[0];
         let option = {};
 
         if (w.type === 'bar') {
-          option = { tooltip: { trigger: 'axis' }, xAxis: { type: 'category', data: results.map(r => r[xField]), axisLabel: { rotate: 30, fontSize: 11 } }, yAxis: { type: 'value' }, series: [{ type: 'bar', data: results.map(r => parseFloat(r[yField]) || 0), itemStyle: { color: w.fillColor } }], grid: { left: 40, right: 20, top: 20, bottom: 60 } };
+          option = { tooltip: { trigger: 'axis' }, xAxis: { type: 'category', data: chartData.map(r => r[xField]), axisLabel: { rotate: 30, fontSize: 11 } }, yAxis: { type: 'value' }, series: [{ type: 'bar', data: chartData.map(r => parseFloat(r[yField]) || 0), itemStyle: { color: w.fillColor } }], grid: { left: 40, right: 20, top: 20, bottom: 60 } };
         } else if (w.type === 'line') {
-          option = { tooltip: { trigger: 'axis' }, xAxis: { type: 'category', data: results.map(r => r[xField]), axisLabel: { rotate: 30, fontSize: 11 } }, yAxis: { type: 'value' }, series: [{ type: 'line', data: results.map(r => parseFloat(r[yField]) || 0), itemStyle: { color: w.fillColor }, smooth: true }], grid: { left: 40, right: 20, top: 20, bottom: 60 } };
+          option = { tooltip: { trigger: 'axis' }, xAxis: { type: 'category', data: chartData.map(r => r[xField]), axisLabel: { rotate: 30, fontSize: 11 } }, yAxis: { type: 'value' }, series: [{ type: 'line', data: chartData.map(r => parseFloat(r[yField]) || 0), itemStyle: { color: w.fillColor }, smooth: true }], grid: { left: 40, right: 20, top: 20, bottom: 60 } };
         } else if (w.type === 'pie') {
-          option = { tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' }, series: [{ type: 'pie', data: results.map(r => ({ name: String(r[xField] || ''), value: parseFloat(r[yField]) || 0 })), radius: ['30%', '65%'], label: { fontSize: 11 } }] };
+          option = { tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' }, series: [{ type: 'pie', data: chartData.map(r => ({ name: String(r[xField] || ''), value: parseFloat(r[yField]) || 0 })), radius: ['30%', '65%'], label: { fontSize: 11 } }] };
         } else if (w.type === 'scatter') {
-          option = { tooltip: { trigger: 'item' }, xAxis: { type: 'value' }, yAxis: { type: 'value' }, series: [{ type: 'scatter', data: results.map(r => [parseFloat(r[xField]) || 0, parseFloat(r[yField]) || 0]), itemStyle: { color: w.fillColor } }], grid: { left: 40, right: 20, top: 20, bottom: 40 } };
+          option = { tooltip: { trigger: 'item' }, xAxis: { type: 'value' }, yAxis: { type: 'value' }, series: [{ type: 'scatter', data: chartData.map(r => [parseFloat(r[xField]) || 0, parseFloat(r[yField]) || 0]), itemStyle: { color: w.fillColor } }], grid: { left: 40, right: 20, top: 20, bottom: 40 } };
         }
         chart.setOption(option);
       }
@@ -10876,20 +11065,26 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         if (value === '(All)') delete DataLaVistaState.previewFilters[field];
         else DataLaVistaState.previewFilters[field] = value;
 
-        let filtered = DataLaVistaState.previewResults || [];
-        for (const [f, v] of Object.entries(DataLaVistaState.previewFilters)) {
-          filtered = filtered.filter(r => String(r[f]) === String(v));
+        // Rebuild the [dlv_active] view — a filter layer on top of [dlv_results].
+        // Per-widget SQL (buildWidgetData) will query FROM [dlv_active] automatically.
+        alasql('DROP VIEW IF EXISTS [dlv_active]');
+        const whereClauses = Object.entries(DataLaVistaState.previewFilters)
+          .map(([f, v]) => `[${f}] = '${String(v).replace(/'/g, "''")}'`);
+        if (whereClauses.length) {
+          alasql(`CREATE VIEW [dlv_active] AS SELECT * FROM [dlv_results] WHERE ${whereClauses.join(' AND ')}`);
         }
 
-        // Re-render canvas with filtered data
+        DataLaVistaState.design.previewFilteredData = null; // view handles all filtering
+
+        // Re-render each widget
         const canvas = document.getElementById('preview-canvas');
         canvas.querySelectorAll('.widget').forEach((el, i) => {
           const w = DataLaVistaState.design.widgets[i];
           if (!w) return;
           const content = el.querySelector('.widget-content');
-          content.innerHTML = getPrevWidgetContent(w, filtered);
+          content.innerHTML = getPrevWidgetContent(w);
           if (['bar', 'line', 'pie', 'scatter'].includes(w.type)) {
-            requestAnimationFrame(() => renderPreviewChart(w, filtered));
+            requestAnimationFrame(() => renderPreviewChart(w));
           }
         });
       }
@@ -10898,7 +11093,9 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       // DOWNLOAD CSV
       // ============================================================
       async function downloadCSV() {
-        let results = DataLaVistaState.previewResults || DataLaVistaState.queryResults;
+        let results = (alasql.tables && alasql.tables['dlv_results'])
+          ? alasql('SELECT * FROM [dlv_results]')
+          : null;
         if (!results) {
           // Try to run query and get all rows
           if (!DataLaVistaState.sql.trim()) { toast('Run a query first', 'error'); return; }

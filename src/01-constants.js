@@ -121,7 +121,6 @@ const DataLaVistaState = {
   },
   sql: '',
   sqlLocked: false,
-  queryResults: null,  // array of row objects
   queryColumns: [],
   design: {
     title: '',
@@ -134,7 +133,6 @@ const DataLaVistaState = {
     transformedResults: null  // cached result of applyDesignTransforms()
   },
   currentWidgetId: null,
-  previewResults: null,
   previewFilters: {},  // field -> value
   activeTab: 'query',
   qbCollapsed: false,

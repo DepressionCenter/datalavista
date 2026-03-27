@@ -30,17 +30,11 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       return;
     }
 
-    // Ensure design transform arrays exist
-    if (!DataLaVistaState.design.conditions) DataLaVistaState.design.conditions = [];
-    if (!DataLaVistaState.design.sorts)      DataLaVistaState.design.sorts = [];
-    if (!DataLaVistaState.design.groupBy)    DataLaVistaState.design.groupBy = [];
-    if (!DataLaVistaState.design.fieldAggs)  DataLaVistaState.design.fieldAggs = {};
-
     const cols = DataLaVistaState.queryColumns;
 
     body.innerHTML = '';
 
-    // ── 1. FIELDS section ──────────────────────────────────────────────────
+    // ── FIELDS section (drag → canvas / widget) ────────────────────────────
     const secFields = document.createElement('div');
     secFields.className = 'qb-section';
     secFields.style.borderTop = 'none';
@@ -63,44 +57,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       secFields.appendChild(row);
     }
     body.appendChild(secFields);
-
-    // ── 2. FILTER CONDITIONS section ───────────────────────────────────────
-    const secFilters = document.createElement('div');
-    secFilters.className = 'qb-section';
-    secFilters.innerHTML = `
-      <div class="qb-section-header">
-        <span>FILTER CONDITIONS</span>
-        <button class="btn btn-ghost btn-sm" onclick="addDesignCondition()">+ Add</button>
-      </div>
-      <div id="design-conditions-area"></div>`;
-    body.appendChild(secFilters);
-
-    // ── 3. SORT ORDER section ──────────────────────────────────────────────
-    const secSorts = document.createElement('div');
-    secSorts.className = 'qb-section';
-    secSorts.innerHTML = `
-      <div class="qb-section-header">
-        <span>SORT ORDER</span>
-        <button class="btn btn-ghost btn-sm" onclick="addDesignSort()">+ Add</button>
-      </div>
-      <div id="design-sorts-area"></div>`;
-    body.appendChild(secSorts);
-
-    // ── 4. GROUP BY section ────────────────────────────────────────────────
-    const secGroup = document.createElement('div');
-    secGroup.className = 'qb-section';
-    secGroup.innerHTML = `
-      <div class="qb-section-header">
-        <span id="design-groupby-label">GROUP BY</span>
-        <button class="btn btn-ghost btn-sm" id="design-groupby-add-btn" onclick="addDesignGroupBy()">+ Add</button>
-      </div>
-      <div id="design-groupby-area"></div>`;
-    body.appendChild(secGroup);
-
-    // Render the sub-sections
-    renderDesignConditions();
-    renderDesignSorts();
-    syncDesignGroupBySection();
   }
 
   // ============================================================
@@ -109,15 +65,20 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
   // as the Query Builder so the UI is identical.
   // ============================================================
 
-  /** Returns design-transformed data if transforms are active, otherwise raw query results. */
+  /** Returns the most-specific base dataset available.
+   *  Priority: previewFilteredData → transformedResults → [dlv_active] view → queryResults fallback. */
   function getDesignData() {
-    return DataLaVistaState.design.transformedResults || DataLaVistaState.queryResults || [];
+    if (DataLaVistaState.design.previewFilteredData)  return DataLaVistaState.design.previewFilteredData;
+    if (DataLaVistaState.design.transformedResults)   return DataLaVistaState.design.transformedResults;
+    if (alasql.tables && alasql.tables['dlv_active']) return alasql('SELECT * FROM [dlv_active]');
+    return [];
   }
 
-  /** Re-runs the design-level AlaSQL transform on DataLaVistaState.queryResults and
-   *  stores the result in DataLaVistaState.design.transformedResults, then re-renders widgets. */
+  /** Re-runs the design-level AlaSQL transform against [dlv_results] (or queryResults fallback)
+   *  and stores the result in DataLaVistaState.design.transformedResults, then re-renders widgets. */
   function applyDesignTransforms() {
-    if (!DataLaVistaState.queryResults || !DataLaVistaState.queryResults.length) {
+    const hasView = !!(alasql.tables && alasql.tables['dlv_results']);
+    if (!hasView) {
       DataLaVistaState.design.transformedResults = null;
       renderDesignCanvas();
       return;
@@ -175,13 +136,14 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 
     const orderParts = sorts.map(s => `[${s.field}] ${s.dir || 'ASC'}`);
 
-    let sql = `SELECT ${selParts.join(', ')} FROM ?`;
+    const fromSrc = hasView ? '[dlv_results]' : '?';
+    let sql = `SELECT ${selParts.join(', ')} FROM ${fromSrc}`;
     if (whereParts.length) sql += ` WHERE ${whereParts.join(' ')}`;
     if (groupParts.length) sql += ` GROUP BY ${groupParts.join(', ')}`;
     if (orderParts.length) sql += ` ORDER BY ${orderParts.join(', ')}`;
 
     try {
-      const results = alasql(sql, [DataLaVistaState.queryResults]);
+      const results = alasql(sql);
       DataLaVistaState.design.transformedResults = Array.isArray(results) ? results : null;
       const rowCount = DataLaVistaState.design.transformedResults ? DataLaVistaState.design.transformedResults.length : 0;
       toast(`Design transform applied — ${rowCount} rows`, 'success');
@@ -471,6 +433,9 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           xField: (fields && fields.length>0) ? fields[0] : DataLaVistaState.queryColumns[0] || '', // TODO: guess x and y based on dataType
           yField: (fields && fields.length>1) ? fields[1] : DataLaVistaState.queryColumns[1] || '',
           aggregation: '',
+          fieldAggs: {},     // per-field aggregate: { [col]: 'SUM' | 'AVG' | ... }
+          conditions: [],    // per-widget WHERE: [{ conj, field, op, value }]
+          sorts: [],         // per-widget ORDER BY: [{ field, dir }]
           fillColor: '#0078d4',
           borderColor: '#edebe9',
           borderSize: 1,
@@ -656,32 +621,128 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         });
       }
 
-      function renderKPIContent(w, data) {
-        let value = '—', label = w.fields[0] || '';
-        const kpiData = data || getDesignData();
-        if (kpiData && kpiData.length && label) {
-          const field = label;
-          const agg = w.aggregation || 'SUM';
-          const vals = kpiData.map(r => parseFloat(r[field]) || 0);
-          if (agg === 'COUNT') value = kpiData.length;
-          else if (agg === 'SUM') value = vals.reduce((a, b) => a + b, 0).toLocaleString();
-          else if (agg === 'AVG') value = vals.length ? (vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(2) : '—';
-          else value = kpiData[0][field] ?? '—';
+      // ============================================================
+      // PER-WIDGET DATA BUILDER
+      // Applies widget-level fieldAggs, conditions, and sorts via AlaSQL
+      // on top of the (possibly globally-transformed) base dataset.
+      // ============================================================
+      function buildWidgetData(w) {
+        // Prefer a named AlaSQL view if one was registered by the preview runner.
+        // [dlv_active] exists when a global filter bar filter is active (sits on top
+        // of [dlv_results]); [dlv_results] is the base view wrapping the user's SQL.
+        // Falling back to the in-memory array keeps the Design tab working before any
+        // preview run has been executed.
+        const hasActive  = !!(alasql.tables && alasql.tables['dlv_active']);
+        const hasResults = !!(alasql.tables && alasql.tables['dlv_results']);
+        const fromSrc    = hasActive ? '[dlv_active]' : hasResults ? '[dlv_results]' : null;
+
+        const base = getDesignData();
+        if (!fromSrc && (!base || !base.length)) return [];
+
+        // Determine the set of columns this widget cares about.
+        // When using a named view we don't have a base[0] to introspect, so we
+        // rely on the widget's own field config (cols will be validated by SQL).
+        let cols;
+        if (w.type === 'table') {
+          cols = fromSrc
+            ? (w.fields || [])
+            : (w.fields || []).filter(f => Object.prototype.hasOwnProperty.call(base[0], f));
+        } else if (['bar', 'line', 'pie', 'scatter'].includes(w.type)) {
+          cols = [...new Set([w.xField, w.yField].filter(Boolean))];
+        } else if (w.type === 'kpi') {
+          cols = (w.fields || []).slice(0, 1);
+        } else {
+          return base;
         }
-        return `<div class="kpi-card"><div class="kpi-value" style="color:${w.fillColor}">${value}</div><div class="kpi-label">${label}</div></div>`;
+        if (!cols.length) return base;
+
+        // Ensure state arrays exist (handles widgets created before this version)
+        const fieldAggs  = w.fieldAggs  || {};
+        const conditions = (w.conditions || []).filter(c => c.field);
+        const sorts      = (w.sorts     || []).filter(s => s.field);
+        const anyAgg     = cols.some(c => fieldAggs[c]);
+
+        if (!conditions.length && !sorts.length && !anyAgg) return base;
+
+        // SELECT — preserve column name via AS so downstream code keeps working
+        const selParts = cols.map(col => {
+          const agg = fieldAggs[col];
+          if (!agg) return `[${col}]`;
+          if (agg === 'COUNT_DISTINCT') return `COUNT(DISTINCT [${col}]) AS [${col}]`;
+          return `${agg}([${col}]) AS [${col}]`;
+        });
+
+        // WHERE — same logic as applyDesignTransforms / AQB node conditions
+        const whereParts = conditions.map((c, i) => {
+          const conj = i === 0 ? '' : (c.conj || 'AND') + ' ';
+          const col  = `[${c.field}]`;
+          if (c.op === 'NULL')    return conj + `${col} IS NULL`;
+          if (c.op === 'NOTNULL') return conj + `${col} IS NOT NULL`;
+          if (DataLaVistaCore.DATE_MACRO_VALS.has(c.op)) {
+            const expr = dateMacroToSQL(c.op, c.value, col);
+            return expr ? conj + expr : conj + `${col} IS NOT NULL`;
+          }
+          const raw = c.value || '';
+          const val = c.op === 'LIKE'
+            ? `'%${raw}%'`
+            : (raw !== '' && !isNaN(raw) ? raw : `'${raw.replace(/'/g, "''")}'`);
+          return conj + `${col} ${c.op} ${val}`;
+        });
+
+        // GROUP BY — auto-derived from non-aggregated columns when any agg is active
+        const groupParts = anyAgg ? cols.filter(c => !fieldAggs[c]).map(c => `[${c}]`) : [];
+
+        // ORDER BY
+        const orderParts = sorts.map(s => `[${s.field}] ${s.dir || 'ASC'}`);
+
+        // Use named view when available (no array binding needed); fall back to ?
+        const from = fromSrc || '?';
+        let sql = `SELECT ${selParts.join(', ')} FROM ${from}`;
+        if (whereParts.length) sql += ` WHERE ${whereParts.join(' ')}`;
+        if (groupParts.length) sql += ` GROUP BY ${groupParts.join(', ')}`;
+        if (orderParts.length) sql += ` ORDER BY ${orderParts.join(', ')}`;
+
+        try {
+          const result = fromSrc ? alasql(sql) : alasql(sql, [base]);
+          return Array.isArray(result) ? result : base;
+        } catch (e) {
+          console.warn('buildWidgetData error:', e.message, '|', sql);
+          return base;
+        }
+      }
+
+      function renderKPIContent(w) {
+        let value = '—';
+        const field = w.fields[0] || '';
+        const kpiData = buildWidgetData(w);
+        if (kpiData && kpiData.length && field) {
+          const fieldAgg = (w.fieldAggs || {})[field];
+          if (fieldAgg) {
+            // buildWidgetData ran SQL aggregation — first row has the result
+            value = kpiData[0][field] ?? '—';
+          } else {
+            // No per-field agg set — fall back to legacy w.aggregation JS aggregation
+            const agg = w.aggregation || 'SUM';
+            const vals = kpiData.map(r => parseFloat(r[field]) || 0);
+            if (agg === 'COUNT') value = kpiData.length;
+            else if (agg === 'SUM') value = vals.reduce((a, b) => a + b, 0).toLocaleString();
+            else if (agg === 'AVG') value = vals.length ? (vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(2) : '—';
+            else value = kpiData[0][field] ?? '—';
+          }
+        }
+        return `<div class="kpi-card"><div class="kpi-value" style="color:${w.fillColor}">${value}</div><div class="kpi-label">${field}</div></div>`;
       }
 
       function renderTableContent(w) {
-        const tableData = getDesignData();
+        const tableData = buildWidgetData(w);
         if (!tableData || !tableData.length) {
           return '<div class="text-muted text-sm" style="padding:12px">No data — run a query first</div>';
         }
-        const allCols = tableData.length ? Object.keys(tableData[0]) : DataLaVistaState.queryColumns;
+        const allCols = Object.keys(tableData[0]);
         const cols = w.fields.filter(f => allCols.includes(f));
-        if (!cols.length) return '<div class="text-muted text-sm" style="padding:12px">No fields selected</div>';
-        const rows = tableData;
+        if (!cols.length) return '<div class="text-muted text-sm" style="padding:12px">No fields selected — add columns in the properties panel</div>';
         let html = '<div style="overflow:auto;max-height:100%"><table class="widget-table"><thead><tr>' + cols.map(c => `<th>${c}</th>`).join('') + '</tr></thead><tbody>';
-        for (const row of rows) {
+        for (const row of tableData) {
           html += '<tr>' + cols.map(c => `<td>${row[c] ?? ''}</td>`).join('') + '</tr>';
         }
         html += '</tbody></table></div>';
@@ -696,7 +757,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         const chart = echarts.init(chartEl);
         DataLaVistaState.charts[w.id] = chart;
 
-        const chartData = aggregateDataForWidget(w);
+        const chartData = buildWidgetData(w);
         if (!chartData || !chartData.length) {
           chart.setOption({ title: { text: 'No data', left: 'center', top: 'middle', textStyle: { color: '#a19f9d', fontSize: 13 } } });
           return;
@@ -808,136 +869,290 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       // ============================================================
       // WIDGET PROPERTIES
       // ============================================================
+      // ============================================================
+      // PER-WIDGET PROPERTY HANDLERS
+      // Mirror the AQB advNode* functions, scoped to a widget.
+      // ============================================================
+
+      /** Re-renders both the properties panel and the widget canvas content. */
+      function _widgetRefresh(wid) {
+        renderWidgetProperties(wid);
+        updateWidgetContent(wid);
+      }
+
+      /** Opens an aggregate-picker popup anchored to btn, for a specific widget field. */
+      function showWidgetFieldAggPopup(wid, field, btn) {
+        document.querySelectorAll('.adv-agg-popup').forEach(p => p.remove());
+        const dt = sniffType(field);
+        const aggs = aggsForType(dt);
+        const w = DataLaVistaState.design.widgets.find(x => x.id === wid);
+        const current = w ? ((w.fieldAggs || {})[field] || '') : '';
+        const popup = document.createElement('div');
+        popup.className = 'adv-agg-popup';
+        popup.innerHTML = aggs.map(a =>
+          `<div class="agg-opt${a.val === current ? ' selected' : ''}"
+            onclick="setWidgetFieldAgg('${wid}','${field.replace(/'/g,"\\'")}','${a.val}');document.querySelectorAll('.adv-agg-popup').forEach(p=>p.remove())">${a.label}</div>`
+        ).join('');
+        document.body.appendChild(popup);
+        const rect = btn.getBoundingClientRect();
+        popup.style.top  = (rect.bottom + 2) + 'px';
+        popup.style.left = Math.max(0, rect.left - popup.offsetWidth + rect.width) + 'px';
+        setTimeout(() => {
+          document.addEventListener('click', function close(e) {
+            if (!popup.contains(e.target)) { popup.remove(); document.removeEventListener('click', close); }
+          });
+        }, 10);
+      }
+
+      /** Sets (or clears) a per-field aggregate on a widget, then refreshes. */
+      function setWidgetFieldAgg(wid, field, agg) {
+        const w = DataLaVistaState.design.widgets.find(x => x.id === wid);
+        if (!w) return;
+        if (!w.fieldAggs) w.fieldAggs = {};
+        if (agg) w.fieldAggs[field] = agg;
+        else delete w.fieldAggs[field];
+        _widgetRefresh(wid);
+      }
+
+      // ── Per-widget conditions ────────────────────────────────────────────
+
+      function widgetAddCond(wid) {
+        const w = DataLaVistaState.design.widgets.find(x => x.id === wid);
+        if (!w || !DataLaVistaState.queryColumns.length) return;
+        if (!w.conditions) w.conditions = [];
+        w.conditions.push({ conj: 'AND', field: DataLaVistaState.queryColumns[0], op: '=', value: '' });
+        renderWidgetProperties(wid);
+      }
+
+      function widgetRemoveCond(wid, idx) {
+        const w = DataLaVistaState.design.widgets.find(x => x.id === wid);
+        if (!w) return;
+        w.conditions.splice(idx, 1);
+        _widgetRefresh(wid);
+      }
+
+      function widgetUpdateCond(wid, idx, prop, val) {
+        const w = DataLaVistaState.design.widgets.find(x => x.id === wid);
+        if (!w || !w.conditions[idx]) return;
+        w.conditions[idx][prop] = val;
+        if (prop === 'op') renderWidgetProperties(wid); // re-render to toggle value input
+        else updateWidgetContent(wid);
+      }
+
+      // ── Per-widget sorts ─────────────────────────────────────────────────
+
+      function widgetAddSort(wid) {
+        const w = DataLaVistaState.design.widgets.find(x => x.id === wid);
+        if (!w || !DataLaVistaState.queryColumns.length) return;
+        if (!w.sorts) w.sorts = [];
+        w.sorts.push({ field: DataLaVistaState.queryColumns[0], dir: 'ASC' });
+        renderWidgetProperties(wid);
+      }
+
+      function widgetRemoveSort(wid, idx) {
+        const w = DataLaVistaState.design.widgets.find(x => x.id === wid);
+        if (!w) return;
+        w.sorts.splice(idx, 1);
+        _widgetRefresh(wid);
+      }
+
+      function widgetUpdateSort(wid, idx, prop, val) {
+        const w = DataLaVistaState.design.widgets.find(x => x.id === wid);
+        if (!w || !w.sorts[idx]) return;
+        w.sorts[idx][prop] = val;
+        updateWidgetContent(wid);
+      }
+
       function renderWidgetProperties(wid) {
         const w = DataLaVistaState.design.widgets.find(x => x.id === wid);
         if (!w) return;
         const section = document.getElementById('props-section');
 
         const isChart = ['bar', 'line', 'pie', 'scatter'].includes(w.type);
-        const isKPI = w.type === 'kpi';
+        const isKPI   = w.type === 'kpi';
         const isTable = w.type === 'table';
-        const isText = w.type === 'text';
+        const isText  = w.type === 'text';
+        const isData  = isChart || isKPI || isTable;
+
+        const cols       = DataLaVistaState.queryColumns;
+        const fieldAggs  = w.fieldAggs  || {};
+        const conditions = w.conditions || [];
+        const sorts      = w.sorts      || [];
+
+        // ── Field row: type-icon + label + field-selector + ∑ agg button ──
+        const fieldRow = (roleLabel, fieldVal, onChangeExpr) => {
+          const dt  = sniffType(fieldVal || '');
+          const ti  = DataLaVistaCore.FIELD_TYPE_ICONS[dt] || DataLaVistaCore.FIELD_TYPE_ICONS.default;
+          const agg = fieldAggs[fieldVal] || '';
+          return `
+            <div class="adv-field-row selected">
+              <span class="field-type-icon ${ti.cls}">${ti.icon}</span>
+              <span style="font-size:11px;color:var(--text-disabled);flex-shrink:0;min-width:16px">${roleLabel}</span>
+              <select class="form-input" style="flex:1;height:22px;font-size:11px" onchange="${onChangeExpr}">
+                ${cols.map(c => `<option value="${c}" ${c === fieldVal ? 'selected' : ''}>${c}</option>`).join('')}
+              </select>
+              <button class="adv-agg-btn${agg ? ' has-agg' : ''}" title="${agg || 'No aggregate'}"
+                onclick="event.stopPropagation();showWidgetFieldAggPopup('${wid}','${(fieldVal||'').replace(/'/g,"\\'")}',this)">${agg ? getAggIcon(agg) : '∑'}</button>
+            </div>`;
+        };
+
+        // ── Table column row: type-icon + name + ∑ agg button + remove ──
+        const tableFieldRow = (fieldName, idx) => {
+          const dt  = sniffType(fieldName);
+          const ti  = DataLaVistaCore.FIELD_TYPE_ICONS[dt] || DataLaVistaCore.FIELD_TYPE_ICONS.default;
+          const agg = fieldAggs[fieldName] || '';
+          return `
+            <div class="adv-field-row selected">
+              <span class="field-type-icon ${ti.cls}">${ti.icon}</span>
+              <span class="field-name" style="flex:1">${fieldName}</span>
+              <button class="adv-agg-btn${agg ? ' has-agg' : ''}" title="${agg || 'No aggregate'}"
+                onclick="event.stopPropagation();showWidgetFieldAggPopup('${wid}','${fieldName.replace(/'/g,"\\'")}',this)">${agg ? getAggIcon(agg) : '∑'}</button>
+              <button class="btn btn-ghost btn-sm btn-icon" style="padding:0 4px" onclick="removeWidgetField('${wid}',${idx})">✕</button>
+            </div>`;
+        };
+
+        // ── Filter conditions ────────────────────────────────────────────
+        const renderConditions = () => {
+          if (!conditions.length)
+            return '<div style="font-size:11px;color:var(--text-disabled);padding:2px 0">No filters — click + Add</div>';
+          return conditions.map((c, ci) => {
+            const isDate = sniffType(c.field) === 'date';
+            const ops    = isDate ? [...QB_OPS, ...DataLaVistaCore.DATE_MACRO_OPS] : QB_OPS;
+            const isMacro    = DataLaVistaCore.DATE_MACRO_VALS.has(c.op);
+            const macroMeta  = DataLaVistaCore.DATE_MACRO_OPS.find(o => o.val === c.op);
+            const needsValue = c.op !== 'NULL' && c.op !== 'NOTNULL' && !(isMacro && !macroMeta?.hasInput);
+            return `<div class="qb-condition-row">
+              ${ci === 0
+                ? `<span class="qb-where-badge">WHERE</span>`
+                : `<select class="form-input qb-conj-select" onchange="widgetUpdateCond('${wid}',${ci},'conj',this.value)">
+                    <option ${c.conj==='AND'?'selected':''}>AND</option>
+                    <option ${c.conj==='OR'?'selected':''}>OR</option></select>`}
+              <select class="form-input qb-field-select" onchange="widgetUpdateCond('${wid}',${ci},'field',this.value)">
+                ${cols.map(col=>`<option value="${col}" ${col===c.field?'selected':''}>${col}</option>`).join('')}
+              </select>
+              <select class="form-input qb-op-select" style="width:${isDate?'150px':'112px'}!important"
+                onchange="widgetUpdateCond('${wid}',${ci},'op',this.value)">
+                ${ops.map(o=>`<option value="${o.val}" ${o.val===c.op?'selected':''}>${o.label}</option>`).join('')}
+              </select>
+              ${needsValue
+                ? `<input type="${isMacro?'number':'text'}" class="form-input qb-val-input" value="${(c.value||'').replace(/"/g,'&quot;')}"
+                     oninput="widgetUpdateCond('${wid}',${ci},'value',this.value)"/>`
+                : `<span class="qb-val-blank"></span>`}
+              <button class="btn btn-ghost btn-sm btn-icon qb-remove-btn" onclick="widgetRemoveCond('${wid}',${ci})">✕</button>
+            </div>`;
+          }).join('');
+        };
+
+        // ── Sort rows ────────────────────────────────────────────────────
+        const renderSorts = () => {
+          if (!sorts.length)
+            return '<div style="font-size:11px;color:var(--text-disabled);padding:2px 0">No sorts — click + Add</div>';
+          return sorts.map((s, si) => `
+            <div class="qb-sort-row">
+              <select class="form-input qb-field-select" onchange="widgetUpdateSort('${wid}',${si},'field',this.value)">
+                ${cols.map(col=>`<option value="${col}" ${col===s.field?'selected':''}>${col}</option>`).join('')}
+              </select>
+              <select class="form-input qb-dir-select" onchange="widgetUpdateSort('${wid}',${si},'dir',this.value)">
+                <option ${s.dir==='ASC'?'selected':''}>ASC</option>
+                <option ${s.dir==='DESC'?'selected':''}>DESC</option>
+              </select>
+              <button class="btn btn-ghost btn-sm btn-icon" onclick="widgetRemoveSort('${wid}',${si})">✕</button>
+            </div>`).join('');
+        };
+
+        // ── Group-by (auto-derived, read-only display) ───────────────────
+        const activeCols  = isChart ? [w.xField, w.yField].filter(Boolean) : (w.fields || []);
+        const anyAgg      = activeCols.some(f => fieldAggs[f]);
+        const nonAggCols  = activeCols.filter(f => !fieldAggs[f]);
+        const renderGroupBy = () => {
+          if (!anyAgg) return '<div style="font-size:11px;color:var(--text-disabled);padding:2px 0">Set aggregates on fields above to enable grouping</div>';
+          if (!nonAggCols.length) return '<div style="font-size:11px;color:var(--text-disabled);padding:2px 0">All fields aggregated — no GROUP BY needed</div>';
+          return `<div style="font-size:11px;color:var(--text-disabled);padding:2px 0">Auto: ${nonAggCols.join(', ')}</div>`;
+        };
 
         section.innerHTML = `
-    <div class="props-group">
-      <div class="props-group-label">General</div>
-      <div class="props-row">
-        <label>Title</label>
-        <input type="text" class="form-input" value="${w.title}" oninput="updateWidgetProp('${wid}','title',this.value)"/>
-      </div>
-      <div class="props-row">
-        <label>Type</label>
-        <select class="form-input" onchange="changeWidgetType('${wid}', this.value)">
-          ${WIDGET_TYPES.map(t => `<option value="${t.id}" ${t.id === w.type ? 'selected' : ''}>${t.label}</option>`).join('')}
-        </select>
-      </div>
-      <div class="props-row">
-        <label>Width %</label>
-        <input type="number" class="form-input" min="10" max="100" value="${w.widthPct}" oninput="updateWidgetProp('${wid}','widthPct',+this.value)"/>
-      </div>
-      <div class="props-row">
-        <label>Height vh</label>
-        <input type="number" class="form-input" min="5" max="100" value="${w.heightVh}" oninput="updateWidgetProp('${wid}','heightVh',+this.value)"/>
-      </div>
-    </div>
+          <div class="adv-node-section">
+            <div class="adv-node-section-hdr">GENERAL</div>
+            <div class="props-row"><label>Title</label>
+              <input type="text" class="form-input" value="${w.title.replace(/"/g,'&quot;')}" oninput="updateWidgetProp('${wid}','title',this.value)"/></div>
+            <div class="props-row"><label>Type</label>
+              <select class="form-input" onchange="changeWidgetType('${wid}',this.value)">
+                ${WIDGET_TYPES.map(t=>`<option value="${t.id}" ${t.id===w.type?'selected':''}>${t.label}</option>`).join('')}
+              </select></div>
+            <div class="props-row"><label>Width %</label>
+              <input type="number" class="form-input" min="10" max="100" value="${w.widthPct}" oninput="updateWidgetProp('${wid}','widthPct',+this.value)"/></div>
+            <div class="props-row"><label>Height vh</label>
+              <input type="number" class="form-input" min="5" max="100" value="${w.heightVh}" oninput="updateWidgetProp('${wid}','heightVh',+this.value)"/></div>
+          </div>
 
-    <div class="props-group">
-      <div class="props-group-label">Appearance</div>
-      <div class="props-row">
-        <label>Fill/Accent</label>
-        <div class="color-input-wrap">
-          <input type="color" value="${w.fillColor}" oninput="updateWidgetProp('${wid}','fillColor',this.value)"/>
-          <input type="text" class="form-input" value="${w.fillColor}" oninput="updateWidgetProp('${wid}','fillColor',this.value)"/>
-        </div>
-      </div>
-      <div class="props-row">
-        <label>Border</label>
-        <div class="color-input-wrap">
-          <input type="color" value="${w.borderColor}" oninput="updateWidgetProp('${wid}','borderColor',this.value)"/>
-          <input type="number" class="form-input" value="${w.borderSize}" min="0" max="10" oninput="updateWidgetProp('${wid}','borderSize',+this.value)" style="width:50px"/>
-        </div>
-      </div>
-      ${isText ? `
-      <div class="props-row">
-        <label>Font size</label>
-        <input type="number" class="form-input" min="8" max="72" value="${w.fontSize}" oninput="updateWidgetProp('${wid}','fontSize',+this.value)"/>
-      </div>
-      <div class="props-row">
-        <label>Font color</label>
-        <div class="color-input-wrap">
-          <input type="color" value="${w.fontColor}" oninput="updateWidgetProp('${wid}','fontColor',this.value)"/>
-          <input type="text" class="form-input" value="${w.fontColor}" oninput="updateWidgetProp('${wid}','fontColor',this.value)"/>
-        </div>
-      </div>
-      <div class="props-row" style="flex-direction:column;align-items:flex-start">
-        <label>Content</label>
-        <textarea class="form-input" rows="4" oninput="updateWidgetProp('${wid}','textContent',this.value)">${w.textContent}</textarea>
-      </div>` : ''}
-    </div>
+          <div class="adv-node-section">
+            <div class="adv-node-section-hdr">APPEARANCE</div>
+            <div class="props-row"><label>Fill/Accent</label>
+              <div class="color-input-wrap">
+                <input type="color" value="${w.fillColor}" oninput="updateWidgetProp('${wid}','fillColor',this.value)"/>
+                <input type="text" class="form-input" value="${w.fillColor}" oninput="updateWidgetProp('${wid}','fillColor',this.value)"/>
+              </div></div>
+            <div class="props-row"><label>Border</label>
+              <div class="color-input-wrap">
+                <input type="color" value="${w.borderColor}" oninput="updateWidgetProp('${wid}','borderColor',this.value)"/>
+                <input type="number" class="form-input" value="${w.borderSize}" min="0" max="10" oninput="updateWidgetProp('${wid}','borderSize',+this.value)" style="width:50px"/>
+              </div></div>
+            ${isText ? `
+            <div class="props-row"><label>Font size</label>
+              <input type="number" class="form-input" min="8" max="72" value="${w.fontSize}" oninput="updateWidgetProp('${wid}','fontSize',+this.value)"/></div>
+            <div class="props-row"><label>Font color</label>
+              <div class="color-input-wrap">
+                <input type="color" value="${w.fontColor}" oninput="updateWidgetProp('${wid}','fontColor',this.value)"/>
+                <input type="text" class="form-input" value="${w.fontColor}" oninput="updateWidgetProp('${wid}','fontColor',this.value)"/>
+              </div></div>
+            <div class="props-row" style="flex-direction:column;align-items:flex-start"><label>Content</label>
+              <textarea class="form-input" rows="4" oninput="updateWidgetProp('${wid}','textContent',this.value)">${w.textContent}</textarea></div>
+            ` : ''}
+          </div>
 
-    ${(isChart || isKPI) ? `
-    <div class="props-group">
-      <div class="props-group-label">Data Binding</div>
-      ${isChart ? `
-      <div class="props-row">
-        <label>X / Label</label>
-        <select class="form-input" onchange="updateWidgetProp('${wid}','xField',this.value)">
-          ${DataLaVistaState.queryColumns.map(c => `<option ${c === w.xField ? 'selected' : ''}>${c}</option>`).join('')}
-        </select>
-      </div>
-      <div class="props-row">
-        <label>Y / Value</label>
-        <select class="form-input" onchange="updateWidgetProp('${wid}','yField',this.value)">
-          ${DataLaVistaState.queryColumns.map(c => `<option ${c === w.yField ? 'selected' : ''}>${c}</option>`).join('')}
-        </select>
-      </div>
-      <div class="props-row">
-        <label>Aggregation</label>
-        <select class="form-input" onchange="updateWidgetProp('${wid}','aggregation',this.value)">
-          ${[{val:'',label:'— none (raw) —'},{val:'SUM',label:'SUM'},{val:'COUNT',label:'COUNT'},{val:'AVG',label:'AVG (Average)'},{val:'MIN',label:'MIN'},{val:'MAX',label:'MAX'},{val:'FIRST',label:'FIRST'},{val:'LAST',label:'LAST'}]
-            .map(a => `<option value="${a.val}" ${a.val === (w.aggregation||'') ? 'selected' : ''}>${a.label}</option>`).join('')}
-        </select>
-      </div>` : ''}
-      ${isKPI ? `
-      <div class="props-row">
-        <label>Field</label>
-        <select class="form-input" onchange="updateWidgetProp('${wid}','fields',[this.value])">
-          ${DataLaVistaState.queryColumns.map(c => `<option ${w.fields[0] === c ? 'selected' : ''}>${c}</option>`).join('')}
-        </select>
-      </div>
-      <div class="props-row">
-        <label>Aggregation</label>
-        <select class="form-input" onchange="updateWidgetProp('${wid}','aggregation',this.value)">
-          ${['SUM', 'COUNT', 'AVG', 'FIRST', 'LAST', 'MIN', 'MAX'].map(a => `<option ${a === w.aggregation ? 'selected' : ''}>${a}</option>`).join('')}
-        </select>
-      </div>` : ''}
-    </div>` : ''}
+          ${isData ? `
+          <div class="adv-node-section">
+            <div class="adv-node-section-hdr">
+              <span>FIELDS</span>
+            </div>
+            ${isChart ? `
+              ${fieldRow('X', w.xField, `updateWidgetProp('${wid}','xField',this.value);renderWidgetProperties('${wid}')`)}
+              ${fieldRow('Y', w.yField, `updateWidgetProp('${wid}','yField',this.value);renderWidgetProperties('${wid}')`)}
+            ` : ''}
+            ${isKPI ? fieldRow('', w.fields[0] || cols[0] || '', `updateWidgetProp('${wid}','fields',[this.value]);renderWidgetProperties('${wid}')`) : ''}
+            ${isTable ? (w.fields.length
+                ? w.fields.map((f,i) => tableFieldRow(f,i)).join('')
+                : `<div style="font-size:11px;color:var(--text-disabled);padding:4px 0">Drop fields from the left panel</div>`) : ''}
+            ${isTable ? `
+            <div class="adv-drop-zone" style="margin-top:4px;text-align:center;padding:5px;font-size:11px"
+              ondragover="event.preventDefault();this.classList.add('drag-over')"
+              ondragleave="this.classList.remove('drag-over')"
+              ondrop="onDropFieldToWidget('${wid}',event)">Drop field to add column</div>
+            ` : ''}
+          </div>
 
-    ${isTable ? `
-    <div class="props-group">
-      <div class="props-group-label">Columns</div>
-      <div id="table-fields-list" class="field-assign-list">
-        ${w.fields.map((f, i) => `
-          <div class="field-assign-item">
-            <span style="flex:1">${f}</span>
-            <span class="remove" onclick="removeWidgetField('${wid}',${i})">✕</span>
-          </div>`).join('')}
-      </div>
-      <div class="field-drop-zone" style="margin-top:4px" ondragover="event.preventDefault();this.classList.add('drag-over')" ondragleave="this.classList.remove('drag-over')" ondrop="onDropFieldToWidget('${wid}',event)">
-        Drop fields here
-      </div>
-    </div>` : ''}
+          <div class="adv-node-section">
+            <div class="adv-node-section-hdr">
+              <span>FILTER CONDITIONS</span>
+              <button class="btn btn-ghost btn-sm" onclick="widgetAddCond('${wid}')">+ Add</button>
+            </div>
+            <div>${renderConditions()}</div>
+          </div>
 
-    <div class="props-group">
-      <div class="props-group-label">Widget Filters</div>
-      <div id="widget-filters-list">
-        ${w.filters.map((f, i) => `<div class="field-assign-item"><span style="flex:1">${f.field}</span><span class="remove" onclick="removeWidgetFilter('${wid}',${i})">✕</span></div>`).join('')}
-      </div>
-      <div class="field-drop-zone" style="margin-top:4px" ondragover="event.preventDefault();this.classList.add('drag-over')" ondragleave="this.classList.remove('drag-over')" ondrop="onDropFilterToWidget('${wid}',event)">
-        Drop fields for widget filter
-      </div>
-    </div>
-  `;
+          <div class="adv-node-section">
+            <div class="adv-node-section-hdr">
+              <span>SORT ORDER</span>
+              <button class="btn btn-ghost btn-sm" onclick="widgetAddSort('${wid}')">+ Add</button>
+            </div>
+            <div>${renderSorts()}</div>
+          </div>
+
+          <div class="adv-node-section">
+            <div class="adv-node-section-hdr"><span>GROUP BY</span></div>
+            <div>${renderGroupBy()}</div>
+          </div>
+          ` : ''}
+        `;
       }
 
       function updateWidgetProp(wid, prop, value) {
@@ -955,8 +1170,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         if (prop === 'textContent' && w.type === 'text') el.querySelector('.text-widget').innerHTML = value;
         if (prop === 'fontSize' && w.type === 'text') el.querySelector('.text-widget').style.fontSize = value + 'px';
         if (prop === 'fontColor' && w.type === 'text') el.querySelector('.text-widget').style.color = value;
-        if (['xField', 'yField', 'aggregation', 'fillColor', 'fields'].includes(prop) && ['bar', 'line', 'pie', 'scatter'].includes(w.type)) renderChart(w);
-        if (['xField', 'yField', 'aggregation', 'fillColor', 'fields'].includes(prop) && w.type === 'kpi') el.querySelector('.widget-content').innerHTML = renderKPIContent(w);
+        if (['xField', 'yField', 'aggregation', 'fieldAggs', 'fillColor', 'fields'].includes(prop) && ['bar', 'line', 'pie', 'scatter'].includes(w.type)) renderChart(w);
+        if (['xField', 'yField', 'aggregation', 'fieldAggs', 'fillColor', 'fields'].includes(prop) && w.type === 'kpi') el.querySelector('.widget-content').innerHTML = renderKPIContent(w);
       }
 
       function changeWidgetType(wid, newType) {
@@ -1037,8 +1252,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 
         DataLaVistaState.design.filters.forEach(f => {
           let uniqueVals = [];
-          if (DataLaVistaState.queryResults) {
-            uniqueVals = [...new Set(DataLaVistaState.queryResults.map(r => r[f.field]).filter(v => v !== null && v !== undefined))].sort();
+          if (alasql.tables && alasql.tables['dlv_results']) {
+            uniqueVals = [...new Set(alasql('SELECT * FROM [dlv_results]').map(r => r[f.field]).filter(v => v !== null && v !== undefined))].sort();
           }
 
           const wrap = document.createElement('div');
@@ -1093,21 +1308,19 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       }
 
       function refreshWidgets() {
-        let filtered = DataLaVistaState.queryResults || [];
-        for (const [field, value] of Object.entries(DataLaVistaState.previewFilters)) {
-          // Basic equals filter matching
-          filtered = filtered.filter(r => String(r[field]) === String(value));
+        // Rebuild [dlv_active] as a filtered view on top of [dlv_results] (view path),
+        // or fall back to JS-filtered array when no view exists (design tab before first run).
+        const hasView = !!(alasql.tables && alasql.tables['dlv_results']);
+        const whereClauses = Object.entries(DataLaVistaState.previewFilters)
+          .map(([f, v]) => `[${f}] = '${String(v).replace(/'/g, "''")}'`);
+        if (hasView) {
+          alasql('DROP VIEW IF EXISTS [dlv_active]');
+          const where = whereClauses.length ? ` WHERE ${whereClauses.join(' AND ')}` : '';
+          alasql(`CREATE VIEW [dlv_active] AS SELECT * FROM [dlv_results]${where}`);
+          DataLaVistaState.design.previewFilteredData = null; // view handles filtering
+        } else {
+          DataLaVistaState.design.previewFilteredData = null;
         }
-
-        // Re-render chart/KPI elements based on filtered subset
-        DataLaVistaState.design.widgets.forEach(w => {
-          const el = document.getElementById('wcontent-' + w.id);
-          if (el) {
-            el.innerHTML = getWidgetContentHTML(w, filtered);
-            if (['bar', 'line', 'pie', 'scatter'].includes(w.type)) {
-              requestAnimationFrame(() => renderChart(w, filtered));
-            }
-          }
-        });
+        DataLaVistaState.design.widgets.forEach(w => updateWidgetContent(w.id));
       }
 

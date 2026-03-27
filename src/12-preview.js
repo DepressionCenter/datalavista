@@ -55,26 +55,18 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
             }
           }
 
-          console.log("DEBUG: Tables loaded into alasql. Preprocessing query...");
+          // Execute SQL once with full data, then materialize into a named table.
+          // Per-widget SQL scans [dlv_active] (a view on the materialized table) — fast.
           const processedSQL = preprocessSQL(DataLaVistaState.sql);
-          console.log("DEBUG: Processed SQL:", processedSQL);
-          console.log("DEBUG: Executing query in alasql...");
-          let results;
-          try{
-            results = alasql(processedSQL);
-            console.log("DEBUG: refreshDashboardPreview -> Query executed successfully.");
-          } catch (err) {
-            console.error("DEBUG: Query execution error:", err);
-            throw err;
-          }
+          const results = alasql(processedSQL);
 
-          console.log("DEBUG: refreshDashboardPreview -> results size: ", results.length);
-          
-          console.log("DEBUG: refreshDashboardPreview -> DataLaVistaState.previewResults");
-          DataLaVistaState.previewResults = results;
-          console.log("DEBUG: refreshDashboardPreview -> DataLaVistaState.queryColumns");
-          DataLaVistaState.queryResults = results;
-          console.log("DEBUG: refreshDashboardPreview -> DataLaVistaState.queryColumns");
+          alasql('DROP TABLE IF EXISTS [dlv_results]');
+          alasql('DROP VIEW  IF EXISTS [dlv_active]');
+          alasql('CREATE TABLE [dlv_results]');
+          alasql.tables['dlv_results'].data = results;     // O(1) reference assignment
+          alasql('CREATE VIEW [dlv_active] AS SELECT * FROM [dlv_results]');
+          DataLaVistaState.previewFilters = {};
+          DataLaVistaState.design.previewFilteredData = null;
           DataLaVistaState.queryColumns = results.length ? Object.keys(results[0]) : DataLaVistaState.queryColumns;
 
           console.log("DEBUG: refreshDashboardPreview -> renderPreviewTab: Rendering preview tab with results...");
@@ -108,7 +100,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         if (barFilters.length) {
           filterBar.classList.remove('hidden');
           for (const filter of barFilters) {
-            const values = ['(All)', ...(DataLaVistaState.previewResults ? [...new Set(DataLaVistaState.previewResults.map(r => r[filter.field]).filter(v => v != null))].sort() : [])];
+            const _fRows = (alasql.tables && alasql.tables['dlv_results']) ? alasql('SELECT * FROM [dlv_results]') : [];
+            const values = ['(All)', ...[...new Set(_fRows.map(r => r[filter.field]).filter(v => v != null))].sort()];
             const wrap = document.createElement('div');
             wrap.className = 'filter-chip';
             wrap.innerHTML = `<span style="font-size:11px;font-weight:600">${filter.label}:</span>
@@ -119,6 +112,9 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           }
         } else filterBar.classList.add('hidden');
 
+        // Reset per-widget filter so buildWidgetData uses raw queryResults as base
+        DataLaVistaState.design.previewFilteredData = null;
+
         // Canvas
         const canvas = document.getElementById('preview-canvas');
         canvas.innerHTML = '';
@@ -128,8 +124,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           if (id.startsWith('prev_')) { try { chart.dispose(); } catch (e) { } delete DataLaVistaState.charts[id]; }
         }
 
-        const results = DataLaVistaState.previewResults || [];
-
         for (const w of DataLaVistaState.design.widgets) {
           const el = document.createElement('div');
           el.className = 'widget';
@@ -137,7 +131,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           el.innerHTML = `
             <div class="widget-header"><span class="widget-title">${w.title}</span></div>
             <div class="widget-content" id="prev-wcontent-${w.id}">
-              ${getPrevWidgetContent(w, results)}
+              ${getPrevWidgetContent(w)}
             </div>
           `;
           canvas.appendChild(el);
@@ -147,47 +141,32 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           for (const w of DataLaVistaState.design.widgets) {
             if (['bar', 'line', 'pie', 'scatter'].includes(w.type)) {
               console.log(`DEBUG: Rendering preview chart for widget ${w.id} of type ${w.type}`);
-              renderPreviewChart(w, results);
+              renderPreviewChart(w);
             }
           }
         });
       }
 
-      function getPrevWidgetContent(w, results) {
+      function getPrevWidgetContent(w) {
         if (w.type === 'text') return `<div class="text-widget" style="font-size:${w.fontSize}px;color:${w.fontColor}">${w.textContent}</div>`;
         if (w.type === 'placeholder') return '';
-        if (w.type === 'kpi') return renderPrevKPI(w, results);
-        if (w.type === 'table') return renderPrevTable(w, results);
+        if (w.type === 'kpi') return renderPrevKPI(w);
+        if (w.type === 'table') return renderPrevTable(w);
         if (['bar', 'line', 'pie', 'scatter'].includes(w.type)) return `<div id="prevchart-${w.id}" style="width:100%;height:100%;min-height:200px"></div>`;
         return '';
       }
 
-      // TODO: .fields may need to be .xField/.yField for charts, and it should support aggregates
-      // TODO: Check if we are using apache-echarts correctly. Do we need to preprocess data or just feed it directly?
-      function renderPrevKPI(w, results) {
-        let value = '—', label = w.fields[0] || '';
-        if (results.length && label) {
-          const vals = results.map(r => parseFloat(r[label]) || 0);
-          const agg = w.aggregation || 'SUM';
-          if (agg === 'COUNT') value = results.length.toLocaleString();
-          else if (agg === 'SUM') value = vals.reduce((a, b) => a + b, 0).toLocaleString();
-          else if (agg === 'AVG') value = vals.length ? (vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(2) : '—';
-          else value = results[0][label] ?? '—';
-        }
-        return `<div class="kpi-card"><div class="kpi-value" style="color:${w.fillColor}">${value}</div><div class="kpi-label">${label}</div></div>`;
+      function renderPrevKPI(w) {
+        // Delegate to the same logic as the design tab (uses buildWidgetData internally)
+        return renderKPIContent(w);
       }
 
-      function renderPrevTable(w, results) {
-        if (!results.length) return '<div class="text-muted text-sm" style="padding:12px">No data</div>';
-        const cols = w.fields.length ? w.fields.filter(f => results[0].hasOwnProperty(f)) : Object.keys(results[0]).slice(0, 8);
-        if (!cols.length) return '<div class="text-muted text-sm" style="padding:12px">No columns configured</div>';
-        let html = '<div style="overflow:auto;max-height:100%"><table class="widget-table"><thead><tr>' + cols.map(c => `<th>${c}</th>`).join('') + '</tr></thead><tbody>';
-        for (const row of results) html += '<tr>' + cols.map(c => `<td>${row[c] ?? ''}</td>`).join('') + '</tr>';
-        html += '</tbody></table></div>';
-        return html;
+      function renderPrevTable(w) {
+        // Delegate to the same logic as the design tab (uses buildWidgetData internally)
+        return renderTableContent(w);
       }
 
-      function renderPreviewChart(w, results) {
+      function renderPreviewChart(w) {
         const chartEl = document.getElementById('prevchart-' + w.id);
         if (!chartEl) return;
         const id = 'prev_' + w.id;
@@ -195,20 +174,25 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         const chart = echarts.init(chartEl);
         DataLaVistaState.charts[id] = chart;
 
-        if (!results.length) { chart.setOption({ title: { text: 'No data', left: 'center', top: 'middle', textStyle: { color: '#a19f9d' } } }); return; }
+        const chartData = buildWidgetData(w);
+        if (!chartData || !chartData.length) {
+          chart.setOption({ title: { text: 'No data', left: 'center', top: 'middle', textStyle: { color: '#a19f9d', fontSize: 13 } } });
+          return;
+        }
 
-        const xField = w.xField || Object.keys(results[0])[0];
-        const yField = w.yField || Object.keys(results[0])[1] || xField;
+        const allCols = Object.keys(chartData[0]);
+        const xField = w.xField || allCols[0];
+        const yField = w.yField || allCols[1] || allCols[0];
         let option = {};
 
         if (w.type === 'bar') {
-          option = { tooltip: { trigger: 'axis' }, xAxis: { type: 'category', data: results.map(r => r[xField]), axisLabel: { rotate: 30, fontSize: 11 } }, yAxis: { type: 'value' }, series: [{ type: 'bar', data: results.map(r => parseFloat(r[yField]) || 0), itemStyle: { color: w.fillColor } }], grid: { left: 40, right: 20, top: 20, bottom: 60 } };
+          option = { tooltip: { trigger: 'axis' }, xAxis: { type: 'category', data: chartData.map(r => r[xField]), axisLabel: { rotate: 30, fontSize: 11 } }, yAxis: { type: 'value' }, series: [{ type: 'bar', data: chartData.map(r => parseFloat(r[yField]) || 0), itemStyle: { color: w.fillColor } }], grid: { left: 40, right: 20, top: 20, bottom: 60 } };
         } else if (w.type === 'line') {
-          option = { tooltip: { trigger: 'axis' }, xAxis: { type: 'category', data: results.map(r => r[xField]), axisLabel: { rotate: 30, fontSize: 11 } }, yAxis: { type: 'value' }, series: [{ type: 'line', data: results.map(r => parseFloat(r[yField]) || 0), itemStyle: { color: w.fillColor }, smooth: true }], grid: { left: 40, right: 20, top: 20, bottom: 60 } };
+          option = { tooltip: { trigger: 'axis' }, xAxis: { type: 'category', data: chartData.map(r => r[xField]), axisLabel: { rotate: 30, fontSize: 11 } }, yAxis: { type: 'value' }, series: [{ type: 'line', data: chartData.map(r => parseFloat(r[yField]) || 0), itemStyle: { color: w.fillColor }, smooth: true }], grid: { left: 40, right: 20, top: 20, bottom: 60 } };
         } else if (w.type === 'pie') {
-          option = { tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' }, series: [{ type: 'pie', data: results.map(r => ({ name: String(r[xField] || ''), value: parseFloat(r[yField]) || 0 })), radius: ['30%', '65%'], label: { fontSize: 11 } }] };
+          option = { tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' }, series: [{ type: 'pie', data: chartData.map(r => ({ name: String(r[xField] || ''), value: parseFloat(r[yField]) || 0 })), radius: ['30%', '65%'], label: { fontSize: 11 } }] };
         } else if (w.type === 'scatter') {
-          option = { tooltip: { trigger: 'item' }, xAxis: { type: 'value' }, yAxis: { type: 'value' }, series: [{ type: 'scatter', data: results.map(r => [parseFloat(r[xField]) || 0, parseFloat(r[yField]) || 0]), itemStyle: { color: w.fillColor } }], grid: { left: 40, right: 20, top: 20, bottom: 40 } };
+          option = { tooltip: { trigger: 'item' }, xAxis: { type: 'value' }, yAxis: { type: 'value' }, series: [{ type: 'scatter', data: chartData.map(r => [parseFloat(r[xField]) || 0, parseFloat(r[yField]) || 0]), itemStyle: { color: w.fillColor } }], grid: { left: 40, right: 20, top: 20, bottom: 40 } };
         }
         chart.setOption(option);
       }
@@ -217,20 +201,26 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         if (value === '(All)') delete DataLaVistaState.previewFilters[field];
         else DataLaVistaState.previewFilters[field] = value;
 
-        let filtered = DataLaVistaState.previewResults || [];
-        for (const [f, v] of Object.entries(DataLaVistaState.previewFilters)) {
-          filtered = filtered.filter(r => String(r[f]) === String(v));
+        // Rebuild the [dlv_active] view — a filter layer on top of [dlv_results].
+        // Per-widget SQL (buildWidgetData) will query FROM [dlv_active] automatically.
+        alasql('DROP VIEW IF EXISTS [dlv_active]');
+        const whereClauses = Object.entries(DataLaVistaState.previewFilters)
+          .map(([f, v]) => `[${f}] = '${String(v).replace(/'/g, "''")}'`);
+        if (whereClauses.length) {
+          alasql(`CREATE VIEW [dlv_active] AS SELECT * FROM [dlv_results] WHERE ${whereClauses.join(' AND ')}`);
         }
 
-        // Re-render canvas with filtered data
+        DataLaVistaState.design.previewFilteredData = null; // view handles all filtering
+
+        // Re-render each widget
         const canvas = document.getElementById('preview-canvas');
         canvas.querySelectorAll('.widget').forEach((el, i) => {
           const w = DataLaVistaState.design.widgets[i];
           if (!w) return;
           const content = el.querySelector('.widget-content');
-          content.innerHTML = getPrevWidgetContent(w, filtered);
+          content.innerHTML = getPrevWidgetContent(w);
           if (['bar', 'line', 'pie', 'scatter'].includes(w.type)) {
-            requestAnimationFrame(() => renderPreviewChart(w, filtered));
+            requestAnimationFrame(() => renderPreviewChart(w));
           }
         });
       }
@@ -239,7 +229,9 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       // DOWNLOAD CSV
       // ============================================================
       async function downloadCSV() {
-        let results = DataLaVistaState.previewResults || DataLaVistaState.queryResults;
+        let results = (alasql.tables && alasql.tables['dlv_results'])
+          ? alasql('SELECT * FROM [dlv_results]')
+          : null;
         if (!results) {
           // Try to run query and get all rows
           if (!DataLaVistaState.sql.trim()) { toast('Run a query first', 'error'); return; }
