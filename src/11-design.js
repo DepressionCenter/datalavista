@@ -37,7 +37,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
     if (!DataLaVistaState.design.fieldAggs)  DataLaVistaState.design.fieldAggs = {};
 
     const cols = DataLaVistaState.queryColumns;
-    const fieldAggs = DataLaVistaState.design.fieldAggs;
 
     body.innerHTML = '';
 
@@ -50,11 +49,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
     for (const col of cols) {
       const dt = sniffType(col);
       const ti = DataLaVistaCore.FIELD_TYPE_ICONS[dt] || DataLaVistaCore.FIELD_TYPE_ICONS.default;
-      const availAggs = aggsForType(dt);
-      const curAgg = fieldAggs[col] || '';
-      const aggOpts = availAggs.map(a =>
-        `<option value="${a.val}" ${a.val === curAgg ? 'selected' : ''}>${a.label}</option>`
-      ).join('');
 
       const row = document.createElement('div');
       row.className = 'design-field-row';
@@ -62,9 +56,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       row.innerHTML = `
         <span class="field-type-icon ${ti.cls}" style="font-size:10px">${ti.icon}</span>
         <span class="field-label" title="${col}">${col}</span>
-        <select class="form-input design-agg-select${curAgg ? ' agg-active' : ''}"
-          title="Aggregate function"
-          onchange="setDesignFieldAgg('${col.replace(/'/g,"\\'")}', this.value)">${aggOpts}</select>
       `;
       row.addEventListener('dragstart', e => {
         safeDragSet(e, { type: 'result-field', field: col, dataType: dt });
@@ -705,7 +696,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         const chart = echarts.init(chartEl);
         DataLaVistaState.charts[w.id] = chart;
 
-        const chartData = getDesignData();
+        const chartData = aggregateDataForWidget(w);
         if (!chartData || !chartData.length) {
           chart.setOption({ title: { text: 'No data', left: 'center', top: 'middle', textStyle: { color: '#a19f9d', fontSize: 13 } } });
           return;
@@ -898,6 +889,13 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         <label>Y / Value</label>
         <select class="form-input" onchange="updateWidgetProp('${wid}','yField',this.value)">
           ${DataLaVistaState.queryColumns.map(c => `<option ${c === w.yField ? 'selected' : ''}>${c}</option>`).join('')}
+        </select>
+      </div>
+      <div class="props-row">
+        <label>Aggregation</label>
+        <select class="form-input" onchange="updateWidgetProp('${wid}','aggregation',this.value)">
+          ${[{val:'',label:'— none (raw) —'},{val:'SUM',label:'SUM'},{val:'COUNT',label:'COUNT'},{val:'AVG',label:'AVG (Average)'},{val:'MIN',label:'MIN'},{val:'MAX',label:'MAX'},{val:'FIRST',label:'FIRST'},{val:'LAST',label:'LAST'}]
+            .map(a => `<option value="${a.val}" ${a.val === (w.aggregation||'') ? 'selected' : ''}>${a.label}</option>`).join('')}
         </select>
       </div>` : ''}
       ${isKPI ? `
