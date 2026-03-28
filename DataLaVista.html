@@ -6772,6 +6772,7 @@ function buildConfig() {
     fontColor: w.fontColor || '#323130',
     textContent: w.textContent || '',
     imageUrl: w.imageUrl || '',
+    fieldAggs: Object.assign({}, w.fieldAggs || {}),
     filters: (w.filters || []).map(f => ({
       field: f.field || '',
       operator: f.operator || '=',
@@ -6816,7 +6817,6 @@ function buildConfig() {
 }
 
 async function loadConfig(cfg) {
-  console.log("+++++++ Entred loadConfig at: " + new Date().toISOString());
   if (!cfg._license) throw new Error('Invalid report config — missing _license key');
   if (!cfg.dataSources || typeof cfg.dataSources != 'object'|| !cfg.tables || typeof cfg.tables != 'object') throw new Error('Invalid report config — missing data sources or tables.');
   // If the config provided is a string, try parsing it safely as JSON
@@ -6885,6 +6885,8 @@ async function loadConfig(cfg) {
     if (titleInput) titleInput.value = DataLaVistaState.design.title || '';
     renderDesignCanvas();
     renderFieldsPanel();
+    renderBasicQB();
+    renderAdvancedQB();
     setStatus('✅ Config loaded');
     toast('Config loaded successfully', 'success');
   }
