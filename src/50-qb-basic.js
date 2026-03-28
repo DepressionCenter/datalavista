@@ -30,11 +30,37 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         document.getElementById('qb-basic-btn').classList.toggle('active', mode === 'basic');
         document.getElementById('qb-adv-btn').classList.toggle('active', mode === 'advanced');
         if (mode === 'advanced') {
+          _migrateBasicToAdvancedQB();
           renderAdvancedQB(); renderAdvOptionsPanel();
         } else {
           // Leaving advanced mode — re-enable design tabs (join restriction only applies to AQB)
           setDesignTabsEnabled(true);
         }
+      }
+
+      // Copy basic QB state into a new advanced QB node, but only when
+      // advanced QB is empty and basic QB has a table selected.
+      function _migrateBasicToAdvancedQB() {
+        const bqb = DataLaVistaState.basicQB;
+        if (!bqb.tableName) return;                                          // nothing to migrate
+        const nodes = DataLaVistaState.advancedQB.nodes || {};
+        if (Object.keys(nodes).length > 0) return;                          // adv QB already has content
+
+        const t = DataLaVistaState.tables[bqb.tableName];
+        const id = 'node_1';
+        DataLaVistaState.advancedQB.nodes = {};
+        DataLaVistaState.advancedQB.nodes[id] = {
+          tableName:      bqb.tableName,
+          x:              80,
+          y:              60,
+          selectedFields: bqb.selectedFields.length ? [...bqb.selectedFields] : [],
+          alias:          (t && t.alias) || bqb.tableName,
+          conditions:     (bqb.conditions || []).map(c => ({ ...c })),
+          sorts:          (bqb.sorts     || []).map(s => ({ ...s })),
+          groupBy:        [...(bqb.groupBy || [])],
+          fieldAggs:      Object.assign({}, bqb.fieldAggs || {})
+        };
+        DataLaVistaState.advancedQB.rowLimit = bqb.rowLimit || 500;
       }
 
       // ============================================================
