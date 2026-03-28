@@ -1,0 +1,454 @@
+Here's what my DataLaVista dashboard designer is doing when loading data (according to your analysis). I want to redesign the data loading portion to:
+
+
+
+
+
+* Have a new tab in my connect popup to drop in files that accepts CSV, JSON, Excel, XML and SQLite, and keeps adding the uploaded files to the list before you hit connect which would actually upload them. It should have both a file upload button (system file picker) and a drag & drop area.
+
+
+
+* Have a new tab in my connect popup that combines connecting to remote data sources. It should have a place to enter a URL to CSV, JSON, Excel, XML, and SQLite files. It should keep using my sharepoint file picker as well to provide the option to navigate sharepoint to get the URL for a file. Just like upload tab, it should allow adding many sources until you click Connect, at which point it will download all of them. Do not treat sharepoint files gathered this way as lists, but rather just like any other remote file.
+
+
+
+* All remote files should try to be loaded directly via alasql's built-in mechanism whenever possible, and if that fails, then try the fetch with fall backs mechanism. (I believe the current CSV loading might be doing this). In the case of SQLite, import all the tables into alasql (which I think alasql handles automatically).
+
+
+
+( Uploaded files need to eventually end up in alasql, I just don't know if it can work the same way as remote where alasql is used first, or if they must be always loaded manually first.
+
+
+
+* All JSON and XML should go through a function to extract the data from the .d node if that's the only node and it's an object (to account for when odata creates the additional node due to being in verbose mode).
+
+
+
+* All JSON, CSV and Excel and XML should go through a function to remove odata columns, as well as those columns from the list of columns to exclude (EXCLUDED_FIELDS[]).
+
+
+
+* All JSON and XML should go through the process used in the current sharepoint loaders to add synthetic fields (ID, Data) and creating the semi-colon separated list of values from arrays, and to expand objects by extracting their elements.
+
+
+
+* All CSV, JSON, Excel and XML should go through a function to guess data types (or if they were loaded directly with alasql, then possible also columns which were brought in as text or number). All sqlite files should already have a data type which we should honor, with the exception of detecting dates from strings because sqlite does not have a native date type. Data types should be checked by checking the first 25 rows and selecting the data type that works for the super majority of those rows. Also recognize the words null, NULL, NaN, and #Error and ignore them while checking data types. For all data type checking, try to determine numeric, boolean, and date values before leaving something as text/array/object/other. For date checking, try to detect ISO dates, Oracle-style dates, whatever format Excel typically uses in CSV, UNIX epochs, and UNIX epochs in scientific notation format (common in JSON exports).
+
+
+
+* All data needs to end up in alasql, and there must be a mapping somewhere  indicating the original url (if applicable), file name (if applicable), file type (if applicable), data source type, and internal table names (if sqlite or xml).
+
+
+
+* Rememer to keep track of whether a data source and table were uploaded or not, so we'll know later whether to keep the data in the report config or not.
+
+
+
+* If possible, all these data-related functions should live in a DataLaVistaPiepeline class/const/object. The data should all land in alasql tables in DataLaVistaState (whith some indication they are raw data).
+
+
+
+* After loading data sources, create a view for each table which will be used to set aliases. For example, when users rename a column in the fields panel in query builder, the renaming should actually trigger an "AS newname" for that column in its respective view. Similarly for renaming tables, it should affect the view name not the actual table. Don't allow duplicate table names. Keep track of which data sources and tables are mapped to which views.
+
+
+
+* In the connect popup, I also want to keep the tab to load SharePoint Lists. It should keep working the same, with lazy loading of the first 25 items only until the user queries it. It should keep the same process for loading field structure and adding those base columns like Title, ID, Created, Modified, Created By, Modified By, etc. However, the processes for detecting data types, extracting from .d, creating synthetic columns,  detecting data types, etc. should now more closely match or even re-use the steps outlined for the other source types (csv/xml/json/excel/sqlite). But, sharepoint list sources will continue having the extra steps for synthetic columns, for ignoring odata, for handling people columns/lookups/multi-selects etc.
+
+
+
+* Leave the tab for loading configs alone for now, just keep in mind we'll follow a similar process for the initial fetching later on.
+
+
+
+* The "Tables and Fields" panel will now show the views for each loaded data source/table, not the actual raw tables. The purpose is so that users can swap out data sources later but keep the aliases so their queries and dashboards continue to work. SQL hints and the SQL generated by basic/advanced query builders will now use the view names and view columns as well instead of the internal field IDs.
+
+
+
+
+
+* The buildConfig() and loadConfig() functions will now need to include all the views that cover the raw tables, as well as the mappings from internal table name to view name (which is the table alias set by the user), and from internal data source name to alias.
+
+* When loading data sources, either with "Get More Data" or via loading a report config, you will need to check if the source is already in the data model by comparing the data source name, URL, file name, etc. If it exists, replace it (but keep the ds, table, column aliases that still apply for things that didn't get removed or renamed since the last time the data source was loaded). This should also allow "refreshing" data structures when loading a report config.
+
+
+* The buildconfig() and loadConfig() functions will also now need to ensure that only table structures and views for tables/views that are actually part of the SQL are included. All unused data structures should not be added to the config, and instead, the data source should be "refreshed" when loading a repot config (trying to keep aliases). The only exception again is for files that were uploaded. These structures (and raw data) will always be part of the report config. The structure for uploaded files however should be allowed to "refresh" as well when a file with the same file name is dropped/uploaded.
+
+Your previous analysis to help speed things up:
+```
+
+________________________________________
+Function Inventory & Call Graphs
+________________________________________
+23-sharepoint.js
+Function	What it does
+spFetch(url, dsName)	Core SP REST GET helper. Tries: CORS → credentials → JSONP → CORSProxy → AllOrigins → Thingproxy. Returns parsed JSON.
+spFetchWrite(url, options, siteUrl)	Mutation-capable companion to spFetch. Adds X-RequestDigest from _spPageContextInfo or fetches it from /_api/contextinfo. Used for POST/MERGE/DELETE.
+normalizeDataSourceName(name)	Sanitizes a string to a safe JS identifier (strips special chars, collapses underscores).
+generateDataSourceName(url, alias)	Derives a unique DS name from URL or alias. Falls back to domain+path snippet.
+updateConnectButton()	Updates the Connect button label/state based on whether any data sources are loaded.
+getDataSourceForTable(tableName)	Returns the DataLaVistaState.dataSources entry that owns a given table.
+getTableQueryName(tableName)	Returns the AlaSQL-safe alias for a table (spaces → underscores, etc.).
+registerTableInAlaSQL(tableName, data)	Calls alasql('CREATE TABLE ...') and populates it with row data.
+dropTableFromAlaSQL(tableName)	Drops the table from AlaSQL (DROP TABLE IF EXISTS).
+extractRows(json)	Pulls the row array out of an SP REST response (json.d.results, json.value, or raw array).
+stripODataMetadata(obj)	Removes OData noise keys (__metadata, odata.type, etc.) from a row object.
+fetchSPLists(siteUrl, dsName)	Fetches all non-hidden lists from /_api/web/lists. Calls spFetch. Returns normalized list metadata.
+fetchSPFields(listGuid, siteUrl)	Fetches all fields for an SP list using its GUID. Calls spFetch. Returns array of field metadata via buildFieldMeta.
+fetchSPItemsWithRetry(listGuid, siteUrl, fields, options)	Paginated SP item fetch. Calls spFetch repeatedly following @odata.nextLink. Handles retry on 429/503. Normalizes each row via normalizeRow.
+fetchTableData(tableName, fetchAll)	Orchestrates loading data for a single table. Calls fetchSPFields → fetchSPItemsWithRetry → registerTableInAlaSQL. Deduplicates concurrent calls via t.fetchPromise.
+deriveStructureFromSample(dataArray)	Infers field types (number, boolean, date, array, lookup, text) from the first 10 rows of a plain JS array. Used for JSON/CSV sources.
+SharePointFileDialog	Singleton object with a modal file/list picker UI backed by SP REST.
+.show(options)	Public entry: returns a Promise resolved with selected file/item info, or null on cancel.
+._createDialog(params, resolve, reject)	Builds the full dialog DOM, wires events, calls _initFileBrowser or _initListBrowser.
+._formatDate(iso)	Formats ISO date string for display.
+._formatSize(bytes)	Converts byte count to human-readable size.
+._createRow(...)	Creates a single list-row DOM element with name/date/size columns and a click handler.
+._matchPattern(name, pattern)	Glob-style match (* → .* regex).
+._matchExtension(name, extFilter)	Checks if a filename ends with one of the allowed extensions.
+._renderBreadcrumb(state)	Renders clickable breadcrumb. File mode uses state.stack; list mode uses list title.
+._initFileBrowser(state)	Checks localStorage for last-used path, then defaultFolders, then calls _loadFileBrowser.
+._loadFileBrowser(state)	Fetches document libraries (root) or folder contents (subfolders + files) via spFetch. Calls _renderFileView.
+._renderFileView(state)	Renders folder/file rows with client-side filtering by pattern + extension.
+._initListBrowser(state)	Fetches all generic lists via _fetchLists, then navigates to last-used or default list.
+._fetchLists(state)	Fetches BaseTemplate eq 100 SP lists (generic custom lists). Caches result in state.cachedLists.
+._loadListsBrowser(state)	Shows list of all available lists.
+._loadListItems(state)	Fetches items in state.currentList via /_api/.../items.
+._renderListsView(state, isRoot)	Renders list items or list catalog rows, with pattern filtering.
+._handleConfirm(state)	Routes to _saveFile/_openFile/_saveListItem/_openListItem based on mode+type.
+._saveFile(state)	Uploads file content to SP document library using spFetchWrite. Checks for existing file (prompts overwrite). Returns { url, serverRelativeUrl, fileName, id }.
+._openFile(state)	Resolves a filename in the current folder to a full URL + list item ID.
+._saveListItem(state)	Creates or updates an SP list item. Optionally writes fileContent as a list column or attachment. Uses spFetchWrite.
+._openListItem(state)	Finds a list item by selection or title search. Returns attachment URL if present.
+._folderExists(siteUrl, serverRelUrl)	Pings GetFolderByServerRelativeUrl — returns true/false.
+._buildFileStack(siteUrl, serverRelUrl)	Reconstructs a breadcrumb stack from a server-relative path string.
+Call graph (23-sharepoint.js):
+fetchTableData
+  └─ fetchSPFields → spFetch
+  └─ fetchSPItemsWithRetry → spFetch, normalizeRow (24-normalization.js)
+  └─ registerTableInAlaSQL
+
+SharePointFileDialog.show
+  └─ _createDialog
+       ├─ _initFileBrowser → _folderExists(spFetch), _buildFileStack, _loadFileBrowser
+       │    └─ _loadFileBrowser → spFetch, _renderFileView
+       └─ _initListBrowser → _fetchLists(spFetch), _loadListsBrowser/_loadListItems
+            └─ _loadListItems → spFetch, _renderListsView
+
+_handleConfirm
+  ├─ _saveFile → spFetch (exists check), spFetchWrite (upload)
+  ├─ _openFile → spFetch
+  ├─ _saveListItem → spFetch (fields), spFetchWrite (create/update/attachment)
+  └─ _openListItem → spFetch
+________________________________________
+24-normalization.js
+Function	What it does
+normalizeDate(val)	Converts any date-like value (Date object, ISO string, /Date(ms)/ SP format) to ISO string. Returns null on failure.
+normalizeObject(obj)	Recursively calls normalizeDate on date-like values and stripODataMetadata on nested objects.
+normalizeRow(row, fields)	Applies field-type coercion to each column using fields metadata: dates → ISO, lookups → .Title, numbers → parseFloat, booleans → Boolean.
+parseFieldType(field)	Maps SP TypeAsString strings ('DateTime', 'Number', 'Boolean', 'Lookup', etc.) to internal type strings.
+fieldDisplayType(field)	Returns a UI-friendly display type string ('date', 'number', 'text', etc.).
+toCamelCase(str)	Converts a string to camelCase (splits on spaces/underscores/dashes).
+toPascalCase(str)	Converts a string to PascalCase. Used for auto-naming aliases from JSON keys.
+stripEntityTypeNameSuffix(str)	Removes trailing SP entity suffixes like Item, ListItem from type names.
+shouldSkipField(field)	Returns true for system-only SP fields (ID clones, content type columns, OData extras).
+buildFieldMeta(rawField)	Converts a raw SP field API response into the internal { internalName, displayName, alias, type, displayType, ... } format. Calls parseFieldType, fieldDisplayType, shouldSkipField.
+getSelectFields(fields)	Builds the comma-separated $select= string for an SP items query from a fields array. Handles lookups (/Id, /Title expansion).
+parseCSV(text)	Pure CSV parser. Returns array of objects. Handles quoted fields, CRLF, empty rows.
+Call graph (24-normalization.js):
+normalizeRow → normalizeDate, normalizeObject, stripODataMetadata (23-sharepoint.js)
+buildFieldMeta → parseFieldType, fieldDisplayType, shouldSkipField, toPascalCase
+getSelectFields (standalone)
+parseCSV (standalone)
+________________________________________
+25-data-sources.js
+Function	What it does
+showConnectPopup() / hideConnectPopup()	Opens/closes the connect data source modal dialog.
+showLoadingPopup(msg) / hideLoadingPopup()	Shows/hides an overlay spinner during async connect operations.
+switchSourceTab(tab)	Switches visible tab in connect popup (json, csv, sharepoint, jsonurl, csvurl).
+doConnect()	Main Connect button handler. Reads the active tab, routes to the appropriate load function.
+validateURL(url)	Returns true if string is a valid http(s):// URL.
+fetchWithTimeout(url, opts, ms)	fetch() wrapped with AbortController timeout.
+tryJSONP(url)	Injects a <script> tag to attempt JSONP callback. Returns a promise.
+fetchJSONWithFallbacks(url, dsName)	Tries CORS → credentials → JSONP → CORSProxy → AllOrigins → Thingproxy in sequence until one succeeds. Calls fetchWithTimeout/tryJSONP.
+fetchCSVWithFallbacks(url)	Same multi-strategy fallback chain, but returns raw text for CSV.
+loadSharePointListsSource(siteUrl, dsName)	Calls fetchSPLists (23-sharepoint.js), registers the SP site as a data source in DataLaVistaState.dataSources, creates table entries for each SP list.
+loadJSONSource(url, dsName)	Fetches JSON via fetchJSONWithFallbacks, then calls loadJSONData.
+loadJSONData(url, dsName, data)	Registers a JSON array (or array-of-arrays) as a table. Calls deriveStructureFromSample for field detection, registerTableInAlaSQL.
+fetchCSVFromURL(url)	Calls fetchCSVWithFallbacks, returns raw CSV text.
+loadCSVSource(url, dsName)	Fetches CSV via URL and delegates to loadCSVData.
+loadCSVData(text, dsName, fileName)	Calls parseCSV (24-normalization.js) → deriveStructureFromSample → registerTableInAlaSQL. Registers as a data source.
+ensureTableData(tableName, fetchAll)	If table has no data loaded, calls fetchTableData (23-sharepoint.js). For file-upload tables with embedded data, loads from t.data directly.
+Call graph (25-data-sources.js):
+doConnect
+  ├─ loadSharePointListsSource → fetchSPLists (23-sharepoint.js)
+  ├─ loadJSONSource → fetchJSONWithFallbacks → fetchWithTimeout / tryJSONP
+  │    └─ loadJSONData → deriveStructureFromSample (23-sharepoint.js), registerTableInAlaSQL (23-sharepoint.js)
+  ├─ loadCSVSource → fetchCSVFromURL → fetchCSVWithFallbacks
+  │    └─ loadCSVData → parseCSV (24-normalization.js), deriveStructureFromSample, registerTableInAlaSQL
+  └─ (file input) → loadJSONData / loadCSVData (same paths)
+
+ensureTableData → fetchTableData (23-sharepoint.js)
+________________________________________
+30-config.js
+Function	What it does
+generateWidgetSQL(w, tableRef)	Generates a SELECT statement for a widget from its type, fields, xField, yField, aggregation, and filters. Returns null for text/placeholder.
+saveConfig()	Calls buildConfig(), serializes to JSON, triggers file download via downloadText().
+buildConfig()	Deep-clones all state into a clean serializable object: dataSources metadata, tables (with optional embedded row data for isFileUpload + keepRawData), design/widgets/filters, QB state, SQL, queryColumns. Calls generateWidgetSQL for each widget.
+loadConfig(cfg)	Restores full app state from a config object. Calls ensureTableData for SQL-referenced tables, then re-renders: renderFilterBar, renderDesignCanvas, renderFieldsPanel, renderBasicQB, renderAdvancedQB.
+renderFieldsPanel()	Builds the left-panel data source / table / field tree. Calls renderDesignFieldsPanel() at the end. Attaches drag events, context menus, click toggle handlers.
+toggleDsGroupExpand(dsName)	Shows/hides a data source group's table list in the tree.
+toggleTableExpand(tkey)	Shows/hides a table's field list in the tree.
+expandAllTables()	First call: expands all DS groups. Second call (already expanded): expands all field lists.
+collapseAllTables()	First call: collapses all field lists. Second call (already collapsed): collapses all DS groups.
+Call graph (30-config.js):
+saveConfig → buildConfig → generateWidgetSQL
+
+loadConfig
+  ├─ findReferencedTables (50-qb-basic.js or sql helpers)
+  ├─ ensureTableData (25-data-sources.js) → fetchTableData (23-sharepoint.js)
+  ├─ renderFilterBar
+  ├─ renderDesignCanvas
+  ├─ renderFieldsPanel → renderDesignFieldsPanel
+  ├─ renderBasicQB (50-qb-basic.js)
+  └─ renderAdvancedQB (60-qb-advanced.js)
+________________________________________
+ 
+Data Flow Maps
+________________________________________
+JSON File Upload (connect popup → file <input>)
+User selects .json file
+  → FileReader.readAsText()
+  → doConnect() with tab = 'json' (file branch)
+
+      → loadJSONData(null, dsName, parsedData)
+           → deriveStructureFromSample(data[0..9])   [type detection]
+           → buildFieldMeta-equivalent inline         [field metadata]
+           → DataLaVistaState.dataSources[dsName] = { type:'json', isFileUpload:true, ... }
+           → DataLaVistaState.tables[tableName] = { fields, data, loaded:true, isFileUpload:true }
+           → registerTableInAlaSQL(tableName, data)   [alasql CREATE + INSERT]
+  → renderFieldsPanel()
+  → updateConnectButton()
+	JSON from URL (connect popup → URL tab)
+User enters URL, clicks Connect
+
+  → doConnect() tab = 'jsonurl'
+      → validateURL(url)
+      → loadJSONSource(url, dsName)
+           → fetchJSONWithFallbacks(url, dsName)
+                → fetchWithTimeout(url)               [direct CORS]
+                → fetchWithTimeout(url, {credentials:'include'})
+                → tryJSONP(url)
+                → fetchWithTimeout('https://corsproxy.io/?url='+url)
+                → fetchWithTimeout('https://api.allorigins.win/raw?url='+url)
+                → fetchWithTimeout('https://thingproxy.freeboard.io/fetch/'+url)
+           → loadJSONData(url, dsName, parsedJSON)
+                → deriveStructureFromSample(data[0..9])
+                → DataLaVistaState.dataSources[dsName] = { type:'json', isFileUpload:false, url, ... }
+                → DataLaVistaState.tables[tableName] = { fields, data:[], loaded:false, url }
+                → registerTableInAlaSQL(tableName, data)
+  → renderFieldsPanel()
+
+
+________________________________________
+Key difference from file upload: isFileUpload = false, so buildConfig() will NOT embed row data. On loadConfig(), ensureTableData() will re-fetch from the URL.
+________________________________________
+CSV File Upload
+User selects .csv file
+  → FileReader.readAsText()
+  → doConnect() tab = 'csv' (file branch)
+      → loadCSVData(csvText, dsName, fileName)
+           → parseCSV(csvText)                        [24-normalization.js]
+           → deriveStructureFromSample(rows[0..9])    [23-sharepoint.js]
+           → DataLaVistaState.dataSources[dsName] = { type:'csv', isFileUpload:true, fileName, ... }
+           → DataLaVistaState.tables[tableName] = { fields, data:rows, isFileUpload:true, keepRawData:true }
+           → registerTableInAlaSQL(tableName, rows)
+  → renderFieldsPanel()
+	CSV from URL
+User enters URL
+  → doConnect() tab = 'csvurl'
+      → loadCSVSource(url, dsName)
+           → fetchCSVFromURL(url)
+                → fetchCSVWithFallbacks(url)          [same 6-strategy chain as JSON]
+           → loadCSVData(csvText, dsName, null)
+                → parseCSV(csvText)
+                → deriveStructureFromSample(rows)
+                → DataLaVistaState.dataSources[dsName] = { type:'csv', isFileUpload:false, url }
+                → DataLaVistaState.tables[tableName] = { fields, data:rows, isFileUpload:false }
+                → registerTableInAlaSQL(tableName, rows)
+  → renderFieldsPanel()
+
+
+________________________________________
+Key difference from file upload: isFileUpload = false → row data is NOT saved in buildConfig(). On reload, rows are re-fetched from URL.
+________________________________________
+SharePoint Connection
+User enters SP site URL, clicks Connect
+  → doConnect() tab = 'sharepoint'
+      → loadSharePointListsSource(siteUrl, dsName)
+           → fetchSPLists(siteUrl, dsName)            [23-sharepoint.js]
+                → spFetch('/_api/web/lists?...')      [credentials include, no proxy needed]
+                → returns list of { Title, Id, ItemCount, ... }
+           → For each list:
+                → DataLaVistaState.tables[tName] = { fields:[], data:[], loaded:false, guid, siteUrl, ... }
+           → DataLaVistaState.dataSources[dsName] = { type:'sharepoint', siteUrl, tables:[...] }
+  → renderFieldsPanel()
+
+-- User runs query (or expands table preview) --
+  → ensureTableData(tableName, fetchAll)
+      → fetchTableData(tableName, fetchAll)            [23-sharepoint.js]
+           → fetchSPFields(listGuid, siteUrl)
+                → spFetch('/_api/web/lists(guid)/fields')
+                → buildFieldMeta() for each field      [24-normalization.js]
+                → shouldSkipField() filters            [24-normalization.js]
+           → getSelectFields(fields)                   [24-normalization.js]
+           → fetchSPItemsWithRetry(listGuid, siteUrl, fields, { fetchAll })
+                → spFetch('/_api/.../items?$select=...&$top=500')
+                → normalizeRow(row, fields)             [24-normalization.js]
+                → follows @odata.nextLink until done
+           → registerTableInAlaSQL(tableName, rows)    [23-sharepoint.js]
+           → t.loaded = true, t.fields = fields, t.data = rows
+Key difference from JSON/CSV: Fields are discovered lazily (only when data is first needed). Row data is never embedded in buildConfig() (SP data is always re-fetched). Authentication uses credentials: 'include' — no proxy needed on the same SharePoint domain.
+________________________________________
+Summary: isFileUpload + keepRawData flags
+Source	isFileUpload	keepRawData	Rows saved in config?	On reload
+JSON file	true	true (default)	Yes	Rows restored from config
+JSON URL	false	false	No	Re-fetched from URL
+CSV file	true	true	Yes	Rows restored from config
+CSV URL	false	false	No	Re-fetched from URL
+SharePoint	false	false	No	Re-fetched from SP REST API
+
+```
+
+* And here is what you proposed in another chat (but I didn't have all the requirements yet):
+```
+DataLaVista Cyberdyne Pipeline — Complete Refactoring Package
+I've designed a comprehensive refactoring of your DataLaVista data loading architecture. Here's what I've built:
+🎯 Core Components
+1. Cyberdyne Pipeline (21-cyberdyne-pipeline.js)
+Your new T-800 series data processor that handles:
+
+6 file types: CSV, JSON, Excel, XML, SQLite, TSV
+Smart type detection: Analyzes first 25 rows, detects dates (ISO, Oracle, Excel, UNIX epochs, scientific notation), numbers, booleans
+OData extraction: Automatically removes .d wrapper nodes and strips metadata columns
+Synthetic field generation: Creates FieldId, FieldData, FieldIds for arrays and objects
+Dual loading strategy: Tries AlaSQL's built-in loaders first, falls back to fetch with your existing proxy chain
+SQLite support: Imports all tables automatically with type preservation
+
+2. View Management System (21-cyberdyne-views.js)
+Separates user-facing names from internal data structures:
+
+Views as aliasing layer: Users see/rename views, raw tables stay unchanged
+Data source swapping: Replace underlying data without breaking queries
+Persistent mappings: View definitions saved in configs
+SQL generation: All queries use view names and column aliases
+
+3. Queue-Based Connect UI (25b-connect-ui.js, new-connect-popup.html)
+New multi-file loading interface:
+
+Upload tab: Drop multiple files before clicking Connect
+Remote tab: Queue multiple URLs, integrated SharePoint file picker
+Visual queue display: Shows file type icons, allows removal
+Unified processing: All queued items processed through the same pipeline
+
+4. Updated Config Management (30b-config-with-views.js)
+Config v2.0 with view support:
+
+View definitions: Serialized with column mappings
+Data source aliases: User-friendly DS names
+Legacy compatibility: Auto-creates views from old configs
+Smart data embedding: Only uploaded files include row data
+
+5. View-Based Fields Panel (30c-fields-panel-with-views.js)
+UI now displays views instead of raw tables:
+
+Rename operations: Update views, not raw tables
+Context menus: Copy SQL references, rename table/field
+Collapsible tree: Data source groups and table lists
+Tooltip integration: Shows internal names for reference
+
+🔄 Data Flow
+User uploads CSV/JSON/Excel/XML/SQLite
+    ↓
+Pipeline.loadUploadedFile()
+    ↓
+extractFromODataWrapper() → removeODataColumns() → inferFieldTypes() → addSyntheticFields()
+    ↓
+registerTableInAlaSQL(rawTableName, data)
+    ↓
+createView(rawTableName, viewName, fields)
+    ↓
+Tables & Fields panel shows VIEW (user can rename)
+    ↓
+SQL queries use VIEW names and column aliases
+📦 What You Get
+8 files ready to integrate:
+
+21-cyberdyne-pipeline.js — Core data loading (670 lines)
+21-cyberdyne-views.js — View management (280 lines)
+25b-connect-ui.js — Connect popup logic (280 lines)
+30b-config-with-views.js — Config save/load (250 lines)
+30c-fields-panel-with-views.js — Fields panel renderer (350 lines)
+new-connect-popup.html — Updated UI with tabs + CSS
+CYBERDYNE-ARCHITECTURE.md — Full technical documentation
+IMPLEMENTATION-CHECKLIST.md — Step-by-step integration guide
+
+✅ Key Features
+
+✅ 6 file types through unified pipeline
+✅ Queue-based loading — add multiple sources before connecting
+✅ Smart type detection — dates, numbers, booleans from first 25 rows
+✅ OData cleanup — automatic .d extraction and metadata removal
+✅ Synthetic fields — Id, Data, Ids for complex values
+✅ View-based aliasing — rename without breaking queries
+✅ SharePoint integration — lazy loading with unified processing
+✅ Config v2.0 — views and aliases serialized
+✅ Legacy compatibility — auto-migrates old configs
+✅ Swap data sources — replace underlying tables, keep aliases
+
+🚀 Integration Time: ~2-3 hours
+The IMPLEMENTATION-CHECKLIST.md has your step-by-step guide with:
+
+Script tag insertion points
+HTML replacements
+Test scripts
+Common issues & fixes
+
+🎓 Architecture Highlights
+Before (Current):
+javascript// Direct table access
+DataLaVistaState.tables['SP_MyList_Internal'].fields[0].internalName
+
+// SQL uses internal names
+SELECT [InternalFieldName] FROM [SP_MyList_Internal]
+After (Cyberdyne):
+javascript// View-based access
+CyberdynePipeline.views['MyList'].fields[0].alias
+
+// SQL uses user-friendly names
+SELECT [UserFriendlyName] FROM [MyList]
+
+// User renames "UserFriendlyName" → "Revenue"
+// Underlying data unchanged, view updated automatically
+🧪 Testing Strategy
+I've included a comprehensive test script in the checklist that validates:
+
+Pipeline loading
+Type detection accuracy
+View creation
+Rename operations
+Config serialization
+SQL query generation
+
+💡 Why This Architecture?
+
+Separation of concerns: Raw data ≠ user interface
+Data portability: Swap CSVs/JSON/SharePoint without query rewrites
+Type safety: Intelligent detection prevents "123" being treated as text
+OData handling: No more manual .d unwrapping or metadata cleanup
+Future-proof: Easy to add new file types (just implement loadXType())
+
+The CYBERDYNE-ARCHITECTURE.md document has full API reference, troubleshooting guide, and performance notes.
+Your data loading is now powered by a T-800. I'll be processing... your files... efficiently.
+```
+
+I am also attaching the code you generated in that previous chat.
