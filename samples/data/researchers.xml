@@ -1,0 +1,497 @@
+<?xml version="1.0" ?>
+<!-- This file is part of DataLaVista. This is a sample, synthetic dataset. Copyright © 2026 The Regents of the University of Michigan. This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version. This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details. You should have received a copy of the GNU General Public License along with this program. If not, see https://www.gnu.org/licenses. -->
+<Researchers>
+    <Researcher id="1">
+        <Name>Dr. Researcher_1</Name>
+        <Department>Immunology</Department>
+        <AssignedStudies>
+            <Study id="284" role="PI"/>
+            <Study id="108" role="PI"/>
+            <Study id="390" role="Co-PI"/>
+            <Study id="344" role="PI"/>
+            <Study id="73" role="Co-PI"/>
+        </AssignedStudies>
+    </Researcher>
+    <Researcher id="2">
+        <Name>Dr. Researcher_2</Name>
+        <Department>Pediatrics</Department>
+        <AssignedStudies>
+            <Study id="427" role="Co-PI"/>
+            <Study id="14" role="PI"/>
+            <Study id="246" role="PI"/>
+            <Study id="311" role="PI"/>
+        </AssignedStudies>
+    </Researcher>
+    <Researcher id="3">
+        <Name>Dr. Researcher_3</Name>
+        <Department>Cardiology</Department>
+        <AssignedStudies>
+            <Study id="130" role="PI"/>
+            <Study id="157" role="Co-PI"/>
+            <Study id="376" role="PI"/>
+        </AssignedStudies>
+    </Researcher>
+    <Researcher id="4">
+        <Name>Dr. Researcher_4</Name>
+        <Department>Cardiology</Department>
+        <AssignedStudies>
+            <Study id="188" role="PI"/>
+            <Study id="56" role="Co-PI"/>
+        </AssignedStudies>
+    </Researcher>
+    <Researcher id="5">
+        <Name>Dr. Researcher_5</Name>
+        <Department>Neurology</Department>
+        <AssignedStudies>
+            <Study id="263" role="Co-PI"/>
+            <Study id="48" role="PI"/>
+            <Study id="294" role="Co-PI"/>
+        </AssignedStudies>
+    </Researcher>
+    <Researcher id="6">
+        <Name>Dr. Researcher_6</Name>
+        <Department>Neurology</Department>
+        <AssignedStudies>
+            <Study id="77" role="Co-PI"/>
+            <Study id="185" role="PI"/>
+            <Study id="72" role="Co-PI"/>
+            <Study id="459" role="PI"/>
+        </AssignedStudies>
+    </Researcher>
+    <Researcher id="7">
+        <Name>Dr. Researcher_7</Name>
+        <Department>Oncology</Department>
+        <AssignedStudies>
+            <Study id="457" role="PI"/>
+            <Study id="461" role="PI"/>
+            <Study id="88" role="PI"/>
+            <Study id="279" role="Co-PI"/>
+            <Study id="152" role="Co-PI"/>
+        </AssignedStudies>
+    </Researcher>
+    <Researcher id="8">
+        <Name>Dr. Researcher_8</Name>
+        <Department>Pediatrics</Department>
+        <AssignedStudies>
+            <Study id="195" role="PI"/>
+            <Study id="20" role="Co-PI"/>
+            <Study id="190" role="PI"/>
+            <Study id="218" role="Co-PI"/>
+            <Study id="413" role="Co-PI"/>
+            <Study id="66" role="Co-PI"/>
+        </AssignedStudies>
+    </Researcher>
+    <Researcher id="9">
+        <Name>Dr. Researcher_9</Name>
+        <Department>Cardiology</Department>
+        <AssignedStudies>
+            <Study id="464" role="Co-PI"/>
+            <Study id="258" role="PI"/>
+            <Study id="429" role="PI"/>
+            <Study id="419" role="Co-PI"/>
+        </AssignedStudies>
+    </Researcher>
+    <Researcher id="10">
+        <Name>Dr. Researcher_10</Name>
+        <Department>Neurology</Department>
+        <AssignedStudies>
+            <Study id="340" role="PI"/>
+            <Study id="188" role="PI"/>
+        </AssignedStudies>
+    </Researcher>
+    <Researcher id="11">
+        <Name>Dr. Researcher_11</Name>
+        <Department>Neurology</Department>
+        <AssignedStudies>
+            <Study id="171" role="Co-PI"/>
+            <Study id="312" role="Co-PI"/>
+            <Study id="289" role="PI"/>
+            <Study id="95" role="Co-PI"/>
+            <Study id="282" role="Co-PI"/>
+            <Study id="295" role="Co-PI"/>
+        </AssignedStudies>
+    </Researcher>
+    <Researcher id="12">
+        <Name>Dr. Researcher_12</Name>
+        <Department>Cardiology</Department>
+        <AssignedStudies>
+            <Study id="113" role="PI"/>
+            <Study id="208" role="PI"/>
+            <Study id="105" role="Co-PI"/>
+            <Study id="185" role="PI"/>
+            <Study id="432" role="Co-PI"/>
+        </AssignedStudies>
+    </Researcher>
+    <Researcher id="13">
+        <Name>Dr. Researcher_13</Name>
+        <Department>Immunology</Department>
+        <AssignedStudies>
+            <Study id="298" role="PI"/>
+            <Study id="282" role="PI"/>
+        </AssignedStudies>
+    </Researcher>
+    <Researcher id="14">
+        <Name>Dr. Researcher_14</Name>
+        <Department>Neurology</Department>
+        <AssignedStudies>
+            <Study id="114" role="Co-PI"/>
+            <Study id="188" role="PI"/>
+            <Study id="66" role="Co-PI"/>
+        </AssignedStudies>
+    </Researcher>
+    <Researcher id="15">
+        <Name>Dr. Researcher_15</Name>
+        <Department>Pediatrics</Department>
+        <AssignedStudies>
+            <Study id="395" role="Co-PI"/>
+            <Study id="238" role="PI"/>
+        </AssignedStudies>
+    </Researcher>
+    <Researcher id="16">
+        <Name>Dr. Researcher_16</Name>
+        <Department>Immunology</Department>
+        <AssignedStudies>
+            <Study id="287" role="Co-PI"/>
+            <Study id="186" role="Co-PI"/>
+            <Study id="101" role="Co-PI"/>
+        </AssignedStudies>
+    </Researcher>
+    <Researcher id="17">
+        <Name>Dr. Researcher_17</Name>
+        <Department>Immunology</Department>
+        <AssignedStudies>
+            <Study id="302" role="Co-PI"/>
+            <Study id="345" role="PI"/>
+            <Study id="464" role="PI"/>
+            <Study id="454" role="PI"/>
+            <Study id="415" role="Co-PI"/>
+        </AssignedStudies>
+    </Researcher>
+    <Researcher id="18">
+        <Name>Dr. Researcher_18</Name>
+        <Department>Immunology</Department>
+        <AssignedStudies>
+            <Study id="351" role="PI"/>
+            <Study id="127" role="Co-PI"/>
+            <Study id="4" role="PI"/>
+            <Study id="195" role="Co-PI"/>
+        </AssignedStudies>
+    </Researcher>
+    <Researcher id="19">
+        <Name>Dr. Researcher_19</Name>
+        <Department>Oncology</Department>
+        <AssignedStudies>
+            <Study id="241" role="PI"/>
+            <Study id="34" role="Co-PI"/>
+        </AssignedStudies>
+    </Researcher>
+    <Researcher id="20">
+        <Name>Dr. Researcher_20</Name>
+        <Department>Oncology</Department>
+        <AssignedStudies>
+            <Study id="183" role="Co-PI"/>
+            <Study id="425" role="Co-PI"/>
+            <Study id="458" role="Co-PI"/>
+            <Study id="225" role="Co-PI"/>
+            <Study id="56" role="Co-PI"/>
+            <Study id="271" role="PI"/>
+        </AssignedStudies>
+    </Researcher>
+    <Researcher id="21">
+        <Name>Dr. Researcher_21</Name>
+        <Department>Cardiology</Department>
+        <AssignedStudies>
+            <Study id="237" role="Co-PI"/>
+            <Study id="482" role="PI"/>
+            <Study id="379" role="PI"/>
+            <Study id="194" role="PI"/>
+            <Study id="56" role="PI"/>
+            <Study id="90" role="PI"/>
+        </AssignedStudies>
+    </Researcher>
+    <Researcher id="22">
+        <Name>Dr. Researcher_22</Name>
+        <Department>Immunology</Department>
+        <AssignedStudies>
+            <Study id="28" role="PI"/>
+            <Study id="433" role="Co-PI"/>
+            <Study id="57" role="Co-PI"/>
+        </AssignedStudies>
+    </Researcher>
+    <Researcher id="23">
+        <Name>Dr. Researcher_23</Name>
+        <Department>Cardiology</Department>
+        <AssignedStudies>
+            <Study id="15" role="Co-PI"/>
+            <Study id="269" role="Co-PI"/>
+            <Study id="351" role="Co-PI"/>
+            <Study id="369" role="PI"/>
+            <Study id="115" role="Co-PI"/>
+        </AssignedStudies>
+    </Researcher>
+    <Researcher id="24">
+        <Name>Dr. Researcher_24</Name>
+        <Department>Cardiology</Department>
+        <AssignedStudies>
+            <Study id="277" role="PI"/>
+            <Study id="136" role="PI"/>
+        </AssignedStudies>
+    </Researcher>
+    <Researcher id="25">
+        <Name>Dr. Researcher_25</Name>
+        <Department>Cardiology</Department>
+        <AssignedStudies>
+            <Study id="327" role="Co-PI"/>
+            <Study id="146" role="Co-PI"/>
+            <Study id="348" role="Co-PI"/>
+        </AssignedStudies>
+    </Researcher>
+    <Researcher id="26">
+        <Name>Dr. Researcher_26</Name>
+        <Department>Oncology</Department>
+        <AssignedStudies>
+            <Study id="285" role="Co-PI"/>
+            <Study id="325" role="Co-PI"/>
+            <Study id="432" role="Co-PI"/>
+        </AssignedStudies>
+    </Researcher>
+    <Researcher id="27">
+        <Name>Dr. Researcher_27</Name>
+        <Department>Cardiology</Department>
+        <AssignedStudies>
+            <Study id="306" role="PI"/>
+            <Study id="297" role="PI"/>
+            <Study id="486" role="PI"/>
+            <Study id="236" role="Co-PI"/>
+            <Study id="416" role="Co-PI"/>
+        </AssignedStudies>
+    </Researcher>
+    <Researcher id="28">
+        <Name>Dr. Researcher_28</Name>
+        <Department>Pediatrics</Department>
+        <AssignedStudies>
+            <Study id="111" role="PI"/>
+            <Study id="351" role="Co-PI"/>
+            <Study id="415" role="Co-PI"/>
+            <Study id="490" role="PI"/>
+            <Study id="445" role="PI"/>
+        </AssignedStudies>
+    </Researcher>
+    <Researcher id="29">
+        <Name>Dr. Researcher_29</Name>
+        <Department>Immunology</Department>
+        <AssignedStudies>
+            <Study id="338" role="PI"/>
+            <Study id="25" role="PI"/>
+            <Study id="294" role="Co-PI"/>
+            <Study id="249" role="Co-PI"/>
+            <Study id="70" role="PI"/>
+        </AssignedStudies>
+    </Researcher>
+    <Researcher id="30">
+        <Name>Dr. Researcher_30</Name>
+        <Department>Neurology</Department>
+        <AssignedStudies>
+            <Study id="187" role="PI"/>
+            <Study id="7" role="Co-PI"/>
+            <Study id="359" role="PI"/>
+            <Study id="109" role="PI"/>
+        </AssignedStudies>
+    </Researcher>
+    <Researcher id="31">
+        <Name>Dr. Researcher_31</Name>
+        <Department>Cardiology</Department>
+        <AssignedStudies>
+            <Study id="400" role="Co-PI"/>
+            <Study id="315" role="Co-PI"/>
+            <Study id="5" role="Co-PI"/>
+        </AssignedStudies>
+    </Researcher>
+    <Researcher id="32">
+        <Name>Dr. Researcher_32</Name>
+        <Department>Pediatrics</Department>
+        <AssignedStudies>
+            <Study id="463" role="PI"/>
+            <Study id="466" role="Co-PI"/>
+        </AssignedStudies>
+    </Researcher>
+    <Researcher id="33">
+        <Name>Dr. Researcher_33</Name>
+        <Department>Neurology</Department>
+        <AssignedStudies>
+            <Study id="148" role="PI"/>
+            <Study id="215" role="PI"/>
+            <Study id="259" role="PI"/>
+            <Study id="34" role="Co-PI"/>
+            <Study id="224" role="Co-PI"/>
+            <Study id="41" role="PI"/>
+        </AssignedStudies>
+    </Researcher>
+    <Researcher id="34">
+        <Name>Dr. Researcher_34</Name>
+        <Department>Neurology</Department>
+        <AssignedStudies>
+            <Study id="125" role="Co-PI"/>
+            <Study id="294" role="PI"/>
+        </AssignedStudies>
+    </Researcher>
+    <Researcher id="35">
+        <Name>Dr. Researcher_35</Name>
+        <Department>Immunology</Department>
+        <AssignedStudies>
+            <Study id="462" role="PI"/>
+            <Study id="199" role="PI"/>
+            <Study id="451" role="PI"/>
+            <Study id="465" role="PI"/>
+            <Study id="195" role="Co-PI"/>
+            <Study id="83" role="PI"/>
+        </AssignedStudies>
+    </Researcher>
+    <Researcher id="36">
+        <Name>Dr. Researcher_36</Name>
+        <Department>Oncology</Department>
+        <AssignedStudies>
+            <Study id="391" role="Co-PI"/>
+            <Study id="489" role="PI"/>
+            <Study id="380" role="PI"/>
+        </AssignedStudies>
+    </Researcher>
+    <Researcher id="37">
+        <Name>Dr. Researcher_37</Name>
+        <Department>Cardiology</Department>
+        <AssignedStudies>
+            <Study id="305" role="Co-PI"/>
+            <Study id="51" role="PI"/>
+            <Study id="385" role="Co-PI"/>
+        </AssignedStudies>
+    </Researcher>
+    <Researcher id="38">
+        <Name>Dr. Researcher_38</Name>
+        <Department>Pediatrics</Department>
+        <AssignedStudies>
+            <Study id="119" role="Co-PI"/>
+            <Study id="294" role="PI"/>
+            <Study id="269" role="Co-PI"/>
+            <Study id="206" role="PI"/>
+        </AssignedStudies>
+    </Researcher>
+    <Researcher id="39">
+        <Name>Dr. Researcher_39</Name>
+        <Department>Oncology</Department>
+        <AssignedStudies>
+            <Study id="51" role="Co-PI"/>
+            <Study id="19" role="Co-PI"/>
+            <Study id="110" role="Co-PI"/>
+            <Study id="477" role="Co-PI"/>
+            <Study id="492" role="Co-PI"/>
+        </AssignedStudies>
+    </Researcher>
+    <Researcher id="40">
+        <Name>Dr. Researcher_40</Name>
+        <Department>Pediatrics</Department>
+        <AssignedStudies>
+            <Study id="193" role="PI"/>
+            <Study id="202" role="PI"/>
+        </AssignedStudies>
+    </Researcher>
+    <Researcher id="41">
+        <Name>Dr. Researcher_41</Name>
+        <Department>Immunology</Department>
+        <AssignedStudies>
+            <Study id="55" role="PI"/>
+            <Study id="80" role="Co-PI"/>
+            <Study id="290" role="PI"/>
+            <Study id="181" role="Co-PI"/>
+            <Study id="458" role="PI"/>
+            <Study id="177" role="Co-PI"/>
+        </AssignedStudies>
+    </Researcher>
+    <Researcher id="42">
+        <Name>Dr. Researcher_42</Name>
+        <Department>Pediatrics</Department>
+        <AssignedStudies>
+            <Study id="377" role="Co-PI"/>
+            <Study id="411" role="Co-PI"/>
+            <Study id="383" role="PI"/>
+            <Study id="104" role="PI"/>
+            <Study id="399" role="Co-PI"/>
+        </AssignedStudies>
+    </Researcher>
+    <Researcher id="43">
+        <Name>Dr. Researcher_43</Name>
+        <Department>Cardiology</Department>
+        <AssignedStudies>
+            <Study id="397" role="Co-PI"/>
+            <Study id="323" role="Co-PI"/>
+            <Study id="334" role="Co-PI"/>
+            <Study id="476" role="Co-PI"/>
+            <Study id="448" role="Co-PI"/>
+        </AssignedStudies>
+    </Researcher>
+    <Researcher id="44">
+        <Name>Dr. Researcher_44</Name>
+        <Department>Neurology</Department>
+        <AssignedStudies>
+            <Study id="340" role="PI"/>
+            <Study id="282" role="Co-PI"/>
+            <Study id="401" role="PI"/>
+        </AssignedStudies>
+    </Researcher>
+    <Researcher id="45">
+        <Name>Dr. Researcher_45</Name>
+        <Department>Immunology</Department>
+        <AssignedStudies>
+            <Study id="171" role="Co-PI"/>
+            <Study id="332" role="Co-PI"/>
+            <Study id="200" role="Co-PI"/>
+        </AssignedStudies>
+    </Researcher>
+    <Researcher id="46">
+        <Name>Dr. Researcher_46</Name>
+        <Department>Neurology</Department>
+        <AssignedStudies>
+            <Study id="393" role="Co-PI"/>
+            <Study id="368" role="Co-PI"/>
+            <Study id="479" role="PI"/>
+            <Study id="354" role="PI"/>
+            <Study id="269" role="PI"/>
+            <Study id="81" role="PI"/>
+        </AssignedStudies>
+    </Researcher>
+    <Researcher id="47">
+        <Name>Dr. Researcher_47</Name>
+        <Department>Pediatrics</Department>
+        <AssignedStudies>
+            <Study id="393" role="Co-PI"/>
+            <Study id="135" role="Co-PI"/>
+        </AssignedStudies>
+    </Researcher>
+    <Researcher id="48">
+        <Name>Dr. Researcher_48</Name>
+        <Department>Cardiology</Department>
+        <AssignedStudies>
+            <Study id="123" role="PI"/>
+            <Study id="444" role="Co-PI"/>
+        </AssignedStudies>
+    </Researcher>
+    <Researcher id="49">
+        <Name>Dr. Researcher_49</Name>
+        <Department>Immunology</Department>
+        <AssignedStudies>
+            <Study id="326" role="Co-PI"/>
+            <Study id="139" role="PI"/>
+            <Study id="162" role="Co-PI"/>
+            <Study id="25" role="Co-PI"/>
+        </AssignedStudies>
+    </Researcher>
+    <Researcher id="50">
+        <Name>Dr. Researcher_50</Name>
+        <Department>Immunology</Department>
+        <AssignedStudies>
+            <Study id="59" role="PI"/>
+            <Study id="439" role="PI"/>
+            <Study id="340" role="Co-PI"/>
+            <Study id="14" role="Co-PI"/>
+        </AssignedStudies>
+    </Researcher>
+</Researchers>
