@@ -63,7 +63,7 @@ Most enterprise data is trapped behind bloated frameworks or expensive BI tools.
 ### Live Demo:
 + ***Dashboard Viewing Demo: [Project Health Dashboard.json](https://code.depressioncenter.org/datalavista/DataLaVista.html?reportMode=view&report=https://code.depressioncenter.org/datalavista/samples/reports/Project%20Health%20Dashboard.json)***
 + ***Dashboard Design Demo: [DataLaVista.html](https://code.depressioncenter.org/datalavista/DataLaVista.html)***
-  - Sample data (use in Connect popup): [studies.csv](https://code.depressioncenter.org/datalavista/DataLaVista.html?reportMode=view&report=https://code.depressioncenter.org/datalavista/samples/data/studies.csv), [researchers.xml](https://code.depressioncenter.org/datalavista/DataLaVista.html?reportMode=view&report=https://code.depressioncenter.org/datalavista/samples/data/researchers.xml), [participants.json](https://code.depressioncenter.org/datalavista/DataLaVista.html?reportMode=view&report=https://code.depressioncenter.org/datalavista/samples/data/participants.json)
+  - Sample data (use in Connect popup): [studies.csv](https://code.depressioncenter.org/datalavista/samples/data/studies.csv), [researchers.xml](https://code.depressioncenter.org/datalavista/samples/data/researchers.xml), [participants.json](https://code.depressioncenter.org/datalavista/samples/data/participants.json)
 ### To use inside a SharePoint Online page:
 + First ensure you have the "Modern Script Editor" app installed. If not available, contact your site administrator to [install it](https://github.com/pnp/sp-dev-fx-webparts/tree/main/samples/react-script-editor)
 +Create a page using a blank template or Modern Script Editor template, and call it "DataLaVista Designer"
