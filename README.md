@@ -61,14 +61,20 @@ Most enterprise data is trapped behind bloated frameworks or expensive BI tools.
 
 ## Quick Start Guide
 ### Live Demo:
-+ ***Dashboard Viewing Demo: [Project Health Dashboard.json](https://code.depressioncenter.org/datalavista/DataLaVista.html?reportMode=view&report=https://code.depressioncenter.org/datalavista/samples/reports/Project%20Health%20Dashboard.json)***
-+ ***Dashboard Design Demo: [DataLaVista.html](https://code.depressioncenter.org/datalavista/DataLaVista.html)***
-  - Sample data (use in Connect popup): [studies.csv](https://code.depressioncenter.org/datalavista/samples/data/studies.csv), [researchers.xml](https://code.depressioncenter.org/datalavista/samples/data/researchers.xml), [participants.json](https://code.depressioncenter.org/datalavista/samples/data/participants.json)
++ ***Dashboard Viewing Demo: [Project Health Dashboard](https://code.depressioncenter.org/datalavista/DataLaVista.html?reportMode=view&report=https://code.depressioncenter.org/datalavista/samples/reports/Project%20Health%20Dashboard.json)***
++ ***Dashboard Designer Demo: [DataLaVista.html](https://code.depressioncenter.org/datalavista/DataLaVista.html)***
+  - Use the "JSON URL" or "CSV URL" in the connection popup and use one of these links for sample data: [studies.csv](https://code.depressioncenter.org/datalavista/samples/data/studies.csv), [researchers.xml](https://code.depressioncenter.org/datalavista/samples/data/researchers.xml), [participants.json](https://code.depressioncenter.org/datalavista/samples/data/participants.json)
 ### To use inside a SharePoint Online page:
 + First ensure you have the "Modern Script Editor" app installed. If not available, contact your site administrator to [install it](https://github.com/pnp/sp-dev-fx-webparts/tree/main/samples/react-script-editor)
-+Create a page using a blank template or Modern Script Editor template, and call it "DataLaVista Designer"
-+ Add a "Modern Script Editor" webpart.
-+ Copy and the paste the code from [DataLaVista.html](DataLaVista.html) into the script editor. Save, and refresh.
++ Go to your site's home page and create a new page using the Modern Script Editor template. Use "DataLaVista" for the page title.
++ In the "Modern Script Editor" webpart, click "Markup" then click the "{ }" button to open the code editor.
++ Copy and the paste the code from [DataLaVista.html](DataLaVista.html) into the script editor.
+  - Note: if your site has CSP restrictions for JavaScript in place, then use the DataLaVista-nojs.html file instead. Change the script tag for datalavista towards the top of the <head> section to point to /SiteAssets/datlavista.js. Then, upload datalavista.js to your /SiteAssets directory.
++ Save, and refresh the page.
+<p>
+<a href="https://code.depressioncenter.org/datalavista/presentations/sharepoint-installation-1.mp4" target="_blank" title="Click to open full video with SharePoint installation instructions"><img src="images/sharepoint-installation-1.gif" alt="Click to open full video with SharePoint installation instructions" style="width: 600px; height: auto" /></a>
+</p>
+
 ### To use inside another web app:
 + If using inside a different web platform, follow the same steps as above with whatever method is available for adding scripts to the page. Alternatively, save [DataLaVista.html](DataLaVista.html) to your web server, and add its URL in an iframe tag.
 ### Load data and design your dashboard:
