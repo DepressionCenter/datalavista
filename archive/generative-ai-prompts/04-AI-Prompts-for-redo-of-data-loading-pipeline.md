@@ -40,6 +40,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 This is a generative AI prompt that was fine-tuned after many tries to produce an enhancement to the data loading process in DataLaVista. The previous iterations had left inconsistencies on how JSON, CSV and SharePoint lists were handled, so the data loading needed a major re-write.
 
 ## AI Prompts
+### Detailed request
 <code>
 Here's what my DataLaVista dashboard designer is doing when loading data (according to your analysis). I want to redesign the data loading portion to:
 
@@ -495,4 +496,31 @@ Your data loading is now powered by a T-800. I'll be processing... your files...
 ```
 
 I am also attaching the code you generated in that previous chat.
+</code>
+
+
+### Follow up request after load failed
+<code>
+Here's what my DataLaVista dashboard designer is doing when loading data (according to your analysis). I want to redesign the data loading portion to:
+* Have a new tab in my connect popup to drop in files that accepts CSV, JSON, Excel, XML and SQLite, and keeps adding the uploaded files to the list before you hit connect which would actually upload them.
+* Have a new tab in my connect popup that combines connecting to remote data sources. It should have a place to enter a URL to CSV, JSON, Excel, XML, and SQLite files. It should keep using my sharepoint file picker as well to provide the option to navigate sharepoint to get the URL for a file. Just like upload tab, it should allow adding many sources until you click Connect, at which point it will download all of them. Do not treat sharepoint files gathered this way as lists, but rather just like any other remote file.
+* All remote files should try to be loaded directly via alasql's built-in mechanism whenever possible, and if that fails, then try the fetch with fall backs mechanism. (I believe the current CSV loading might be doing this). In the case of SQLite, import all the tables into alasql (which I think alasql handles automatically).
+* Uploaded files need to eventually end up in alasql, I just don't know if it can work the same way as remote where alasql is used first, or if they must be always loaded manually first.
+* All JSON and XML should go through a function to extract the data from the .d node if that's the only node and it's an object (to account for when odata creates the additional node due to being in verbose mode).
+* All JSON, CSV and Excel and XML should go through a function to remove odata columns, as well as those columns from the list of columns to exclude (EXCLUDED_FIELDS[]).
+* All JSON and XML should go through the process used in the current sharepoint loaders to add synthetic fields (ID, Data) and creating the semi-colon separated list of values from arrays, and to expand objects by extracting their elements.
+* All CSV, JSON, Excel and XML should go through a function to guess data types (or if they were loaded directly with alasql, then possible also columns which were brought in as text or number). All sqlite files should already have a data type which we should honor, with the exception of detecting dates from strings because sqlite does not have a native date type. Data types should be checked by checking the first 25 rows and selecting the data type that works for the super majority of those rows. Also recognize the words null, NULL, NaN, and #Error and ignore them while checking data types. For all data type checking, try to determine numeric, boolean, and date values before leaving something as text/array/object/other. For date checking, try to detect ISO dates, Oracle-style dates, whatever format Excel typically uses in CSV, UNIX epochs, and UNIX epochs in scientific notation format (common in JSON exports).
+* All data needs to end up in alasql, and there must be a mapping somewhere  indicating the original url (if applicable), file name (if applicable), file type (if applicable), data source type, and internal table names (if sqlite or xml).
+* Rememer to keep track of whether a data source and table were uploaded or not, so we'll know later whether to keep the data in the report config or not.
+* If possible, all these data-related functions should live in a DataLaVistaPiepeline class/const/object. The data should all land in alasql tables in DataLaVistaState (whith some indication they are raw data).
+* After loading data sources, create a view for each table which will be used to set aliases. For example, when users rename a column in the fields panel in query builder, the renaming should actually trigger an "AS newname" for that column in its respective view. Similarly for renaming tables, it should affect the view name not the actual table. Don't allow duplicate table names. Keep track of which data sources and tables are mapped to which views.
+* In the connect popup, I also want to keep the tab to load SharePoint Lists. It should keep working the same, with lazy loading of the first 25 items only until the user queries it. It should keep the same process for loading field structure and adding those base columns like Title, ID, Created, Modified, Created By, Modified By, etc. However, the processes for detecting data types, extracting from .d, creating synthetic columns,  detecting data types, etc. should now more closely match or even re-use the steps outlined for the other source types (csv/xml/json/excel/sqlite). But, sharepoint list sources will continue having the extra steps for synthetic columns, for ignoring odata, for handling people columns/lookups/multi-selects etc.
+* Leave the tab for loading configs alone for now, just keep in mind we'll follow a similar process for the initial fetching later on.
+* The "Tables and Fields" panel will now show the views for each loaded data source/table, not the actual raw tables. The purpose is so that users can swap out data sources later but keep the aliases so their queries and dashboards continue to work. SQL hints and the SQL generated by basic/advanced query builders will now use the view names and view columns as well instead of the internal field IDs.
+* The buildConfig will now need to include all the views that cover the raw tables, as well as the mappings from internal table name to view name (which is the table alias set by the user), and from internal data source name to alias.
+
+
+```
+
+```
 </code>

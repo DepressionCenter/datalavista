@@ -82,7 +82,7 @@ replace_placeholder() {
   local template="$1"
   local replacement_file="$2"
   local output="$3"
-  python3 - "$template" "$replacement_file" "$output" <<'PYEOF'
+  python - "$template" "$replacement_file" "$output" <<'PYEOF'
 import sys, re
 template_path, replacement_file, output_path = sys.argv[1], sys.argv[2], sys.argv[3]
 template = open(template_path, encoding='utf-8').read()

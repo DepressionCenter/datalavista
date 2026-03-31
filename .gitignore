@@ -3,15 +3,21 @@
 # Ignore log files
 *.log
 
-#Ignore IDE and tool settings
+# Ignore IDE and tool settings
 .vscode/
 .claude/
+.claudeignore
 .gemini/
 .copilot/
 
-#Ignore temporary files
+# Ignore temporary files
 *.tmp
 WIP.html
+
+# Ignore environment variable files
+.env
+.env.*
+/env/**
 
 # Ignore all data files except the one that's tracked
 # Example: .csv
@@ -20,8 +26,4 @@ WIP.html
 .xls
 .xlsx
 .json
-!sample-data*.csv
-!sample-data*.xlsx
-!sample-data*.json
-!sample-report*.json
-!report-template.json
+!/samples/**
