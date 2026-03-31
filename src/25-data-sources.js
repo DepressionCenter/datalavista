@@ -1,9 +1,9 @@
 ﻿/* ============================================================
 This file is part of DataLaVista
-05-data-sources.js: Data source connection popup, remote fetch guards, and source loaders.
+25-data-sources.js: Data source connection popup, remote fetch guards, and source loaders.
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 Created: 2026-03-24
-Last Modified: 2026-03-24
+Last Modified: 2026-03-31
 Summary: Data source connection popup, remote fetch guards, and source loaders.
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
@@ -22,6 +22,66 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 ================================================================ */
 
     // ============================================================
+    // CONNECT QUEUE — queue-based upload/remote loading
+    // ============================================================
+    var ConnectQueue = {
+      uploadedFiles: [],  // { file, type, dsName }
+      remoteUrls: [],     // { url, type, dsName }
+
+      addUploadedFile(file, type, dsName) {
+        this.uploadedFiles.push({ file, type, dsName });
+        this.renderUploadQueue();
+      },
+      addRemoteUrl(url, type, dsName) {
+        this.remoteUrls.push({ url, type, dsName });
+        this.renderRemoteQueue();
+      },
+      removeUploadedFile(idx) { this.uploadedFiles.splice(idx, 1); this.renderUploadQueue(); },
+      removeRemoteUrl(idx)    { this.remoteUrls.splice(idx, 1);    this.renderRemoteQueue(); },
+      clearAll() {
+        this.uploadedFiles = []; this.remoteUrls = [];
+        this.renderUploadQueue(); this.renderRemoteQueue();
+      },
+      _fileIcon(type) {
+        const icons = { csv:'📄', json:'📚', xlsx:'📗', xls:'📗', xml:'🗂️', sqlite:'🗄️', db:'🗄️' };
+        return icons[type] || '📎';
+      },
+      renderUploadQueue() {
+        const c = document.getElementById('upload-queue');
+        if (!c) return;
+        if (!this.uploadedFiles.length) { c.innerHTML = '<div class="queue-empty">No files queued</div>'; return; }
+        c.innerHTML = this.uploadedFiles.map((item, i) => {
+          const errClass = item.error ? ' queue-item-error' : '';
+          const errMsg = item.error ? `<span class="queue-error-msg" title="${item.error}">⚠ ${item.error}</span>` : '';
+          return `<div class="queue-item${errClass}" style="flex-wrap:wrap">
+            <span>${this._fileIcon(item.type)}</span>
+            <span class="queue-name" title="${item.file.name}">${item.file.name}</span>
+            <span class="queue-badge">${item.type.toUpperCase()}</span>
+            <button class="queue-remove" onclick="ConnectQueue.removeUploadedFile(${i})" title="Remove">✕</button>
+            ${errMsg}
+          </div>`;
+        }).join('');
+      },
+      renderRemoteQueue() {
+        const c = document.getElementById('remote-queue');
+        if (!c) return;
+        if (!this.remoteUrls.length) { c.innerHTML = '<div class="queue-empty">No remote files queued</div>'; return; }
+        c.innerHTML = this.remoteUrls.map((item, i) => {
+          const fname = item.url.split('/').pop() || 'remote file';
+          const errClass = item.error ? ' queue-item-error' : '';
+          const errMsg = item.error ? `<span class="queue-error-msg" title="${item.error}">⚠ ${item.error}</span>` : '';
+          return `<div class="queue-item${errClass}" style="flex-wrap:wrap">
+            <span>${this._fileIcon(item.type)}</span>
+            <span class="queue-name" title="${item.url}">${fname}</span>
+            <span class="queue-badge">${item.type.toUpperCase()}</span>
+            <button class="queue-remove" onclick="ConnectQueue.removeRemoteUrl(${i})" title="Remove">✕</button>
+            ${errMsg}
+          </div>`;
+        }).join('');
+      }
+    };
+
+    // ============================================================
     // POPUP LOGIC
     // ============================================================
     function showConnectPopup() {
@@ -30,6 +90,21 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       if(overlayDiv) {
         overlayDiv.classList.add('active');
         overlayDiv.style.display = 'flex';
+      }
+      // Disable SP tab and default to Remote Files when not running inside SharePoint
+      const spTab = document.getElementById('tab-sharepoint');
+      const spWrapper = document.getElementById('tab-sharepoint-wrapper');
+      if (spTab) {
+        if (!DataLaVistaState.isSpSite) {
+          spTab.classList.add('disabled');
+          if (spWrapper) dlvTooltip.attach(spWrapper, 'Only available when running inside SharePoint', { placement: 'top', delay: 200 });
+          // Activate Remote Files tab instead
+          const remoteTab = document.querySelector('.source-tab[data-src="remote"]');
+          if (remoteTab) switchSourceTab(remoteTab, 'remote');
+        } else {
+          spTab.classList.remove('disabled');
+          if (spWrapper) dlvTooltip.detach(spWrapper);
+        }
       }
     }
     function hideConnectPopup() {
@@ -57,11 +132,12 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
     }
 
     function switchSourceTab(el, src) {
+      if (el.classList.contains('disabled')) return;
       document.querySelectorAll('.source-tab').forEach(t => t.classList.remove('active'));
       document.querySelectorAll('.source-pane').forEach(p => p.classList.remove('active'));
       el.classList.add('active');
-      document.getElementById('src-' + src).classList.add('active');
-      if (src === 'csv') spPickerCheckVisibility();
+      document.getElementById('src-' + src)?.classList.add('active');
+      if (src === 'upload' || src === 'remote') spPickerCheckVisibility();
     }
     
 
@@ -94,52 +170,51 @@ async function doConnect() {
       progText.textContent = 'Fetching list inventory...';
       await loadSharePointListsSource(siteUrl, dsName, document.getElementById('sp-auth')?.value || 'current', document.getElementById('sp-token')?.value || '', '');
 
-    } else if (activeTab === 'json') {
-      /* JSON Tab */
-      const siteUrl = (document.getElementById('json-url')?.value || '').trim();
-      if (!siteUrl) {
-        throw new Error('Invalid JSON URL.');
-      }
-      // Use last segment of URL as default name, without file extension
-      const fileName = siteUrl.split('/').pop().replace(/\.[^/.]+$/, "");
-      const rawDsName = (fileName || '').trim();
-      const dsName = generateDataSourceName('json', rawDsName);
-      progText.textContent = 'Loading JSON...';
-      await loadJSONSource(siteUrl, dsName);
+    } else if (activeTab === 'upload') {
+      /* Upload Files Tab */
+      progText.textContent = 'Loading uploaded files...';
+      await processConnectQueue('upload');
 
-    } else if (activeTab === 'csv') {
-      /* CSV Tab */
-      // Handles CSV URLs only.
-      // File uploads are handled separately in spPickerCheckVisibility() → handleFileUpload().
-      const siteUrl = (document.getElementById('csv-url')?.value || '').trim();
-      if (!siteUrl) {
-        throw new Error('Invalid CSV URL.');
-      }
-      // Use last segment of URL as default name, without file extension
-      const fileName = siteUrl.split('/').pop().replace(/\.[^/.]+$/, "");
-      const rawDsName = (fileName || '').trim();
-      const dsName = generateDataSourceName('csv', rawDsName);
-      progText.textContent = 'Loading CSV...';
-      await loadCSVSource(siteUrl, dsName);
-      
+    } else if (activeTab === 'remote') {
+      /* Remote Files Tab */
+      progText.textContent = 'Loading remote files...';
+      await processConnectQueue('remote');
+
     } else if (activeTab === 'loadconfig') {
-      /* Open Dashboard Tab */
-      const configUrl = ((/** @type {HTMLInputElement|null} */ (document.getElementById('config-url')))?.value || '').trim();
-      const jsonText = ((/** @type {HTMLTextAreaElement|null} */ (document.getElementById('config-json-input')))?.value || '').trim();
-      if (!configUrl && !jsonText) {
-        throw new Error('Please provide a dashboard URL, upload a file, or paste a JSON configuration.');
-      }
-      progText.textContent = 'Loading dashboard...';
-      let parsed;
-      if (configUrl) {
-        const json = await fetchJSONWithFallbacks(configUrl);
-        parsed = json;
-      } else {
-        parsed = safeJSONParse(jsonText, 'Config');
-      }
-      if (!parsed) return;
-      await loadConfig(parsed);
-    }
+  /* Open Dashboard Tab */
+  // Check for FILE UPLOAD FIRST (this was missing!)
+  const fileInput = document.getElementById('config-file');
+  const configUrl = (document.getElementById('config-url')?.value || '').trim();
+  const jsonText = (document.getElementById('config-json-input')?.value || '').trim();
+  
+  let parsed;
+  
+  // Priority: file upload > URL > textarea
+  if (fileInput && fileInput.files && fileInput.files.length > 0) {
+    progText.textContent = 'Reading uploaded config file...';
+    const file = fileInput.files[0];
+    const text = await file.text();
+    parsed = safeJSONParse(text, 'Config');
+    if (!parsed) throw new Error('Invalid JSON in uploaded file');
+    fileInput.value = ''; // Clear the input
+    
+  } else if (configUrl) {
+    progText.textContent = 'Fetching config from URL...';
+    const json = await fetchJSONWithFallbacks(configUrl);
+    parsed = json;
+    
+  } else if (jsonText) {
+    progText.textContent = 'Parsing config JSON...';
+    parsed = safeJSONParse(jsonText, 'Config');
+    if (!parsed) throw new Error('Invalid JSON in textarea');
+    
+  } else {
+    throw new Error('Please provide a dashboard URL, upload a file, or paste a JSON configuration.');
+  }
+  
+  progText.textContent = 'Loading dashboard...';
+  await loadConfig(parsed);
+}
 
     // Post successful connection popup cleanup and UI updates
     updateConnectButton();
@@ -158,6 +233,288 @@ async function doConnect() {
 }
 
 
+
+// ============================================================
+// STATE HELPERS
+// ============================================================
+
+/**
+ * Write new state for a table, preserving any user-assigned alias from the
+ * existing state so that re-connecting to the same source does not clobber
+ * a name the user has already customised.
+ * @param {string} tableKey
+ * @param {object} newState
+ */
+function setTableState(tableKey, newState) {
+  const prevAlias = DataLaVistaState.tables[tableKey]?.alias;
+  DataLaVistaState.tables[tableKey] = prevAlias ? { ...newState, alias: prevAlias } : newState;
+}
+
+// ============================================================
+// UPLOAD / REMOTE QUEUE HANDLERS
+// ============================================================
+
+/**
+ * Trigger a file picker for re-uploading an existing file-based data source.
+ * On file selection, processes it as a replacement (preserving aliases).
+ * @param {string} dsName - the data source to replace
+ */
+function triggerFileReupload(dsName) {
+  const ds = DataLaVistaState.dataSources[dsName];
+  if (!ds) return;
+
+  const extMap = { csv: '.csv', json: '.json', xlsx: '.xlsx,.xls', xml: '.xml', sqlite: '.sqlite,.db', db: '.sqlite,.db' };
+  const accept = extMap[ds.type] || '*';
+
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = accept;
+  input.style.display = 'none';
+  document.body.appendChild(input);
+
+  input.addEventListener('change', async () => {
+    const file = input.files && input.files[0];
+    document.body.removeChild(input);
+    if (!file) return;
+
+    showLoadingPopup('Refreshing data source...');
+    try {
+      const ext = file.name.split('.').pop().toLowerCase();
+      const type = ['xlsx','xls'].includes(ext) ? 'xlsx' : (ext === 'db' ? 'sqlite' : ext);
+      ConnectQueue.addUploadedFile(file, type, dsName);
+      await processConnectQueue('upload');
+      renderFieldsPanel();
+      setupCodeMirror();
+      toast(`Refreshed "${dsName}" from ${file.name}`, 'success');
+    } catch (err) {
+      toast('Refresh failed: ' + err.message, 'error');
+    } finally {
+      hideLoadingPopup();
+    }
+  });
+
+  input.click();
+}
+
+/** Called when files are chosen via the Upload Files tab file picker. */
+function handleUploadFiles() {
+  const input = document.getElementById('upload-file-input');
+  if (!input || !input.files || !input.files.length) {
+    toast('Please select files to upload', 'warning');
+    return;
+  }
+  
+  const fileCount = input.files.length;
+  
+  Array.from(input.files).forEach(file => {
+    const ext = file.name.split('.').pop().toLowerCase();
+    const type = ['xlsx','xls'].includes(ext) ? 'xlsx' : ext;
+    
+    if (!['csv','json','xlsx','xml','sqlite','db'].includes(type)) {
+      toast(`Unsupported file type: .${ext}`, 'warning');
+      return;
+    }
+    
+    const rawDsName = (document.getElementById('upload-ds-name')?.value || '').trim();
+    const dsName = generateDataSourceName(type, rawDsName || file.name.replace(/\.[^/.]+$/, ''));
+    ConnectQueue.addUploadedFile(file, type, dsName);
+  });
+  
+  input.value = ''; // Clear the input
+  toast(`Added ${fileCount} file(s) to queue`, 'success');
+}
+
+/** Called when the Add button is clicked on the Remote Files tab. */
+function handleAddRemoteUrl() {
+  const urlEl = /** @type {HTMLInputElement|null} */ (document.getElementById('remote-url'));
+  if (!urlEl) return;
+  const url = urlEl.value.trim();
+  if (!url) { toast('Please enter a URL', 'warning'); return; }
+  try { validateURL(url); } catch(e) { toast(e.message, 'error'); return; }
+  const ext = url.split('?')[0].split('.').pop().toLowerCase();
+  const type = ['xlsx','xls'].includes(ext) ? 'xlsx'
+             : ['csv','json','xml','sqlite','db'].includes(ext) ? ext
+             : 'json';
+  // Normalize db/sqlite3 to 'sqlite'
+  const normalizedType = ['db', 'sqlite3'].includes(type) ? 'sqlite' : type;
+  const fname = url.split('/').pop().replace(/\?.*$/, '').replace(/\.[^/.]+$/, '');
+  const rawDsName = (/** @type {HTMLInputElement|null} */ (document.getElementById('remote-ds-name'))?.value || '').trim();
+  const dsName = generateDataSourceName(normalizedType, rawDsName || fname);
+  ConnectQueue.addRemoteUrl(url, normalizedType, dsName);  // ← Use normalizedType
+  urlEl.value = '';
+}
+
+/** Process all queued uploads or remote URLs. Throws if nothing is queued.
+ * @param {'upload'|'remote'} mode */
+async function processConnectQueue(mode) {
+  if (mode === 'upload') {
+    if (!ConnectQueue.uploadedFiles.length) {
+      throw new Error('No files queued. Please add files before clicking Connect & Load.');
+    }
+    
+    let loadedCount = 0;
+    let anyFailed = false;
+    const loadedDataSources = new Map(); // Group tables by data source
+
+    for (const item of ConnectQueue.uploadedFiles) {
+      item.error = null; // Clear previous error
+      try {
+        // Load the file and get the result
+        const result = await CyberdynePipeline.loadUploadedFile(item.file, item.dsName);
+
+        // Handle SQLite (returns { tables: [...], foreignKeys?, dbName })
+        if (result.tables && Array.isArray(result.tables)) {
+          // SQLite returns multiple tables
+          const dsMetadata = {
+            type: 'sqlite',
+            fileName: item.file.name,
+            isFileUpload: true,
+            url: null
+          };
+
+          // Detect if same filename was uploaded before — replace existing DS
+          const existingEntry = Object.entries(DataLaVistaState.dataSources)
+            .find(([, ds]) => ds.isFileUpload && ds.fileName === item.file.name);
+          const effectiveDsName = existingEntry ? existingEntry[0] : item.dsName;
+
+          if (existingEntry) {
+            CyberdynePipeline.refreshDataSourceTables(effectiveDsName, dsMetadata, result.tables);
+          } else {
+            CyberdynePipeline.registerDataSource(effectiveDsName, dsMetadata, result.tables, result.foreignKeys);
+          }
+          loadedCount += result.tables.length;
+          
+        } else {
+          // Single table (CSV, JSON, Excel, XML)
+          const dsMetadata = {
+            type: result.metadata.sourceType,
+            fileName: result.metadata.fileName,
+            isFileUpload: true,
+            url: null
+          };
+
+          // Detect if same filename was uploaded before — replace existing DS
+          const existingEntry = Object.entries(DataLaVistaState.dataSources)
+            .find(([, ds]) => ds.isFileUpload && ds.fileName === item.file.name);
+          const effectiveDsName = existingEntry ? existingEntry[0] : item.dsName;
+
+          // Group tables by effective data source name
+          if (!loadedDataSources.has(effectiveDsName)) {
+            loadedDataSources.set(effectiveDsName, {
+              metadata: dsMetadata,
+              tables: [],
+              isReplace: !!existingEntry
+            });
+          }
+
+          loadedDataSources.get(effectiveDsName).tables.push(result);
+          loadedCount++;
+        }
+
+      } catch (err) {
+        item.error = err.message;
+        anyFailed = true;
+        console.error(`Error loading ${item.file.name}:`, err);
+      }
+    }
+
+    // Register all successfully grouped data sources
+    for (const [dsName, dsData] of loadedDataSources.entries()) {
+      if (dsData.isReplace) {
+        CyberdynePipeline.refreshDataSourceTables(dsName, dsData.metadata, dsData.tables);
+      } else {
+        CyberdynePipeline.registerDataSource(dsName, dsData.metadata, dsData.tables);
+      }
+    }
+
+    // Remove only successful items from queue; keep failed ones visible
+    ConnectQueue.uploadedFiles = ConnectQueue.uploadedFiles.filter(item => item.error);
+    ConnectQueue.renderUploadQueue();
+    renderFieldsPanel();
+    setupCodeMirror();
+
+    if (loadedCount > 0) {
+      toast(`Loaded ${loadedCount} table(s) from ${loadedDataSources.size} data source(s)`, 'success');
+      setStatus(`Loaded ${loadedCount} table(s)`, 'success');
+    }
+    if (anyFailed) {
+      throw new Error('Some files failed to load — see the queue for details.');
+    }
+
+  } else if (mode === 'remote') {
+    if (!ConnectQueue.remoteUrls.length) {
+      throw new Error('No remote URLs queued. Please add URLs before clicking Connect & Load.');
+    }
+
+    let loadedCount = 0;
+    let anyFailed = false;
+    const loadedDataSources = new Map();
+
+    for (const item of ConnectQueue.remoteUrls) {
+      item.error = null;
+      try {
+        // Load the remote file
+        const result = await CyberdynePipeline.loadRemoteFile(item.url, item.dsName, item.type);
+
+        // Handle SQLite
+        if (result.tables && Array.isArray(result.tables)) {
+          const dsMetadata = {
+            type: 'sqlite',
+            fileName: item.url.split('/').pop(),
+            isFileUpload: false,
+            url: item.url
+          };
+
+          CyberdynePipeline.registerDataSource(item.dsName, dsMetadata, result.tables);
+          loadedCount += result.tables.length;
+
+        } else {
+          // Single table
+          const dsMetadata = {
+            type: result.metadata.sourceType,
+            fileName: result.metadata.fileName,
+            isFileUpload: false,
+            url: item.url
+          };
+
+          if (!loadedDataSources.has(item.dsName)) {
+            loadedDataSources.set(item.dsName, {
+              metadata: dsMetadata,
+              tables: []
+            });
+          }
+
+          loadedDataSources.get(item.dsName).tables.push(result);
+          loadedCount++;
+        }
+
+      } catch (err) {
+        item.error = err.message;
+        anyFailed = true;
+        console.error(`Error loading ${item.url}:`, err);
+      }
+    }
+
+    // Register all successfully grouped data sources
+    for (const [dsName, dsData] of loadedDataSources.entries()) {
+      CyberdynePipeline.registerDataSource(dsName, dsData.metadata, dsData.tables);
+    }
+
+    // Remove only successful items from queue; keep failed ones visible
+    ConnectQueue.remoteUrls = ConnectQueue.remoteUrls.filter(item => item.error);
+    ConnectQueue.renderRemoteQueue();
+    renderFieldsPanel();
+    setupCodeMirror();
+
+    if (loadedCount > 0) {
+      toast(`Loaded ${loadedCount} table(s) from ${loadedDataSources.size} remote source(s)`, 'success');
+      setStatus(`Loaded ${loadedCount} remote table(s)`, 'success');
+    }
+    if (anyFailed) {
+      throw new Error('Some remote files failed to load — see the queue for details.');
+    }
+  }
+}
 
 // ============================================================
 // CONFIGURATION & GUARDS FOR REMOTE FETCHING
@@ -331,7 +688,7 @@ function tryJSONP(url) {
 // SHAREPOINT SOURCE LOADER
 // ============================================================
 async function loadSharePointListsSource(siteUrl, dsName, newAuth='current', newToken='', description='') {
-  setStatus('⏳ Loading SharePoint lists from ' + siteUrl + '...');
+  setStatus('Loading SharePoint lists from ' + siteUrl + '...', 'loading');
 
   // dsName is the immutable internal key; alias = user-entered name from connect popup
   if (!DataLaVistaState.dataSources[dsName]) {
@@ -370,7 +727,7 @@ async function loadSharePointListsSource(siteUrl, dsName, newAuth='current', new
       // User-facing alias: PascalCase of Title (no "List" suffix)
       const tableAlias = toPascalCase(list.Title || entityTypeName);
 
-      DataLaVistaState.tables[tableKey] = {
+      setTableState(tableKey, {
         internalName: entityTypeName,
         displayName: list.Title || tableAlias || entityTypeName,
         description: list.Description || '',
@@ -388,20 +745,27 @@ async function loadSharePointListsSource(siteUrl, dsName, newAuth='current', new
         dataSource: dsName,
         isFileUpload: false,
         keepRawData: false
-      };
+      });
 
       if (!DataLaVistaState.dataSources[dsName].tables.includes(tableKey)) {
         DataLaVistaState.dataSources[dsName].tables.push(tableKey);
       }
+
+      // Register a view for this list so users see/query by the friendly list title
+      CyberdynePipeline.registerSharePointList(dsName, tableKey, list.Title || tableAlias, fieldMetas);
+
       loadedCount++;
     } catch (e) {
       console.warn('[loadSharePointListsSource] Skipped list:', list.Title, e.message);
     }
   }
-  
+
+
+  // Register lookup-field relationships now that all lists are known
+  CyberdynePipeline.registerSpLookupRelationships(dsName);
 
   if(DataLaVistaState.reportMode !== 'view') {
-    setStatus(`✅ Loaded ${loadedCount} lists from SharePoint (${dsName})`);
+    setStatus(`Loaded ${loadedCount} lists from SharePoint (${dsName})`, 'success');
     renderFieldsPanel();
     setupCodeMirror();
     toast(`Connected to SharePoint as "${dsName}" — ${loadedCount} lists`, 'success');
@@ -459,7 +823,8 @@ async function fetchJSONWithFallbacks(url) {
   }
 
   const summary = Object.entries(errors).map(([k, v]) => `  [${k}] ${v}`).join('\n');
-  throw new Error(`All fetch strategies failed for "${url}":\n${summary}`);
+  console.error('[fetchJSONWithFallbacks] All strategies failed:', summary);
+  throw new Error('Unable to fetch file. Check the URL and try again.');
 }
 
 // Fetch raw CSV text from a URL trying multiple strategies.
@@ -499,7 +864,8 @@ async function fetchCSVWithFallbacks(url) {
   }
 
   const summary = Object.entries(errors).map(([k, v]) => `  [${k}] ${v}`).join('\n');
-  throw new Error(`All CSV fetch strategies failed for "${url}":\n${summary}`);
+  console.error('[fetchCSVWithFallbacks] All strategies failed:', summary);
+  throw new Error('Unable to fetch file. Check the URL and try again.');
 }
 
 // Load JSON from URL with multiple strategies and robust error handling
@@ -565,7 +931,7 @@ async function loadJSONSource(url, dsName) {
     };
   }
 
-  DataLaVistaState.tables[tableKey] = {
+  setTableState(tableKey, {
     displayName: 'Data',
     alias: 'Data',
     dsAlias: dsName,
@@ -574,19 +940,18 @@ async function loadJSONSource(url, dsName) {
     loaded: true,
     sourceType: 'json',
     dataSource: dsName,
-    dsAlias: dsName,
     isFileUpload: false,
     keepRawData: false,
     siteUrl: null,
     url: url,
     itemCount: normalizedRows.length || 0
-  };
+  });
 
   if (!DataLaVistaState.dataSources[dsName].tables.includes(tableKey)) {
     DataLaVistaState.dataSources[dsName].tables.push(tableKey);
   }
 
-  setStatus(`✅ Loaded ${normalizedRows.length} rows from JSON`);
+  setStatus(`Loaded ${normalizedRows.length} rows from JSON`, 'success');
   renderFieldsPanel();
   setupCodeMirror();
 }
@@ -655,7 +1020,7 @@ function loadJSONData(dsName, fileName, fileUrl, isFileUpload, text) {
     };
   }
 
-  DataLaVistaState.tables[tableKey] = {
+  setTableState(tableKey, {
     displayName: 'Data',
     alias: 'Data',
     dsAlias: dsName,
@@ -669,13 +1034,13 @@ function loadJSONData(dsName, fileName, fileUrl, isFileUpload, text) {
     siteUrl: null,
     url: fileUrl || fileName || dsName + '.json',
     itemCount: normalizedRows.length
-  };
+  });
 
   if (!DataLaVistaState.dataSources[dsName].tables.includes(tableKey)) {
     DataLaVistaState.dataSources[dsName].tables.push(tableKey);
   }
 
-  setStatus(`✅ Loaded ${normalizedRows.length} rows from JSON`);
+  setStatus(`Loaded ${normalizedRows.length} rows from JSON`, 'success');
   if (DataLaVistaState.reportMode === 'edit') {
     renderFieldsPanel();
     setupCodeMirror();
@@ -738,7 +1103,7 @@ async function loadCSVSource(url, dsName, fileName) {
           url: url, keepRawData: false
         };
       }
-      DataLaVistaState.tables[tableKey] = {
+      setTableState(tableKey, {
         alias: tableKey, data: rows, dataSource: dsName,
         description: 'This table was created from a CSV file (' + (fileName || dsName + '.csv') + ').',
         displayName: 'Data',
@@ -747,7 +1112,7 @@ async function loadCSVSource(url, dsName, fileName) {
         internalName: tableKey, itemCount: rows.length,
         siteUrl: null, url: url, loaded: true,
         sourceType: 'csv', isFileUpload: false, keepRawData: false
-      };
+      });
       if (!DataLaVistaState.dataSources[dsName].tables.includes(tableKey)) DataLaVistaState.dataSources[dsName].tables.push(tableKey);
       setStatus(`Loaded ${rows.length} rows from CSV`, 'success');
       if (DataLaVistaState.reportMode === 'edit') { renderFieldsPanel(); setupCodeMirror(); }
@@ -808,7 +1173,7 @@ function loadCSVData(dsName, tableKey = '', fileName = '', fileUrl = '', isFileU
     };
   }
 
-  DataLaVistaState.tables[tableKey] = {
+  setTableState(tableKey, {
     alias: tableKey,
     data: rows || [],
     dataSource: dsName,
@@ -822,15 +1187,15 @@ function loadCSVData(dsName, tableKey = '', fileName = '', fileUrl = '', isFileU
     url: fileUrl || fileName || dsName + '.csv',
     loaded: true,
     sourceType: 'csv',
-    isFileUpload: isFileUpload, // true if uploaded from local file picker; false if loaded from URL
-    keepRawData: (isFileUpload) ? true : false // if loaded from file, keep raw data
-  };
+    isFileUpload: isFileUpload,
+    keepRawData: (isFileUpload) ? true : false
+  });
 
   if (!DataLaVistaState.dataSources[dsName].tables.includes(tableKey)) {
     DataLaVistaState.dataSources[dsName].tables.push(tableKey);
   }
 
-  setStatus(`✅ Loaded ${rows.length} rows from CSV`);
+  setStatus(`Loaded ${rows.length} rows from CSV`, 'success');
   if(DataLaVistaState.reportMode === 'edit') {
     renderFieldsPanel();
     setupCodeMirror();

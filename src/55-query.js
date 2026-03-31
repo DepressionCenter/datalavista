@@ -1,9 +1,9 @@
 ﻿/* ============================================================
 This file is part of DataLaVista
-10-query.js: Query execution, result type detection, and query preview.
+55-query.js: Query execution, result type detection, and query preview.
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 Created: 2026-03-24
-Last Modified: 2026-03-24
+Last Modified: 2026-03-31
 Summary: Query execution, result type detection, and query preview.
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
@@ -28,7 +28,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         if (!sql.trim()) { toast('Please enter a SQL query', 'error'); return; }
         DataLaVistaState.sql = sql;
 
-        setStatus('⏳ Running query...');
+        setStatus('Running query...', 'loading');
 
         try {
           // Find referenced tables
@@ -39,12 +39,29 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
             await ensureTableData(tname,true);
           }
 
-          // Register each referenced table in AlaSQL under its live query name (DSAlias_TableAlias)
-          // TODO shouldnt this be internal names? Can we use alasql aliases?
+          // Register each referenced table in AlaSQL under its raw table name (_raw_<tableKey>)
+          // AND create/update the view that maps aliases to internal names
           for (const tname of referencedTables) {
             const t = DataLaVistaState.tables[tname];
             if (!t || !t.data) continue;
+            
+            // Register the raw table: _raw_SP_PeopleList
             registerTableInAlaSQL(tname);
+            
+            // Create/update the view: SP_Contacts -> SELECT [alias] AS [internalName] FROM [_raw_SP_PeopleList]
+            // This ensures the view exists and is up-to-date with the latest field mappings
+            const viewName = t.viewName || CyberdynePipeline.getViewForTable(tname);
+            if (viewName) {
+              try {
+                CyberdynePipeline.updateViewSQL(viewName);
+              } catch (e) {
+                console.warn(`[runQuery] Failed to update view ${viewName}:`, e.message);
+                // If view doesn't exist yet, create it
+                if (!CyberdynePipeline.views[viewName]) {
+                  CyberdynePipeline.createView(tname, viewName, t.fields || []);
+                }
+              }
+            }
           }
 
           // Execute SQL once, then store results in a named AlaSQL table so
@@ -68,12 +85,12 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           DataLaVistaState.design.transformedResults = null;
           applyDesignTransforms();
           renderDesignFieldsPanel();
-          setStatus(`✅ Query returned ${sampleRows.length} rows`);
+          setStatus(`Query returned ${sampleRows.length} rows`, 'success');
           toast(`Query returned ${sampleRows.length} rows`, 'success');
         } catch (err) {
           console.error(err);
           toast('Query error: ' + err.message, 'error');
-          setStatus('❌ Query error: ' + err.message);
+          setStatus('Query error: ' + err.message, 'error');
           hideUseInDesign();
         }
       }
@@ -116,11 +133,13 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         const btn = document.getElementById('btn-use-in-design');
         if (btn) btn.style.display = '';
         DataLaVistaState.queryResultsReady = true;
+        setDesignTabsEnabled(true);
       }
       function hideUseInDesign() {
         const btn = document.getElementById('btn-use-in-design');
         if (btn) btn.style.display = 'none';
         DataLaVistaState.queryResultsReady = false;
+        setDesignTabsEnabled(false, 'Run a query first to use Design, Preview, and Generate');
       }
 
       function toggleAdvOptionsPanel() {
@@ -164,4 +183,3 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
     if (typeof v === 'string' && ISO_DATE_RE.test(v)) return 'date';
     return 'text';
   }
-  

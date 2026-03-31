@@ -18,7 +18,7 @@ but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 GNU General Public License for more details.
 You should have received a copy of the GNU General Public License along
-with this program. If not, see <https://www.gnu.org/licenses/>.
+with this program. If not, see https://www.gnu.org/licenses/.
 
 -->
 <html lang="en">
@@ -31,6 +31,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
   <script src="https://cdnjs.cloudflare.com/ajax/libs/alasql/4.1.3/alasql.min.js"></script>
   <!-- ECharts -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.5.0/echarts.min.js"></script>
+  <!-- SheetJS v0.18.5 (Apache 2.0 / GPLv3-compatible) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.mini.min.js"></script>
   <!-- CodeMirror core -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
@@ -429,6 +431,16 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       border-bottom-color: var(--primary);
     }
 
+    .source-tab.disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+      pointer-events: none;
+    }
+
+    .source-tab-sp-wrapper {
+      display: inline-flex;
+    }
+
     .source-pane {
       display: none;
     }
@@ -437,6 +449,85 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       display: flex;
       flex-direction: column;
       gap: 10px;
+    }
+
+    /* ============================================================
+   QUEUE & DROPZONE
+   ============================================================ */
+    .dlv-dropzone {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      border: 2px dashed var(--border-strong);
+      border-radius: var(--radius);
+      padding: 14px 12px;
+      background: var(--surface-alt);
+      color: var(--text-secondary);
+      font-size: 13px;
+      transition: border-color var(--transition), background var(--transition);
+      cursor: default;
+    }
+    .dlv-dropzone.drag-over {
+      border-color: var(--primary);
+      background: color-mix(in srgb, var(--primary) 8%, var(--surface-alt));
+    }
+    .dlv-queue {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      max-height: 140px;
+      overflow-y: auto;
+    }
+    .queue-empty {
+      font-size: 12px;
+      color: var(--text-disabled);
+      padding: 4px 0;
+    }
+    .queue-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      background: var(--surface-alt);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 4px 8px;
+    }
+    .queue-name {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .queue-badge {
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      background: var(--border);
+      border-radius: 3px;
+      padding: 1px 4px;
+    }
+    .queue-remove {
+      background: none;
+      border: none;
+      color: var(--text-disabled);
+      cursor: pointer;
+      font-size: 11px;
+      padding: 0 2px;
+      line-height: 1;
+    }
+    .queue-remove:hover { color: var(--error); }
+    .queue-item-error {
+      border-color: var(--error, #d32f2f);
+      background: color-mix(in srgb, var(--error, #d32f2f) 8%, var(--surface-alt));
+    }
+    .queue-item-error .queue-name { color: var(--error, #d32f2f); }
+    .queue-error-msg {
+      font-size: 10px;
+      color: var(--error, #d32f2f);
+      flex-basis: 100%;
+      padding-top: 2px;
     }
 
     /* ============================================================
@@ -1368,8 +1459,10 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
     .qb-node-resize {
       position: absolute; width: 10px; height: 10px;
       background: var(--border-strong); border-radius: 2px; z-index: 3;
-      transition: background var(--transition);
+      transition: background var(--transition), opacity var(--transition);
+      opacity: 0; pointer-events: none;
     }
+    .qb-table-node.selected .qb-node-resize { opacity: 1; pointer-events: all; }
     .qb-node-resize:hover { background: var(--primary); }
     .qb-node-resize.br { bottom: -4px; right: -4px; cursor: se-resize; }
     .qb-node-resize.bl { bottom: -4px; left: -4px;  cursor: sw-resize; }
@@ -2882,6 +2975,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
   <div id="dlv-ctx-menu">
     <div class="ctx-menu-item" id="ctx-copy-url" onclick="dlvCtxCopyUrl();">🔗 Copy URL</div>
     <div class="ctx-menu-sep" id="ctx-sep-url"></div>
+    <div class="ctx-menu-item" id="ctx-refresh-source" onclick="dlvCtxRefreshSource()">🔄 Refresh Source</div>
+    <div class="ctx-menu-sep" id="ctx-sep-refresh"></div>
     <div class="ctx-menu-item" id="ctx-rename" onclick="dlvCtxRename()">✏️ Rename</div>
     <div class="ctx-menu-item danger" id="ctx-delete" onclick="dlvCtxDelete()">🗑 Delete</div>
   </div>
@@ -2919,14 +3014,15 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         </div>
         <div class="popup-body">
           <div class="source-tabs">
-            <div class="source-tab active" data-src="sharepoint" onclick="switchSourceTab(this,'sharepoint')">SharePoint
-              Lists</div>
-            <div class="source-tab" data-src="json" onclick="switchSourceTab(this,'json')">JSON URL</div>
-            <div class="source-tab" data-src="csv" onclick="switchSourceTab(this,'csv')">CSV File</div>
+            <div class="source-tab-sp-wrapper" id="tab-sharepoint-wrapper">
+              <div class="source-tab" id="tab-sharepoint" data-src="sharepoint" onclick="switchSourceTab(this,'sharepoint')">SharePoint Lists</div>
+            </div>
+            <div class="source-tab" data-src="upload" onclick="switchSourceTab(this,'upload')">Upload Files</div>
+            <div class="source-tab" data-src="remote" onclick="switchSourceTab(this,'remote')">Remote Files</div>
             <div class="source-tab" data-src="loadconfig" onclick="switchSourceTab(this,'loadconfig')">Open Dashboard</div>
           </div>
 
-          <!-- SharePoint -->
+          <!-- SharePoint Lists -->
           <div class="source-pane active" id="src-sharepoint">
             <div class="form-group">
               <label>SharePoint Site URL</label>
@@ -2951,50 +3047,53 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
             </div>
           </div>
 
-          <!-- JSON -->
-          <div class="source-pane" id="src-json">
+          <!-- Upload Files -->
+          <div class="source-pane" id="src-upload">
             <div class="form-group">
-              <label>JSON URL (SharePoint library or direct link)</label>
-              <div style="display:flex;gap:6px;align-items:center">
-                <input type="text" class="form-input" id="json-url" placeholder="https://code.depressioncenter.org/datalavista/samples/sample-data/sample-data.json"
-                  style="flex:1" />
-                <button class="btn btn-default btn-sm" id="btn-sp-browse-json" onclick="spBrowseJSON()"
-                  title="Browse SharePoint document libraries for a JSON file"
-                  style="display:none;white-space:nowrap;flex-shrink:0">📂 Browse SharePoint Files</button>
+              <label>Select files to upload</label>
+              <div class="dlv-dropzone" id="upload-dropzone"
+                ondragover="event.preventDefault();this.classList.add('drag-over')"
+                ondragleave="this.classList.remove('drag-over')"
+                ondrop="event.preventDefault();this.classList.remove('drag-over');document.getElementById('upload-file-input').files=event.dataTransfer.files;handleUploadFiles()">
+                <span>📂 Drag &amp; drop files here, or</span>
+                <label class="btn btn-default btn-sm" style="cursor:pointer;margin:0">
+                  Browse…
+                  <input type="file" id="upload-file-input" multiple
+                    accept=".csv,.CSV,.json,.json5,.JSON,.xlsx,.xls,.xml,.XML,.sqlite,.db"
+                    style="display:none" onchange="handleUploadFiles()" />
+                </label>
               </div>
-              <span class="text-xs text-muted">URL must return a JSON array or SharePoint REST format</span>
+              <span class="text-xs text-muted">Supported: CSV, JSON, Excel (.xlsx/.xls), XML, SQLite (.sqlite/.db)</span>
             </div>
             <div class="form-group">
-              <label>Data Source Name <span style="font-weight:400;color:var(--text-disabled)">(up to 6 alphanumeric chars, default: JSON)</span></label>
-              <input type="text" class="form-input" id="json-ds-name" placeholder="JSON" maxlength="6" />
+              <label>Data Source Name <span style="font-weight:400;color:var(--text-disabled)">(optional — auto-generated from filename)</span></label>
+              <input type="text" class="form-input" id="upload-ds-name" placeholder="auto" maxlength="6" />
             </div>
-            <div class="form-group">
-              <label>Or upload a local JSON file</label>
-              <input type="file" class="form-input" id="json-file" accept=".json, .json5, .JSON, .js, .txt, application/json, text/javascript, text/plain" />
-            </div>
+            <div id="upload-queue" class="dlv-queue"><div class="queue-empty">No files queued</div></div>
           </div>
 
-          <!-- CSV -->
-          <div class="source-pane" id="src-csv">
+          <!-- Remote Files -->
+          <div class="source-pane" id="src-remote">
             <div class="form-group">
-              <label>CSV URL (SharePoint library or direct link)</label>
+              <label>Remote file URL</label>
               <div style="display:flex;gap:6px;align-items:center">
-                <input type="text" class="form-input" id="csv-url"
-                  placeholder="https://code.depressioncenter.org/datalavista/samples/sample-data/sample-data.csv"
+                <input type="text" class="form-input" id="remote-url"
+                  placeholder="https://example.com/data/report.csv"
                   style="flex:1" />
-                <button class="btn btn-default btn-sm" id="btn-sp-browse" onclick="spBrowseCSV()"
-                  title="Browse SharePoint document libraries for a CSV or TSV file"
-                  style="display:none;white-space:nowrap;flex-shrink:0">📂 Browse SharePoint Files</button>
+                <button class="btn btn-default btn-sm" id="btn-sp-browse-remote" onclick="spBrowseRemoteFile()"
+                  title="Browse SharePoint document libraries for a data file"
+                  style="display:none;white-space:nowrap;flex-shrink:0">📂 Browse SharePoint</button>
               </div>
+              <span class="text-xs text-muted">Supported: CSV, JSON, Excel, XML, SQLite — enter URL then click Add</span>
             </div>
             <div class="form-group">
-              <label>Data Source Name <span style="font-weight:400;color:var(--text-disabled)">(up to 6 alphanumeric chars, default: CSV)</span></label>
-              <input type="text" class="form-input" id="csv-ds-name" placeholder="CSV" maxlength="6" />
+              <label>Data Source Name <span style="font-weight:400;color:var(--text-disabled)">(optional — auto-generated from filename)</span></label>
+              <input type="text" class="form-input" id="remote-ds-name" placeholder="auto" maxlength="6" />
             </div>
-            <div class="form-group">
-              <label>Or upload a local CSV file</label>
-              <input type="file" class="form-input" id="csv-file" accept=".csv, .CSV, text/csv" />
+            <div style="display:flex;justify-content:flex-end;margin-bottom:6px">
+              <button class="btn btn-default btn-sm" onclick="handleAddRemoteUrl()">+ Add to Queue</button>
             </div>
+            <div id="remote-queue" class="dlv-queue"><div class="queue-empty">No remote files queued</div></div>
           </div>
 
           <!-- Open Dashboard -->
@@ -3011,7 +3110,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
             </div>
             <div class="form-group">
               <label>Or upload a local dashboard file</label>
-              <input type="file" class="form-input" id="config-file" accept=".json, .JSON, .json5, .JSON5, text/json, application/json" />
+              <input type="file" class="form-input" id="config-file" 
+                    accept=".json,.JSON,.json5,.JSON5,text/json,application/json" />
             </div>
             <div class="form-group">
               <label>Or paste JSON configuration</label>
@@ -3369,6 +3469,8 @@ This program is distributed in the hope that it will be useful, but WITHOUT ANY 
   <script src="src/23-sharepoint.js"></script>
   <script src="src/24-normalization.js"></script>
   <script src="src/25-data-sources.js"></script>
+  <script src="src/26-cyberdyne-pipeline.js"></script>
+  <script src="src/27-cyberdyne-views.js"></script>
   <script src="src/30-config.js"></script>
   <script src="src/40-ui-context-menu.js"></script>
   <script src="src/50-qb-basic.js"></script>

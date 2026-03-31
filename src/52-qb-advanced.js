@@ -1,9 +1,9 @@
 ﻿/* ============================================================
 This file is part of DataLaVista
-09-qb-advanced.js: Advanced query builder - visual join graph, nodes, and options panel.
+52-qb-advanced.js: Advanced query builder - visual join graph, nodes, and options panel.
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 Created: 2026-03-24
-Last Modified: 2026-03-24
+Last Modified: 2026-03-31
 Summary: Advanced query builder - visual join graph, nodes, and options panel.
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
@@ -36,6 +36,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         // Remove existing nodes (not SVG)
         canvas.querySelectorAll('.qb-table-node').forEach(n => n.remove());
         document.getElementById('qb-svg').innerHTML = '';
+
+        DataLaVistaState.advancedQB.nodeAliases ??= {};
 
         for (const [id, nd] of Object.entries(DataLaVistaState.advancedQB.nodes)) {
           createAdvNode(id, nd);
@@ -93,6 +95,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
               shootLightning(tx, ty, nr.left + nr.width/2, nr.top + nr.height/2, () => {
                 poofAndRemove(nodeEl, () => {
                   delete DataLaVistaState.advancedQB.nodes[nodeId];
+                  delete DataLaVistaState.advancedQB.nodeAliases?.[nodeId];
                   DataLaVistaState.advancedQB.joins = DataLaVistaState.advancedQB.joins.filter(j => j.fromNode !== nodeId && j.toNode !== nodeId);
                   redrawJoins(); rebuildAdvancedSQL(); renderAdvOptionsPanel(null, null);
                 });
@@ -195,10 +198,10 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         }
       }
 
-      function addAdvNode(tableName, x, y, preselectedField) {
+      function addAdvNode(tableName, x, y, preselectedField, sqlAlias, _skipAutoJoin = false) {
         const id = 'node_' + (++advNodeCounter);
         const t = DataLaVistaState.tables[tableName];
-        if (!t) return;
+        if (!t) return id;
 
         let defaultFields = [];
         if (preselectedField) {
@@ -222,6 +225,20 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           }
         }
 
+        // If the same table is already on canvas and no explicit sqlAlias was given,
+        // generate a uniqueness alias like "People_2", "People_3", etc.
+        if (!sqlAlias) {
+          const existingCount = Object.values(DataLaVistaState.advancedQB.nodes)
+            .filter(n => n.tableName === tableName).length;
+          if (existingCount > 0) {
+            const base = t.alias || tableName;
+            let counter = existingCount + 1;
+            const usedAliases = new Set(Object.values(DataLaVistaState.advancedQB.nodeAliases || {}));
+            while (usedAliases.has(base + '_' + counter)) counter++;
+            sqlAlias = base + '_' + counter;
+          }
+        }
+
         DataLaVistaState.advancedQB.nodes[id] = {
           tableName, x, y,
           selectedFields: defaultFields,
@@ -231,16 +248,106 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           groupBy: [],
           fieldAggs: {}
         };
+
+        if (sqlAlias) {
+          DataLaVistaState.advancedQB.nodeAliases ??= {};
+          DataLaVistaState.advancedQB.nodeAliases[id] = sqlAlias;
+        }
+
         createAdvNode(id, DataLaVistaState.advancedQB.nodes[id]);
         ensureTableData(tableName);
+
+        // Auto-apply relationships involving this table (skip when called from autoApplySuggestedJoins to avoid recursion)
+        if (!_skipAutoJoin) autoApplySuggestedJoins(id, tableName);
+
         rebuildAdvancedSQL();
         selectAdvNode(id);
+        return id;
       }
 
-      function getAllFieldAliases(tableName) {
+      /**
+       * Auto-apply any registered relationships that connect the newly-added node
+       * to an already-present node in the advanced QB.
+       * Supports multiple relationships to the same parent table (e.g. 3 lookup fields → People).
+       * Each unique relationship gets its own join; extra copies of the parent table are added
+       * as needed with derived SQL aliases like "TeamsList_TeamLead".
+       */
+      function autoApplySuggestedJoins(newNodeId, newTableName) {
+        const rels = DataLaVistaState.relationships || [];
+        if (!rels.length) return;
+
+        // Build a map of tableKey → [nodeId, ...] for existing nodes (excluding the new one)
+        const existingTableToNodes = {};
+        for (const [nid, nd] of Object.entries(DataLaVistaState.advancedQB.nodes)) {
+          if (nid !== newNodeId) {
+            (existingTableToNodes[nd.tableName] ??= []).push(nid);
+          }
+        }
+
+        // Derive the SQL alias for a node being auto-added for a specific lookup field.
+        // Pattern: {childTable.alias}_{lookupFieldAlias} e.g. "TeamsList_TeamLead"
+        const deriveSPAlias = (childTableKey, childField) => {
+          const childT = DataLaVistaState.tables[childTableKey];
+          const childAlias = childT?.alias || childTableKey;
+          // childField is the *Data synthetic field; strip the 'Data' suffix to get the base field name
+          const fieldBase = childField.endsWith('Data') ? childField.slice(0, -4) : childField;
+          return childAlias + '_' + fieldBase;
+        };
+
+        // Track how many times we've used the new node as parent/child for a given peer table,
+        // so subsequent rels get a fresh node instead.
+        const usedNewNodeForParent = new Set(); // set of childTableKey already handled via newNodeId as parent
+
+        for (const rel of rels) {
+          let fromNodeId, toNodeId, fromKey, toKey, joinType;
+
+          if (rel.parentTableKey === newTableName && existingTableToNodes[rel.childTableKey]) {
+            // New node is parent; child already on canvas
+            const childT  = DataLaVistaState.tables[rel.childTableKey];
+            const parentT = DataLaVistaState.tables[rel.parentTableKey];
+            const childFieldAlias  = (childT?.fields || []).find(f => f.internalName === rel.childField)?.alias || rel.childField;
+            const parentFieldAlias = (parentT?.fields || []).find(f => f.internalName === rel.parentField)?.alias || rel.parentField;
+            joinType = rel.source === 'sharepoint-lookup' ? 'INCLUDES' : (rel.joinType || 'LEFT');
+            fromKey  = childFieldAlias;
+            toKey    = parentFieldAlias;
+            fromNodeId = existingTableToNodes[rel.childTableKey][0];
+            // Each rel needs a distinct parent node. Use newNodeId for the first rel,
+            // then create additional parent nodes (siblings of the new node) for subsequent rels.
+            if (!usedNewNodeForParent.has(rel.childTableKey)) {
+              toNodeId = newNodeId;
+              usedNewNodeForParent.add(rel.childTableKey);
+            } else {
+              const nd0 = DataLaVistaState.advancedQB.nodes[newNodeId];
+              const siblingAlias = deriveSPAlias(rel.childTableKey, rel.childField);
+              toNodeId = addAdvNode(newTableName, (nd0?.x ?? 0) + 200, (nd0?.y ?? 0), undefined, siblingAlias, true);
+            }
+          } else {
+            continue;
+          }
+
+          // Skip if an identical join (same nodes + same keys) already exists
+          const alreadyJoined = DataLaVistaState.advancedQB.joins.some(j =>
+            ((j.fromNode === fromNodeId && j.toNode === toNodeId) ||
+             (j.fromNode === toNodeId   && j.toNode === fromNodeId)) &&
+            j.fromKey === fromKey && j.toKey === toKey
+          );
+          if (alreadyJoined) continue;
+
+          DataLaVistaState.advancedQB.joins.push({
+            fromNode: fromNodeId, fromSide: 'right',
+            toNode: toNodeId,     toSide: 'left',
+            fromKey, toKey,
+            type: joinType
+          });
+        }
+
+        if (DataLaVistaState.advancedQB.joins.length > 0) redrawJoins();
+      }
+
+      function getAllFieldAliases(tableName, hideSynthetic = false) {
         const t = DataLaVistaState.tables[tableName];
         if (!t) return [];
-        return t.fields.filter(f => !f.isAutoId).map(f => f.alias);
+        return t.fields.filter(f => !hideSynthetic || !f.isAutoId).map(f => f.alias);
       }
 
       function createAdvNode(id, nd) {
@@ -262,7 +369,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         el.innerHTML = `
     <div class="qb-node-header">
       <span class="qb-node-join-icon" title="Drag to another table to create a join">🔗</span>
-      <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin:0 4px">${nd.alias || nd.tableName}</span>
+      <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin:0 4px">${nd.alias || nd.tableName}${(DataLaVistaState.advancedQB.nodeAliases?.[id] && DataLaVistaState.advancedQB.nodeAliases[id] !== (nd.alias || nd.tableName)) ? ` <span style="opacity:.6;font-size:11px">(${DataLaVistaState.advancedQB.nodeAliases[id]})</span>` : ''}</span>
       <span class="qb-node-trash-icon" draggable="true" title="Drag to Clear button to remove">⠿</span>
       <button style="background:none;border:none;color:rgba(255,255,255,.7);cursor:pointer;padding:0 2px;font-size:13px;line-height:1" onclick="removeAdvNode('${id}')">✕</button>
     </div>
@@ -596,12 +703,18 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       function startNodeResize(e, nodeId, el, corner) {
         e.preventDefault();
         const startMouseX = e.clientX;
+        const startMouseY = e.clientY;
         const startW = el.offsetWidth;
+        const startH = el.offsetHeight;
         const nd = DataLaVistaState.advancedQB.nodes[nodeId];
         const startNdX = nd.x;
+        const startNdY = nd.y;
 
         const onMove = mv => {
           const dx = mv.clientX - startMouseX;
+          const dy = mv.clientY - startMouseY;
+
+          // Width
           let newW;
           if (corner === 'br' || corner === 'tr') {
             newW = Math.max(160, startW + dx);
@@ -613,6 +726,18 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           el.style.width = newW + 'px';
           el.style.minWidth = newW + 'px';
           el.style.maxWidth = newW + 'px';
+
+          // Height
+          let newH;
+          if (corner === 'br' || corner === 'bl') {
+            newH = Math.max(80, startH + dy);
+          } else {
+            newH = Math.max(80, startH - dy);
+            nd.y = startNdY + (startH - newH);
+            el.style.top = nd.y + 'px';
+          }
+          el.style.height = newH + 'px';
+
           redrawJoins();
         };
         const onUp = () => {
@@ -633,8 +758,9 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       }
 
       function selectAdvNode(id) {
-        // No canvas selection highlight — the options panel shows which table is active
         document.querySelectorAll('.qb-table-node').forEach(n => n.classList.remove('selected'));
+        const el = document.getElementById('adv-' + id);
+        if (el) el.classList.add('selected');
         if (selectedNode !== id) _advOptsFieldsExpanded = false; // reset expand on new node
         selectedNode = id;
         DataLaVistaState.advancedQB.activeJoinIdx = -1;
@@ -660,15 +786,15 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         body.innerHTML = `
     <div class="form-group">
       <label>Alias</label>
-      <input type="text" class="form-input" style="height:28px" value="${nd.alias}" oninput="DataLaVistaState.advancedQB.nodes['${nodeId}'].alias=this.value; rebuildAdvancedSQL()"/>
+      <input type="text" class="form-input" style="height:28px" value="${nd.alias}" oninput="DataLaVistaState.advancedQB.nodes['${nodeId}'].alias=this.value; if(DataLaVistaState.advancedQB.nodeAliases?.['${nodeId}']!==undefined) DataLaVistaState.advancedQB.nodeAliases['${nodeId}']=this.value; rebuildAdvancedSQL()"/>
     </div>
     <div>
       <div style="font-size:11px;font-weight:700;color:var(--text-disabled);text-transform:uppercase;margin-bottom:4px">Fields — click to toggle</div>
-      ${t.fields.filter(f => !f.isAutoId).map(f => {
+      ${t.fields.map(f => {
           const sel = nd.selectedFields.includes(f.alias);
-          return `<div class="basic-field-row" onclick="toggleAdvFieldInProps('${nodeId}','${f.alias}',this)">
+          return `<div class="basic-field-row${f.isAutoId ? ' adv-field-synthetic' : ''}" onclick="toggleAdvFieldInProps('${nodeId}','${f.alias}',this)" title="${f.isAutoId ? 'Synthetic/auto-generated field' : ''}">
           <input type="checkbox" ${sel ? 'checked' : ''} onclick="event.stopPropagation();" onchange="toggleAdvFieldInProps('${nodeId}','${f.alias}',this.closest('.basic-field-row'))"/>
-          <label>${f.alias}</label>
+          <label>${f.alias}${f.isAutoId ? ' <span style="opacity:.5;font-size:10px">[auto]</span>' : ''}</label>
         </div>`;
         }).join('')}
     </div>
@@ -719,18 +845,31 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           const toAlias   = toND?.alias   || toND?.tableName   || '';
 
           const JOIN_TYPES = [
-            { val: 'INNER', label: 'Inner Join',    desc: 'ℹ️ Matching rows in both sides' },
-            { val: 'LEFT',  label: 'Left Join',     desc: 'ℹ️ Everything on the left, only matching rows on the right' },
-            { val: 'RIGHT', label: 'Right Join',    desc: 'ℹ️ Everything on the right, only matching rows on the left' },
-            { val: 'CROSS', label: 'Cross Join',    desc: 'ℹ️ Combine tables, repeating all rows in 2nd table for every row in 1st table' },
-            { val: 'UNION', label: 'Union',         desc: 'ℹ️ Combine tables, removing duplicate rows' },
-            { val: 'UNION ALL', label: 'Union All', desc: 'ℹ️ Combine tables, keeping duplicate rows' }
+            { val: 'INNER',    label: 'Inner Join',          desc: 'ℹ️ Matching rows in both sides' },
+            { val: 'LEFT',     label: 'Left Join',           desc: 'ℹ️ Everything on the left, only matching rows on the right' },
+            { val: 'RIGHT',    label: 'Right Join',          desc: 'ℹ️ Everything on the right, only matching rows on the left' },
+            { val: 'CROSS',    label: 'Cross Join',          desc: 'ℹ️ Combine tables, repeating all rows in 2nd table for every row in 1st table' },
+            { val: 'UNION',    label: 'Union',               desc: 'ℹ️ Combine tables, removing duplicate rows' },
+            { val: 'UNION ALL',label: 'Union All',           desc: 'ℹ️ Combine tables, keeping duplicate rows' },
+            { val: 'INCLUDES', label: 'Lookup Join (SP)',    desc: 'ℹ️ SharePoint lookup join — uses INCLUDES() to match lookup array against parent ID' }
           ];
 
-          const fromFieldOpts = (fromT?.fields || []).filter(f => !f.isAutoId)
-            .map(f => `<option value="${f.alias}" ${f.alias === j.fromKey ? 'selected' : ''}>${f.alias}</option>`).join('');
-          const toFieldOpts = (toT?.fields || []).filter(f => !f.isAutoId)
-            .map(f => `<option value="${f.alias}" ${f.alias === j.toKey ? 'selected' : ''}>${f.alias}</option>`).join('');
+          const augmentFields = (t, tableKey) => {
+            const fields = [...(t?.fields || [])];
+            const aliases = new Set(fields.map(f => f.alias));
+            // Add synthetic *Data fields from relationships if not yet in t.fields (data not loaded yet)
+            for (const r of (DataLaVistaState.relationships || [])) {
+              if (r.childTableKey === tableKey && r.childField && !aliases.has(r.childField)) {
+                fields.push({ alias: r.childField, internalName: r.childField, isAutoId: true });
+                aliases.add(r.childField);
+              }
+            }
+            return fields;
+          };
+          const fromFieldOpts = augmentFields(fromT, fromND?.tableName)
+            .map(f => `<option value="${f.alias}" ${f.alias === j.fromKey ? 'selected' : ''}>${f.alias}${f.isAutoId ? ' [auto]' : ''}</option>`).join('');
+          const toFieldOpts = augmentFields(toT, toND?.tableName)
+            .map(f => `<option value="${f.alias}" ${f.alias === j.toKey ? 'selected' : ''}>${f.alias}${f.isAutoId ? ' [auto]' : ''}</option>`).join('');
 
           setTitle('Join Options');
           body.innerHTML = `
@@ -740,7 +879,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
                 <div class="form-group">
                   <label>Alias</label>
                   <input type="text" class="form-input" style="height:26px" value="${fromAlias}"
-                    oninput="if(DataLaVistaState.advancedQB.nodes['${j.fromNode}']) { DataLaVistaState.advancedQB.nodes['${j.fromNode}'].alias=this.value; rebuildAdvancedSQL(); }"/>
+                    oninput="if(DataLaVistaState.advancedQB.nodes['${j.fromNode}']) { DataLaVistaState.advancedQB.nodes['${j.fromNode}'].alias=this.value; if(DataLaVistaState.advancedQB.nodeAliases?.['${j.fromNode}']!==undefined) DataLaVistaState.advancedQB.nodeAliases['${j.fromNode}']=this.value; rebuildAdvancedSQL(); }"/>
                 </div>
                 <div class="form-group">
                   <label>Key Field</label>
@@ -757,7 +896,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
                 <div class="form-group">
                   <label>Alias</label>
                   <input type="text" class="form-input" style="height:26px" value="${toAlias}"
-                    oninput="if(DataLaVistaState.advancedQB.nodes['${j.toNode}']) { DataLaVistaState.advancedQB.nodes['${j.toNode}'].alias=this.value; rebuildAdvancedSQL(); }"/>
+                    oninput="if(DataLaVistaState.advancedQB.nodes['${j.toNode}']) { DataLaVistaState.advancedQB.nodes['${j.toNode}'].alias=this.value; if(DataLaVistaState.advancedQB.nodeAliases?.['${j.toNode}']!==undefined) DataLaVistaState.advancedQB.nodeAliases['${j.toNode}']=this.value; rebuildAdvancedSQL(); }"/>
                 </div>
                 <div class="form-group">
                   <label>Key Field</label>
@@ -1241,21 +1380,23 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 
       // ── Enable / disable the Design › Preview › Generate toolbar buttons ──────
       function setDesignTabsEnabled(enabled, reason) {
+        // Only enable if caller says OK AND a query has already run successfully
+        const actualEnabled = enabled && !!DataLaVistaState.queryResultsReady;
         const ids = ['toolbar-button-design', 'toolbar-button-preview', 'toolbar-button-generate'];
         ids.forEach(id => {
           const btn = document.getElementById(id);
           if (!btn) return;
-          btn.disabled = !enabled;
-          btn.title = enabled ? '' : (reason || 'Disabled');
-          btn.style.opacity = enabled ? '' : '.4';
-          btn.style.pointerEvents = enabled ? '' : 'none';
+          btn.disabled = !actualEnabled;
+          btn.title = actualEnabled ? '' : (reason || (!DataLaVistaState.queryResultsReady ? 'Run a query first' : 'Disabled'));
+          btn.style.opacity = actualEnabled ? '' : '.4';
+          btn.style.pointerEvents = actualEnabled ? '' : 'none';
         });
       }
 
       function rebuildAdvancedSQL() {
         if (DataLaVistaState.sqlLocked) return;
         const nodes = Object.entries(DataLaVistaState.advancedQB.nodes);
-        if (!nodes.length) { if (window._cmEditor) window._cmEditor.setValue(''); return; }
+        if (!nodes.length) { if (window._cmEditor) window._cmEditor.setValue(''); updateRunQueryButton(); return; }
 
         const joins = DataLaVistaState.advancedQB.joins;
         const multiNode = nodes.length > 1;
@@ -1267,32 +1408,40 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           setDesignTabsEnabled(true);
         }
 
-        // Helper: field alias → internalName for SQL column refs
-        const getInternal = (tableName, fieldAlias) => {
-          const t = DataLaVistaState.tables[tableName];
-          if (!t) return fieldAlias;
-          const f = t.fields.find(f => f.alias === fieldAlias);
-          return f ? (f.internalName || fieldAlias) : fieldAlias;
+        // Helper: resolve raw table key → DS-prefixed view name (used in FROM clause)
+        const getView  = (tableName) => CyberdynePipeline.rawTableToView[tableName] || tableName;
+        // Helper: resolve raw table key → short alias (used in column refs and AS alias)
+        const getAlias = (tableName) => DataLaVistaState.tables[tableName]?.alias || getView(tableName);
+        // Helper: resolve per-node SQL alias (nodeAliases takes precedence over table-level alias)
+        const getNodeAlias = (nodeId, nd) =>
+          DataLaVistaState.advancedQB.nodeAliases?.[nodeId] || getAlias(nd.tableName);
+        // Helper: build FROM fragment — "AS alias" only when view name differs from alias
+        const fromFrag = (nodeId, nd) => {
+          const v = getView(nd.tableName), a = getNodeAlias(nodeId, nd);
+          return a !== v ? `[${v}] AS [${a}]` : `[${v}]`;
         };
 
         const [mainId, mainNd] = nodes[0];
-        const mainKey = mainNd.tableName;
+        const mainView = getView(mainNd.tableName);
 
         // Collect SELECT fields, detect duplicate output aliases, apply per-field aggregates
         const allFields = [];
         for (const [id, nd] of nodes) {
           const fieldAggs = nd.fieldAggs || {};
+          const vname = getNodeAlias(id, nd); // use per-node alias for column refs
           for (const fa of nd.selectedFields) {
-            allFields.push({ tkey: nd.tableName, fa, iname: getInternal(nd.tableName, fa), agg: fieldAggs[fa] || '' });
+            allFields.push({ vname, fa, agg: fieldAggs[fa] || '' });
           }
         }
         const seenAliases = {};
-        const selects = allFields.length ? allFields.map(({ tkey, fa, iname, agg }) => {
+        const selects = allFields.length ? allFields.map(({ vname, fa, agg }) => {
           const count = seenAliases[fa] = (seenAliases[fa] || 0) + 1;
           const outAlias = count === 1 ? fa : fa + (count - 1);
-          if (agg === 'COUNT_DISTINCT') return `  COUNT(DISTINCT [${tkey}].[${iname}]) AS [${outAlias}]`;
-          if (agg)                      return `  ${agg}([${tkey}].[${iname}]) AS [${outAlias}]`;
-          return `  [${tkey}].[${iname}] AS [${outAlias}]`;
+          const col = `[${vname}].[${fa}]`;
+          if (agg === 'COUNT_DISTINCT') return `  COUNT(DISTINCT ${col}) AS [${outAlias}]`;
+          if (agg)                      return `  ${agg}(${col}) AS [${outAlias}]`;
+          // For single-table or unambiguous fields, omit AS (view column is already named fa)
+          return count === 1 ? `  ${col}` : `  ${col} AS [${outAlias}]`;
         }) : ['  *'];
 
         // Auto GROUP BY: if any field has an agg, non-agg fields need to be in GROUP BY
@@ -1311,20 +1460,20 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 
         if (hasUnion) {
           const parts = [];
-          for (const [id, nd] of nodes) {
-            const nodeKey = nd.tableName;
+          for (const [nid, nd] of nodes) {
+            const nodeAlias = getNodeAlias(nid, nd); // per-node alias for column refs
             const fAggs = nd.fieldAggs || {};
             const nodeSelects = nd.selectedFields.length
               ? nd.selectedFields.map(fa => {
-                  const iname = getInternal(nodeKey, fa);
                   const agg = fAggs[fa] || '';
-                  if (agg === 'COUNT_DISTINCT') return `  COUNT(DISTINCT [${nodeKey}].[${iname}]) AS [${fa}]`;
-                  if (agg)                      return `  ${agg}([${nodeKey}].[${iname}]) AS [${fa}]`;
-                  return `  [${nodeKey}].[${iname}] AS [${fa}]`;
+                  const col = `[${nodeAlias}].[${fa}]`;
+                  if (agg === 'COUNT_DISTINCT') return `  COUNT(DISTINCT ${col}) AS [${fa}]`;
+                  if (agg)                      return `  ${agg}(${col}) AS [${fa}]`;
+                  return `  ${col}`;
                 }).join(',\n')
               : '  *';
-            let part = `SELECT\n${nodeSelects}\nFROM [${nodeKey}]`;
-            const where = buildNodeWhere(nd, nodeKey);
+            let part = `SELECT\n${nodeSelects}\nFROM ${fromFrag(nid, nd)}`;
+            const where = buildNodeWhere(nd, nd.tableName, nid);
             if (where) part += `\nWHERE ${where}`;
             parts.push({ sql: part });
           }
@@ -1338,63 +1487,69 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           DataLaVistaState.sql = sql; if (window._cmEditor) window._cmEditor.setValue(sql); return;
         }
 
-        let sql = `SELECT\n${selects.join(',\n')}\nFROM [${mainKey}]`;
+        let sql = `SELECT\n${selects.join(',\n')}\nFROM ${fromFrag(mainId, mainNd)}`;
 
+        const joinedNodes = new Set([mainId]);
         for (const j of joins) {
           const fromNd = DataLaVistaState.advancedQB.nodes[j.fromNode];
           const toNd   = DataLaVistaState.advancedQB.nodes[j.toNode];
           if (!fromNd || !toNd) continue;
-          const fromKey   = fromNd.tableName;
-          const toKey     = toNd.tableName;
-          const fromIname = getInternal(fromKey, j.fromKey);
-          const toIname   = getInternal(toKey,   j.toKey);
+
+          // Always JOIN the node not yet in the query; keep ON condition aliases tied to fromNd/toNd
+          const newIsTo   = !joinedNodes.has(j.toNode);
+          const newNd     = newIsTo ? toNd   : fromNd;
+          const newNodeId = newIsTo ? j.toNode : j.fromNode;
+          joinedNodes.add(newNodeId);
+
+          const fromAlias = getNodeAlias(j.fromNode, fromNd);
+          const toAlias   = getNodeAlias(j.toNode, toNd);
           if (j.type === 'CROSS') {
-            sql += `\nCROSS JOIN [${toKey}]`;
+            sql += `\nCROSS JOIN ${fromFrag(newNodeId, newNd)}`;
+          } else if (j.type === 'INCLUDES') {
+            sql += `\nLEFT JOIN ${fromFrag(newNodeId, newNd)} ON INCLUDES([${fromAlias}].[${j.fromKey}], [${toAlias}].[${j.toKey}])`;
           } else {
-            sql += `\n${j.type} JOIN [${toKey}] ON [${fromKey}].[${fromIname}] = [${toKey}].[${toIname}]`;
+            sql += `\n${j.type} JOIN ${fromFrag(newNodeId, newNd)} ON [${fromAlias}].[${j.fromKey}] = [${toAlias}].[${j.toKey}]`;
           }
         }
 
         const allWhere = [];
-        for (const [id, nd] of nodes) {
+        for (const [nid, nd] of nodes) {
           if (nd.conditions && nd.conditions.length) {
-            const w = buildNodeWhere(nd, nd.tableName);
+            const w = buildNodeWhere(nd, nd.tableName, nid);
             if (w) allWhere.push(`(${w})`);
           }
         }
         if (allWhere.length) sql += `\nWHERE ${allWhere.join(' AND ')}`;
 
         const allGB = [];
-        for (const [id, nd] of nodes) {
+        for (const [nid, nd] of nodes) {
           if (nd.groupBy && nd.groupBy.length)
-            nd.groupBy.forEach(g => allGB.push(`[${nd.tableName}].[${getInternal(nd.tableName, g)}]`));
+            nd.groupBy.forEach(g => allGB.push(`[${getNodeAlias(nid, nd)}].[${g}]`));
         }
         if (allGB.length) sql += `\nGROUP BY ${allGB.join(', ')}`;
 
         const allOrder = [];
-        for (const [id, nd] of nodes) {
+        for (const [nid, nd] of nodes) {
           if (nd.sorts && nd.sorts.length)
-            nd.sorts.forEach(s => allOrder.push(`[${nd.tableName}].[${getInternal(nd.tableName, s.field)}] ${s.dir || 'ASC'}`));
+            nd.sorts.forEach(s => allOrder.push(`[${getNodeAlias(nid, nd)}].[${s.field}] ${s.dir || 'ASC'}`));
         }
         if (allOrder.length) sql += `\nORDER BY ${allOrder.join(', ')}`;
 
         sql += `\nLIMIT ${DataLaVistaState.advancedQB.rowLimit || 500}`;
-        DataLaVistaState.sql = sql; if (window._cmEditor) window._cmEditor.setValue(sql); hideUseInDesign();
+        DataLaVistaState.sql = sql; if (window._cmEditor) window._cmEditor.setValue(sql); hideUseInDesign(); updateRunQueryButton();
       }
 
-      // buildNodeWhere: tableKey is passed as the table prefix; resolves field alias → internalName
-      function buildNodeWhere(nd, tableKey) {
+      // buildNodeWhere: uses per-node SQL alias (or table alias fallback) for column refs
+      function buildNodeWhere(nd, tableKey, nodeId) {
         if (!nd.conditions || !nd.conditions.length) return '';
-        const t = tableKey ? DataLaVistaState.tables[tableKey] : null;
-        const getInternal = (alias) => {
-          if (!t) return alias;
-          const f = t.fields.find(f => f.alias === alias);
-          return f ? (f.internalName || alias) : alias;
-        };
-        const prefix = tableKey ? `[${tableKey}].` : '';
+        const vname = (nodeId && DataLaVistaState.advancedQB.nodeAliases?.[nodeId])
+          || DataLaVistaState.tables[tableKey]?.alias
+          || CyberdynePipeline.rawTableToView[tableKey]
+          || tableKey;
+        const prefix = vname ? `[${vname}].` : '';
         return nd.conditions.map((c, i) => {
           const conj = i === 0 ? '' : (c.conj + ' ');
-          const col = `${prefix}[${getInternal(c.field)}]`;
+          const col = `${prefix}[${c.field}]`;
           if (c.op === 'NULL')    return conj + `${col} IS NULL`;
           if (c.op === 'NOTNULL') return conj + `${col} IS NOT NULL`;
           if (DataLaVistaCore.DATE_MACRO_VALS.has(c.op)) return conj + dateMacroToSQL(c.op, c.value, col);
@@ -1411,7 +1566,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           hideUseInDesign();
         } else {
           DataLaVistaState.basicQB = { tableName: null, selectedFields: [], filters: [] };
-          DataLaVistaState.advancedQB = { nodes: {}, joins: [], activeJoinIdx: -1 };
+          DataLaVistaState.advancedQB = { nodes: {}, joins: [], activeJoinIdx: -1, nodeAliases: {}, rowLimit: 500 };
           if (window._cmEditor) window._cmEditor.setValue('');
           DataLaVistaState.sql = '';
           renderBasicQB();

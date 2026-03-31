@@ -1,9 +1,9 @@
 ﻿/* ============================================================
 This file is part of DataLaVista
-12-preview.js: Preview tab, CSV download, and report generation.
+70-preview.js: Preview tab, CSV download, and report generation.
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 Created: 2026-03-24
-Last Modified: 2026-03-24
+Last Modified: 2026-03-31
 Summary: Preview tab, CSV download, and report generation.
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
@@ -25,7 +25,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       // ============================================================
       async function refreshDashboardPreview() {
         if (!DataLaVistaState.sql.trim()) { toast('Please build a query first', 'error'); return; }
-        if(DataLaVistaState.reportMode != 'view') setStatus('⏳ Loading preview data...');
+        if(DataLaVistaState.reportMode != 'view') setStatus('Loading preview data...', 'loading');
 
         try {
           const referencedTables = findReferencedTables(DataLaVistaState.sql);
@@ -62,13 +62,13 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 
           renderPreviewTab();
           
-          if(DataLaVistaState.reportMode !== 'view') setStatus(`✅ Preview: ${results.length} rows`);
+          if(DataLaVistaState.reportMode !== 'view') setStatus(`Preview: ${results.length} rows`, 'success');
         } catch (err) {
           if(DataLaVistaState.reportMode !== 'view') {
           toast('Preview error: ' + err.message, 'error');
-          setStatus('❌ Preview error');
+          setStatus('Preview error', 'error');
           } else {
-           setStatus('❌ Report error');
+           setStatus('Report error', 'error');
           }
         }
       }

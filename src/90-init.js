@@ -1,9 +1,9 @@
 ﻿/* ============================================================
 This file is part of DataLaVista
-14-init.js: App initialization, lazy init guard, and report URL loading.
+90-init.js: App initialization, lazy init guard, and report URL loading.
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 Created: 2026-03-24
-Last Modified: 2026-03-24
+Last Modified: 2026-03-31
 Summary: App initialization, lazy init guard, and report URL loading.
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
@@ -59,7 +59,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
     // Show full-screen loading overlay immediately
     showLoadingPopup('⏳ Loading report. Please wait...');
     hideConnectPopup();
-    setStatus('⏳ Loading report…');
+    setStatus('Loading report…', 'loading');
 
     try {
       // ── Step 1: Fetch the config JSON ──────────────────────────────
@@ -78,14 +78,14 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 
       // ── Step 4: Switch to preview and maximise ─────────────────────
       document.body.classList.add('dlv-report-mode');
-      setStatus('✅ Report ready');
+      setStatus('Report ready', 'success');
       toast('Report loaded', 'success');
 
     } catch (err) {
       showLoadingPopup('⚠ Unable to load report data.');
       toast('Unable to load report. :(', 'error');
       console.log('❌ DataLaVista was unable to load the report: \n ' + err.message);
-      setStatus('❌ DataLaVista was unable to load the report. See console for details');
+      setStatus('DataLaVista was unable to load the report. See console for details', 'error');
     } finally {
       hideLoadingPopup();
     }
@@ -241,7 +241,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         } else {
           document.getElementById('preview-canvas').innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-secondary);font-size:14px">The Report URL is missing or invalid. Please check your report link.</div>';
           toast('Invalid report URL. Please check your report link.', 'error');
-          setStatus('❌ The Report URL is missing or invalid. Please check your report link.');
+          setStatus('The Report URL is missing or invalid. Please check your report link.', 'error');
           return;
         }
         
@@ -281,43 +281,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           }
         });
 
-        // Handle JSON upload (file input change event) for Connect popup
-        document.getElementById('json-file')?.addEventListener('change', async function () {
-          const f = this.files[0];
-          if (!f) return;
-          let text;
-          try {
-            text = await f.text();
-          } catch (e) {
-            toast('Error reading file: ' + e.message, 'error');
-            return;
-          }
-          const dsEl = document.getElementById('json-ds-name');
-          const rawDsName = (dsEl?.value || '').trim();
-          const dsName = generateDataSourceName('json', rawDsName);
-          loadJSONData(dsName || 'JSON', f.name, '', true, text);
-          updateConnectButton();
-          hideConnectPopup();
-        });
-
-        // Handle CSV upload (file input change event) for Connect popup
-        document.getElementById('csv-file')?.addEventListener('change', async function () {
-          const f = this.files[0];
-          if (!f) return;
-          let text;
-          try {
-            text = await f.text();
-          } catch (e) {
-            toast('Error reading file: ' + e.message, 'error');
-            return;
-          }
-          const dsEl = document.getElementById('csv-ds-name');
-          const rawDsName = (dsEl?.value || '').trim();
-          const dsName = generateDataSourceName('csv', rawDsName);
-          loadCSVData(dsName||'CSV', null, f.name, '', true, text); // Create new DS for this CSV file, with isUploadedFile=true
-          updateConnectButton();
-          hideConnectPopup();
-        });
 
         // Wire options panel left-edge resizer
         initAdvOptsResizer();
@@ -348,4 +311,18 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
     const contentDiv = document.getElementById('content');
     if (contentDiv) contentDiv.style.display = 'flex';
     console.log("*** DataLaVista visual component loading complete. ***");
+
+      // Load Google Analytics after everything else is loaded and only if we're on the production domain.
+    try{
+      if (window.location.hostname === 'code.depressioncenter.org') {    
+        var gaScript = document.createElement('script');
+        gaScript.async = true;
+        gaScript.src = 'https://www.googletagmanager.com/gtag/js?id=G-3Q455XWS5F';
+        document.head.appendChild(gaScript);
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-3Q455XWS5F');
+      }
+    } catch (e) { }
   }

@@ -1,9 +1,9 @@
 ﻿/* ============================================================
 This file is part of DataLaVista
-08-qb-basic.js: Basic query builder - field selection, filters, sorts, and SQL generation.
+50-qb-basic.js: Basic query builder - field selection, filters, sorts, and SQL generation.
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 Created: 2026-03-24
-Last Modified: 2026-03-24
+Last Modified: 2026-03-31
 Summary: Basic query builder - field selection, filters, sorts, and SQL generation.
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
@@ -32,9 +32,11 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         if (mode === 'advanced') {
           _migrateBasicToAdvancedQB();
           renderAdvancedQB(); renderAdvOptionsPanel();
+          rebuildAdvancedSQL();
         } else {
           // Leaving advanced mode — re-enable design tabs (join restriction only applies to AQB)
           setDesignTabsEnabled(true);
+          rebuildBasicSQL();
         }
       }
 
@@ -60,6 +62,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           groupBy:        [...(bqb.groupBy || [])],
           fieldAggs:      Object.assign({}, bqb.fieldAggs || {})
         };
+        advNodeCounter = 1;
         DataLaVistaState.advancedQB.rowLimit = bqb.rowLimit || 500;
       }
 
@@ -106,6 +109,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           } else {
             // Insert table name at cursor
             if (cm) cm.replaceSelection(`[${data.table}]`);
+            ensureTableData(data.table);
           }
         } else if (data.type === 'field') {
           const t = DataLaVistaState.tables[data.table];
@@ -123,6 +127,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           } else {
             // Insert field at cursor
             if (cm) cm.replaceSelection(`[${data.field}]`);
+            ensureTableData(data.table);
           }
         } else {
           // Unknown custom data type — just ignore and don't insert anything
@@ -298,19 +303,19 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       }
 
       // ── QB: build SQL from state ──────────────────────────────────────────────
-      // Rule: FROM always uses the immutable tableKey (registered in AlaSQL).
-      //       Column refs use [tableKey].[internalName].
-      //       AS clause adds the user-facing field alias as the result column name.
+      // Rule: FROM uses the view name (user-facing alias) that wraps the raw table.
+      //       Column refs use [viewName].[fieldAlias] — views map aliases to internal names.
+      //       This lets users rename fields/tables without breaking existing queries.
       function buildBasicSQL(formatted = false) {
         const tkey = DataLaVistaState.basicQB.tableName;
         const t = tkey ? DataLaVistaState.tables[tkey] : null;
         if (!t) return '';
 
-        // Helper: resolve a field alias → internalName for SQL column references
-        const getInternal = (alias) => {
-          const f = t.fields.find(f => f.alias === alias);
-          return f ? (f.internalName || alias) : alias;
-        };
+        // Use the view name (DS-prefixed) for the FROM clause; use the short table alias for column refs.
+        // E.g.: FROM [Depres_Consultations] AS [Consultations]  →  [Consultations].[field]
+        const vname = CyberdynePipeline.rawTableToView[tkey] || tkey;
+        const alias = t.alias || vname;
+        const fromClause = alias !== vname ? `[${vname}] AS [${alias}]` : `[${vname}]`;
 
         const selectedAliases = DataLaVistaState.basicQB.selectedFields;
         const aggs   = DataLaVistaState.basicQB.fieldAggs || {};
@@ -319,27 +324,26 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         const limit  = DataLaVistaState.basicQB.rowLimit || 500;
         const anyAgg = selectedAliases.some(a => aggs[a]);
 
-        // SELECT [tkey].[internalName] AS [fieldAlias]
+        // SELECT [alias].[fieldAlias]  — view columns are already named by alias
         const selCols = selectedAliases.length ? selectedAliases.map(fa => {
-          const agg   = aggs[fa];
-          const iname = getInternal(fa);
-          const col   = `[${tkey}].[${iname}]`;
-          if (!agg) return `${col} AS [${fa}]`;
+          const agg = aggs[fa];
+          const col = `[${alias}].[${fa}]`;
+          if (!agg) return col;
           if (agg === 'COUNT_DISTINCT') return `COUNT(DISTINCT ${col}) AS [CountDistinct_${fa}]`;
           return `${agg}(${col}) AS [${agg}_${fa}]`;
-        }) : [`[${tkey}].*`];
+        }) : [`[${alias}].*`];
 
         const autoGroups   = anyAgg
-          ? selectedAliases.filter(a => !aggs[a]).map(a => `[${tkey}].[${getInternal(a)}]`)
+          ? selectedAliases.filter(a => !aggs[a]).map(a => `[${alias}].[${a}]`)
           : [];
         const manualGroups = !anyAgg
-          ? (DataLaVistaState.basicQB.groupBy || []).filter(g => g).map(g => `[${tkey}].[${getInternal(g)}]`)
+          ? (DataLaVistaState.basicQB.groupBy || []).filter(g => g).map(g => `[${alias}].[${g}]`)
           : [];
         const groupParts = anyAgg ? autoGroups : manualGroups;
 
         const whereParts = conds.map((c, i) => {
           const conj = i === 0 ? '' : (c.conj || 'AND') + ' ';
-          const col  = `[${tkey}].[${getInternal(c.field)}]`;
+          const col  = `[${alias}].[${c.field}]`;
           if (c.op === 'NULL')    return conj + `${col} IS NULL`;
           if (c.op === 'NOTNULL') return conj + `${col} IS NOT NULL`;
           if (DataLaVistaCore.DATE_MACRO_VALS.has(c.op)) {
@@ -353,17 +357,17 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           return conj + `${col} ${c.op} ${val}`;
         });
 
-        const orderParts = sorts.map(s => `[${tkey}].[${getInternal(s.field)}] ${s.dir || 'ASC'}`);
+        const orderParts = sorts.map(s => `[${alias}].[${s.field}] ${s.dir || 'ASC'}`);
 
         if (!formatted) {
-          let sql = `SELECT ${selCols.join(', ')} FROM [${tkey}]`;
+          let sql = `SELECT ${selCols.join(', ')} FROM ${fromClause}`;
           if (whereParts.length) sql += ` WHERE ${whereParts.join(' ')}`;
           if (groupParts.length) sql += ` GROUP BY ${groupParts.join(', ')}`;
           if (orderParts.length) sql += ` ORDER BY ${orderParts.join(', ')}`;
           sql += ` LIMIT ${limit}`;
           return sql;
         } else {
-          let sql = `SELECT\n  ${selCols.join(',\n  ')}\nFROM [${tkey}]`;
+          let sql = `SELECT\n  ${selCols.join(',\n  ')}\nFROM ${fromClause}`;
           if (whereParts.length) sql += `\nWHERE\n  ${whereParts.join('\n  ')}`;
           if (groupParts.length) sql += `\nGROUP BY\n  ${groupParts.join(',\n  ')}`;
           if (orderParts.length) sql += `\nORDER BY\n  ${orderParts.join(',\n  ')}`;
@@ -659,11 +663,13 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       // ── Rebuild SQL and push to editor ────────────────────────────────────────────
       function rebuildBasicSQL() {
         if (DataLaVistaState.sqlLocked) return;
+        if (DataLaVistaState.queryMode !== 'basic') return;
         const compact = buildBasicSQL(false);
         const formatted = buildBasicSQL(true);
         DataLaVistaState.sql = compact;
         if (window._cmEditor && formatted) window._cmEditor.setValue(formatted);
         hideUseInDesign();
+        updateRunQueryButton();
       }
 
       // ── Group By ─────────────────────────────────────────────────────────────────

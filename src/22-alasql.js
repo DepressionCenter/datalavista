@@ -1,9 +1,9 @@
 ﻿/* ============================================================
 This file is part of DataLaVista
-02-alasql.js: AlaSQL in-browser SQL engine setup and custom functions.
+22-alasql.js: AlaSQL in-browser SQL engine setup and custom functions.
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 Created: 2026-03-24
-Last Modified: 2026-03-24
+Last Modified: 2026-03-31
 Summary: AlaSQL in-browser SQL engine setup and custom functions.
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
@@ -157,8 +157,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
     }
 
     // Map a raw data row into our internal format.
-    // OUTPUT KEYS ARE ALWAYS internalName (so SQL "SELECT [table].[InternalName]" works).
-    // The SQL query builder adds "AS [fieldAlias]" to give result columns friendly names.
     function mapDataRow(tableName, row, fieldDefs) {
       const mapped = {};
       const processingRow = { ...row };
@@ -167,7 +165,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       for (const f of fieldDefs) {
         const key = f.InternalName || f.internalName;
         if (!key) continue;
-        // Output key is ALWAYS the internalName — SQL references internalName
         const outKey = key === 'Attachments' ? 'HasAttachments' : key;
 
         let value = processingRow[key];

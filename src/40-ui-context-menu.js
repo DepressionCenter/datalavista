@@ -1,9 +1,9 @@
 ﻿/* ============================================================
 This file is part of DataLaVista
-07-ui-context-menu.js: Right-click context menus and data source management.
+40-ui-context-menu.js: Right-click context menus and data source management.
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 Created: 2026-03-24
-Last Modified: 2026-03-24
+Last Modified: 2026-03-31
 Summary: Right-click context menus and data source management.
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
@@ -31,11 +31,18 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         const copyUrlItem = document.getElementById('ctx-copy-url');
         const sepUrl = document.getElementById('ctx-sep-url');
         const deleteItem = document.getElementById('ctx-delete');
+        const refreshItem = document.getElementById('ctx-refresh-source');
+        const sepRefresh = document.getElementById('ctx-sep-refresh');
 
         // "Copy URL" only for DS/Table that are NOT file uploads
         const showCopyUrl = (target.level === 'ds' || target.level === 'table') && !target.isFileUpload;
         copyUrlItem.style.display = showCopyUrl ? '' : 'none';
         sepUrl.style.display = showCopyUrl ? '' : 'none';
+
+        // "Refresh Source" for all DS-level sources (uploaded files use file picker; remote sources auto-fetch)
+        const showRefresh = target.level === 'ds';
+        if (refreshItem) refreshItem.style.display = showRefresh ? '' : 'none';
+        if (sepRefresh) sepRefresh.style.display = showRefresh ? '' : 'none';
 
         // "Delete" not available for fields
         deleteItem.style.display = target.level === 'field' ? 'none' : '';
@@ -63,11 +70,18 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         let url = '';
         if (_ctxTarget.level === 'ds') {
           const ds = DataLaVistaState.dataSources[_ctxTarget.dsName];
-          url = ds ? (ds.url || '') : '';
+          url = ds ? (ds.siteUrl || ds.url || '') : '';
         } else if (_ctxTarget.level === 'table') {
           const t = DataLaVistaState.tables[_ctxTarget.tableKey];
           const ds = t ? DataLaVistaState.dataSources[t.dataSource] : null;
-          url = ds ? (ds.url || '') : '';
+          if(ds && ds.type === 'sharepoint') {
+            // For SharePoint sources, construct the URL to the list view (not the API endpoint)
+            const siteUrl = ds.siteUrl || '';
+            const listUrlPart = t.url || unescapeSharePointInternalName(t.internalName) || unescapeSharePointInternalName(_ctxTarget.tableKey);
+            url = siteUrl ? `${siteUrl.replace(/\/$/, '')}/${t.isDocLib?'':'Lists/'}${listUrlPart}` : '';
+          } else {
+            url = ds ? (t.url || ds.url || '') : '';
+          }
         }
         if (url) {
           navigator.clipboard.writeText(url).then(() => toast('URL copied to clipboard', 'success'), () => {
@@ -77,6 +91,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           toast('No URL available for this source', 'warning');
         }
       }
+
+      
 
       function dlvCtxRename() {
         document.getElementById('dlv-ctx-menu').classList.remove('visible');
@@ -182,6 +198,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         const updated = cur.replace(re, (m, lb, rb) => lb ? '[' + newQName + ']' : newQName);
         if (updated !== cur) window._cmEditor.setValue(updated);
         DataLaVistaState.sql = window._cmEditor.getValue();
+        // TODO: Is this needed? Should it be called her or elsewhere?
+        updateCMHints();
       }
 
       function renameDatasource(dsName, newAlias) {
@@ -192,13 +210,33 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         const oldDsAlias = ds.alias;
         if (newAlias === oldDsAlias) { renderFieldsPanel(); return; }
 
-        // For each table: update SQL editor (alias appears in FROM [key] [oldAlias_TableAlias])
+        // For each table: rename views whose name carries the old DS alias as a prefix,
+        // and update SQL for non-view tables
         (ds.tables || []).forEach(tableKey => {
           const t = DataLaVistaState.tables[tableKey];
           if (!t) return;
-          const oldQName = oldDsAlias + '_' + t.alias;
-          const newQName = newAlias + '_' + t.alias;
-          updateSQLEditorName(oldQName, newQName);
+          const viewName = CyberdynePipeline.rawTableToView[tableKey];
+          if (viewName) {
+            // If the view name starts with the old DS alias, rename it to use the new alias
+            if (viewName.startsWith(oldDsAlias)) {
+              const suffix = viewName.slice(oldDsAlias.length);
+              const newViewName = newAlias + suffix;
+              try {
+                updateSQLEditorName(viewName, newViewName);
+                CyberdynePipeline.renameView(viewName, newViewName);
+                t.viewName = newViewName;
+                // t.alias is the table's own alias — it doesn't include the DS prefix, so leave it unchanged
+              } catch (err) {
+                console.warn('[renameDatasource] Could not rename view', viewName, '->', newViewName, err.message);
+              }
+            }
+            // (Views without DS prefix are independent — no rename needed)
+          } else {
+            // Non-view table: update SQL using DSAlias_TableAlias pattern
+            const oldQName = oldDsAlias + '_' + t.alias;
+            const newQName = newAlias + '_' + t.alias;
+            updateSQLEditorName(oldQName, newQName);
+          }
         });
 
         // Commit alias change and propagate to child tables
@@ -208,7 +246,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           if (t) t.dsAlias = newAlias;
         });
 
-        // Rebuild QB SQL so FROM clauses use the new alias
+        // Rebuild QB SQL (FROM clauses use view names; regenerating picks up any renamed views)
         if (DataLaVistaState.basicQB.tableName) {
           const t = DataLaVistaState.tables[DataLaVistaState.basicQB.tableName];
           if (t && t.dataSource === dsName) rebuildBasicSQL();
@@ -222,6 +260,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         }
 
         renderFieldsPanel();
+        renderBasicQB();
+        renderAdvancedQB();
         setupCodeMirror();
         toast(`Data source renamed to "${newAlias}"`, 'success');
       }
@@ -229,12 +269,34 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       function renameTable(tableKey, newAlias) {
         const t = DataLaVistaState.tables[tableKey];
         if (!t) return;
-        const oldQName = getTableQueryName(tableKey);
-        t.alias = newAlias;
-        const newQName = getTableQueryName(tableKey);
 
-        // Update SQL editor: FROM alias and SELECT alias references
-        updateSQLEditorName(oldQName, newQName);
+        const existingView = CyberdynePipeline.rawTableToView[tableKey];
+        if (existingView) {
+          // View-backed table: rename the view; SQL uses view names.
+          // Preserve any DS-alias prefix the view name already has (e.g. "SP_Citations" → "SP_Citations2").
+          const ds = DataLaVistaState.dataSources[t.dataSource];
+          const dsAlias = (ds && ds.alias) || t.dsAlias || '';
+          const dsPrefix = dsAlias ? (dsAlias + '_') : '';
+          const newViewName = (dsPrefix && existingView.startsWith(dsPrefix))
+            ? dsPrefix + newAlias
+            : newAlias;
+          try {
+            updateSQLEditorName(existingView, newViewName);
+            CyberdynePipeline.renameView(existingView, newViewName);
+            t.alias = newAlias;
+            t.viewName = newViewName;
+          } catch (err) {
+            toast('Rename failed: ' + err.message, 'error');
+            renderFieldsPanel();
+            return;
+          }
+        } else {
+          // No view: use legacy DSAlias_TableAlias format
+          const oldQName = getTableQueryName(tableKey);
+          t.alias = newAlias;
+          const newQName = getTableQueryName(tableKey);
+          updateSQLEditorName(oldQName, newQName);
+        }
 
         // Update advanced QB node alias if present
         for (const nd of Object.values(DataLaVistaState.advancedQB.nodes || {})) {
@@ -246,6 +308,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         if (Object.keys(DataLaVistaState.advancedQB.nodes || {}).length) rebuildAdvancedSQL();
 
         renderFieldsPanel();
+        renderBasicQB();
+        renderAdvancedQB();
         setupCodeMirror();
         toast(`Table renamed to "${newAlias}"`, 'success');
       }
@@ -255,6 +319,17 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         if (!t) return;
         const f = t.fields.find(x => x.alias === oldAlias);
         if (!f) return;
+
+        // For view-backed tables, update the view's column mapping so AlaSQL view stays in sync
+        const viewName = CyberdynePipeline.rawTableToView[tableKey];
+        if (viewName) {
+          try {
+            CyberdynePipeline.updateColumnAlias(viewName, f.internalName, newAlias);
+          } catch (err) {
+            console.warn('[renameField] updateColumnAlias:', err.message);
+          }
+        }
+
         f.alias = newAlias;
         // NOTE: data rows are keyed by internalName, not alias — no row migration needed.
         // The AS alias in generated SQL is what produces the output column name.
@@ -284,9 +359,53 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         });
 
         renderFieldsPanel();
+        renderBasicQB();
+        renderAdvancedQB();
         setupCodeMirror();
         toast(`Field renamed to "${newAlias}"`, 'success');
       }
+
+      function dlvCtxRefreshSource() {
+        document.getElementById('dlv-ctx-menu').classList.remove('visible');
+        if (!_ctxTarget || _ctxTarget.level !== 'ds') return;
+        refreshDataSource(_ctxTarget.dsName);
+      }
+
+      async function refreshDataSource(dsName) {
+  const ds = DataLaVistaState.dataSources[dsName];
+  if (!ds) return;
+
+  // Uploaded files: trigger file picker for re-upload (replaces existing DS, preserving aliases)
+  if (ds.isFileUpload) {
+    triggerFileReupload(dsName);
+    return;
+  }
+
+  showLoadingPopup('Refreshing data source...');
+  try {
+    if (ds.type === 'sharepoint') {
+      await loadSharePointListsSource(ds.siteUrl || ds.url, dsName, ds.auth || 'current', ds.token || '', ds.description || '');
+    } else if (ds.type === 'json') {
+      await loadJSONSource(ds.url, dsName);
+    } else if (ds.type === 'csv') {
+      await loadCSVSource(ds.url, dsName);
+    } else if (['xlsx', 'xml', 'sqlite', 'db'].includes(ds.type)) {
+      // Re-load from URL and replace DS tables (preserving aliases)
+      const result = await CyberdynePipeline.loadRemoteFile(ds.url, dsName, ds.type);
+      const tables = result.tables || [result];
+      CyberdynePipeline.refreshDataSourceTables(dsName, { ...ds }, tables);
+      renderFieldsPanel();
+      setupCodeMirror();
+      toast(`Refreshed "${dsName}"`, 'success');
+    } else {
+      toast('This source type does not support automatic refresh.', 'warning');
+    }
+  } catch (err) {
+    toast('Refresh failed: ' + err.message, 'error');
+  } finally {
+    hideLoadingPopup();
+  }
+}
 
       function deleteDatasource(dsName) {
         const ds = DataLaVistaState.dataSources[dsName];
@@ -309,7 +428,9 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         if (ds && ds.tables) {
           ds.tables = ds.tables.filter(k => k !== tableKey);
         }
-        // Drop from AlaSQL by table key
+        // Drop from AlaSQL by table key (and clean up any associated view)
+        const tableViewName = CyberdynePipeline.rawTableToView[tableKey];
+        if (tableViewName) CyberdynePipeline.deleteView(tableViewName);
         dropTableFromAlaSQL(tableKey);
         // Remove from basicQB if active
         if (DataLaVistaState.basicQB.tableName === tableKey) {
@@ -376,6 +497,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           cm.on('change', (inst) => {
             DataLaVistaState.sql = inst.getValue();
             hideUseInDesign();
+            updateRunQueryButton();
           });
           window._cmEditor = cm;
           updateCMHints();
@@ -394,7 +516,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         const cursor = cm.getCursor();
         const lineUpToCursor = cm.getLine(cursor.line).slice(0, cursor.ch);
 
-        // ── Dot-context: detect "SP_PeopleList." or "SP_Contacts." ──────────────
+        // ── Dot-context: detect "People." or "Departments." ──────────────────
         const dotMatch = lineUpToCursor.match(/\[?([\w]+)\]?\.(\w*)$/);
         if (dotMatch) {
           const tableRef    = dotMatch[1];
@@ -402,14 +524,15 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           const completions = [];
 
           for (const [tkey, t] of Object.entries(DataLaVistaState.tables)) {
-            const qname = getTableQueryName(tkey);
-            // Match against either the tableKey or the live alias form
-            if (tkey.toUpperCase() === tableRef.toUpperCase() ||
-                qname.toUpperCase() === tableRef.toUpperCase()) {
-              // Suggest internalName.field (that's what SQL column refs use)
+            const viewName = CyberdynePipeline.rawTableToView[tkey] || tkey;
+            // Match against view name, short table alias (AS alias), or raw table key
+            if (viewName.toUpperCase() === tableRef.toUpperCase() ||
+                tkey.toUpperCase() === tableRef.toUpperCase() ||
+                (t.alias && t.alias.toUpperCase() === tableRef.toUpperCase())) {
+              // Suggest field aliases — views expose columns by alias
               for (const f of t.fields) {
-                if ((f.internalName || '').toUpperCase().startsWith(fieldPrefix.toUpperCase())) {
-                  completions.push(tableRef + '.' + f.internalName);
+                if ((f.alias || '').toUpperCase().startsWith(fieldPrefix.toUpperCase())) {
+                  completions.push(tableRef + '.' + f.alias);
                 }
               }
               break;
@@ -440,18 +563,13 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           ...ALASQL_KEYWORDS
         ];
 
-        // Add table keys (immutable, always queryable) and their fully-qualified field names.
-        // Also add the live alias-based name so the user sees what the QB generates.
+        // Suggest view names (user-facing table aliases) and view.fieldAlias for column refs.
+        // SQL generated by the QB uses [viewName].[fieldAlias] — views map aliases to internal names.
         for (const [tkey, t] of Object.entries(DataLaVistaState.tables)) {
-          const qname = getTableQueryName(tkey);   // DSAlias_TableAlias (used in FROM clause)
-          // Primary suggestion: the tableKey (what goes in FROM [tableKey])
-          allKeywords.push(tkey);
-          // Also suggest the SQL alias form for awareness (what QB puts after FROM [key])
-          if (qname !== tkey) allKeywords.push(qname);
-          // Include ALL fields by internalName for SQL column references
+          const viewName = CyberdynePipeline.rawTableToView[tkey] || tkey;
+          allKeywords.push(viewName);
           for (const f of t.fields) {
-            allKeywords.push(tkey + '.' + f.internalName);
-            allKeywords.push(qname + '.' + f.internalName);
+            if (f.alias) allKeywords.push(viewName + '.' + f.alias);
           }
         }
 

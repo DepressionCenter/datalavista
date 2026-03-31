@@ -1,9 +1,9 @@
 ﻿/* ============================================================
 This file is part of DataLaVista
-15-public-api.js: Public API (window.dlv) and app self-initialization entry point.
+95-public-api.js: Public API (window.dlv) and app self-initialization entry point.
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 Created: 2026-03-24
-Last Modified: 2026-03-24
+Last Modified: 2026-03-31
 Summary: Public API (window.dlv) and app self-initialization entry point.
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
@@ -21,6 +21,8 @@ You should have received a copy of the GNU General Public License along
 with this program. If not, see <https://www.gnu.org/licenses/>.
 ================================================================ */
       window.dlv = {
+        CyberdynePipeline,
+        ConnectQueue,
         DataLaVistaCore,
         safeDragParse,
         safeDragSet,
@@ -34,6 +36,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         spFetchWrite,
         extractRows,
         stripODataMetadata,
+        unescapeSharePointInternalName,
         fetchSPLists,
         fetchSPFields,
         normalizeDate,
@@ -53,6 +56,9 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         hideLoadingPopup,
         switchSourceTab,
         doConnect,
+        handleUploadFiles,
+        handleAddRemoteUrl,
+        processConnectQueue,
         loadSharePointListsSource,
         fetchJSONWithFallbacks,
         loadJSONSource,
@@ -99,6 +105,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         spBrowseCSV,
         spBrowseJSON,
         spBrowseConfig,
+        spBrowseRemoteFile,
         spPickerCheckVisibility,
         SharePointFileDialog,
         setupCodeMirror,

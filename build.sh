@@ -4,7 +4,7 @@
 #  build.sh: DataLaVista build script (Linux / macOS / GitHub Actions).
 #  Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 #  Created: 2026-03-24
-#  Last Modified: 2026-03-24
+#  Last Modified: 2026-03-31
 #  Summary: Generates datalavista.js, DataLaVista.html, DataLaVista-nojs.html, DataLaVista-dev.html.
 #  Notes: See README file for documentation and full license information.
 #  Website: https://github.com/DepressionCenter/datalavista

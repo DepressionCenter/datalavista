@@ -1,9 +1,9 @@
 ﻿/* ============================================================
 This file is part of DataLaVista
-06-config.js: Widget SQL generation, configuration save/load, and fields panel rendering.
+30-config.js: Widget SQL generation, configuration save/load, and fields panel rendering.
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 Created: 2026-03-24
-Last Modified: 2026-03-24
+Last Modified: 2026-03-31
 Summary: Widget SQL generation, configuration save/load, and fields panel rendering.
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
@@ -107,7 +107,9 @@ function buildConfig() {
     required: !!f.required,
     maxLength: f.maxLength || null,
     isAutoId: !!f.isAutoId,
-    choices: (Array.isArray(f.choices) && f.choices.length <= 50) ? f.choices : null
+    choices: (Array.isArray(f.choices) && f.choices.length <= 50) ? f.choices : null,
+    lookupList: f.lookupList || null,
+    lookupField: f.lookupField || null
   }));
 
 
@@ -214,6 +216,49 @@ function buildConfig() {
     fieldAggs: Object.assign({}, DataLaVistaState.design.fieldAggs || {})
   };
 
+  // ── Smart export: only include tables referenced in the SQL (or uploaded files) ──
+  // Collect all SQL text: main query + every widget's generated SQL
+  const _allSqlParts = [DataLaVistaState.sql || ''];
+  for (const w of DataLaVistaState.design.widgets || []) {
+    const wsql = generateWidgetSQL(w, '_results');
+    if (wsql) _allSqlParts.push(wsql);
+  }
+  const _combinedSql = _allSqlParts.join('\n');
+
+  const _referencedKeys = new Set();
+  if (_combinedSql.trim()) {
+    for (const tkey of Object.keys(tablesMeta)) {
+      const t = DataLaVistaState.tables[tkey];
+      // Uploaded files are always included regardless of SQL
+      if (t && t.isFileUpload) { _referencedKeys.add(tkey); continue; }
+      // Match raw table key in SQL
+      const _escKey = tkey.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      if (new RegExp(`\\[${_escKey}\\]|\\b${_escKey}\\b`, 'i').test(_combinedSql)) {
+        _referencedKeys.add(tkey); continue;
+      }
+      // Match view name in SQL (users write SQL against view names)
+      const _viewName = CyberdynePipeline.rawTableToView[tkey];
+      if (_viewName) {
+        const _escView = _viewName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        if (new RegExp(`\\[${_escView}\\]|\\b${_escView}\\b`, 'i').test(_combinedSql)) {
+          _referencedKeys.add(tkey);
+        }
+      }
+    }
+  } else {
+    // No SQL written yet — include everything (preserve all connections)
+    for (const tkey of Object.keys(tablesMeta)) _referencedKeys.add(tkey);
+  }
+
+  // Filter tablesMeta and update DS tables arrays to match
+  const filteredTablesMeta = {};
+  for (const [tkey, tmeta] of Object.entries(tablesMeta)) {
+    if (_referencedKeys.has(tkey)) filteredTablesMeta[tkey] = tmeta;
+  }
+  for (const dsName of Object.keys(dataSourcesMeta)) {
+    dataSourcesMeta[dsName].tables = (dataSourcesMeta[dsName].tables || []).filter(/** @param {string} t */ t => _referencedKeys.has(t));
+  }
+
   return {
     _license: 'This file is part of DataLaVista. This is a configuration script for a report designed in DataLaVista. Copyright © 2026 The Regents of the University of Michigan. This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version. This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details. You should have received a copy of the GNU General Public License along with this program. If not, see https://www.gnu.org/licenses.',
     activeTab: (DataLaVistaState.reportMode === 'view') ? 'dashboardPreview' : 'design',
@@ -228,9 +273,21 @@ function buildConfig() {
     qmTab: DataLaVistaState.qmTab || 'dataPreview',
     queryColumns: Array.isArray(DataLaVistaState.queryColumns) ? [...DataLaVistaState.queryColumns] : [],
     queryMode: (DataLaVistaState.queryMode && DataLaVistaState.queryMode != null && DataLaVistaState.queryMode != undefined && DataLaVistaState.queryMode != '') ? DataLaVistaState.queryMode : 'sql',
+    relationships: (DataLaVistaState.relationships || []).filter(r =>
+      _referencedKeys.has(r.childTableKey) || _referencedKeys.has(r.parentTableKey)
+    ),
     sql: DataLaVistaState.sql || '',
     sqlLocked: DataLaVistaState.sqlLocked || false,
-    tables: tablesMeta
+    tables: filteredTablesMeta,
+    views: (() => {
+      // Only export views whose underlying raw table made it into the filtered set
+      const _allViews = CyberdynePipeline.buildViewsForConfig();
+      const _filteredViews = {};
+      for (const [vName, vDef] of Object.entries(_allViews)) {
+        if (_referencedKeys.has(vDef.rawTable)) _filteredViews[vName] = vDef;
+      }
+      return _filteredViews;
+    })()
   };
 }
 
@@ -256,9 +313,11 @@ async function loadConfig(cfg) {
     if (cfg && typeof cfg !== 'object') throw new Error('Invalid report config — no report JSON detected.');
 
   // Basic validation passed — now clear the existing state and load the config values
+  CyberdynePipeline.clearAllViews(); // drop any existing AlaSQL views before reloading
   //{ ...cfg.dataSource } || { type: 'sharepoint', url: '', auth: 'current' };
   DataLaVistaState.activeTab = (DataLaVistaState.reportMode==='view')?'dataPreview':'design';
   DataLaVistaState.advancedQB = cfg.advancedQB || {};
+  DataLaVistaState.advancedQB.nodeAliases ??= {};
   DataLaVistaState.basicQB = cfg.basicQB || {};
   DataLaVistaState.currentWidgetId = null;
   DataLaVistaState.dataSources = cfg.dataSources || {};
@@ -278,9 +337,15 @@ async function loadConfig(cfg) {
   DataLaVistaState.queryColumns = Array.isArray(cfg.queryColumns) ? [...cfg.queryColumns] : [];
   DataLaVistaState.queryMode = (cfg.queryMode && cfg.queryMode != null && cfg.queryMode != undefined && cfg.queryMode != '') ? cfg.queryMode : 'sql';
   // Don't load reportMode or reportUrl from config - it's handled by init()
+  DataLaVistaState.relationships = Array.isArray(cfg.relationships) ? cfg.relationships : [];
   DataLaVistaState.sql = cfg.sql || '';
   DataLaVistaState.sqlLocked = cfg.sqlLocked || false;
   DataLaVistaState.tables = cfg.tables || {};
+
+  // Restore view definitions (gracefully skipped for legacy configs without views)
+  if (cfg.views && typeof cfg.views === 'object' && Object.keys(cfg.views).length) {
+    CyberdynePipeline.restoreViewsFromConfig(cfg.views);
+  }
 
   // Background fetch for referenced tables
   if (DataLaVistaState.sql) {
@@ -305,7 +370,7 @@ async function loadConfig(cfg) {
     renderFieldsPanel();
     renderBasicQB();
     renderAdvancedQB();
-    setStatus('✅ Config loaded');
+    setStatus('Config loaded', 'success');
     toast('Config loaded successfully', 'success');
   }
     
@@ -362,7 +427,7 @@ async function loadConfig(cfg) {
           // Right-click
           dsHeader.addEventListener('contextmenu', (e) => {
             e.preventDefault();
-            showCtxMenu(e, { level: 'ds', dsName, isFileUpload: ds.type === 'csv' });
+            showCtxMenu(e, { level: 'ds', dsName, isFileUpload: ds.isFileUpload || false});
           });
 
           dsGroup.appendChild(dsHeader);
@@ -374,8 +439,9 @@ async function loadConfig(cfg) {
 
           for (const tkey of tableKeys) {
             const t = DataLaVistaState.tables[tkey];
-            // Strip the DS prefix for display (users already see it in the group header)
-            const tAlias = t.alias || t.displayName || tkey;
+            // Show the short alias (view name minus DS prefix); fall back to full view name
+            const viewName = CyberdynePipeline.rawTableToView[tkey];
+            const tAlias   = t.alias || viewName || t.displayName || tkey;
             const tIcon = getTableIcon(t);
 
             const node = document.createElement('div');
@@ -399,7 +465,7 @@ async function loadConfig(cfg) {
             // Right-click on table header
             header.addEventListener('contextmenu', (e) => {
               e.preventDefault();
-              showCtxMenu(e, { level: 'table', tableKey: tkey, dsName, isFileUpload: ds.type === 'csv' });
+              showCtxMenu(e, { level: 'table', tableKey: tkey, dsName, isFileUpload: ds.isFileUpload || false });
             });
 
             // Build fields list, sorted alphabetically

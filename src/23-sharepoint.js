@@ -1,9 +1,9 @@
 ﻿/* ============================================================
 This file is part of DataLaVista
-03-sharepoint.js: SharePoint REST API adapter and field structure loader.
+23-sharepoint.js: SharePoint REST API adapter and field structure loader.
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 Created: 2026-03-24
-Last Modified: 2026-03-24
+Last Modified: 2026-03-31
 Summary: SharePoint REST API adapter and field structure loader.
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
@@ -85,13 +85,23 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
      * instead of using the raw tableKey in SQL/AlaSQL.
      */
     function getTableQueryName(tableKey) {
+      // View-backed tables: the view name IS the canonical SQL name
+      const viewName = CyberdynePipeline.rawTableToView[tableKey];
+      if (viewName) return viewName;
       const t = DataLaVistaState.tables[tableKey];
       if (!t) return tableKey;
       const ds = DataLaVistaState.dataSources[t.dataSource];
       const dsAlias = (ds && ds.alias) || t.dataSource || '';
       const tAlias = t.alias || t.internalName || tableKey;
-      return dsAlias ? dsAlias + '_' + tAlias : tAlias; // TODO: Check if this works after renaming a data source
+      return dsAlias ? dsAlias + '_' + tAlias : tAlias;
     }
+
+    // Helper to unescape SharePoint internal field names (e.g. 'My_x0020_Field' → 'My Field')
+    function unescapeSharePointInternalName(internalName) {
+      return internalName.replace(/_x([0-9A-Fa-f]{4})_/g, (match, hex) => {
+        return String.fromCharCode(parseInt(hex, 16));
+    });
+  }
 
     /** Register a table in AlaSQL under its immutable tableKey only.
      *  SQL always uses the tableKey in FROM (e.g. FROM [SP_PeopleList]).
@@ -101,15 +111,21 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
     function registerTableInAlaSQL(tableKey) {
       const t = DataLaVistaState.tables[tableKey];
       if (!t || !t.data) return;
-      alasql(`DROP TABLE IF EXISTS [${tableKey}]`);
-      alasql(`CREATE TABLE [${tableKey}]`); // TODO: store table alises in alasql
-      const actual = Object.keys(alasql.tables).find(k => k.toLowerCase() === tableKey.toLowerCase()) || tableKey;
-      alasql.tables[actual].data = t.data;
+      const alasqlName = '_raw_' + tableKey;
+      const existing = Object.keys(alasql.tables).find(k => k.toLowerCase() === alasqlName.toLowerCase());
+      if (existing) {
+        // Update data in-place so any VIEW referencing this table stays valid
+        alasql.tables[existing].data = t.data;
+      } else {
+        alasql(`CREATE TABLE [${alasqlName}]`);
+        const actual = Object.keys(alasql.tables).find(k => k.toLowerCase() === alasqlName.toLowerCase()) || alasqlName;
+        alasql.tables[actual].data = t.data;
+      }
     }
 
     /** Drop an AlaSQL table by a (possibly old) query name. */
     function dropTableFromAlaSQL(qname) {
-      try { alasql(`DROP TABLE IF EXISTS [${qname}]`); } catch(e) {}
+      try { alasql(`DROP TABLE IF EXISTS [_raw_${qname}]`); } catch(e) {}
     }
 
     // Universal JSON extractor
@@ -290,8 +306,9 @@ async function fetchTableData(tableName, fetchAll = false) {
   // Create the fetch sequence and store it in the table state
   t.fetchPromise = (async (tableName) => {
     try {
-      if (!fetchAll) setStatus(`⏳ Fetching preview for ${tableName}...`);
-      
+      if (!fetchAll) setStatus(`Fetching preview for ${tableName}...`, 'loading');
+      if (fetchAll) { setStatus(`Loading data for ${tableName}...`, 'loading'); toast(`Fetching data for ${tableName}...`, 'info'); }
+
       const spFields = t.originalFields || t.fields;
       let rawData = [];
       
@@ -325,7 +342,6 @@ async function fetchTableData(tableName, fetchAll = false) {
           }
         });
         
-        console.log('Calling fetchSPItemsWithRetry with select:', Array.from(baseSelect), 'expand:', Array.from(baseExpand));
         rawData = await fetchSPItemsWithRetry(
           spSiteUrl,
           t.guid,
@@ -333,7 +349,9 @@ async function fetchTableData(tableName, fetchAll = false) {
           Array.from(baseExpand).join(','),
           limit
         );
-      } else if(t.sourceType === 'json') {
+        // TODO: Possible dead branches from previous verion
+        // Verify if CSV/JSON loading still works after commenting them out
+      /* } else if(t.sourceType === 'json') {
         const jsonUrl = t.url || (DataLaVistaState.dataSources[t.dataSource] && DataLaVistaState.dataSources[t.dataSource].url);
         if (!jsonUrl) {
           return;
@@ -368,12 +386,28 @@ async function fetchTableData(tableName, fetchAll = false) {
       } else if(t.sourceType === 'api') {
         const apiUrl = t.url || (DataLaVistaState.dataSources[t.dataSource] && DataLaVistaState.dataSources[t.dataSource].url);
         // TODO: Add support for API sources (fetch with headers, auth, etc) — currently just a placeholder
-      } else {
+      */
+     } else {
         return;
       
       }
       t.data = rawData.map(row => mapDataRow(tableName, row, spFields)); 
       t.loaded = fetchAll;
+
+      // Sync fetched data to AlaSQL raw table
+      if (t.data && t.data.length > 0) {
+        CyberdynePipeline._registerRawTable(tableName, t.data);
+        
+        // Update view column mappings
+        const viewName = t.viewName || CyberdynePipeline.getViewForTable(tableName);
+        if (viewName) {
+          try {
+            CyberdynePipeline.updateSharePointListView(tableName, t.fields);
+          } catch (e) {
+            console.warn(`[fetchTableData] Failed to update view ${viewName}:`, e.message);
+          }
+        }
+      }
       
       if (!t.originalFields) {
         t.originalFields = [...t.fields]; 
@@ -397,7 +431,8 @@ async function fetchTableData(tableName, fetchAll = false) {
         });
       }
       
-      if (!fetchAll) setStatus(`✅ Loaded preview for ${tableName}`);
+      if (!fetchAll) setStatus(`Loaded preview for ${tableName}`, 'success');
+      if (fetchAll) setStatus(`Loaded data for ${tableName} (${t.data.length} rows)`, 'success');
     } finally {
       // *** CLEANUP: Remove the promise once the fetch completes or fails ***
       t.fetchPromise = null;
@@ -1209,6 +1244,16 @@ const SharePointFileDialog = {
         state.siteUrl
       );
       if (!ar.ok) { const t = await ar.text(); throw new Error(`Attachment failed (${ar.status}): ${t}`); }
+
+      // Get attachment URL from response, or construct it from the known SP pattern
+      let attServerRelUrl = null;
+      try { const attJson = await ar.json(); attServerRelUrl = attJson.ServerRelativeUrl || attJson.d?.ServerRelativeUrl; } catch(e) {}
+      if (!attServerRelUrl) {
+        const siteRelUrl = new URL(state.siteUrl).pathname.replace(/\/$/, '');
+        attServerRelUrl = `${siteRelUrl}/Lists/${listTitle}/Attachments/${id}/${attName}`;
+      }
+      const origin = state.siteUrl.replace(/^(https?:\/\/[^/]+).*$/, '$1');
+      return { listName: listTitle, id, title, folderName: listTitle, itemUrl: `${state.siteUrl}/Lists/${listTitle}/DispForm.aspx?ID=${id}`, fileName: attName, url: origin + attServerRelUrl, serverRelativeUrl: attServerRelUrl };
     }
 
     return { listName: listTitle, id, title, folderName: listTitle, itemUrl: `${state.siteUrl}/Lists/${listTitle}/DispForm.aspx?ID=${id}`, fileName: null, url: null, serverRelativeUrl: null };

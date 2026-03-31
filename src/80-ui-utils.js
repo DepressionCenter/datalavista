@@ -1,9 +1,9 @@
 ﻿/* ============================================================
 This file is part of DataLaVista
-13-ui-utils.js: Resizable panels, tab switching, utility functions, and SharePoint file picker.
+80-ui-utils.js: Resizable panels, tab switching, utility functions, and SharePoint file picker.
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 Created: 2026-03-24
-Last Modified: 2026-03-24
+Last Modified: 2026-03-31
 Summary: Resizable panels, tab switching, utility functions, and SharePoint file picker.
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
@@ -125,13 +125,33 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         if (tab === 'sql' && window._cmEditor) setTimeout(() => window._cmEditor.refresh(), 50);
         // Switching to SQL editor lifts the advanced-QB join restriction
         if (tab === 'sql' && DataLaVistaState.queryMode === 'advanced') setDesignTabsEnabled(true);
-        if (tab === 'dataPreview') {
-          document.getElementById('btn-clear-query').disabled = true;
-          document.getElementById('btn-run-query').disabled = true;
 
+        const clearBtn = document.getElementById('btn-clear-query');
+        if (clearBtn) clearBtn.disabled = (tab === 'dataPreview');
+        updateRunQueryButton();
+      }
+
+      /** Enable/disable Run Query based on the active sub-tab and its content. */
+      function updateRunQueryButton() {
+        const btn = document.getElementById('btn-run-query');
+        if (!btn) return;
+        const tab = DataLaVistaState.qmTab || 'qb';
+        if (tab === 'dataPreview') {
+          btn.disabled = true;
+          return;
+        }
+        if (tab === 'sql') {
+          const hasSQL = window._cmEditor
+            ? !!window._cmEditor.getValue().trim()
+            : !!(DataLaVistaState.sql || '').trim();
+          btn.disabled = !hasSQL;
         } else {
-          document.getElementById('btn-clear-query').disabled = false;
-          document.getElementById('btn-run-query').disabled = false;
+          // QB tab — enabled only when the active mode has at least one table loaded
+          const qmode = DataLaVistaState.queryMode || 'basic';
+          const hasTable = qmode === 'basic'
+            ? !!DataLaVistaState.basicQB.tableName
+            : Object.keys(DataLaVistaState.advancedQB.nodes || {}).length > 0;
+          btn.disabled = !hasTable;
         }
       }
 
@@ -178,6 +198,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         a.click();
       }
 
+      // TODO: actually show help! Also credits, like the ones in the generate config tab
       function showHelp() {
         toast('DataLaVista — Connect a SharePoint site, CSVs, or JSON, and create beautiful dashboards.', 'info');
       }
@@ -218,7 +239,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       function spPickerCheckVisibility() {
         const url = getSpSiteUrl();
         const display = url ? '' : 'none';
-        ['btn-sp-browse', 'btn-sp-browse-json', 'btn-sp-browse-config'].forEach(id => {
+        ['btn-sp-browse', 'btn-sp-browse-json', 'btn-sp-browse-config', 'btn-sp-browse-remote'].forEach(id => {
           const btn = document.getElementById(id);
           if (btn) btn.style.display = display;
         });
@@ -301,6 +322,24 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           });
           if (!result) return;
           const urlEl = /** @type {HTMLInputElement|null} */ (document.getElementById('config-url'));
+          if (urlEl) urlEl.value = result.url;
+          toast(`Selected: ${result.fileName}`, 'success');
+        } catch (err) {
+          if (err && err.message !== 'Dialog cancelled') toast(err.message || String(err), 'error');
+        }
+      }
+
+      /** Open SharePointFileDialog to browse for any supported data file and populate #remote-url. */
+      async function spBrowseRemoteFile() {
+        try {
+          const result = await SharePointFileDialog.show({
+            mode: 'open',
+            type: 'file',
+            fileExtensions: ['.csv', '.CSV', '.json', '.json5', '.JSON', '.xlsx', '.xls', '.xml', '.XML', '.sqlite', '.db'],
+            defaultFolders: ['/Shared Documents/Data', '/Shared Documents', '/SiteAssets']
+          });
+          if (!result) return;
+          const urlEl = /** @type {HTMLInputElement|null} */ (document.getElementById('remote-url'));
           if (urlEl) urlEl.value = result.url;
           toast(`Selected: ${result.fileName}`, 'success');
         } catch (err) {

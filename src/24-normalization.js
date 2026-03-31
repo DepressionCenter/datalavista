@@ -1,9 +1,9 @@
 ﻿/* ============================================================
 This file is part of DataLaVista
-04-normalization.js: Data normalization, field type parsing, and CSV parsing.
+24-normalization.js: Data normalization, field type parsing, and CSV parsing.
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 Created: 2026-03-24
-Last Modified: 2026-03-24
+Last Modified: 2026-03-31
 Summary: Data normalization, field type parsing, and CSV parsing.
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
@@ -229,6 +229,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         required: spField.Required,
         maxLength: spField.MaxLength,
         choices: spField.Choices ? (spField.Choices.results || spField.Choices) : null,
+        lookupList: (type === 'lookup' || type === 'lookup-multi') ? (spField.LookupList || null) : null,
+        lookupField: (type === 'lookup' || type === 'lookup-multi') ? (spField.LookupField || null) : null,
       };
     }
 
