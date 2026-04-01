@@ -261,6 +261,9 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 
         createAdvNode(id, DataLaVistaState.advancedQB.nodes[id]);
 
+        // Redraw joins AFTER the node is in the DOM so offsetWidth/offsetHeight are correct
+        if (!_skipAutoJoin && DataLaVistaState.advancedQB.joins.length > 0) redrawJoins();
+
         rebuildAdvancedSQL();
         selectAdvNode(id);
         return id;
@@ -358,7 +361,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           });
         }
 
-        if (DataLaVistaState.advancedQB.joins.length > 0) redrawJoins();
       }
 
       function getAllFieldAliases(tableName, hideSynthetic = false) {
