@@ -73,7 +73,7 @@ Object.assign(CyberdynePipeline, {
     if (!view) return;
     const cols = [];
     for (const [alias, internalName] of Object.entries(view.columnMappings)) {
-      cols.push(alias === internalName ? `[${internalName}]` : `[${internalName}] AS [${alias}]`);
+      cols.push(`[${internalName}] AS [${alias}]`);
     }
     if (cols.length === 0) return; // Nothing to select yet (lazy SP list)
     try { alasql(`DROP VIEW [${viewName}]`); } catch (_) {} // May not exist on first creation

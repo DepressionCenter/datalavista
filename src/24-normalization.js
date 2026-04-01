@@ -181,9 +181,18 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
     }
 
     /**
+     * Decode SharePoint's _xNNNN_ hex-encoded characters in a field name.
+     * e.g. "My_x0020_Field" → "My Field", "Cost_x0025_" → "Cost%"
+     */
+    function decodeSpFieldName(name) {
+      if (!name) return name;
+      return name.replace(/_x([0-9a-fA-F]{4})_/gi, (_, hex) => String.fromCharCode(parseInt(hex, 16)));
+    }
+
+    /**
      * Strip the trailing "List" or "ListItem" suffix that SharePoint appends
      * to EntityTypeName values, e.g. "PeopleList" → "People".
-     * Also strips the _x0020_ encoding: "My_x0020_List" → "My_x0020_"... 
+     * Also strips the _x0020_ encoding: "My_x0020_List" → "My_x0020_"...
      * (we leave _x0020_ in place since it is the InternalName standard).
      */
     function stripEntityTypeNameSuffix(name) {
@@ -212,13 +221,13 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         ? spField.InternalName
         : stripEntityTypeNameSuffix(rawInternal);
 
-      const displayName = spField.Title || internalName;
+      const displayName = spField.Title || decodeSpFieldName(internalName);
       const description = spField.Description || '';
       const type = parseFieldType(spField.TypeAsString, internalName);
 
       // Build alias from display name (PascalCase, no spaces)
       let alias = toPascalCase(displayName);
-      if (!alias || alias === internalName) alias = internalName;
+      if (!alias || alias === internalName) alias = toPascalCase(decodeSpFieldName(internalName)) || internalName;
 
       return {
         internalName,

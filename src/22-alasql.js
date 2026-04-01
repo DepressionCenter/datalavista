@@ -165,7 +165,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       for (const f of fieldDefs) {
         const key = f.InternalName || f.internalName;
         if (!key) continue;
-        const outKey = key === 'Attachments' ? 'HasAttachments' : key;
+        const _rawKey1 = key === 'Attachments' ? 'HasAttachments' : key;
+        const outKey = toPascalCase(decodeSpFieldName(_rawKey1)) || _rawKey1;
 
         let value = processingRow[key];
         if (value === null || value === undefined) continue;
@@ -247,10 +248,11 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       // PASS 2: Primitives — output key is the raw SP internalName
       for (const [key, value] of Object.entries(processingRow)) {
         if (value === null || value === undefined) continue;
-        const outKey = key === 'Attachments' ? 'HasAttachments' : key;
+        const _rawKey2 = key === 'Attachments' ? 'HasAttachments' : key;
+        const outKey = toPascalCase(decodeSpFieldName(_rawKey2)) || _rawKey2;
 
         // Skip if already handled (e.g. lookup Id already written)
-        if (key.endsWith('Id') && mapped[key.slice(0, -2)] !== undefined) continue;
+        if (outKey.endsWith('Id') && mapped[outKey.slice(0, -2)] !== undefined) continue;
 
         let finalVal = value;
         if (typeof finalVal === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z?$/.test(finalVal)) {
