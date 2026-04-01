@@ -3,7 +3,7 @@ This file is part of DataLaVista
 DataLaVista.html: Report and dashboard designer main file.
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 Created: 2026-03-10
-Last Modified: 2026-03-23
+Last Modified: 2026-03-31
 Summary: Main window in DataLaVista for loading data and designing reports and dashboards.
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
@@ -1159,10 +1159,32 @@ with this program. If not, see https://www.gnu.org/licenses/.
     #qb-canvas-wrap {
       flex: 1;
       position: relative;
-      overflow: hidden;
+      overflow: auto;
       background: #f8f9fa;
       background-image: radial-gradient(circle, #d1d5db 1px, transparent 1px);
       background-size: 20px 20px;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(0,0,0,0.2) transparent;
+    }
+    #qb-canvas-wrap::-webkit-scrollbar {
+      width: 12px;
+      height: 12px;
+    }
+    #qb-canvas-wrap::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    #qb-canvas-wrap::-webkit-scrollbar-thumb {
+      background: rgba(0,0,0,0.2);
+      border-radius: 6px;
+      border: 3px solid transparent;
+      background-clip: content-box;
+    }
+    #qb-canvas-wrap::-webkit-scrollbar-thumb:hover {
+      background: rgba(0,0,0,0.4);
+      background-clip: content-box;
+    }
+    #qb-canvas-wrap::-webkit-scrollbar-corner {
+      background: transparent;
     }
 
     #qb-canvas {

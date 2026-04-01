@@ -438,6 +438,36 @@ Object.assign(CyberdynePipeline, {
           });
         }
       }
+
+      // Register Person/User-type fields → UserInformationList (no GUID needed)
+      const uilKey = ds.tables.find(k => {
+        const t = DataLaVistaState.tables[k];
+        return t && (t.internalName === 'UserInformationList' ||
+          (t.displayName || '').toLowerCase().includes('user information'));
+      });
+      if (uilKey) {
+        for (const field of (childTable.fields || [])) {
+          const typeStr = (field.TypeAsString || field.type || '').toLowerCase();
+          if (!typeStr.includes('user')) continue;
+          const childDataField = field.internalName + 'Data';
+          const exists = DataLaVistaState.relationships.some(r =>
+            r.childTableKey === childTableKey && r.spLookupField === field.internalName &&
+            r.parentTableKey === uilKey
+          );
+          if (!exists) {
+            DataLaVistaState.relationships.push({
+              id: this._nextRelId(),
+              source: 'sharepoint-lookup',
+              childTableKey,
+              childField: childDataField,
+              parentTableKey: uilKey,
+              parentField: 'ID',
+              joinType: 'LEFT',
+              spLookupField: field.internalName
+            });
+          }
+        }
+      }
     }
   },
 

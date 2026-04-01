@@ -165,10 +165,10 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         const data = safeDragParse(event);
         if (!data) return;
 
-        const canvas = document.getElementById('qb-canvas');
-        const rect = canvas.getBoundingClientRect();
-        const x = event.clientX - rect.left - 80;
-        const y = event.clientY - rect.top - 40;
+        const wrap = document.getElementById('qb-canvas-wrap');
+        const wrapRect = wrap.getBoundingClientRect();
+        const x = event.clientX - wrapRect.left + wrap.scrollLeft - 80;
+        const y = event.clientY - wrapRect.top  + wrap.scrollTop  - 40;
 
         if (data.type === 'table') {
           addAdvNode(data.table, x, y);
@@ -254,11 +254,12 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           DataLaVistaState.advancedQB.nodeAliases[id] = sqlAlias;
         }
 
-        createAdvNode(id, DataLaVistaState.advancedQB.nodes[id]);
         ensureTableData(tableName);
 
-        // Auto-apply relationships involving this table (skip when called from autoApplySuggestedJoins to avoid recursion)
+        // Auto-apply relationships BEFORE rendering so nodeAliases are set when createAdvNode draws the header
         if (!_skipAutoJoin) autoApplySuggestedJoins(id, tableName);
+
+        createAdvNode(id, DataLaVistaState.advancedQB.nodes[id]);
 
         rebuildAdvancedSQL();
         selectAdvNode(id);
@@ -289,8 +290,11 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         const deriveSPAlias = (childTableKey, childField) => {
           const childT = DataLaVistaState.tables[childTableKey];
           const childAlias = childT?.alias || childTableKey;
-          // childField is the *Data synthetic field; strip the 'Data' suffix to get the base field name
-          const fieldBase = childField.endsWith('Data') ? childField.slice(0, -4) : childField;
+          // childField is the *Data synthetic field; strip 'Data' suffix to get the internalName,
+          // then look up the field's alias (view column name) for the display label.
+          const fieldInternalName = childField.endsWith('Data') ? childField.slice(0, -4) : childField;
+          const fieldObj = (childT?.fields || []).find(f => f.internalName === fieldInternalName);
+          const fieldBase = fieldObj?.alias || fieldInternalName;
           return childAlias + '_' + fieldBase;
         };
 
@@ -311,11 +315,31 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
             fromKey  = childFieldAlias;
             toKey    = parentFieldAlias;
             fromNodeId = existingTableToNodes[rel.childTableKey][0];
+
+            // Skip self-joins (joining a table to itself).
+            if (rel.childTableKey === rel.parentTableKey) continue;
+
+            // Pre-check if this join already exists before creating any sibling node.
+            const preAlreadyJoined = DataLaVistaState.advancedQB.joins.some(j => {
+              const jFrom = DataLaVistaState.advancedQB.nodes[j.fromNode]?.tableName;
+              const jTo   = DataLaVistaState.advancedQB.nodes[j.toNode]?.tableName;
+              return ((jFrom === rel.childTableKey && jTo === rel.parentTableKey) ||
+                      (jFrom === rel.parentTableKey && jTo === rel.childTableKey)) &&
+                     j.fromKey === fromKey && j.toKey === toKey;
+            });
+            if (preAlreadyJoined) continue;
+
             // Each rel needs a distinct parent node. Use newNodeId for the first rel,
             // then create additional parent nodes (siblings of the new node) for subsequent rels.
             if (!usedNewNodeForParent.has(rel.childTableKey)) {
               toNodeId = newNodeId;
               usedNewNodeForParent.add(rel.childTableKey);
+              // Assign derived SP alias to the first-used node too
+              if (rel.source === 'sharepoint-lookup') {
+                const firstAlias = deriveSPAlias(rel.childTableKey, rel.childField);
+                DataLaVistaState.advancedQB.nodeAliases ??= {};
+                DataLaVistaState.advancedQB.nodeAliases[newNodeId] = firstAlias;
+              }
             } else {
               const nd0 = DataLaVistaState.advancedQB.nodes[newNodeId];
               const siblingAlias = deriveSPAlias(rel.childTableKey, rel.childField);
@@ -324,14 +348,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           } else {
             continue;
           }
-
-          // Skip if an identical join (same nodes + same keys) already exists
-          const alreadyJoined = DataLaVistaState.advancedQB.joins.some(j =>
-            ((j.fromNode === fromNodeId && j.toNode === toNodeId) ||
-             (j.fromNode === toNodeId   && j.toNode === fromNodeId)) &&
-            j.fromKey === fromKey && j.toKey === toKey
-          );
-          if (alreadyJoined) continue;
 
           DataLaVistaState.advancedQB.joins.push({
             fromNode: fromNodeId, fromSide: 'right',
@@ -422,19 +438,43 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           const corner = Array.from(rh.classList).find(c => ['tl','tr','bl','br'].includes(c)) || 'br';
           rh.addEventListener('mousedown', e => { e.stopPropagation(); startNodeResize(e, id, el, corner); });
         });
+
+        expandCanvas();
+      }
+
+      // Expand #qb-canvas so it always fits all placed nodes + padding
+      function expandCanvas() {
+        const canvas = document.getElementById('qb-canvas');
+        if (!canvas) return;
+        let maxX = 0, maxY = 0;
+        for (const nd of Object.values(DataLaVistaState.advancedQB.nodes)) {
+          maxX = Math.max(maxX, (nd.x || 0) + (nd.w || 240) + 40);
+          maxY = Math.max(maxY, (nd.y || 0) + (nd.h || 200) + 40);
+        }
+        canvas.style.minWidth  = maxX + 'px';
+        canvas.style.minHeight = maxY + 'px';
       }
 
       function startNodeDrag(e, id, el) {
         e.preventDefault();
         const nd = DataLaVistaState.advancedQB.nodes[id];
-        const startX = e.clientX - nd.x;
-        const startY = e.clientY - nd.y;
+        const wrap = document.getElementById('qb-canvas-wrap');
+        const wrapRect = wrap.getBoundingClientRect();
+        const toCanvas = mv => ({
+          x: mv.clientX - wrapRect.left + wrap.scrollLeft,
+          y: mv.clientY - wrapRect.top  + wrap.scrollTop
+        });
+        const startPt = toCanvas(e);
+        const offX = startPt.x - nd.x;
+        const offY = startPt.y - nd.y;
 
         const onMove = mv => {
-          nd.x = mv.clientX - startX;
-          nd.y = mv.clientY - startY;
+          const pt = toCanvas(mv);
+          nd.x = pt.x - offX;
+          nd.y = pt.y - offY;
           el.style.left = nd.x + 'px';
           el.style.top = nd.y + 'px';
+          expandCanvas();
           redrawJoins();
         };
         const onUp = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp); };

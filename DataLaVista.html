@@ -3,7 +3,7 @@ This file is part of DataLaVista
 DataLaVista.html: Report and dashboard designer main file.
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 Created: 2026-03-10
-Last Modified: 2026-03-23
+Last Modified: 2026-03-31
 Summary: Main window in DataLaVista for loading data and designing reports and dashboards.
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
@@ -1159,10 +1159,32 @@ with this program. If not, see https://www.gnu.org/licenses/.
     #qb-canvas-wrap {
       flex: 1;
       position: relative;
-      overflow: hidden;
+      overflow: auto;
       background: #f8f9fa;
       background-image: radial-gradient(circle, #d1d5db 1px, transparent 1px);
       background-size: 20px 20px;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(0,0,0,0.2) transparent;
+    }
+    #qb-canvas-wrap::-webkit-scrollbar {
+      width: 12px;
+      height: 12px;
+    }
+    #qb-canvas-wrap::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    #qb-canvas-wrap::-webkit-scrollbar-thumb {
+      background: rgba(0,0,0,0.2);
+      border-radius: 6px;
+      border: 3px solid transparent;
+      background-clip: content-box;
+    }
+    #qb-canvas-wrap::-webkit-scrollbar-thumb:hover {
+      background: rgba(0,0,0,0.4);
+      background-clip: content-box;
+    }
+    #qb-canvas-wrap::-webkit-scrollbar-corner {
+      background: transparent;
     }
 
     #qb-canvas {
@@ -3469,7 +3491,7 @@ This file is part of DataLaVista
 05-tooltip.js: Tooltip functionality for DataLaVista.
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 Created: 2026-03-27
-Last Modified: 2026-03-29
+Last Modified: 2026-03-31
 Summary: Tooltip functionality for DataLaVista.
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
@@ -3756,7 +3778,7 @@ This file is part of DataLaVista
 10-constants.js: Constants, state object, and core DataLaVista objects.
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 Created: 2026-03-24
-Last Modified: 2026-03-24
+Last Modified: 2026-03-31
 Summary: Constants, state object, and core DataLaVista objects.
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
@@ -4019,7 +4041,7 @@ This file is part of DataLaVista
 22-alasql.js: AlaSQL in-browser SQL engine setup and custom functions.
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 Created: 2026-03-24
-Last Modified: 2026-03-24
+Last Modified: 2026-03-31
 Summary: AlaSQL in-browser SQL engine setup and custom functions.
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
@@ -4294,7 +4316,7 @@ This file is part of DataLaVista
 23-sharepoint.js: SharePoint REST API adapter and field structure loader.
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 Created: 2026-03-24
-Last Modified: 2026-03-24
+Last Modified: 2026-03-31
 Summary: SharePoint REST API adapter and field structure loader.
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
@@ -5625,7 +5647,7 @@ This file is part of DataLaVista
 24-normalization.js: Data normalization, field type parsing, and CSV parsing.
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 Created: 2026-03-24
-Last Modified: 2026-03-24
+Last Modified: 2026-03-31
 Summary: Data normalization, field type parsing, and CSV parsing.
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
@@ -5907,7 +5929,7 @@ This file is part of DataLaVista
 25-data-sources.js: Data source connection popup, remote fetch guards, and source loaders.
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 Created: 2026-03-24
-Last Modified: 2026-03-24
+Last Modified: 2026-03-31
 Summary: Data source connection popup, remote fetch guards, and source loaders.
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
@@ -7119,7 +7141,7 @@ This file is part of DataLaVista
 26-cyberdyne-pipeline.js: Unified data loading and processing pipeline
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 Created: 2026-03-28
-Last Modified: 2026-03-28
+Last Modified: 2026-03-31
 Summary: Cyberdyne Pipeline - unified data processing for CSV, JSON, Excel, XML, SQLite
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
@@ -7818,7 +7840,7 @@ This file is part of DataLaVista
 27-cyberdyne-views.js: View management for CyberdynePipeline
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 Created: 2026-03-28
-Last Modified: 2026-03-28
+Last Modified: 2026-03-31
 Summary: AlaSQL view creation and management — maps raw tables to user-friendly aliases
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
@@ -8253,6 +8275,36 @@ Object.assign(CyberdynePipeline, {
           });
         }
       }
+
+      // Register Person/User-type fields → UserInformationList (no GUID needed)
+      const uilKey = ds.tables.find(k => {
+        const t = DataLaVistaState.tables[k];
+        return t && (t.internalName === 'UserInformationList' ||
+          (t.displayName || '').toLowerCase().includes('user information'));
+      });
+      if (uilKey) {
+        for (const field of (childTable.fields || [])) {
+          const typeStr = (field.TypeAsString || field.type || '').toLowerCase();
+          if (!typeStr.includes('user')) continue;
+          const childDataField = field.internalName + 'Data';
+          const exists = DataLaVistaState.relationships.some(r =>
+            r.childTableKey === childTableKey && r.spLookupField === field.internalName &&
+            r.parentTableKey === uilKey
+          );
+          if (!exists) {
+            DataLaVistaState.relationships.push({
+              id: this._nextRelId(),
+              source: 'sharepoint-lookup',
+              childTableKey,
+              childField: childDataField,
+              parentTableKey: uilKey,
+              parentField: 'ID',
+              joinType: 'LEFT',
+              spLookupField: field.internalName
+            });
+          }
+        }
+      }
     }
   },
 
@@ -8342,7 +8394,7 @@ This file is part of DataLaVista
 30-config.js: Widget SQL generation, configuration save/load, and fields panel rendering.
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 Created: 2026-03-24
-Last Modified: 2026-03-24
+Last Modified: 2026-03-31
 Summary: Widget SQL generation, configuration save/load, and fields panel rendering.
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
@@ -8912,7 +8964,7 @@ This file is part of DataLaVista
 40-ui-context-menu.js: Right-click context menus and data source management.
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 Created: 2026-03-24
-Last Modified: 2026-03-24
+Last Modified: 2026-03-31
 Summary: Right-click context menus and data source management.
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
@@ -9547,7 +9599,7 @@ This file is part of DataLaVista
 50-qb-basic.js: Basic query builder - field selection, filters, sorts, and SQL generation.
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 Created: 2026-03-24
-Last Modified: 2026-03-24
+Last Modified: 2026-03-31
 Summary: Basic query builder - field selection, filters, sorts, and SQL generation.
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
@@ -10271,7 +10323,7 @@ This file is part of DataLaVista
 52-qb-advanced.js: Advanced query builder - visual join graph, nodes, and options panel.
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 Created: 2026-03-24
-Last Modified: 2026-03-24
+Last Modified: 2026-03-31
 Summary: Advanced query builder - visual join graph, nodes, and options panel.
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
@@ -10433,10 +10485,10 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         const data = safeDragParse(event);
         if (!data) return;
 
-        const canvas = document.getElementById('qb-canvas');
-        const rect = canvas.getBoundingClientRect();
-        const x = event.clientX - rect.left - 80;
-        const y = event.clientY - rect.top - 40;
+        const wrap = document.getElementById('qb-canvas-wrap');
+        const wrapRect = wrap.getBoundingClientRect();
+        const x = event.clientX - wrapRect.left + wrap.scrollLeft - 80;
+        const y = event.clientY - wrapRect.top  + wrap.scrollTop  - 40;
 
         if (data.type === 'table') {
           addAdvNode(data.table, x, y);
@@ -10522,11 +10574,12 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           DataLaVistaState.advancedQB.nodeAliases[id] = sqlAlias;
         }
 
-        createAdvNode(id, DataLaVistaState.advancedQB.nodes[id]);
         ensureTableData(tableName);
 
-        // Auto-apply relationships involving this table (skip when called from autoApplySuggestedJoins to avoid recursion)
+        // Auto-apply relationships BEFORE rendering so nodeAliases are set when createAdvNode draws the header
         if (!_skipAutoJoin) autoApplySuggestedJoins(id, tableName);
+
+        createAdvNode(id, DataLaVistaState.advancedQB.nodes[id]);
 
         rebuildAdvancedSQL();
         selectAdvNode(id);
@@ -10557,8 +10610,11 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         const deriveSPAlias = (childTableKey, childField) => {
           const childT = DataLaVistaState.tables[childTableKey];
           const childAlias = childT?.alias || childTableKey;
-          // childField is the *Data synthetic field; strip the 'Data' suffix to get the base field name
-          const fieldBase = childField.endsWith('Data') ? childField.slice(0, -4) : childField;
+          // childField is the *Data synthetic field; strip 'Data' suffix to get the internalName,
+          // then look up the field's alias (view column name) for the display label.
+          const fieldInternalName = childField.endsWith('Data') ? childField.slice(0, -4) : childField;
+          const fieldObj = (childT?.fields || []).find(f => f.internalName === fieldInternalName);
+          const fieldBase = fieldObj?.alias || fieldInternalName;
           return childAlias + '_' + fieldBase;
         };
 
@@ -10579,11 +10635,31 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
             fromKey  = childFieldAlias;
             toKey    = parentFieldAlias;
             fromNodeId = existingTableToNodes[rel.childTableKey][0];
+
+            // Skip self-joins (joining a table to itself).
+            if (rel.childTableKey === rel.parentTableKey) continue;
+
+            // Pre-check if this join already exists before creating any sibling node.
+            const preAlreadyJoined = DataLaVistaState.advancedQB.joins.some(j => {
+              const jFrom = DataLaVistaState.advancedQB.nodes[j.fromNode]?.tableName;
+              const jTo   = DataLaVistaState.advancedQB.nodes[j.toNode]?.tableName;
+              return ((jFrom === rel.childTableKey && jTo === rel.parentTableKey) ||
+                      (jFrom === rel.parentTableKey && jTo === rel.childTableKey)) &&
+                     j.fromKey === fromKey && j.toKey === toKey;
+            });
+            if (preAlreadyJoined) continue;
+
             // Each rel needs a distinct parent node. Use newNodeId for the first rel,
             // then create additional parent nodes (siblings of the new node) for subsequent rels.
             if (!usedNewNodeForParent.has(rel.childTableKey)) {
               toNodeId = newNodeId;
               usedNewNodeForParent.add(rel.childTableKey);
+              // Assign derived SP alias to the first-used node too
+              if (rel.source === 'sharepoint-lookup') {
+                const firstAlias = deriveSPAlias(rel.childTableKey, rel.childField);
+                DataLaVistaState.advancedQB.nodeAliases ??= {};
+                DataLaVistaState.advancedQB.nodeAliases[newNodeId] = firstAlias;
+              }
             } else {
               const nd0 = DataLaVistaState.advancedQB.nodes[newNodeId];
               const siblingAlias = deriveSPAlias(rel.childTableKey, rel.childField);
@@ -10592,14 +10668,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           } else {
             continue;
           }
-
-          // Skip if an identical join (same nodes + same keys) already exists
-          const alreadyJoined = DataLaVistaState.advancedQB.joins.some(j =>
-            ((j.fromNode === fromNodeId && j.toNode === toNodeId) ||
-             (j.fromNode === toNodeId   && j.toNode === fromNodeId)) &&
-            j.fromKey === fromKey && j.toKey === toKey
-          );
-          if (alreadyJoined) continue;
 
           DataLaVistaState.advancedQB.joins.push({
             fromNode: fromNodeId, fromSide: 'right',
@@ -10690,19 +10758,43 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           const corner = Array.from(rh.classList).find(c => ['tl','tr','bl','br'].includes(c)) || 'br';
           rh.addEventListener('mousedown', e => { e.stopPropagation(); startNodeResize(e, id, el, corner); });
         });
+
+        expandCanvas();
+      }
+
+      // Expand #qb-canvas so it always fits all placed nodes + padding
+      function expandCanvas() {
+        const canvas = document.getElementById('qb-canvas');
+        if (!canvas) return;
+        let maxX = 0, maxY = 0;
+        for (const nd of Object.values(DataLaVistaState.advancedQB.nodes)) {
+          maxX = Math.max(maxX, (nd.x || 0) + (nd.w || 240) + 40);
+          maxY = Math.max(maxY, (nd.y || 0) + (nd.h || 200) + 40);
+        }
+        canvas.style.minWidth  = maxX + 'px';
+        canvas.style.minHeight = maxY + 'px';
       }
 
       function startNodeDrag(e, id, el) {
         e.preventDefault();
         const nd = DataLaVistaState.advancedQB.nodes[id];
-        const startX = e.clientX - nd.x;
-        const startY = e.clientY - nd.y;
+        const wrap = document.getElementById('qb-canvas-wrap');
+        const wrapRect = wrap.getBoundingClientRect();
+        const toCanvas = mv => ({
+          x: mv.clientX - wrapRect.left + wrap.scrollLeft,
+          y: mv.clientY - wrapRect.top  + wrap.scrollTop
+        });
+        const startPt = toCanvas(e);
+        const offX = startPt.x - nd.x;
+        const offY = startPt.y - nd.y;
 
         const onMove = mv => {
-          nd.x = mv.clientX - startX;
-          nd.y = mv.clientY - startY;
+          const pt = toCanvas(mv);
+          nd.x = pt.x - offX;
+          nd.y = pt.y - offY;
           el.style.left = nd.x + 'px';
           el.style.top = nd.y + 'px';
+          expandCanvas();
           redrawJoins();
         };
         const onUp = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp); };
@@ -12033,7 +12125,7 @@ This file is part of DataLaVista
 60-design.js: Design canvas, widget rendering, data transforms, and widget properties.
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 Created: 2026-03-24
-Last Modified: 2026-03-24
+Last Modified: 2026-03-31
 Summary: Design canvas, widget rendering, data transforms, and widget properties.
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
@@ -13282,7 +13374,7 @@ This file is part of DataLaVista
 70-preview.js: Preview tab, CSV download, and report generation.
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 Created: 2026-03-24
-Last Modified: 2026-03-24
+Last Modified: 2026-03-31
 Summary: Preview tab, CSV download, and report generation.
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
@@ -13664,7 +13756,7 @@ This file is part of DataLaVista
 80-ui-utils.js: Resizable panels, tab switching, utility functions, and SharePoint file picker.
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 Created: 2026-03-24
-Last Modified: 2026-03-24
+Last Modified: 2026-03-31
 Summary: Resizable panels, tab switching, utility functions, and SharePoint file picker.
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
@@ -14151,7 +14243,7 @@ This file is part of DataLaVista
 90-init.js: App initialization, lazy init guard, and report URL loading.
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 Created: 2026-03-24
-Last Modified: 2026-03-24
+Last Modified: 2026-03-31
 Summary: App initialization, lazy init guard, and report URL loading.
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
@@ -14480,7 +14572,7 @@ This file is part of DataLaVista
 95-public-api.js: Public API (window.dlv) and app self-initialization entry point.
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 Created: 2026-03-24
-Last Modified: 2026-03-24
+Last Modified: 2026-03-31
 Summary: Public API (window.dlv) and app self-initialization entry point.
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
