@@ -140,6 +140,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       if (t.startsWith('bool') || t === 'yesno' || t === 'yes/no') return 'boolean';
       if (t === 'number' || t === 'currency' || t === 'integer') return 'number';
       if (t === 'datetime') return 'date';
+      if (t === 'url') return 'url';
       if (t === 'calculated') return 'text';
       if (t === 'note' || t === 'html') return 'html';
       return 'text';

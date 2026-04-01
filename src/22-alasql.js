@@ -175,7 +175,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         const isUser   = ts.includes('user')     || ft === 'user'       || ft === 'user-multi';
         const isTax    = ts.includes('taxonomy') || ft === 'taxkeyword' || key === 'TaxKeyword';
         const isLookup = ts.includes('lookup')   || ft === 'lookup'     || ft === 'lookup-multi';
-        const isURL    = ts.includes('url');
+        const isURL    = ts.includes('url') || ft === 'url';
         const isMulti  = ts.includes('multi') || ft.includes('multi') || ft === 'taxkeyword' || key === 'TaxKeyword';
 
         if (isLookup && !isMulti && typeof value === 'object' && !Array.isArray(value)) {
@@ -237,8 +237,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 
         if (isURL && typeof value === 'object' && value.Url) {
           mapped[outKey]                  = value.Url;
-          mapped[outKey + 'Description']  = value.Description || '';
-          mapped[outKey + 'Url']          = value.Url;
+          mapped[outKey + 'Label']        = value.Description || '';
+          mapped[outKey + 'Data']         = value;
           delete processingRow[key];
           continue;
         }
