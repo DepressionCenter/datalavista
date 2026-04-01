@@ -1,0 +1,142 @@
+{
+    "_license": "This file is part of DataLaVista. This file contains list data obtained by querying the SharePoint REST API for the items in a custom list called TestList that contains all possible field types. Copyright © 2026 The Regents of the University of Michigan. This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version. This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details. You should have received a copy of the GNU General Public License along with this program. If not, see https://www.gnu.org/licenses.",
+    "odata.metadata": "https://umhealth.sharepoint.com/sites/DepressionCenter-TrackMaster/_api/$metadata#SP.ListData.TestListListItems&$select=Id,Title,MultiSelectChoiceColumn,PersonOrGroupProfilePhotosMultiS/Id,PersonOrGroupProfilePhotosMultiS/Title,PersonOrGroupProfilePhotosMultiS/Name,Editor/Id,Editor/Title,Editor/Name,Editor/EMail,PersonOrGroupColumn/Id,PersonOrGroupColumn/Title,PersonOrGroupColumn/Name,PersonColumn/Id,PersonColumn/Title,PersonColumn/Name,LocationSimpleColumn,ImageColumn,HyperlinkColumn,SingleLookupColumn/Id,MultiSelectLookupColumn/Id,MultiLookupProjectedFieldsColumn/Id,SingleLookupColumn/Title,MultiSelectLookupColumn/Title,MultiLookupProjectedFieldsColumn/Title",
+    "value": [
+        {
+            "odata.type": "SP.Data.TestListListItem",
+            "odata.id": "64b297e1-4957-4aaf-8e08-148e0c640284",
+            "odata.etag": "\"7\"",
+            "odata.editLink": "Web/Lists(guid'3bf4ae2d-000d-4d00-bfb1-b05c8cf5c003')/Items(1)",
+            "PersonColumn@odata.navigationLinkUrl": "Web/Lists(guid'3bf4ae2d-000d-4d00-bfb1-b05c8cf5c003')/Items(1)/PersonColumn",
+            "PersonColumn": {
+                "odata.type": "SP.Data.UserInfoItem",
+                "odata.id": "7de82aad-74b0-41b9-b4e8-a2106b06e3ce",
+                "Id": 14,
+                "Title": "Mongefranco, Gabriel",
+                "Name": "i:0#.f|membership|m-test@med.umich.edu"
+            },
+            "PersonOrGroupColumn@odata.navigationLinkUrl": "Web/Lists(guid'3bf4ae2d-000d-4d00-bfb1-b05c8cf5c003')/Items(1)/PersonOrGroupColumn",
+            "PersonOrGroupColumn": {
+                "odata.type": "SP.Data.UserInfoItem",
+                "odata.id": "59ca6b5f-08ba-4def-b6a7-de3ecb9c9f30",
+                "Id": 46,
+                "Title": "efdc-mobiletech-test",
+                "Name": "c:0t.c|tenant|19ccca5c-00a4-48c7-96a8-55e237dadda2"
+            },
+            "PersonOrGroupProfilePhotosMultiS@odata.navigationLinkUrl": "Web/Lists(guid'3bf4ae2d-000d-4d00-bfb1-b05c8cf5c003')/Items(1)/PersonOrGroupProfilePhotosMultiS",
+            "PersonOrGroupProfilePhotosMultiS": [
+                {
+                    "odata.type": "SP.Data.UserInfoItem",
+                    "odata.id": "5cf3b3bf-5373-423b-9370-60c8eb252a78",
+                    "Id": 14,
+                    "Title": "Mongefranco, Gabriel",
+                    "Name": "i:0#.f|membership|m-test@med.umich.edu"
+                },
+                {
+                    "odata.type": "SP.Data.UserInfoItem",
+                    "odata.id": "3116baba-1b4c-442e-b548-97a920b11309",
+                    "Id": 46,
+                    "Title": "efdc-mobiletech-test",
+                    "Name": "c:0t.c|tenant|19ccca5c-00a4-48c7-96a8-55e237dadda2"
+                },
+                {
+                    "odata.type": "SP.Data.UserInfoItem",
+                    "odata.id": "789385b5-d7c3-4391-a22d-eb1a0fc6225a",
+                    "Id": 1506,
+                    "Title": "efdc-mobiletech-test.mm Members",
+                    "Name": "c:0o.c|federateddirectoryclaimprovider|be2af5e5-8f87-46bd-b3a1-6b7db75b85ef"
+                }
+            ],
+            "SingleLookupColumn@odata.navigationLinkUrl": "Web/Lists(guid'3bf4ae2d-000d-4d00-bfb1-b05c8cf5c003')/Items(1)/SingleLookupColumn",
+            "SingleLookupColumn": {
+                "odata.type": "SP.Data.PeopleListItem",
+                "odata.id": "f9ff8867-9297-4b01-b497-656e7e849a72",
+                "Id": 721,
+                "Title": "Gabriel Multitasker"
+            },
+            "MultiSelectLookupColumn@odata.navigationLinkUrl": "Web/Lists(guid'3bf4ae2d-000d-4d00-bfb1-b05c8cf5c003')/Items(1)/MultiSelectLookupColumn",
+            "MultiSelectLookupColumn": [
+                {
+                    "odata.type": "SP.Data.PeopleListItem",
+                    "odata.id": "63b1d442-64d7-418b-a1cf-11722232c8d5",
+                    "Id": 721,
+                    "Title": "Gabriel Multitasker"
+                },
+                {
+                    "odata.type": "SP.Data.PeopleListItem",
+                    "odata.id": "0f655678-1733-413c-b5a6-68e6b5543f99",
+                    "Id": 663,
+                    "Title": "Virtuasa Testelina"
+                }
+            ],
+            "MultiLookupProjectedFieldsColumn@odata.navigationLinkUrl": "Web/Lists(guid'3bf4ae2d-000d-4d00-bfb1-b05c8cf5c003')/Items(1)/MultiLookupProjectedFieldsColumn",
+            "MultiLookupProjectedFieldsColumn": [
+                {
+                    "odata.type": "SP.Data.PeopleListItem",
+                    "odata.id": "87f72879-2ec4-4c2a-9112-141ade34f955",
+                    "Id": 721,
+                    "Title": "Gabriel Multitasker"
+                },
+                {
+                    "odata.type": "SP.Data.PeopleListItem",
+                    "odata.id": "9a8dc1b3-3011-4705-9ff5-b9fab208a054",
+                    "Id": 663,
+                    "Title": "Virtuasa Testelina"
+                }
+            ],
+            "Editor@odata.navigationLinkUrl": "Web/Lists(guid'3bf4ae2d-000d-4d00-bfb1-b05c8cf5c003')/Items(1)/Editor",
+            "Editor": {
+                "odata.type": "SP.Data.UserInfoItem",
+                "odata.id": "d97c0101-fc47-4b03-bbee-e0189c803f04",
+                "Id": 14,
+                "Title": "Mongefranco, Gabriel",
+                "Name": "i:0#.f|membership|m-test@med.umich.edu",
+                "EMail": "m-test@med.umich.edu"
+            },
+            "Id": 1,
+            "Title": "Item #1 title",
+            "MultiSelectChoiceColumn": [
+                "Choice 1",
+                "Choice 2",
+                "Choice 3"
+            ],
+            "LocationSimpleColumn": "{\"Score\":-20,\"EntityType\":\"LocalBusiness\",\"LocationSource\":\"Bing\",\"FormattedAddress\":\"1500 E Medical Center Dr, Ann Arbor, MI 48109\",\"LocationUri\":\"https://www.bingapis.com/api/v6/localbusinesses/YN4F1E3A0FE46C44A8\",\"Availability\":\"Unknown\",\"UniqueId\":\"https://www.bingapis.com/api/v6/localbusinesses/YN4F1E3A0FE46C44A8\",\"IsPreviouslyUsed\":false,\"Id\":\"https://www.bingapis.com/api/v6/localbusinesses/YN4F1E3A0FE46C44A8\",\"DisplayName\":\"University of Michigan Medical Center\",\"Address\":{\"Street\":\"1500 E Medical Center Dr\",\"City\":\"Ann Arbor\",\"State\":\"MI\",\"CountryOrRegion\":\"United States\",\"PostalCode\":\"48109\",\"Type\":\"Unknown\",\"IsInferred\":false},\"Coordinates\":{\"Latitude\":42.2837,\"Longitude\":-83.7287}}",
+            "ImageColumn": "{\"fileName\":\"Reserved_ImageAttachment_[11]_[ImageColumn][32]_[a1d5155053fe4034a59e20a47767ebae][1]_[1].png\",\"originalImageName\":\"EFDCLogo_375w\"}",
+            "HyperlinkColumn": {
+                "Description": "Depression Center Website",
+                "Url": "https://depressioncenter.org"
+            },
+            "ID": 1
+        },
+        {
+            "odata.type": "SP.Data.TestListListItem",
+            "odata.id": "bd89e313-8eb9-4ed0-b4f6-c34ff1463b1f",
+            "odata.etag": "\"1\"",
+            "odata.editLink": "Web/Lists(guid'3bf4ae2d-000d-4d00-bfb1-b05c8cf5c003')/Items(2)",
+            "PersonColumn@odata.navigationLinkUrl": "Web/Lists(guid'3bf4ae2d-000d-4d00-bfb1-b05c8cf5c003')/Items(2)/PersonColumn",
+            "PersonOrGroupColumn@odata.navigationLinkUrl": "Web/Lists(guid'3bf4ae2d-000d-4d00-bfb1-b05c8cf5c003')/Items(2)/PersonOrGroupColumn",
+            "PersonOrGroupProfilePhotosMultiS@odata.navigationLinkUrl": "Web/Lists(guid'3bf4ae2d-000d-4d00-bfb1-b05c8cf5c003')/Items(2)/PersonOrGroupProfilePhotosMultiS",
+            "SingleLookupColumn@odata.navigationLinkUrl": "Web/Lists(guid'3bf4ae2d-000d-4d00-bfb1-b05c8cf5c003')/Items(2)/SingleLookupColumn",
+            "MultiSelectLookupColumn@odata.navigationLinkUrl": "Web/Lists(guid'3bf4ae2d-000d-4d00-bfb1-b05c8cf5c003')/Items(2)/MultiSelectLookupColumn",
+            "MultiSelectLookupColumn": [],
+            "MultiLookupProjectedFieldsColumn@odata.navigationLinkUrl": "Web/Lists(guid'3bf4ae2d-000d-4d00-bfb1-b05c8cf5c003')/Items(2)/MultiLookupProjectedFieldsColumn",
+            "MultiLookupProjectedFieldsColumn": [],
+            "Editor@odata.navigationLinkUrl": "Web/Lists(guid'3bf4ae2d-000d-4d00-bfb1-b05c8cf5c003')/Items(2)/Editor",
+            "Editor": {
+                "odata.type": "SP.Data.UserInfoItem",
+                "odata.id": "507f349a-bf6e-4cdb-afa8-b8fdfde01ba8",
+                "Id": 14,
+                "Title": "Mongefranco, Gabriel",
+                "Name": "i:0#.f|membership|m-test@med.umich.edu",
+                "EMail": "m-test@med.umich.edu"
+            },
+            "Id": 2,
+            "Title": "Item #2 title",
+            "MultiSelectChoiceColumn": null,
+            "LocationSimpleColumn": null,
+            "ImageColumn": null,
+            "HyperlinkColumn": null,
+            "ID": 2
+        }
+    ]
+}
