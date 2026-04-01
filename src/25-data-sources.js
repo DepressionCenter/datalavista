@@ -734,7 +734,7 @@ async function loadSharePointListsSource(siteUrl, dsName, newAuth='current', new
         alias: tableAlias,
         dsAlias: dsName,
         fields: fieldMetas,
-        originalFields: fields,
+        //originalFields: fields, // TODO: Commented out to debug synthetic fields not being generated 3/31/26
         data: [],
         loaded: false,
         sourceType: 'sharepoint',

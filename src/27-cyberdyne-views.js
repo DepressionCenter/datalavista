@@ -419,8 +419,13 @@ Object.assign(CyberdynePipeline, {
         const parentTableKey = guidToTableKey[normalizedGuid];
         if (!parentTableKey || parentTableKey === childTableKey) continue;
 
-        // Use the synthetic Data field for INCLUDES joins
-        const childDataField = field.internalName + 'Data';
+        // Multi-select lookups store an array in *Data; single-select store a scalar in *Id.
+        const typeStr = (field.TypeAsString || field.type || '').toLowerCase();
+        const isMultiSelect = typeStr.includes('multi') || typeStr.includes('multichoice');
+        const childJoinField = isMultiSelect
+          ? field.internalName + 'Data'   // array field → INCLUDES join
+          : field.internalName + 'Id';    // scalar FK  → regular LEFT JOIN
+
         const exists = DataLaVistaState.relationships.some(r =>
           r.childTableKey === childTableKey && r.spLookupField === field.internalName &&
           r.parentTableKey === parentTableKey
@@ -430,10 +435,11 @@ Object.assign(CyberdynePipeline, {
             id: this._nextRelId(),
             source: 'sharepoint-lookup',
             childTableKey,
-            childField: childDataField,
+            childField: childJoinField,
             parentTableKey,
             parentField: 'ID',
             joinType: 'LEFT',
+            isMultiSelect,
             spLookupField: field.internalName
           });
         }
@@ -449,7 +455,11 @@ Object.assign(CyberdynePipeline, {
         for (const field of (childTable.fields || [])) {
           const typeStr = (field.TypeAsString || field.type || '').toLowerCase();
           if (!typeStr.includes('user')) continue;
-          const childDataField = field.internalName + 'Data';
+          // Multi-select person fields store an array in *Data; single-select store a scalar in *Id.
+          const isMultiSelect = typeStr.includes('multi');
+          const childJoinField = isMultiSelect
+            ? field.internalName + 'Data'
+            : field.internalName + 'Id';
           const exists = DataLaVistaState.relationships.some(r =>
             r.childTableKey === childTableKey && r.spLookupField === field.internalName &&
             r.parentTableKey === uilKey
@@ -459,10 +469,11 @@ Object.assign(CyberdynePipeline, {
               id: this._nextRelId(),
               source: 'sharepoint-lookup',
               childTableKey,
-              childField: childDataField,
+              childField: childJoinField,
               parentTableKey: uilKey,
               parentField: 'ID',
               joinType: 'LEFT',
+              isMultiSelect,
               spLookupField: field.internalName
             });
           }
