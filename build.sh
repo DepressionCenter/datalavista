@@ -129,4 +129,4 @@ echo "  -> DataLaVista.html"
 
 rm -f /tmp/dlv_snippet.txt
 echo ""
-echo "Build complete."
+echo "Build completed at $(date '+%Y-%m-%d %I:%M:%S %p')."

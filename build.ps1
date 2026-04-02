@@ -116,4 +116,4 @@ Replace-Placeholder "$SRC\00-full-page.html" $inlineSb.ToString() 'DataLaVista.h
 Write-Host '  -> DataLaVista.html'
 
 Write-Host ''
-Write-Host 'Build complete.'
+Write-Host ("Build completed at {0:yyyy-MM-dd hh:mm:ss tt}." -f (Get-Date))
