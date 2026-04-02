@@ -1,5 +1,5 @@
 <!--
-This file is part of DataLaVista
+This file is part of DataLaVista™
 README.md
 Author(s): Gabriel Mongefranco.
 Created: 2026-03-10
@@ -26,22 +26,22 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 
        /|____________|\
       ||  /--------\  ||    ___       _          _            _    _ _     _
-      ||_|__________| ||   |   \ __ _| |_ __ _  | |   __ _  | \  / (_) ___| |_ __  
+      ||_|__________| ||   |   \ __ _| |_ __ _  | |   __ _  | \  / (_) ___| |_ __ TM
       ||              ||   | |) / _` |  _/ _` | | |__/ _` |  \ \/ /| (_-<  _/ _` |
       | \____________/ |   |___/\__,_|\__\__,_| |____\__,_|   \__/ |_/__/\__\__,_|
        \  |_|_|_|_|  / 
-        \___________/         🕶️ "The BI Terminator" 🕶️
+        \___________/         🕶️ "The BI Terminator" ™ 🕶️
 ```
 
-# 🕶️ Data La Vista
+# 🕶️ DataLaVista™
 
 ## Description
 <div style="display: flex; justify-content: flex-end;" align="right"><a href="https://doi.org/10.5281/zenodo.19245606" title="DOI" target="_blank" style="align: right;"><img src="https://zenodo.org/badge/1177965725.svg" alt="DOI" title="DOI" align="right" /></a></div>
 
-***🕶️ Tell your expensive BI tools: "Data la vista, baby!"***
+**🕶️ Tell your expensive BI tools: "Data la vista, baby!"** ™
 
 
-***DataLaVista*** is a lightweight, client-side reporting and dashboard toolkit. It brings the full power of SQL directly to your browser, allowing you to build high-performance visualizations without the need for expensive server-side licenses or complex backend infrastructure.
+**DataLaVista**™ is a lightweight, client-side reporting and dashboard toolkit. It brings the full power of SQL directly to your browser, allowing you to build high-performance visualizations without the need for expensive server-side licenses or complex backend infrastructure.
 
 <a href="https://code.depressioncenter.org/datalavista/DataLaVista.html" title="Click to try it live!" target="_blank"><img src="images/datalavista-screenshot-1.png" 
     alt="Screenshot of Data La Vista in action, terminating a data silo, displaying a SQL query with auto-completion dropdown menu and a dashboard designer with a table and pie chart with filters." 
@@ -49,7 +49,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 
 While it was initially designed to dominate SharePoint List items with pure JavaScript widgets that run directly in the browser, Data La Vista is built to be a universal survivor. It aims to be framework-agnostic and designed to plug into any webpage to terminate data silos across REST services, JSON, Excel, and CSV files.
 
-### Come with me if you want to query
+### Come with me if you want to query™
 Most enterprise data is trapped behind bloated frameworks or expensive BI tools. Data La Vista terminates them to free your data:
 
 + Zero Server Footprint: 100% JavaScript. Your browser is the engine.
@@ -103,7 +103,7 @@ Data La Vista does not aim to replace other BI tools completly. This tool is mea
 The mission is far from over. Future updates will include:
 + Advanced REST Integration: Seamlessly fetch and join data from multiple API endpoints
 + Excel/CSV Drag-and-Drop: Instant dashboards from local spreadsheets
-+ The "Skynet" UI Kit: A library of aggressive, high-contrast dashboard components
++ The "Skynet UI Kit"™: A library of aggressive, high-contrast dashboard components
 + Support for Lua, a blazing fast and easy-to-learn scripting language
 
 
@@ -130,7 +130,7 @@ If you need assistance identifying a contact person, email the EFDC's Mobile Tec
 + [Gabriel Mongefranco](https://gabriel.mongefranco.com) [(@gabrielmongefranco)](https://github.com/gabrielmongefranco)
 + [Jeremy Gluskin](https://mcommunity.umich.edu/person/jgluskin) [(@jerm-ops)](https://github.com/jerm-ops) - Revenue Lifecycle System Coordinator, Quality - Patient Safety, Michigan Medicine.
 + [Shelley Boa](https://mcommunity.umich.edu/person/sboa) [(@blondilox-ai)](https://github.com/blondilox-ai) - Program Manager, Internal Medicine / Pulmonology & Critical Care, Michigan Medicine.
-+ The [Automators Anonumous](https://github.com/DepressionCenter/AutomatorsAnonymous) group.
++ The [Automators Anonumous™](https://github.com/DepressionCenter/AutomatorsAnonymous) group.
 
 
 #### This work is based in part on the following projects, libraries and/or studies:
@@ -143,6 +143,8 @@ If you need assistance identifying a contact person, email the EFDC's Mobile Tec
 
 ## License
 ### Copyright Notice
+<small><strong>DataLaVista™</strong>, "Come with me if you want to query"™, "The BI Tool Terminator"™, "I'll be back... with a better report"™, "Skynet UI Toolkit"™, "CyberdynePipeline", "I'll be pipeline"™, and "I'll be data processing"™</small> are all trademarks of The Regents of the University of Michigan.
+<small>Microsoft, SharePoint, Script Editor, DOI, Zenodo, GNU, GPL, Free Software Foundation, Apache ECharts, AlaSQL, CodeMirror, and other external libraries</small> are all registred marks or trademarks of their respective owners.
 Copyright © 2026 The Regents of the University of Michigan
 
 
@@ -168,7 +170,7 @@ Free Documentation License". If not, see <https://www.gnu.org/licenses/fdl-1.3-s
 If you find this repository, code or paper useful for your research, please cite it.
 
 #### Citation Example:
->_Mongefranco, Gabriel; Gluskin, Jeremy; Boa, Shelley (2026). DataLaVista. University of Michigan. Software. https://github.com/DepressionCenter/datalavista_  
+>_Mongefranco, Gabriel; Gluskin, Jeremy; Boa, Shelley (2026). DataLaVista™. University of Michigan. Software. https://github.com/DepressionCenter/datalavista_  
 ​​​​​​​     _DOI: [https://doi.org/10.5281/zenodo.19245606](https://doi.org/10.5281/zenodo.19245606)_
 
 
