@@ -36,7 +36,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 # 🕶️ DataLaVista™
 
 ## Description
-<div style="display: flex; justify-content: flex-end;" align="right"><a href="https://doi.org/10.5281/zenodo.19245606" title="DOI" target="_blank" style="align: right;"><img src="https://zenodo.org/badge/1177965725.svg" alt="DOI" title="DOI" align="right" /></a></div>
+<div style="display: flex; justify-content: flex-end;" align="right"><a href="https://doi.org/10.5281/zenodo.19245606" title="DOI" target="_blank" style="align: right;"><img alt="10.5281/zenodo.19245606" src="https://zenodo.org/badge/DOI/10.5281/zenodo.19245606.svg" style="float: right; width: 191px; height: 20px;" /></a></div>
 
 **🕶️ Tell your expensive BI tools: "Data la vista, baby!"** ™
 
