@@ -95,6 +95,7 @@ function saveConfig() {
 
 // Build a clean, minimal config object from the current state, suitable for saving or sharing
 function buildConfig() {
+  // TODO: DEBUG: It looks like relationships, basicQB and advancedQB are not being included in the config.
   const cleanFields = (arr) => (arr || []).map(f => ({
     InternalName: f.InternalName || f.internalName || '',
     internalName: f.internalName || f.InternalName || '',
@@ -219,6 +220,7 @@ function buildConfig() {
  
   // ── Smart export: only include tables referenced in the SQL (or uploaded files) ──
   // Collect all SQL text: main query + every widget's generated SQL
+  // TODO: DEBUG: This probably shoulnd't take widget SQL into account since it always uses the materialized view. Only state.sql should be used.
   const _allSqlParts = [DataLaVistaState.sql || ''];
   for (const w of DataLaVistaState.design.widgets || []) {
     const wsql = generateWidgetSQL(w, '_results');
@@ -318,8 +320,11 @@ async function loadConfig(cfg) {
   CyberdynePipeline.clearAllViews(); // drop any existing AlaSQL views before reloading
   //{ ...cfg.dataSource } || { type: 'sharepoint', url: '', auth: 'current' };
   DataLaVistaState.activeTab = (DataLaVistaState.reportMode==='view')?'dataPreview':'design';
+  console.log('DEBUG: loadConfig: advancedQB:', cfg.advancedQB);
   DataLaVistaState.advancedQB = cfg.advancedQB || {};
+   console.log('DEBUG: loadConfig: advancedQB.nodeAliases:', cfg.advancedQB.nodeAliases);
   DataLaVistaState.advancedQB.nodeAliases ??= {};
+   console.log('DEBUG: loadConfig: basicQB:', cfg.basicQB);
   DataLaVistaState.basicQB = cfg.basicQB || {};
   DataLaVistaState.currentWidgetId = null;
   DataLaVistaState.dataSources = cfg.dataSources || {};
@@ -335,11 +340,13 @@ async function loadConfig(cfg) {
     transformedResults: null
   };
   DataLaVistaState.previewFilters = cfg.previewFilters || {};
-  DataLaVistaState.qmTab = cfg.qmTab || 'previewData';
+  // Normalize legacy tab name ('previewData' was renamed to 'dataPreview')
+  DataLaVistaState.qmTab = (cfg.qmTab === 'previewData') ? 'dataPreview' : (cfg.qmTab || 'qb');
   DataLaVistaState.queryColumns = Array.isArray(cfg.queryColumns) ? [...cfg.queryColumns] : [];
   DataLaVistaState.queryMode = (cfg.queryMode && cfg.queryMode != null && cfg.queryMode != undefined && cfg.queryMode != '') ? cfg.queryMode : 'sql';
   // Don't load reportMode or reportUrl from config - it's handled by init()
   DataLaVistaState.relationships = Array.isArray(cfg.relationships) ? cfg.relationships : [];
+   console.log('DEBUG: loadConfig: sql:', cfg.sql);
   DataLaVistaState.sql = cfg.sql || '';
   DataLaVistaState.sqlLocked = cfg.sqlLocked || false;
   DataLaVistaState.tables = cfg.tables || {};
@@ -420,6 +427,10 @@ async function loadConfig(cfg) {
     renderFieldsPanel();
     renderBasicQB();
     renderAdvancedQB();
+    // Restore the QB mode (basic/advanced) and active sub-tab (qb/sql/dataPreview)
+    // that were saved with the config, so the user lands on the right panel.
+    setQBMode(DataLaVistaState.queryMode || 'basic');
+    switchQMTab(DataLaVistaState.qmTab || 'qb');
     setStatus('Config loaded', 'success');
     toast('Config loaded successfully', 'success');
   }
@@ -615,4 +626,3 @@ async function loadConfig(cfg) {
           });
         }
       }
-

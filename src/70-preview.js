@@ -42,12 +42,16 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
             }
             // Register the raw _raw_tname TABLE (safe regardless of VIEW state)
             registerTableInAlaSQL(tname);
-            // Rebuild the FieldExpander VIEW so the SQL can use alias column names + UDFs
+            // Rebuild the FieldExpander VIEW only if the AlaSQL view object is absent or stale.
+            // ensureTableData already creates it for SP lists; fetchTableData does it for
+            // remote files. Skip redundant _applyViewSQL calls for views already active.
             const viewName = t.viewName || CyberdynePipeline.getViewForTable(tname);
             if (viewName) {
-              try { CyberdynePipeline.updateViewSQL(viewName); }
-              catch (e) { console.warn('[DLV] [refreshDashboardPreview] updateViewSQL:', viewName, e.message); }
-												   
+              const alasqlViewExists = !!(alasql.tables && alasql.tables[viewName] && alasql.tables[viewName].view);
+              if (!alasqlViewExists) {
+                try { CyberdynePipeline.updateViewSQL(viewName); }
+                catch (e) { console.warn('[DLV] [refreshDashboardPreview] updateViewSQL:', viewName, e.message); }
+              }
             }
           }
 

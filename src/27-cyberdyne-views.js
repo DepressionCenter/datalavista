@@ -660,41 +660,33 @@ _applyViewSQL(viewName) {
   restoreViewsFromConfig(viewDefs) {
     console.log('DEBUG: Entered restoreViewsFromConfig Restoring views from config:', Object.keys(viewDefs || {}));
     if (!viewDefs) return;
-    
     for (const [viewName, viewDef] of Object.entries(viewDefs)) {
-      console.log(`DEBUG: restoreViewsFromConfig: Restoring view "${viewName}" with raw table "${viewDef.rawTable}"...`);
-
-      // 1. FIX MISSING DATA: Ensure raw table exists in AlaSQL WITHOUT wiping or touching its data
-      const alasqlName = '_raw_' + viewDef.rawTable;
-      const existing = Object.keys(alasql.tables).find(k => k.toLowerCase() === alasqlName.toLowerCase());
-      if (!existing) {
-          alasql(`CREATE TABLE [${alasqlName}]`); // Create a safe empty shell if it doesn't exist yet
-      }
-
-      // Restore view metadata
-      this.views[viewName] = {
-        rawTable: viewDef.rawTable,
-        baseFields: viewDef.baseFields || null,
-        columnMappings: viewDef.columnMappings || {},
-        fields: viewDef.fields || [],
-        createdAt: new Date().toISOString()
-      };
-      
+      console.log(`DEBUG: restoreViewsFromConfig: Restoring view "${viewName}" with raw table "${viewDef.rawTable}" and fields:`, viewDef.fields);
+      // Always restore the in-memory view metadata (viewToRawTable / rawTableToView maps,
+      // baseFields, columnMappings, etc.).  This is safe even before data is loaded —
+      // findReferencedTables, updateViewSQL, and ensureTableData all depend on it.
+      this.views[viewName] = { ...viewDef, createdAt: new Date().toISOString() };
       this.viewToRawTable[viewName] = viewDef.rawTable;
       this.rawTableToView[viewDef.rawTable] = viewName;
-      
-      // Apply the main view SQL (e.g. creates [Projectstatus] from [_raw_projec_Projectstatus])
-      this._applyViewSQL(viewName);
+      console.log('DEBUG: restoreViewsFromConfig: Registered view metadata for', viewName, 'with raw table', viewDef.rawTable);
 
-      // 2. FIX LEGACY WIDGET CRASHES: Create fallback alias so old saved widget SQL still works
-      if (viewName !== viewDef.rawTable) {
-          try {
-              alasql(`DROP VIEW IF EXISTS [${viewDef.rawTable}]`);
-              // Maps the old ID (projec_Projectstatus) to the new View (Projectstatus)
-              alasql(`CREATE VIEW [${viewDef.rawTable}] AS SELECT * FROM [${viewName}]`);
-          } catch (e) {
-              console.warn(`Could not create legacy alias view for ${viewDef.rawTable}`, e);
-          }
+      // Only attempt the AlaSQL CREATE VIEW statement if the corresponding _raw_ table
+      // already exists in AlaSQL (i.e. data was loaded in a previous session or by a
+      // prior doConnect call).  If not, skip silently — the AlaSQL view will be created
+      // by ensureTableData → fetchTableData → _registerRawTable + updateViewSQL once
+      // the data is actually loaded.
+      const rawAlasqlName = '_raw_' + viewDef.rawTable;
+      const rawTableExists = !!(alasql.tables && alasql.tables[rawAlasqlName]);
+      if (rawTableExists) {
+        try {
+          console.log('DEBUG: restoreViewsFromConfig: Raw table already loaded — applying view SQL for', viewName);
+          this._applyViewSQL(viewName);
+          console.log('DEBUG: restoreViewsFromConfig: Successfully applied view SQL for', viewName);
+        } catch (e) {
+          console.warn('[CyberdynePipeline] restoreViewsFromConfig: _applyViewSQL failed for', viewName, e.message);
+        }
+      } else {
+        console.log(`DEBUG: restoreViewsFromConfig: Deferring AlaSQL VIEW for "${viewName}" — _raw_${viewDef.rawTable} not loaded yet; will be created by ensureTableData`);
       }
     }
   },

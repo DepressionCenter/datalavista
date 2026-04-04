@@ -344,7 +344,57 @@ async function fetchTableData(tableName, fetchAll = false) {
           Array.from(baseExpand).join(','),
           limit
         );
+      } else if (['csv', 'json', 'json5', 'tsv', 'xlsx', 'xls', 'xml', 'sqlite', 'db'].includes(t.sourceType)) {
+        // ── Remote file source (sqlite, csv, xlsx, xml, json) ──────────────
+        // Delegate to CyberdynePipeline.loadRemoteFile, then register each
+        // raw table and rebuild its view using the existing view metadata
+        // already restored by restoreViewsFromConfig (preserving user aliases).
+        const dsName = t.dataSource;
+        const ds = dsName ? DataLaVistaState.dataSources[dsName] : null;
+        const url = t.url || (ds && ds.url);
+        const fileType = t.sourceType || (ds && ds.type);
+        if (!url) {
+          console.warn(`[fetchTableData] No URL found for remote file table "${tableName}" — use Refresh Datasource to reload.`);
+          return;
+        }
+        try {
+          const result = await CyberdynePipeline.loadRemoteFile(url, dsName || tableName, fileType);
+          const loadedTables = result.tables || [result];
+
+          for (const tb of loadedTables) {
+            if (!tb || !tb.data) continue;
+            const tbName = tb.tableName;
+            const tbState = DataLaVistaState.tables[tbName];
+
+            // Register raw data in AlaSQL (_raw_<tableName>)
+            CyberdynePipeline._registerRawTable(tbName, tb.data);
+
+            // Update state on the existing table entry (preserves viewName, aliases, etc.)
+            if (tbState) {
+              tbState.data   = tb.data;
+              tbState.loaded = fetchAll;
+              tbState.itemCount = tb.data.length;
+            }
+
+            // Rebuild the AlaSQL VIEW now that the raw table exists.
+            // view.baseFields was already restored by restoreViewsFromConfig,
+            // so _applyViewSQL will use the saved field definitions.
+            const siblingViewName = CyberdynePipeline.getViewForTable(tbName);
+            if (siblingViewName) {
+              try { CyberdynePipeline.updateViewSQL(siblingViewName); }
+              catch (e) { console.warn(`[fetchTableData] updateViewSQL failed for "${siblingViewName}":`, e.message); }
+            }
+          }
+        } catch (e) {
+          console.warn(`[fetchTableData] Remote file load failed for "${tableName}":`, e.message);
+        }
+        // Status and cleanup are handled by the finally block below — return early
+        // so we don't fall through into the SP-only post-processing code.
+        if (!fetchAll) setStatus(`Loaded preview for ${tableName}`, 'success');
+        if (fetchAll) setStatus(`Loaded data for ${tableName} (${(t.data && t.data.length) || 0} rows)`, 'success');
+        return;
       } else {
+        console.warn(`[fetchTableData] Unhandled sourceType "${t.sourceType}" for table "${tableName}"`);
         return;
       }
  
@@ -1273,4 +1323,3 @@ _buildFileStack(siteUrl, serverRelUrl) {
     return stack;
   }
 };
-
