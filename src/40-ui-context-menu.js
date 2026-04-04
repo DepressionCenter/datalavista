@@ -1,9 +1,9 @@
 ﻿/* ============================================================
-This file is part of DataLaVista
+This file is part of DataLaVista™
 40-ui-context-menu.js: Right-click context menus and data source management.
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 Created: 2026-03-24
-Last Modified: 2026-03-31
+Last Modified: 2026-04-04
 Summary: Right-click context menus and data source management.
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
@@ -385,12 +385,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
   try {
     if (ds.type === 'sharepoint') {
       await loadSharePointListsSource(ds.siteUrl || ds.url, dsName, ds.auth || 'current', ds.token || '', ds.description || '');
-    } else if (ds.type === 'json') {
-      await loadJSONSource(ds.url, dsName);
-    } else if (ds.type === 'csv') {
-      await loadCSVSource(ds.url, dsName);
-    } else if (['xlsx', 'xml', 'sqlite', 'db'].includes(ds.type)) {
-      // Re-load from URL and replace DS tables (preserving aliases)
+    } else if (['json', 'json5', 'csv', 'tsv', 'xlsx', 'xls', 'xml', 'sqlite', 'db'].includes(ds.type)) {
+      // Unified refresh path for all remote file types via CyberdynePipeline
       const result = await CyberdynePipeline.loadRemoteFile(ds.url, dsName, ds.type);
       const tables = result.tables || [result];
       CyberdynePipeline.refreshDataSourceTables(dsName, { ...ds }, tables);

@@ -1,9 +1,9 @@
 ﻿/* ============================================================
-This file is part of DataLaVista
+This file is part of DataLaVista™
 90-init.js: App initialization, lazy init guard, and report URL loading.
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 Created: 2026-03-24
-Last Modified: 2026-03-31
+Last Modified: 2026-04-04
 Summary: App initialization, lazy init guard, and report URL loading.
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
@@ -112,47 +112,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       if(document.getElementById('toolbar-tab-reportMode')) document.getElementById('toolbar-tab-reportMode').classList.add('hidden');
     } else{return;}
   }
-
-
-
-/*const dlvStateHandler = {
-  get(target, property) {
-    const item = target[property];
-    // Lazy deep proxy for nested objects
-    if (item && typeof item === 'object') {
-      return new Proxy(item, dlvStateHandler);
-    }
-    return item;
-  },
-
-  set(target, property, value) {
-    console.log(`State change: target=`,target);
-    console.log(`${property} = `, value);
-    const oldValue = target[property];
-    target[property] = value; // Update the data
-
-    if (oldValue !== value) {
-      // --- UI ROUTING LOGIC ---
-      switch (property) {
-        case 'reportMode':
-          console.log(`[UI Update] reportMode changed to: ${value}`);
-          swapReportMode();
-          break;
-        case 'activeTab':
-          console.log(`[UI Update] activeTab changed to: ${value}`);
-          break;
-        case 'title':
-          console.log(`[UI Update] Dashboard Title changed to: ${value}`);
-          break;
-      }
-    } else if(property==='reportMode' && value==='view') {
-      // Even if reportMode is set to the same value, if it's 'view' we should still apply the report mode UI classes in case they were removed by other code (e.g. if user switched to edit mode and back to view mode)
-        swapReportMode();     
-    }
-    return true;
-  }
-};*/
-
   
   // Guard: call init() automatically if it was never called (e.g. SiteAssets/lazy mode).
   function ensureInit() {

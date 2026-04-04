@@ -1,9 +1,9 @@
 ﻿/* ============================================================
-This file is part of DataLaVista
+This file is part of DataLaVista™
 55-query.js: Query execution, result type detection, and query preview.
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 Created: 2026-03-24
-Last Modified: 2026-03-31
+Last Modified: 2026-04-04
 Summary: Query execution, result type detection, and query preview.
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista

@@ -3157,7 +3157,7 @@ with this program. If not, see https://www.gnu.org/licenses/.
 
     <!-- TOP TOOLBAR -->
     <div id="toolbar">
-      <div class="logo">Data<span>LaVista™</span></div>
+      <div class="logo">Data<span>LaVista</span></div>
       <div class="toolbar-sep"></div>
       <button class="btn btn-default btn-sm" id="btn-connect" title="Come with me if you want to load... more data."
         onclick="showConnectPopup()">⚡ Connect + Load</button>
@@ -3407,7 +3407,7 @@ with this program. If not, see https://www.gnu.org/licenses/.
             <div class="gen-info-logo"><pre style="font-family: monospace; line-height: 1;">
        /|____________|\
       ||  /--------\  ||    ___       _          _            _    _ _     _
-      ||_|__________| ||   |   \ __ _| |_ __ _  | |   __ _  | \  / (_) ___| |_ __ TM
+      ||_|__________| ||   |   \ __ _| |_ __ _  | |   __ _  | \  / (_) ___| |_ __ TM 
       ||              ||   | |) / _` |  _/ _` | | |__/ _` |  \ \/ /| (_-<  _/ _` |
       | \____________/ |   |___/\__,_| |_\__,_| |____\__,_|   \__/ |_/__/\__\__,_|
        \  |_|_|_|_|  / 
@@ -3417,7 +3417,7 @@ with this program. If not, see https://www.gnu.org/licenses/.
               <h4>About</h4>
               <p><strong>Created by <a href="https://gabriel.mongefranco.com" target="_blank">Gabriel Mongefranco</a>, <a href="https://www.linkedin.com/in/jeremy-gluskin-16980623/" target="_blank">Jeremy Gluskin</a>, and <a href="https://www.linkedin.com/in/shelleyboa/" target="_blank">Shelley Boa.</a></strong></p>
               <p>&nbsp;</p>
-              <p>Contributions by the <a href="https://github.com/DepressionCenter/AutomatorsAnonymous" target="_blank">Automators Anonymous</a> community of practice at Michigan Medicine.</p>
+              <p>Contributions by the <a href="https://github.com/DepressionCenter/AutomatorsAnonymous" target="_blank">Automators Anonymous™</a> community of practice at Michigan Medicine.</p>
               <p>DataLaVista™ is brought to you and maintained by the <a href="https://depressioncenter.org/mobiletech" target="_blank">Mobile Technologies Core</a> at the <a href="https://depressioncenter.org" target="_blank">Eisenberg Family Depression Center</a>.</p>
             </div>
             <div><p>&nbsp;</p></div>
@@ -4120,6 +4120,195 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           member?.id?.toString() === keyStr
         );
       };
+
+      // ── DLV_PROP: extract a named property from an object ──────────────────
+      alasql.fn.DLV_PROP = function(obj, prop) {
+        if (obj === null || obj === undefined) return null;
+        if (typeof obj !== 'object' || Array.isArray(obj)) return null;
+        const v = obj[prop];
+        return v !== undefined ? v : null;
+      };
+
+      // ── DLV_DISPLAY: human-readable display value from any field value ──────
+      alasql.fn.DLV_DISPLAY = function(val) {
+        if (val === null || val === undefined) return null;
+        if (typeof val === 'string' || typeof val === 'number' || typeof val === 'boolean') return val;
+        if (Array.isArray(val)) {
+          const parts = val.map(v => {
+            if (typeof v === 'object' && v !== null) {
+              return v.Title || v.Label || v.Name || v.Value || v.lookupValue || JSON.stringify(v);
+            }
+            return v != null ? String(v) : null;
+          }).filter(s => s != null && s !== '');
+          return parts.length > 0 ? parts.join('; ') : null;
+        }
+        if (typeof val === 'object') {
+          // Un-expanded SP deferred reference — no data available yet
+          if (val.__deferred) return null;
+          if (val.TermGuid !== undefined) return val.Label || val.Title || null;
+          if (val.results && Array.isArray(val.results)) {
+            const parts = val.results.map(r => r.Label || r.Title || r.Name || r.lookupValue || JSON.stringify(r)).filter(s => s);
+            return parts.length > 0 ? parts.join('; ') : null;
+          }
+          // SP URL field: return the URL, not the Description
+          if (val.Url !== undefined) return val.Url || null;
+          return val.Title || val.Label || val.Name || val.lookupValue || val.Value || null;
+        }
+        return String(val);
+      };
+
+      // ── DLV_IDS: extract Id/ID from an array of objects, join with '; ' ─────
+      alasql.fn.DLV_IDS = function(arr) {
+        if (!Array.isArray(arr)) return null;
+        const ids = arr.map(v => {
+          if (typeof v === 'object' && v !== null) {
+            return v.Id !== undefined ? v.Id : (v.ID !== undefined ? v.ID : null);
+          }
+          return null;
+        }).filter(id => id != null);
+        return ids.length > 0 ? ids.join('; ') : null;
+      };
+
+      // ── DLV_JOIN: map array elements to a property and join with '; ' ────────
+      alasql.fn.DLV_JOIN = function(arr, prop) {
+        if (!Array.isArray(arr)) return null;
+        const parts = arr.map(v => {
+          if (typeof v === 'object' && v !== null) {
+            if (prop) {
+              const pv = v[prop];
+              if (pv != null) return String(pv);
+            }
+            return v.Title || v.Label || v.Name || v.Value || v.lookupValue || JSON.stringify(v);
+          }
+          return v != null ? String(v) : null;
+        }).filter(s => s != null && s !== '');
+        return parts.length > 0 ? parts.join('; ') : null;
+      };
+
+      // ── DLV_EMAIL: extract email address from a SharePoint claims string ─────
+      alasql.fn.DLV_EMAIL = function(claimsStr) {
+        if (!claimsStr) return '';
+        const match = String(claimsStr).match(/([a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/i);
+        return match ? match[1] : '';
+      };
+
+      // ── DLV_EMAILS: extract emails from an array of SP user objects ──────────
+      alasql.fn.DLV_EMAILS = function(arr) {
+        if (!Array.isArray(arr)) return null;
+        const emails = arr.map(v => {
+          const name = (typeof v === 'object' && v !== null) ? (v.Name || '') : '';
+          const match = name.match(/([a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/i);
+          return match ? match[1] : null;
+        }).filter(e => e);
+        return emails.length > 0 ? emails.join('; ') : null;
+      };
+
+      // ── DLV_PICTURE_URL: build SP user photo URL from claims string ──────────
+      alasql.fn.DLV_PICTURE_URL = function(claimsStr, siteBase) {
+        if (!claimsStr) return '';
+        const base = (siteBase || '..').replace(/\/$/, '');
+        return `${base}/_layouts/15/userphoto.aspx?size=L&accountname=${encodeURIComponent(claimsStr)}`;
+      };
+
+      // ── DLV_NORMALIZE_DATE: normalize date strings to 'YYYY-MM-DD [HH:mm:ss]'─
+      alasql.fn.DLV_NORMALIZE_DATE = function(val) {
+        if (val === null || val === undefined || val === '') return val;
+        const str = String(val).trim();
+        // ISO with T separator: 2026-01-15T14:30:00Z or 2026-01-15T00:00:00
+        if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(str)) {
+          let d = str.replace('T', ' ').replace('Z', '').replace(/\.\d+$/, '');
+          if (d.endsWith(' 00:00:00')) d = d.replace(' 00:00:00', '');
+          return d;
+        }
+        // Already ISO date: 2026-01-15
+        if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
+        // Already ISO datetime without T: 2026-01-15 14:30:00
+        if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(str)) {
+          return str.endsWith(' 00:00:00') ? str.replace(' 00:00:00', '') : str;
+        }
+        // Oracle: 15-JAN-2026 or 15-JAN-26
+        const ORACLE_MONTHS = {JAN:1,FEB:2,MAR:3,APR:4,MAY:5,JUN:6,JUL:7,AUG:8,SEP:9,OCT:10,NOV:11,DEC:12};
+        const oracleM = str.match(/^(\d{2})-([A-Z]{3})-(\d{2,4})$/i);
+        if (oracleM) {
+          const day = oracleM[1].padStart(2, '0');
+          const mon = String(ORACLE_MONTHS[oracleM[2].toUpperCase()] || 1).padStart(2, '0');
+          let yr = parseInt(oracleM[3], 10);
+          if (yr < 100) yr += yr < 30 ? 2000 : 1900;
+          return `${yr}-${mon}-${day}`;
+        }
+        // MM/DD/YYYY or M/D/YY
+        const slashM = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+        if (slashM) {
+          let yr = parseInt(slashM[3], 10);
+          if (yr < 100) yr += yr < 30 ? 2000 : 1900;
+          const mon = String(slashM[1]).padStart(2, '0');
+          const day = String(slashM[2]).padStart(2, '0');
+          return `${yr}-${mon}-${day}`;
+        }
+        // Unix epoch (10 digits)
+        if (/^\d{10}$/.test(str)) {
+          const n = parseInt(str, 10);
+          if (n > 946684800 && n < 9999999999) {
+            let d = new Date(n * 1000).toISOString().replace('T', ' ').replace('Z', '').replace(/\.\d+$/, '');
+            return d.endsWith(' 00:00:00') ? d.replace(' 00:00:00', '') : d;
+          }
+        }
+        // Unix epoch ms (13 digits)
+        if (/^\d{13}$/.test(str)) {
+          const n = parseInt(str, 10);
+          if (n > 946684800000 && n < 9999999999999) {
+            let d = new Date(n).toISOString().replace('T', ' ').replace('Z', '').replace(/\.\d+$/, '');
+            return d.endsWith(' 00:00:00') ? d.replace(' 00:00:00', '') : d;
+          }
+        }
+        // Scientific notation epoch (e.g. 1.7116e+12 ms)
+        if (/^\d+\.?\d*[eE][+-]?\d+$/.test(str)) {
+          const n = parseFloat(str);
+          if (n > 9.46e11 && n < 9.99e12) {
+            let d = new Date(n).toISOString().replace('T', ' ').replace('Z', '').replace(/\.\d+$/, '');
+            return d.endsWith(' 00:00:00') ? d.replace(' 00:00:00', '') : d;
+          }
+        }
+        return val; // return original if no pattern matched
+      };
+
+      // ── DLV_TAX_LABELS: get taxonomy labels joined with '; ' ─────────────────
+      alasql.fn.DLV_TAX_LABELS = function(val) {
+        if (val === null || val === undefined) return null;
+        if (Array.isArray(val)) {
+          const labels = val.map(v => (typeof v === 'object' && v !== null) ? (v.Label || v.Term || v.Title || '') : String(v)).filter(l => l);
+          return labels.length > 0 ? labels.join('; ') : null;
+        }
+        if (typeof val === 'object') {
+          if (val.TermGuid !== undefined) return val.Label || val.Title || null;
+          if (val.results && Array.isArray(val.results)) {
+            const labels = val.results.map(r => r.Label || r.Term || r.Title || '').filter(l => l);
+            return labels.length > 0 ? labels.join('; ') : null;
+          }
+        }
+        return typeof val === 'string' ? val : null;
+      };
+
+      // ── DLV_TAX_IDS: get 'Label|TermGuid' strings joined with '; ' ──────────
+      alasql.fn.DLV_TAX_IDS = function(val) {
+        if (val === null || val === undefined) return null;
+        if (Array.isArray(val)) {
+          const ids = val.map(v => {
+            if (typeof v === 'object' && v !== null) {
+              const label = v.Label || v.Term || v.Title || '';
+              const guid = v.TermGuid || v.WssId || '';
+              return `${label}|${guid}`;
+            }
+            return String(v);
+          }).filter(s => s && s !== '|');
+          return ids.length > 0 ? ids.join('; ') : null;
+        }
+        if (typeof val === 'object' && val !== null) {
+          if (val.TermGuid !== undefined) return `${val.Label || ''}|${val.TermGuid || ''}`;
+          if (val.results && Array.isArray(val.results)) return alasql.fn.DLV_TAX_IDS(val.results);
+        }
+        return null;
+      };
     }
 
     // ── SELECT column helpers ────────────────────────────────────────────────────
@@ -4196,6 +4385,9 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
     }
 
     // Map a raw data row into our internal format.
+    // @deprecated Since view-layer refactor. Raw SP objects are now stored directly in
+    // _raw_* tables and all transformation is handled by FieldExpander UDFs in the VIEW layer.
+    // This function is kept for backward compatibility only.
     function mapDataRow(tableName, row, fieldDefs) {
       const mapped = {};
       const processingRow = { ...row };
@@ -4609,22 +4801,22 @@ async function fetchTableData(tableName, fetchAll = false) {
   const t = DataLaVistaState.tables[tableName];
   if (!t) return;
   const limit = fetchAll ? 50000 : 10;
-
+ 
   // Skip if we already have enough data
   if (fetchAll && t.loaded && t.data && t.data.length > 10) return; 
   if (!fetchAll && t.data && t.data.length >= 10) return;          
-
+ 
   // *** PROMISE TRACKER: If a fetch is already running, return its promise ***
   if (t.fetchPromise) {
     return t.fetchPromise; 
   }
-
+ 
   // Create the fetch sequence and store it in the table state
   t.fetchPromise = (async (tableName) => {
     try {
       if (!fetchAll) setStatus(`Fetching preview for ${tableName}...`, 'loading');
       if (fetchAll) { setStatus(`Loading data for ${tableName}...`, 'loading'); toast(`Fetching data for ${tableName}...`, 'info'); }
-
+ 
       const spFields = t.originalFields || t.fields;
       let rawData = [];
       
@@ -4668,43 +4860,31 @@ async function fetchTableData(tableName, fetchAll = false) {
       } else {
         return;
       }
-
-      t.data = rawData.map(row => mapDataRow(tableName, row, spFields)); 
+ 
+      t.data = CyberdynePipeline.removeODataColumns(rawData);
       t.loaded = fetchAll;
-
-      // Sync fetched data to AlaSQL raw table
+ 
+      // Register raw (un-processed) SP objects in the AlaSQL _raw_ table.
+      // FieldExpander in _applyViewSQL generates all virtual columns from these objects.
       if (t.data && t.data.length > 0) {
         CyberdynePipeline._registerRawTable(tableName, t.data);
       }
-
-      // Add synthetic fields BEFORE updating the view
+ 
+      // Preserve base SP field definitions on first load (preserves user-renamed aliases on refresh).
+      // spFields = t.originalFields (user's aliases) || t.fields (fresh from SP metadata).
+      // We deliberately do NOT include synthetic fields here — FieldExpander derives them.
       if (!t.originalFields) {
-        t.originalFields = [...t.fields]; 
-        
-        const dataKeys = new Set();
-        t.data.forEach(row => Object.keys(row).forEach(k => dataKeys.add(k)));
-        
-        // Dynamically add any fields generated by mapDataRow (Emails, Claims, Data, etc)
-        dataKeys.forEach(k => {
-          if (!t.fields.some(f => f.alias === k)) {
-            t.fields.push({ 
-              internalName: k, 
-              displayName: k, 
-              alias: k, 
-              type: 'text', 
-              displayType: k.endsWith('Data') ? 'array' : 'text', 
-              isAutoId: true // <--- Flags synthetic fields to hide them in basic builder
-            });
-          }
-        });
+        t.originalFields = [...spFields];
       }
-
-      // NOW update view column mappings — includes synthetic fields
+ 
+      // Rebuild the VIEW using FieldExpander — generates display/Id/Data/Email/etc columns
+      // from the raw SP objects now stored in _raw_tableName.
       if (t.data && t.data.length > 0) {
         const viewName = t.viewName || CyberdynePipeline.getViewForTable(tableName);
         if (viewName) {
           try {
-            CyberdynePipeline.updateSharePointListView(tableName, t.fields);
+            // Pass base SP fields (spFields) — NOT t.fields — so FieldExpander starts clean.
+            CyberdynePipeline.updateSharePointListView(tableName, spFields);
           } catch (e) {
             console.warn(`[fetchTableData] Failed to update view ${viewName}:`, e.message);
           }
@@ -4718,7 +4898,7 @@ async function fetchTableData(tableName, fetchAll = false) {
       t.fetchPromise = null;
     }
   })(tableName);
-
+ 
   // Await the promise we just created and return it
   return t.fetchPromise;
 }
@@ -6612,13 +6792,16 @@ async function loadSharePointListsSource(siteUrl, dsName, newAuth='current', new
   const lists = await fetchSPLists(siteUrl, dsName);
   let loadedCount = 0;
 
+  // Capture which tables were already fully loaded before refresh, so we can re-fetch them
+  const prevLoadedKeys = new Set(
+    (DataLaVistaState.dataSources[dsName]?.tables || [])
+      .filter(k => DataLaVistaState.tables[k]?.loaded)
+  );
+
   for (const list of lists) {
     try {
       const isDocLib = list.BaseType === 1;
       const fields = await fetchSPFields(siteUrl, list.Id, isDocLib);
-      const fieldMetas = fields
-        .filter(f => !shouldSkipField(f))
-        .map(f => buildFieldMeta(f));
 
       // Strip SharePoint's "List" / "ListItem" suffix from EntityTypeName for cleaner keys
       const rawEntityType = list.EntityTypeName || (list.Title || 'List').replace(/[^A-Za-z0-9_]/g, '');
@@ -6626,6 +6809,21 @@ async function loadSharePointListsSource(siteUrl, dsName, newAuth='current', new
 
       // tableKey = DSInternalName_EntityTypeName — immutable forever
       const tableKey = dsName + '_' + entityTypeName;
+
+      // Preserve user-renamed field aliases from the existing table state
+      const existingFieldAliases = {};
+      for (const ef of (DataLaVistaState.tables[tableKey]?.fields || [])) {
+        if (ef.alias && ef.internalName) existingFieldAliases[ef.internalName] = ef.alias;
+      }
+
+      const fieldMetas = fields
+        .filter(f => !shouldSkipField(f))
+        .map(f => {
+          const fm = buildFieldMeta(f);
+          if (existingFieldAliases[fm.internalName]) fm.alias = existingFieldAliases[fm.internalName];
+          return fm;
+        });
+
       // User-facing alias: PascalCase of Title (no "List" suffix)
       const tableAlias = toPascalCase(list.Title || entityTypeName);
 
@@ -6665,6 +6863,13 @@ async function loadSharePointListsSource(siteUrl, dsName, newAuth='current', new
 
   // Register lookup-field relationships now that all lists are known
   CyberdynePipeline.registerSpLookupRelationships(dsName);
+
+  // Re-fetch data for tables that were fully loaded before refresh (don't make users re-run queries)
+  for (const tableKey of prevLoadedKeys) {
+    if (DataLaVistaState.tables[tableKey]) {
+      fetchTableData(tableKey, true).catch(e => console.warn('[loadSharePointListsSource] Re-fetch failed:', tableKey, e.message));
+    }
+  }
 
   if(DataLaVistaState.reportMode !== 'view') {
     setStatus(`Loaded ${loadedCount} lists from SharePoint (${dsName})`, 'success');
@@ -7289,6 +7494,10 @@ const CyberdynePipeline = {
   ============================================================ */
 
   /**
+   * @deprecated Since view-layer refactor. Synthetic field generation now happens
+   * in _applyViewSQL via FieldExpander. This function is kept only for backward
+   * compatibility with external callers and old config restore paths.
+   *
    * Expand arrays and objects into additional synthetic columns.
    * For arrays: FieldName → semicolon-joined display, FieldNameIds → IDs, FieldNameData → original
    * For objects: FieldName → display value, FieldNameId → ID, FieldNameData → original object
@@ -7434,10 +7643,11 @@ const CyberdynePipeline = {
           const text = e.target.result;
           const parsed = parseCSV(text);
           const rows = this.removeODataColumns(parsed.rows);
-          const fields = this.inferFieldTypes(rows);
-          const processed = this.addSyntheticFields(rows, fields);
-          const tableName = normalizeDataSourceName(dsName) + '_Data';
-          resolve({ tableName, data: processed.rows, fields: processed.fields, metadata: { ...metadata, rowCount: processed.rows.length } });
+          let fields = this.inferFieldTypes(rows);
+          // No synthetic expansion here — FieldExpander in _applyViewSQL handles it via the VIEW layer
+          const fileStem = toPascalCase((metadata.fileName || '').replace(/\.[^/.]+$/, '')) || 'Data';
+          const tableName = normalizeDataSourceName(dsName) + '_' + fileStem;
+          resolve({ tableName, data: rows, fields, metadata: { ...metadata, rowCount: rows.length } });
         } catch (err) { reject(err); }
       };
       reader.onerror = () => reject(new Error('File read error'));
@@ -7455,9 +7665,10 @@ const CyberdynePipeline = {
           let rows = this.extractFromODataWrapper(parsed);
           rows = this.removeODataColumns(rows);
           let fields = this.inferFieldTypes(rows);
-          const processed = this.addSyntheticFields(rows, fields);
-          const tableName = normalizeDataSourceName(dsName) + '_Data';
-          resolve({ tableName, data: processed.rows, fields: processed.fields, metadata: { ...metadata, rowCount: processed.rows.length } });
+          // No synthetic expansion here — FieldExpander in _applyViewSQL handles it via the VIEW layer
+          const fileStem = toPascalCase((metadata.fileName || '').replace(/\.[^/.]+$/, '')) || 'Data';
+          const tableName = normalizeDataSourceName(dsName) + '_' + fileStem;
+          resolve({ tableName, data: rows, fields, metadata: { ...metadata, rowCount: rows.length } });
         } catch (err) { reject(err); }
       };
       reader.onerror = () => reject(new Error('File read error'));
@@ -7483,9 +7694,9 @@ const CyberdynePipeline = {
             let rows = XLSX.utils.sheet_to_json(sheet, { defval: null });
             rows = this.removeODataColumns(rows);
             let fields = this.inferFieldTypes(rows);
-            const processed = this.addSyntheticFields(rows, fields);
+            // No synthetic expansion — FieldExpander handles it via the VIEW layer
             const tableName = normalizeDataSourceName(dsName) + '_' + (toPascalCase(baseFileName) || 'Data');
-            resolve({ tableName, data: processed.rows, fields: processed.fields, metadata: { ...metadata, rowCount: processed.rows.length } });
+            resolve({ tableName, data: rows, fields, metadata: { ...metadata, rowCount: rows.length } });
           } else {
             // Multiple sheets → return multi-table result (same shape as SQLite)
             const results = [];
@@ -7494,9 +7705,9 @@ const CyberdynePipeline = {
               let rows = XLSX.utils.sheet_to_json(sheet, { defval: null });
               rows = this.removeODataColumns(rows);
               let fields = this.inferFieldTypes(rows);
-              const processed = this.addSyntheticFields(rows, fields);
+              // No synthetic expansion — FieldExpander handles it via the VIEW layer
               const tableName = normalizeDataSourceName(dsName) + '_' + (toPascalCase(sheetName) || sheetName);
-              results.push({ tableName, data: processed.rows, fields: processed.fields, metadata: { ...metadata, internalTableName: sheetName, rowCount: processed.rows.length } });
+              results.push({ tableName, data: rows, fields, metadata: { ...metadata, internalTableName: sheetName, rowCount: rows.length } });
             }
             resolve({ tables: results });
           }
@@ -7518,9 +7729,10 @@ const CyberdynePipeline = {
           rows = this.extractFromODataWrapper(rows);
           rows = this.removeODataColumns(rows);
           let fields = this.inferFieldTypes(rows);
-          const processed = this.addSyntheticFields(rows, fields);
-          const tableName = normalizeDataSourceName(dsName) + '_Data';
-          resolve({ tableName, data: processed.rows, fields: processed.fields, metadata: { ...metadata, rowCount: processed.rows.length } });
+          // No synthetic expansion — FieldExpander handles it via the VIEW layer
+          const fileStem = toPascalCase((metadata.fileName || '').replace(/\.[^/.]+$/, '')) || 'Data';
+          const tableName = normalizeDataSourceName(dsName) + '_' + fileStem;
+          resolve({ tableName, data: rows, fields, metadata: { ...metadata, rowCount: rows.length } });
         } catch (err) { reject(err); }
       };
       reader.onerror = () => reject(new Error('File read error'));
@@ -7537,15 +7749,11 @@ async loadSQLiteFile(file, dsName, metadata) {
         const arrayBuffer = e.target.result;
         const dbAlias = normalizeDataSourceName(dsName);
         
-        console.log('[SQLite] File size:', arrayBuffer.byteLength, 'bytes');
-        console.log('[SQLite] Database alias:', dbAlias);
-        
         // Try using SQL.js instead of AlaSQL's built-in SQLite
         // SQL.js is more reliable for SQLite files
         
         // Check if we need to load SQL.js
         if (typeof SQL === 'undefined') {
-          console.log('[SQLite] Loading SQL.js library...');
           await new Promise((resolveScript, rejectScript) => {
             const script = document.createElement('script');
             script.src = 'https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/sql-wasm.js';
@@ -7561,7 +7769,6 @@ async loadSQLiteFile(file, dsName, metadata) {
           });
         }
         
-        console.log('[SQLite] Opening database with SQL.js...');
         const uInt8Array = new Uint8Array(arrayBuffer);
         const db = new SQL.Database(uInt8Array);
         
@@ -7574,13 +7781,10 @@ async loadSQLiteFile(file, dsName, metadata) {
         }
         
         const tableNames = tablesQuery[0].values.map(row => row[0]);
-        console.log('[SQLite] Found tables:', tableNames);
         
         const results = [];
         
         for (const tName of tableNames) {
-          console.log('[SQLite] Processing table:', tName);
-          
           // Get table data
           const dataQuery = db.exec(`SELECT * FROM "${tName}"`);
           
@@ -7591,8 +7795,6 @@ async loadSQLiteFile(file, dsName, metadata) {
           
           const columns = dataQuery[0].columns;
           const values = dataQuery[0].values;
-          
-          console.log(`[SQLite] Table ${tName}: ${columns.length} columns, ${values.length} rows`);
           
           // Convert to array of objects
           const rows = values.map(row => {
@@ -7640,8 +7842,6 @@ async loadSQLiteFile(file, dsName, metadata) {
           const cleanRows = this.removeODataColumns(rows);
           const tableName = normalizeDataSourceName(dsName) + '_' + (toPascalCase(tName) || tName);
           
-          console.log(`[SQLite] Created table ${tableName} with ${cleanRows.length} rows`);
-          
           results.push({
             tableName,
             data: cleanRows,
@@ -7670,12 +7870,10 @@ async loadSQLiteFile(file, dsName, metadata) {
           throw new Error('No valid tables could be read from SQLite database');
         }
 
-        console.log('[SQLite] Successfully loaded', results.length, 'tables');
         if (foreignKeys.length > 0) console.log('[SQLite] Found', foreignKeys.length, 'foreign key(s)');
         resolve({ tables: results, foreignKeys });
         
       } catch (err) {
-        console.error('[SQLite] Loading failed:', err);
         reject(new Error('SQLite loading failed: ' + err.message));
       }
     };
@@ -7693,6 +7891,7 @@ async loadSQLiteFile(file, dsName, metadata) {
    * Returns: { tableName, data, fields, metadata } or { tables: [...] } for SQLite
    */
   async loadRemoteFile(url, dsName, fileType) {
+    console.log('DEBUG: loadRemoteFile() called with URL:', url, 'DataSource Name:', dsName, 'File Type:', fileType);
     const metadata = {
       sourceType: fileType,
       fileName: url.split('/').pop() || ('remote.' + fileType),
@@ -7700,6 +7899,7 @@ async loadSQLiteFile(file, dsName, metadata) {
       url
     };
     try {
+      console.log('DEBUG: Attempting to load with AlaSQL...');
       return await this.loadWithAlaSQL(url, dsName, fileType, metadata);
     } catch (alasqlErr) {
       console.warn('[CyberdynePipeline] AlaSQL loading failed, trying fetch fallback:', alasqlErr.message);
@@ -7708,37 +7908,86 @@ async loadSQLiteFile(file, dsName, metadata) {
   },
 
   /** Try loading with AlaSQL built-in mechanisms */
-  async loadWithAlaSQL(url, dsName, fileType, metadata) {
-    let rows;
-    switch (fileType) {
-      case 'csv':
-      case 'tsv': {
-        const sep = fileType === 'tsv' ? '\\t' : ',';
-        try { rows = alasql(`SELECT * FROM CSV("${url}", {headers:true, separator:"${sep}"})`); }
-        catch (_) { rows = alasql(`SELECT * FROM CSV("${url}", {headers:true})`); }
-        break;
+async loadWithAlaSQL(url, dsName, fileType, metadata) {
+  let rows;
+
+  switch (fileType.toLowerCase()) {
+    case 'tsv':
+    case 'csv': {
+      const sep = fileType === 'tsv' ? '\\t' : ',';
+      try {
+        rows = await alasql.promise(
+          `SELECT * FROM CSV("${url}", {headers:true, separator:"${sep}"})`
+        );
+      } catch (e1) {
+        try{
+          // Retry without separator
+         rows = await alasql.promise(
+           `SELECT * FROM CSV("${url}", {headers:true})`
+         );
+        } catch (e2) {
+          // Retry without headers
+          rows = await alasql.promise(
+            `SELECT * FROM CSV("${url}", {headers:false})`
+          );
+        }
       }
-      case 'json':
-        rows = alasql(`SELECT * FROM JSON("${url}")`);
-        break;
-      case 'xlsx': case 'xls':
-        rows = alasql(`SELECT * FROM XLSX("${url}", {headers:true})`);
-        break;
-      case 'xml':
-        throw new Error('XML requires fetch fallback');
-      case 'sqlite':
-        throw new Error('SQLite requires fetch fallback');
-      default:
-        throw new Error('Unsupported file type for AlaSQL: ' + fileType);
+      break;
     }
-    if (!rows || rows.length === 0) throw new Error('AlaSQL returned no rows');
-    rows = this.extractFromODataWrapper(rows);
-    rows = this.removeODataColumns(rows);
-    let fields = this.inferFieldTypes(rows);
-    const processed = this.addSyntheticFields(rows, fields);
-    const tableName = normalizeDataSourceName(dsName) + '_Data';
-    return { tableName, data: processed.rows, fields: processed.fields, metadata: { ...metadata, rowCount: processed.rows.length } };
-  },
+
+    case 'json':
+      rows = await alasql.promise(`SELECT * FROM JSON("${url}")`);
+      break;
+
+    case 'xlsx':
+    case 'xls': {
+      try{
+        rows = await alasql.promise(
+        `SELECT * FROM XLSX("${url}", {headers:true})`
+        );
+      } catch (e1) {
+        try {
+          // Retry without headers
+          rows = await alasql.promise(
+            `SELECT * FROM XLSX("${url}", {headers:false})`
+          );
+        } catch (e2) {
+          // Retry with SHEET option to specify first sheet
+          rows = await alasql.promise(
+            `SELECT * FROM XLSX("${url}", {sheet:1, headers:true})`
+          );
+        }
+      }
+      break;
+    }
+
+    case 'xml':
+      throw new Error('XML requires fetch fallback');
+
+    case 'sqlite':
+      throw new Error('SQLite requires fetch fallback');
+
+    default:
+      throw new Error('Unsupported file type for AlaSQL: ' + fileType);
+  }
+
+
+  if (!rows || rows.length === 0) throw new Error('AlaSQL returned no rows');
+
+  rows = this.extractFromODataWrapper(rows);
+  rows = this.removeODataColumns(rows);
+  let fields = this.inferFieldTypes(rows);
+  // No synthetic expansion — FieldExpander handles it via the VIEW layer
+  const tableName = normalizeDataSourceName(dsName) + '_Data';
+
+  return {
+    tableName,
+    data: rows,
+    fields,
+    metadata: { ...metadata, rowCount: rows.length }
+  };
+},
+
 
   /** Load remote file using fetch fallbacks */
   async loadWithFetch(url, dsName, fileType, metadata) {
@@ -7749,8 +7998,8 @@ async loadSQLiteFile(file, dsName, metadata) {
       const parsed = parseCSV(text);
       let rows = this.removeODataColumns(parsed.rows);
       let fields = this.inferFieldTypes(rows);
-      const processed = this.addSyntheticFields(rows, fields);
-      return { tableName, data: processed.rows, fields: processed.fields, metadata: { ...metadata, rowCount: processed.rows.length } };
+      // No synthetic expansion — FieldExpander handles it via the VIEW layer
+      return { tableName, data: rows, fields, metadata: { ...metadata, rowCount: rows.length } };
     }
 
     if (fileType === 'json' || fileType === 'json5') {
@@ -7758,8 +8007,8 @@ async loadSQLiteFile(file, dsName, metadata) {
       let rows = this.extractFromODataWrapper(jsonData);
       rows = this.removeODataColumns(rows);
       let fields = this.inferFieldTypes(rows);
-      const processed = this.addSyntheticFields(rows, fields);
-      return { tableName, data: processed.rows, fields: processed.fields, metadata: { ...metadata, rowCount: processed.rows.length } };
+      // No synthetic expansion — FieldExpander handles it via the VIEW layer
+      return { tableName, data: rows, fields, metadata: { ...metadata, rowCount: rows.length } };
     }
 
     // For binary formats: fetch as blob → File object → use uploaded file handlers
@@ -7810,7 +8059,6 @@ async loadSQLiteFile(file, dsName, metadata) {
   }
 
 }; // End CyberdynePipeline
-
 /* ============================================================
 This file is part of DataLaVista
 27-cyberdyne-views.js: View management for CyberdynePipeline
@@ -7862,7 +8110,7 @@ Object.assign(CyberdynePipeline, {
       viewName = viewName + counter;
     }
 
-    // Build column mappings: alias → internalName
+    // Build column mappings: alias → internalName (used by old fallback path)
     const columnMappings = {};
     for (const field of (fields || [])) {
       if (field.alias && field.internalName) {
@@ -7870,7 +8118,13 @@ Object.assign(CyberdynePipeline, {
       }
     }
 
-    this.views[viewName] = { rawTable: rawTableName, columnMappings, fields: fields || [], createdAt: new Date().toISOString() };
+    this.views[viewName] = {
+      rawTable: rawTableName,
+      baseFields: fields ? [...fields] : null,  // source of truth for FieldExpander
+      columnMappings,
+      fields: fields || [],
+      createdAt: new Date().toISOString()
+    };
     this.viewToRawTable[viewName] = rawTableName;
     this.rawTableToView[rawTableName] = viewName;
 
@@ -7881,16 +8135,70 @@ Object.assign(CyberdynePipeline, {
   },
 
   /** Build and execute the AlaSQL CREATE VIEW statement for a view */
-  _applyViewSQL(viewName) {
+_applyViewSQL(viewName) {
     const view = this.views[viewName];
     if (!view) return;
+ 
+    const rawTable = view.rawTable;
+    const rawTableRef = `[_raw_${rawTable}]`;
+    const t = DataLaVistaState.tables[rawTable];
+ 
+    // ── FieldExpander path: activated when baseFields are present ──────────
+    // Filter out any already-synthetic fields that may have leaked in from old configs
+    const baseFields = (view.baseFields || []).filter(f => !f.isSynthetic && !f.isAutoId);
+    if (baseFields.length > 0) {
+      const sourceType = (t && t.sourceType) ? t.sourceType : 'unknown';
+      const siteUrl   = (t && t.siteUrl)    ? t.siteUrl    : (DataLaVistaState.spSiteUrl || '');
+      const sampleRows = (t && t.data)       ? t.data.slice(0, 100) : [];
+ 
+      const virtualCols = [];
+      const seenAliases = new Set();
+      for (const field of baseFields) {
+        const expanded = this.FieldExpander.expand(field, sampleRows, rawTableRef, { sourceType, siteUrl });
+        for (const vc of expanded) {
+          if (!seenAliases.has(vc.alias)) {
+            seenAliases.add(vc.alias);
+            virtualCols.push(vc);
+          }
+        }
+      }
+ 
+      if (virtualCols.length === 0) return;
+ 
+      const selectParts = virtualCols.map(vc => `${vc.sqlExpr} AS [${vc.alias}]`);
+      try { alasql(`DROP VIEW IF EXISTS [${viewName}]`); } catch (_) {}
+      alasql(`CREATE VIEW [${viewName}] AS SELECT ${selectParts.join(', ')} FROM ${rawTableRef}`);
+ 
+      // Rebuild view metadata from expanded virtual columns
+      view.columnMappings = {};
+      view.fields = [];
+      for (const vc of virtualCols) {
+        view.columnMappings[vc.alias] = vc.internalName;
+        view.fields.push({
+          internalName: vc.internalName,
+          displayName: vc.alias,
+          alias: vc.alias,
+          type: vc.type,
+          displayType: vc.displayType,
+          isSynthetic: vc.isSynthetic,
+          parentField: vc.parentField,
+          isAutoId: vc.isSynthetic  // hide synthetics from basic QB
+        });
+      }
+ 
+      // Sync t.fields so renderFieldsPanel and QB show the expanded field list
+      if (t && t.data && t.data.length > 0) t.fields = view.fields;
+      return;
+    }
+ 
+    // ── Fallback: legacy columnMappings (old configs without baseFields) ───
     const cols = [];
     for (const [alias, internalName] of Object.entries(view.columnMappings)) {
       cols.push(`[${internalName}] AS [${alias}]`);
     }
     if (cols.length === 0) return; // Nothing to select yet (lazy SP list)
-    try { alasql(`DROP VIEW [${viewName}]`); } catch (_) {} // May not exist on first creation
-    alasql(`CREATE VIEW [${viewName}] AS SELECT ${cols.join(', ')} FROM [_raw_${view.rawTable}]`);
+    try { alasql(`DROP VIEW IF EXISTS [${viewName}]`); } catch (_) {}
+    alasql(`CREATE VIEW [${viewName}] AS SELECT ${cols.join(', ')} FROM ${rawTableRef}`);
   },
 
   /** Recreate the AlaSQL view with current column mappings (call after alias changes) */
@@ -7928,6 +8236,9 @@ Object.assign(CyberdynePipeline, {
   updateColumnAlias(viewName, internalName, newAlias) {
     const view = this.views[viewName];
     if (!view) throw new Error(`View "${viewName}" not found`);
+    // Update alias in baseFields (source of truth for FieldExpander)
+    const baseField = (view.baseFields || []).find(f => f.internalName === internalName);
+    if (baseField) baseField.alias = newAlias;
     // Remove old alias for this internal name
     for (const [alias, iName] of Object.entries(view.columnMappings)) {
       if (iName === internalName) { delete view.columnMappings[alias]; break; }
@@ -7946,6 +8257,10 @@ Object.assign(CyberdynePipeline, {
     view.columnMappings[field.alias] = field.internalName;
     if (!view.fields.find(f => f.internalName === field.internalName)) {
       view.fields.push(field);
+    }
+    // Keep baseFields in sync so FieldExpander picks up the new field
+    if (view.baseFields && !view.baseFields.find(f => f.internalName === field.internalName)) {
+      view.baseFields.push(field);
     }
     this.updateViewSQL(viewName);
   },
@@ -8068,7 +8383,7 @@ Object.assign(CyberdynePipeline, {
     ds.fileName = dsMetadata.fileName || ds.fileName;
     ds.url = dsMetadata.url || ds.url;
     ds.isFileUpload = dsMetadata.isFileUpload != null ? dsMetadata.isFileUpload : ds.isFileUpload;
-    ds.keepRawData = ds.isFileUpload || false;
+    ds.keepRawData = ds.keepRawData || false;
 
     const newTableInternalNames = new Set(tables.map(t => t.metadata?.internalTableName || t.tableName));
     const oldTableKeys = [...ds.tables];
@@ -8123,7 +8438,8 @@ Object.assign(CyberdynePipeline, {
         // Rebuild view with updated (alias-preserving) field list
         const viewName = this.rawTableToView[existingKey];
         if (viewName && this.views[viewName]) {
-          this.views[viewName].fields = mergedFields;
+          this.views[viewName].baseFields = mergedFields; // FieldExpander will expand on next _applyViewSQL
+          this.views[viewName].fields = mergedFields;     // will be overwritten by _applyViewSQL
           this.views[viewName].columnMappings = {};
           for (const f of mergedFields) {
             if (f.alias && f.internalName) this.views[viewName].columnMappings[f.alias] = f.internalName;
@@ -8236,8 +8552,8 @@ Object.assign(CyberdynePipeline, {
         const typeStr = (field.TypeAsString || field.type || '').toLowerCase();
         const isMultiSelect = typeStr.includes('multi') || typeStr.includes('multichoice');
         const childJoinField = isMultiSelect
-          ? field.internalName + 'Data'   // array field → INCLUDES join
-          : field.internalName + 'Id';    // scalar FK  → regular LEFT JOIN
+          ? field.alias + 'Data'   // array field → INCLUDES join
+          : field.alias + 'Id';    // scalar FK  → regular LEFT JOIN
 
         const exists = DataLaVistaState.relationships.some(r =>
           r.childTableKey === childTableKey && r.spLookupField === field.internalName &&
@@ -8271,8 +8587,8 @@ Object.assign(CyberdynePipeline, {
           // Multi-select person fields store an array in *Data; single-select store a scalar in *Id.
           const isMultiSelect = typeStr.includes('multi');
           const childJoinField = isMultiSelect
-            ? field.internalName + 'Data'
-            : field.internalName + 'Id';
+            ? field.alias + 'Data'
+            : field.alias + 'Id';
           const exists = DataLaVistaState.relationships.some(r =>
             r.childTableKey === childTableKey && r.spLookupField === field.internalName &&
             r.parentTableKey === uilKey
@@ -8309,18 +8625,42 @@ Object.assign(CyberdynePipeline, {
     // Table alias = view name minus DS prefix (e.g. "Consultations").
     const dsPrefix = normalizeDataSourceName(dsName) + '_';
     const displayPart = toPascalCase(listTitle) || tableKey.replace(new RegExp('^' + dsPrefix), '');
-    const viewName = dsPrefix + displayPart;
-    const tableAlias = displayPart;
-    this.views[viewName] = { rawTable: tableKey, columnMappings: {}, fields: [], createdAt: new Date().toISOString() };
+    const defaultTableAlias = displayPart;
+
+    // On refresh: preserve the existing view name (user may have renamed it)
+    const existingViewName = this.rawTableToView[tableKey];
+    const existingView = existingViewName ? this.views[existingViewName] : null;
+    const viewName = existingViewName || (dsPrefix + displayPart);
+
+    // Merge field aliases: existing user-renamed aliases take priority (keyed by internalName)
+    const internalToExistingAlias = {};
+    for (const [alias, internalName] of Object.entries(existingView?.columnMappings || {})) {
+      internalToExistingAlias[internalName] = alias;
+    }
+    const newColumnMappings = {};
+    if (fields && fields.length > 0) {
+      for (const f of fields) {
+        newColumnMappings[internalToExistingAlias[f.internalName] || f.alias] = f.internalName;
+      }
+    }
+
+    this.views[viewName] = {
+      rawTable: tableKey,
+      baseFields: fields && fields.length > 0 ? [...fields] : null,
+      columnMappings: newColumnMappings,
+      fields: existingView?.fields || [],
+      createdAt: existingView?.createdAt || new Date().toISOString()
+    };
     this.viewToRawTable[viewName] = tableKey;
     this.rawTableToView[tableKey] = viewName;
     if (DataLaVistaState.tables[tableKey]) {
       DataLaVistaState.tables[tableKey].viewName = viewName;
-      DataLaVistaState.tables[tableKey].alias = tableAlias;
+      // Preserve user-renamed table alias; only set default on first registration
+      if (!DataLaVistaState.tables[tableKey].alias) {
+        DataLaVistaState.tables[tableKey].alias = defaultTableAlias;
+      }
     }
     if (fields && fields.length > 0) {
-      this.views[viewName].fields = fields;
-      for (const f of fields) this.views[viewName].columnMappings[f.alias] = f.internalName;
       try { this._applyViewSQL(viewName); } catch (_) {}
     }
     return viewName;
@@ -8329,14 +8669,20 @@ Object.assign(CyberdynePipeline, {
   /**
    * Update a SharePoint list's view after data has been loaded into AlaSQL.
    * Called by fetchTableData() after a successful SP fetch.
+   * @param {string} rawTableName
+   * @param {Array} fields - base SP field definitions (from buildFieldMeta, no synthetics)
    */
   updateSharePointListView(rawTableName, fields) {
     const viewName = this.rawTableToView[rawTableName];
     if (!viewName || !this.views[viewName]) return;
     const view = this.views[viewName];
-    view.fields = fields;
+    // Store only non-synthetic base fields as baseFields — FieldExpander generates synthetics
+    const baseOnly = (fields || []).filter(f => !f.isSynthetic && !f.isAutoId);
+    view.baseFields = [...baseOnly];
     view.columnMappings = {};
-    for (const f of fields) view.columnMappings[f.alias] = f.internalName;
+    for (const f of baseOnly) {
+      if (f.alias && f.internalName) view.columnMappings[f.alias] = f.internalName;
+    }
     try { this.updateViewSQL(viewName); } catch (e) { console.warn('[CyberdynePipeline] updateSharePointListView SQL failed:', e.message); }
   },
 
@@ -8348,7 +8694,12 @@ Object.assign(CyberdynePipeline, {
   buildViewsForConfig() {
     const viewDefs = {};
     for (const [viewName, view] of Object.entries(this.views)) {
-      viewDefs[viewName] = { rawTable: view.rawTable, columnMappings: view.columnMappings, fields: view.fields };
+      viewDefs[viewName] = {
+        rawTable: view.rawTable,
+        baseFields: view.baseFields || null,  // save base fields for re-expansion on load
+        columnMappings: view.columnMappings,
+        fields: view.fields
+      };
     }
     return viewDefs;
   },
@@ -8372,7 +8723,147 @@ Object.assign(CyberdynePipeline, {
     this.views = {};
     this.viewToRawTable = {};
     this.rawTableToView = {};
-  }
+  },
+
+  /* ============================================================
+     FIELD EXPANDER — generates VIEW-layer virtual columns
+     Called by _applyViewSQL() for every base field in a view.
+  ============================================================ */
+
+  /**
+   * Expand a single field definition into one or more VirtualColumn specs.
+   * VirtualColumn: { alias, internalName, sqlExpr, type, displayType, isSynthetic, parentField }
+   */
+  FieldExpander: {
+
+    expand(field, sampleRows, rawTableRef, opts) {
+      const ft = (field.type || 'text').toLowerCase();
+      const typeStr = (field.TypeAsString || field.type || '').toLowerCase();
+      const siteUrl = (opts && opts.siteUrl) ? opts.siteUrl : '';
+      // Output alias: use field.alias (already PascalCase from buildFieldMeta/inferFieldTypes)
+      const outKey = field.alias || toPascalCase(field.internalName) || field.internalName;
+      const rawCol = `[${field.internalName}]`;
+
+      // ── SP-specific types ──────────────────────────────────────────────────
+      if (ft === 'user')        return this._expandUserSingle(field, outKey, rawCol, siteUrl);
+      if (ft === 'user-multi')  return this._expandUserMulti(field, outKey, rawCol);
+
+      if (ft === 'lookup')      return this._expandLookupSingle(field, outKey, rawCol);
+      if (ft === 'lookup-multi') return this._expandLookupMulti(field, outKey, rawCol);
+
+      if (ft === 'taxkeyword') {
+        const isMulti = typeStr.includes('multi') || field.internalName === 'TaxKeyword';
+        return isMulti
+          ? this._expandTaxonomyMulti(field, outKey, rawCol)
+          : this._expandTaxonomy(field, outKey, rawCol);
+      }
+
+      if (ft === 'url') return this._expandUrlField(field, outKey, rawCol);
+
+      // ── Generic types inferred from data ───────────────────────────────────
+      if (ft === 'object') return this._expandGenericObject(field, outKey, rawCol);
+      if (ft === 'array')  return this._expandGenericArray(field, outKey, rawCol);
+      if (ft === 'date')   return this._expandDateField(field, outKey, rawCol);
+
+      // ── Passthrough (number, boolean, text, choice, html, etc.) ───────────
+      return this._expandPassthrough(field, outKey, rawCol);
+    },
+
+    _vc(alias, internalName, sqlExpr, type, displayType, isSynthetic, parentField) {
+      return { alias, internalName, sqlExpr, type, displayType, isSynthetic: !!isSynthetic, parentField };
+    },
+
+    _expandUserSingle(field, outKey, rawCol, siteUrl) {
+      const base = (siteUrl || '..').replace(/\/$/, '');
+      return [
+        this._vc(outKey,                  field.internalName, `DLV_DISPLAY(${rawCol})`,                                          'text',   'text',   false, field.internalName),
+        this._vc(outKey + 'Id',           field.internalName, `DLV_PROP(${rawCol}, 'Id')`,                                       'number', 'number', true,  field.internalName),
+        this._vc(outKey + 'Claims',       field.internalName, `DLV_PROP(${rawCol}, 'Name')`,                                     'text',   'text',   true,  field.internalName),
+        this._vc(outKey + 'Email',        field.internalName, `DLV_EMAIL(DLV_PROP(${rawCol}, 'Name'))`,                          'text',   'text',   true,  field.internalName),
+        this._vc(outKey + 'PictureUrl',   field.internalName, `DLV_PICTURE_URL(DLV_PROP(${rawCol}, 'Name'), '${base}')`,         'text',   'text',   true,  field.internalName),
+        this._vc(outKey + 'Data',         field.internalName, rawCol,                                                             'object', 'object', true,  field.internalName),
+      ];
+    },
+
+    _expandUserMulti(field, outKey, rawCol) {
+      return [
+        this._vc(outKey,          field.internalName, `DLV_JOIN(${rawCol}, 'Title')`, 'text',  'text',  false, field.internalName),
+        this._vc(outKey + 'Ids',  field.internalName, `DLV_IDS(${rawCol})`,           'text',  'text',  true,  field.internalName),
+        this._vc(outKey + 'Emails', field.internalName, `DLV_EMAILS(${rawCol})`,      'text',  'text',  true,  field.internalName),
+        this._vc(outKey + 'Data', field.internalName, rawCol,                          'array', 'array', true,  field.internalName),
+      ];
+    },
+
+    _expandLookupSingle(field, outKey, rawCol) {
+      return [
+        this._vc(outKey,         field.internalName, `DLV_DISPLAY(${rawCol})`,   'text',   'text',   false, field.internalName),
+        this._vc(outKey + 'Id',  field.internalName, `DLV_PROP(${rawCol}, 'Id')`, 'number', 'number', true,  field.internalName),
+        this._vc(outKey + 'Data', field.internalName, rawCol,                     'object', 'object', true,  field.internalName),
+      ];
+    },
+
+    _expandLookupMulti(field, outKey, rawCol) {
+      return [
+        this._vc(outKey,          field.internalName, `DLV_JOIN(${rawCol}, 'Title')`, 'text',  'text',  false, field.internalName),
+        this._vc(outKey + 'Ids',  field.internalName, `DLV_IDS(${rawCol})`,           'text',  'text',  true,  field.internalName),
+        this._vc(outKey + 'Data', field.internalName, rawCol,                          'array', 'array', true,  field.internalName),
+      ];
+    },
+
+    _expandTaxonomy(field, outKey, rawCol) {
+      return [
+        this._vc(outKey,         field.internalName, `DLV_TAX_LABELS(${rawCol})`, 'text', 'text', false, field.internalName),
+        this._vc(outKey + 'Id',  field.internalName, `DLV_TAX_IDS(${rawCol})`,   'text', 'text', true,  field.internalName),
+        this._vc(outKey + 'Data', field.internalName, rawCol,                     'object', 'object', true, field.internalName),
+      ];
+    },
+
+    _expandTaxonomyMulti(field, outKey, rawCol) {
+      return [
+        this._vc(outKey,          field.internalName, `DLV_TAX_LABELS(${rawCol})`, 'text',  'text',  false, field.internalName),
+        this._vc(outKey + 'Ids',  field.internalName, `DLV_TAX_IDS(${rawCol})`,   'text',  'text',  true,  field.internalName),
+        this._vc(outKey + 'Data', field.internalName, rawCol,                       'array', 'array', true,  field.internalName),
+      ];
+    },
+
+    _expandUrlField(field, outKey, rawCol) {
+      console.log('DEBUG: _expandUrlField() called for field', field);
+      return [
+        this._vc(outKey,           field.internalName, `DLV_PROP(${rawCol}, 'Url')`,         'text',   'text',   false, field.internalName),
+        this._vc(outKey + 'Label', field.internalName, `DLV_PROP(${rawCol}, 'Description')`, 'text',   'text',   true,  field.internalName),
+        this._vc(outKey + 'Data',  field.internalName, rawCol,                                'object', 'object', true,  field.internalName),
+      ];
+    },
+
+    _expandGenericObject(field, outKey, rawCol) {
+      return [
+        this._vc(outKey,          field.internalName, `DLV_DISPLAY(${rawCol})`,    'text',   'text',   false, field.internalName),
+        this._vc(outKey + 'Id',   field.internalName, `DLV_PROP(${rawCol}, 'Id')`, 'text',   'text',   true,  field.internalName),
+        this._vc(outKey + 'Data', field.internalName, rawCol,                       'object', 'object', true,  field.internalName),
+      ];
+    },
+
+    _expandGenericArray(field, outKey, rawCol) {
+      return [
+        this._vc(outKey,          field.internalName, `DLV_JOIN(${rawCol}, '')`, 'text',  'text',  false, field.internalName),
+        this._vc(outKey + 'Ids',  field.internalName, `DLV_IDS(${rawCol})`,      'text',  'text',  true,  field.internalName),
+        this._vc(outKey + 'Data', field.internalName, rawCol,                     'array', 'array', true,  field.internalName),
+      ];
+    },
+
+    _expandDateField(field, outKey, rawCol) {
+      return [
+        this._vc(outKey, field.internalName, `DLV_NORMALIZE_DATE(${rawCol})`, 'date', 'date', false, field.internalName),
+      ];
+    },
+
+    _expandPassthrough(field, outKey, rawCol) {
+      return [
+        this._vc(outKey, field.internalName, rawCol, field.type || 'text', field.displayType || 'text', false, field.internalName),
+      ];
+    }
+
+  } // End FieldExpander
 
 }); // End CyberdynePipeline view management
 
@@ -8489,8 +8980,8 @@ function buildConfig() {
     lookupList: f.lookupList || null,
     lookupField: f.lookupField || null
   }));
-
-
+ 
+ 
   // Save dataSources
   let dataSourcesMeta = {};
   let uploadedFilesDsNames = [];
@@ -8512,13 +9003,14 @@ function buildConfig() {
       uploadedFilesDsNames.push(dsName);
     }
   }
-
+ 
   // Save tables (and row data if the files were uploaded)
   const tablesMeta = {};
   for (const [name, t] of Object.entries(DataLaVistaState.tables)) {
     const ds = t.dataSource ? DataLaVistaState.dataSources[t.dataSource] : null;
     tablesMeta[name] = {
       alias: t.alias || name,
+      baseFields: cleanFields(t.originalFields || t.fields),  // base (non-synthetic) fields for FieldExpander on reload
       dataSource: t.dataSource || '',
       description: t.description || '',
       displayName: t.displayName || name,
@@ -8526,16 +9018,16 @@ function buildConfig() {
       fields: cleanFields(t.fields),
       guid: t.guid || '',
       internalName: t.internalName || name,
-      itemCount: t.itemCount || 0,   // for SharePoint lists?
+      itemCount: t.itemCount || 0,
       loaded: false,
       isFileUpload: t.isFileUpload || false,
       keepRawData: t.keepRawData || false,
       originalFields: cleanFields(t.originalFields || t.fields),
-      siteUrl: t.siteUrl || '', // for SharePoint lists
+      siteUrl: t.siteUrl || '',
       sourceType: t.sourceType || 'sharepoint',
-      url: ds ? (ds.url || '') : ''  // for CSV/JSON standalone fetching
+      url: ds ? (ds.url || '') : ''
     };
-
+ 
     // Only include row data for tables that were explicitly uploaded from a local file
     try {
       const shouldKeepData = t.isFileUpload === true && t.keepRawData === true;
@@ -8552,7 +9044,7 @@ function buildConfig() {
       tablesMeta[name].loaded = false;
     }
   }
-
+ 
   const cleanWidgets = (DataLaVistaState.design.widgets || []).map(w => ({
     id: w.id,
     type: w.type,
@@ -8579,7 +9071,7 @@ function buildConfig() {
     })),
     widgetSql: generateWidgetSQL(w, '_results')
   }));
-
+ 
   const cleanDesign = {
     title: DataLaVistaState.design.title || '',
     widgets: cleanWidgets,
@@ -8593,7 +9085,7 @@ function buildConfig() {
     groupBy: (DataLaVistaState.design.groupBy || []).filter(g => g),
     fieldAggs: Object.assign({}, DataLaVistaState.design.fieldAggs || {})
   };
-
+ 
   // ── Smart export: only include tables referenced in the SQL (or uploaded files) ──
   // Collect all SQL text: main query + every widget's generated SQL
   const _allSqlParts = [DataLaVistaState.sql || ''];
@@ -8602,7 +9094,7 @@ function buildConfig() {
     if (wsql) _allSqlParts.push(wsql);
   }
   const _combinedSql = _allSqlParts.join('\n');
-
+ 
   const _referencedKeys = new Set();
   if (_combinedSql.trim()) {
     for (const tkey of Object.keys(tablesMeta)) {
@@ -8627,7 +9119,7 @@ function buildConfig() {
     // No SQL written yet — include everything (preserve all connections)
     for (const tkey of Object.keys(tablesMeta)) _referencedKeys.add(tkey);
   }
-
+ 
   // Filter tablesMeta and update DS tables arrays to match
   const filteredTablesMeta = {};
   for (const [tkey, tmeta] of Object.entries(tablesMeta)) {
@@ -8636,9 +9128,9 @@ function buildConfig() {
   for (const dsName of Object.keys(dataSourcesMeta)) {
     dataSourcesMeta[dsName].tables = (dataSourcesMeta[dsName].tables || []).filter(/** @param {string} t */ t => _referencedKeys.has(t));
   }
-
+ 
   return {
-    _license: 'This file is part of DataLaVista. This is a configuration script for a report designed in DataLaVista. Copyright © 2026 The Regents of the University of Michigan. This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version. This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details. You should have received a copy of the GNU General Public License along with this program. If not, see https://www.gnu.org/licenses.',
+    _license: 'This file is part of DataLaVista™. This is a configuration script for a report designed in DataLaVista™. Copyright © 2026 The Regents of the University of Michigan. This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version. This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details. You should have received a copy of the GNU General Public License along with this program. If not, see https://www.gnu.org/licenses.',
     activeTab: (DataLaVistaState.reportMode === 'view') ? 'dashboardPreview' : 'design',
     advancedQB: DataLaVistaState.advancedQB || {},
     basicQB: DataLaVistaState.basicQB || {},
@@ -8669,6 +9161,7 @@ function buildConfig() {
   };
 }
 
+// Load a config file (saved report) into the current state. This is called on initial load if a config URL or file param is detected, and can also be used to load a local config file via the "Load Config" button in the UI.
 async function loadConfig(cfg) {
   if (!cfg._license) throw new Error('Invalid report config — missing _license key');
   if (!cfg.dataSources || typeof cfg.dataSources != 'object'|| !cfg.tables || typeof cfg.tables != 'object') throw new Error('Invalid report config — missing data sources or tables.');
@@ -8689,7 +9182,7 @@ async function loadConfig(cfg) {
   
     // At this point, cfg should be an object. If it's not, throw an error.
     if (cfg && typeof cfg !== 'object') throw new Error('Invalid report config — no report JSON detected.');
-
+ 
   // Basic validation passed — now clear the existing state and load the config values
   CyberdynePipeline.clearAllViews(); // drop any existing AlaSQL views before reloading
   //{ ...cfg.dataSource } || { type: 'sharepoint', url: '', auth: 'current' };
@@ -8719,12 +9212,26 @@ async function loadConfig(cfg) {
   DataLaVistaState.sql = cfg.sql || '';
   DataLaVistaState.sqlLocked = cfg.sqlLocked || false;
   DataLaVistaState.tables = cfg.tables || {};
-
+ 
   // Restore view definitions (gracefully skipped for legacy configs without views)
   if (cfg.views && typeof cfg.views === 'object' && Object.keys(cfg.views).length) {
     CyberdynePipeline.restoreViewsFromConfig(cfg.views);
   }
-
+ 
+  // Back-fill baseFields from table meta for views that don't have them yet
+  // (handles legacy configs where views.baseFields wasn't saved, and new configs
+  //  where table.baseFields is more authoritative than the view entry)
+  for (const [tkey, tmeta] of Object.entries(DataLaVistaState.tables)) {
+    const viewName = CyberdynePipeline.rawTableToView[tkey];
+    if (!viewName) continue;
+    const view = CyberdynePipeline.views[viewName];
+    if (!view) continue;
+    const sourceFields = tmeta.baseFields || tmeta.originalFields || null;
+    if (sourceFields && sourceFields.length > 0 && (!view.baseFields || view.baseFields.length === 0)) {
+      view.baseFields = sourceFields;
+    }
+  }
+ 
   // Background fetch for referenced tables
   if (DataLaVistaState.sql) {
     const referencedTables = findReferencedTables(DataLaVistaState.sql);
@@ -8736,10 +9243,10 @@ async function loadConfig(cfg) {
   if (DataLaVistaState.sql && window._cmEditor) {
     window._cmEditor.setValue(DataLaVistaState.sql);
   }
-
+ 
   updateConnectButton();
   document.getElementById('btn-save-config').disabled = false;
-
+ 
   renderFilterBar();
   if(DataLaVistaState.reportMode !== 'view') {
     const titleInput = document.getElementById('title-input');
@@ -8753,7 +9260,6 @@ async function loadConfig(cfg) {
   }
     
 }
-
 
       // ============================================================
       // FIELDS PANEL RENDERING — grouped by data source
@@ -9333,12 +9839,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
   try {
     if (ds.type === 'sharepoint') {
       await loadSharePointListsSource(ds.siteUrl || ds.url, dsName, ds.auth || 'current', ds.token || '', ds.description || '');
-    } else if (ds.type === 'json') {
-      await loadJSONSource(ds.url, dsName);
-    } else if (ds.type === 'csv') {
-      await loadCSVSource(ds.url, dsName);
-    } else if (['xlsx', 'xml', 'sqlite', 'db'].includes(ds.type)) {
-      // Re-load from URL and replace DS tables (preserving aliases)
+    } else if (['json', 'json5', 'csv', 'tsv', 'xlsx', 'xls', 'xml', 'sqlite', 'db'].includes(ds.type)) {
+      // Unified refresh path for all remote file types via CyberdynePipeline
       const result = await CyberdynePipeline.loadRemoteFile(ds.url, dsName, ds.type);
       const tables = result.tables || [result];
       CyberdynePipeline.refreshDataSourceTables(dsName, { ...ds }, tables);
@@ -13562,14 +14064,14 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           for (const tname of referencedTables) {
             const t = DataLaVistaState.tables[tname];
             if (!t || !t.data.length) continue;
-            alasql(`DROP TABLE IF EXISTS [${tname}]`);
-            alasql(`CREATE TABLE [${tname}]`);
-            alasql.tables[tname].data = t.data;
-            // Also register by alias so QB-generated SQL (FROM alias) works in preview
-            if (t.alias && t.alias !== tname) {
-              alasql(`DROP TABLE IF EXISTS [${t.alias}]`);
-              alasql(`CREATE TABLE [${t.alias}]`);
-              alasql.tables[t.alias].data = t.data;
+            // Register the raw _raw_tname TABLE (safe regardless of VIEW state)
+            registerTableInAlaSQL(tname);
+            // Rebuild the FieldExpander VIEW so the SQL can use alias column names + UDFs
+            const viewName = t.viewName || CyberdynePipeline.getViewForTable(tname);
+            if (viewName) {
+              try { CyberdynePipeline.updateViewSQL(viewName); }
+              catch (e) { console.warn('[DLV] [refreshDashboardPreview] updateViewSQL:', viewName, e.message); }
+												   
             }
           }
 
@@ -13579,10 +14081,14 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           const results = alasql(processedSQL);
 
           alasql('DROP TABLE IF EXISTS [dlv_results]');
+													  
           alasql('DROP VIEW  IF EXISTS [dlv_active]');
           alasql('CREATE TABLE [dlv_results]');
           alasql.tables['dlv_results'].data = results;     // O(1) reference assignment
+																					
+																					   
           alasql('CREATE VIEW [dlv_active] AS SELECT * FROM [dlv_results]');
+																				   
           DataLaVistaState.previewFilters = {};
           DataLaVistaState.design.previewFilteredData = null;
           DataLaVistaState.queryColumns = results.length ? Object.keys(results[0]) : DataLaVistaState.queryColumns;
@@ -13742,6 +14248,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       // ============================================================
       // DOWNLOAD CSV
       // ============================================================
+      // TODO: This may need to be changed after VIEW restructuring.
       async function downloadCSV() {
         let results = (alasql.tables && alasql.tables['dlv_results'])
           ? alasql('SELECT * FROM [dlv_results]')
@@ -13904,8 +14411,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         }
         navigator.clipboard.writeText(url).then(() => toast('URL copied to clipboard', 'success'));
       }
-
-      
 
 /* ============================================================
 This file is part of DataLaVista

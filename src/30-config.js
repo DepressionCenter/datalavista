@@ -1,9 +1,9 @@
 ﻿/* ============================================================
-This file is part of DataLaVista
+This file is part of DataLaVista™
 30-config.js: Widget SQL generation, configuration save/load, and fields panel rendering.
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 Created: 2026-03-24
-Last Modified: 2026-03-31
+Last Modified: 2026-04-04
 Summary: Widget SQL generation, configuration save/load, and fields panel rendering.
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
@@ -111,8 +111,8 @@ function buildConfig() {
     lookupList: f.lookupList || null,
     lookupField: f.lookupField || null
   }));
-
-
+ 
+ 
   // Save dataSources
   let dataSourcesMeta = {};
   let uploadedFilesDsNames = [];
@@ -134,13 +134,14 @@ function buildConfig() {
       uploadedFilesDsNames.push(dsName);
     }
   }
-
+ 
   // Save tables (and row data if the files were uploaded)
   const tablesMeta = {};
   for (const [name, t] of Object.entries(DataLaVistaState.tables)) {
     const ds = t.dataSource ? DataLaVistaState.dataSources[t.dataSource] : null;
     tablesMeta[name] = {
       alias: t.alias || name,
+      baseFields: cleanFields(t.originalFields || t.fields),  // base (non-synthetic) fields for FieldExpander on reload
       dataSource: t.dataSource || '',
       description: t.description || '',
       displayName: t.displayName || name,
@@ -148,16 +149,16 @@ function buildConfig() {
       fields: cleanFields(t.fields),
       guid: t.guid || '',
       internalName: t.internalName || name,
-      itemCount: t.itemCount || 0,   // for SharePoint lists?
+      itemCount: t.itemCount || 0,
       loaded: false,
       isFileUpload: t.isFileUpload || false,
       keepRawData: t.keepRawData || false,
       originalFields: cleanFields(t.originalFields || t.fields),
-      siteUrl: t.siteUrl || '', // for SharePoint lists
+      siteUrl: t.siteUrl || '',
       sourceType: t.sourceType || 'sharepoint',
-      url: ds ? (ds.url || '') : ''  // for CSV/JSON standalone fetching
+      url: ds ? (ds.url || '') : ''
     };
-
+ 
     // Only include row data for tables that were explicitly uploaded from a local file
     try {
       const shouldKeepData = t.isFileUpload === true && t.keepRawData === true;
@@ -174,7 +175,7 @@ function buildConfig() {
       tablesMeta[name].loaded = false;
     }
   }
-
+ 
   const cleanWidgets = (DataLaVistaState.design.widgets || []).map(w => ({
     id: w.id,
     type: w.type,
@@ -201,7 +202,7 @@ function buildConfig() {
     })),
     widgetSql: generateWidgetSQL(w, '_results')
   }));
-
+ 
   const cleanDesign = {
     title: DataLaVistaState.design.title || '',
     widgets: cleanWidgets,
@@ -215,7 +216,7 @@ function buildConfig() {
     groupBy: (DataLaVistaState.design.groupBy || []).filter(g => g),
     fieldAggs: Object.assign({}, DataLaVistaState.design.fieldAggs || {})
   };
-
+ 
   // ── Smart export: only include tables referenced in the SQL (or uploaded files) ──
   // Collect all SQL text: main query + every widget's generated SQL
   const _allSqlParts = [DataLaVistaState.sql || ''];
@@ -224,7 +225,7 @@ function buildConfig() {
     if (wsql) _allSqlParts.push(wsql);
   }
   const _combinedSql = _allSqlParts.join('\n');
-
+ 
   const _referencedKeys = new Set();
   if (_combinedSql.trim()) {
     for (const tkey of Object.keys(tablesMeta)) {
@@ -249,7 +250,7 @@ function buildConfig() {
     // No SQL written yet — include everything (preserve all connections)
     for (const tkey of Object.keys(tablesMeta)) _referencedKeys.add(tkey);
   }
-
+ 
   // Filter tablesMeta and update DS tables arrays to match
   const filteredTablesMeta = {};
   for (const [tkey, tmeta] of Object.entries(tablesMeta)) {
@@ -258,9 +259,9 @@ function buildConfig() {
   for (const dsName of Object.keys(dataSourcesMeta)) {
     dataSourcesMeta[dsName].tables = (dataSourcesMeta[dsName].tables || []).filter(/** @param {string} t */ t => _referencedKeys.has(t));
   }
-
+ 
   return {
-    _license: 'This file is part of DataLaVista. This is a configuration script for a report designed in DataLaVista. Copyright © 2026 The Regents of the University of Michigan. This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version. This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details. You should have received a copy of the GNU General Public License along with this program. If not, see https://www.gnu.org/licenses.',
+    _license: 'This file is part of DataLaVista™. This is a configuration script for a report designed in DataLaVista™. Copyright © 2026 The Regents of the University of Michigan. This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version. This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details. You should have received a copy of the GNU General Public License along with this program. If not, see https://www.gnu.org/licenses.',
     activeTab: (DataLaVistaState.reportMode === 'view') ? 'dashboardPreview' : 'design',
     advancedQB: DataLaVistaState.advancedQB || {},
     basicQB: DataLaVistaState.basicQB || {},
@@ -291,6 +292,7 @@ function buildConfig() {
   };
 }
 
+// Load a config file (saved report) into the current state. This is called on initial load if a config URL or file param is detected, and can also be used to load a local config file via the "Load Config" button in the UI.
 async function loadConfig(cfg) {
   if (!cfg._license) throw new Error('Invalid report config — missing _license key');
   if (!cfg.dataSources || typeof cfg.dataSources != 'object'|| !cfg.tables || typeof cfg.tables != 'object') throw new Error('Invalid report config — missing data sources or tables.');
@@ -311,7 +313,7 @@ async function loadConfig(cfg) {
   
     // At this point, cfg should be an object. If it's not, throw an error.
     if (cfg && typeof cfg !== 'object') throw new Error('Invalid report config — no report JSON detected.');
-
+ 
   // Basic validation passed — now clear the existing state and load the config values
   CyberdynePipeline.clearAllViews(); // drop any existing AlaSQL views before reloading
   //{ ...cfg.dataSource } || { type: 'sharepoint', url: '', auth: 'current' };
@@ -341,12 +343,26 @@ async function loadConfig(cfg) {
   DataLaVistaState.sql = cfg.sql || '';
   DataLaVistaState.sqlLocked = cfg.sqlLocked || false;
   DataLaVistaState.tables = cfg.tables || {};
-
+ 
   // Restore view definitions (gracefully skipped for legacy configs without views)
   if (cfg.views && typeof cfg.views === 'object' && Object.keys(cfg.views).length) {
     CyberdynePipeline.restoreViewsFromConfig(cfg.views);
   }
-
+ 
+  // Back-fill baseFields from table meta for views that don't have them yet
+  // (handles legacy configs where views.baseFields wasn't saved, and new configs
+  //  where table.baseFields is more authoritative than the view entry)
+  for (const [tkey, tmeta] of Object.entries(DataLaVistaState.tables)) {
+    const viewName = CyberdynePipeline.rawTableToView[tkey];
+    if (!viewName) continue;
+    const view = CyberdynePipeline.views[viewName];
+    if (!view) continue;
+    const sourceFields = tmeta.baseFields || tmeta.originalFields || null;
+    if (sourceFields && sourceFields.length > 0 && (!view.baseFields || view.baseFields.length === 0)) {
+      view.baseFields = sourceFields;
+    }
+  }
+ 
   // Background fetch for referenced tables
   if (DataLaVistaState.sql) {
     const referencedTables = findReferencedTables(DataLaVistaState.sql);
@@ -358,10 +374,10 @@ async function loadConfig(cfg) {
   if (DataLaVistaState.sql && window._cmEditor) {
     window._cmEditor.setValue(DataLaVistaState.sql);
   }
-
+ 
   updateConnectButton();
   document.getElementById('btn-save-config').disabled = false;
-
+ 
   renderFilterBar();
   if(DataLaVistaState.reportMode !== 'view') {
     const titleInput = document.getElementById('title-input');
@@ -375,7 +391,6 @@ async function loadConfig(cfg) {
   }
     
 }
-
 
       // ============================================================
       // FIELDS PANEL RENDERING — grouped by data source

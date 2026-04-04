@@ -1,5 +1,5 @@
 -- ============================================================
--- This file is part of DataLaVista
+-- This file is part of DataLaVista™
 -- generate-sample-data-lua.lua: Script for generating synthetic sample data.
 -- Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 -- Created: 2026-03-28

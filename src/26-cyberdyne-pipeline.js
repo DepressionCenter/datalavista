@@ -1,9 +1,9 @@
 /* ============================================================
-This file is part of DataLaVista
+This file is part of DataLaVista™
 26-cyberdyne-pipeline.js: Unified data loading and processing pipeline
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 Created: 2026-03-28
-Last Modified: 2026-03-31
+Last Modified: 2026-04-04
 Summary: Cyberdyne Pipeline - unified data processing for CSV, JSON, Excel, XML, SQLite
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
@@ -175,6 +175,10 @@ const CyberdynePipeline = {
   ============================================================ */
 
   /**
+   * @deprecated Since view-layer refactor. Synthetic field generation now happens
+   * in _applyViewSQL via FieldExpander. This function is kept only for backward
+   * compatibility with external callers and old config restore paths.
+   *
    * Expand arrays and objects into additional synthetic columns.
    * For arrays: FieldName → semicolon-joined display, FieldNameIds → IDs, FieldNameData → original
    * For objects: FieldName → display value, FieldNameId → ID, FieldNameData → original object
@@ -320,10 +324,11 @@ const CyberdynePipeline = {
           const text = e.target.result;
           const parsed = parseCSV(text);
           const rows = this.removeODataColumns(parsed.rows);
-          const fields = this.inferFieldTypes(rows);
-          const processed = this.addSyntheticFields(rows, fields);
-          const tableName = normalizeDataSourceName(dsName) + '_Data';
-          resolve({ tableName, data: processed.rows, fields: processed.fields, metadata: { ...metadata, rowCount: processed.rows.length } });
+          let fields = this.inferFieldTypes(rows);
+          // No synthetic expansion here — FieldExpander in _applyViewSQL handles it via the VIEW layer
+          const fileStem = toPascalCase((metadata.fileName || '').replace(/\.[^/.]+$/, '')) || 'Data';
+          const tableName = normalizeDataSourceName(dsName) + '_' + fileStem;
+          resolve({ tableName, data: rows, fields, metadata: { ...metadata, rowCount: rows.length } });
         } catch (err) { reject(err); }
       };
       reader.onerror = () => reject(new Error('File read error'));
@@ -341,9 +346,10 @@ const CyberdynePipeline = {
           let rows = this.extractFromODataWrapper(parsed);
           rows = this.removeODataColumns(rows);
           let fields = this.inferFieldTypes(rows);
-          const processed = this.addSyntheticFields(rows, fields);
-          const tableName = normalizeDataSourceName(dsName) + '_Data';
-          resolve({ tableName, data: processed.rows, fields: processed.fields, metadata: { ...metadata, rowCount: processed.rows.length } });
+          // No synthetic expansion here — FieldExpander in _applyViewSQL handles it via the VIEW layer
+          const fileStem = toPascalCase((metadata.fileName || '').replace(/\.[^/.]+$/, '')) || 'Data';
+          const tableName = normalizeDataSourceName(dsName) + '_' + fileStem;
+          resolve({ tableName, data: rows, fields, metadata: { ...metadata, rowCount: rows.length } });
         } catch (err) { reject(err); }
       };
       reader.onerror = () => reject(new Error('File read error'));
@@ -369,9 +375,9 @@ const CyberdynePipeline = {
             let rows = XLSX.utils.sheet_to_json(sheet, { defval: null });
             rows = this.removeODataColumns(rows);
             let fields = this.inferFieldTypes(rows);
-            const processed = this.addSyntheticFields(rows, fields);
+            // No synthetic expansion — FieldExpander handles it via the VIEW layer
             const tableName = normalizeDataSourceName(dsName) + '_' + (toPascalCase(baseFileName) || 'Data');
-            resolve({ tableName, data: processed.rows, fields: processed.fields, metadata: { ...metadata, rowCount: processed.rows.length } });
+            resolve({ tableName, data: rows, fields, metadata: { ...metadata, rowCount: rows.length } });
           } else {
             // Multiple sheets → return multi-table result (same shape as SQLite)
             const results = [];
@@ -380,9 +386,9 @@ const CyberdynePipeline = {
               let rows = XLSX.utils.sheet_to_json(sheet, { defval: null });
               rows = this.removeODataColumns(rows);
               let fields = this.inferFieldTypes(rows);
-              const processed = this.addSyntheticFields(rows, fields);
+              // No synthetic expansion — FieldExpander handles it via the VIEW layer
               const tableName = normalizeDataSourceName(dsName) + '_' + (toPascalCase(sheetName) || sheetName);
-              results.push({ tableName, data: processed.rows, fields: processed.fields, metadata: { ...metadata, internalTableName: sheetName, rowCount: processed.rows.length } });
+              results.push({ tableName, data: rows, fields, metadata: { ...metadata, internalTableName: sheetName, rowCount: rows.length } });
             }
             resolve({ tables: results });
           }
@@ -404,9 +410,10 @@ const CyberdynePipeline = {
           rows = this.extractFromODataWrapper(rows);
           rows = this.removeODataColumns(rows);
           let fields = this.inferFieldTypes(rows);
-          const processed = this.addSyntheticFields(rows, fields);
-          const tableName = normalizeDataSourceName(dsName) + '_Data';
-          resolve({ tableName, data: processed.rows, fields: processed.fields, metadata: { ...metadata, rowCount: processed.rows.length } });
+          // No synthetic expansion — FieldExpander handles it via the VIEW layer
+          const fileStem = toPascalCase((metadata.fileName || '').replace(/\.[^/.]+$/, '')) || 'Data';
+          const tableName = normalizeDataSourceName(dsName) + '_' + fileStem;
+          resolve({ tableName, data: rows, fields, metadata: { ...metadata, rowCount: rows.length } });
         } catch (err) { reject(err); }
       };
       reader.onerror = () => reject(new Error('File read error'));
@@ -423,15 +430,11 @@ async loadSQLiteFile(file, dsName, metadata) {
         const arrayBuffer = e.target.result;
         const dbAlias = normalizeDataSourceName(dsName);
         
-        console.log('[SQLite] File size:', arrayBuffer.byteLength, 'bytes');
-        console.log('[SQLite] Database alias:', dbAlias);
-        
         // Try using SQL.js instead of AlaSQL's built-in SQLite
         // SQL.js is more reliable for SQLite files
         
         // Check if we need to load SQL.js
         if (typeof SQL === 'undefined') {
-          console.log('[SQLite] Loading SQL.js library...');
           await new Promise((resolveScript, rejectScript) => {
             const script = document.createElement('script');
             script.src = 'https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/sql-wasm.js';
@@ -447,7 +450,6 @@ async loadSQLiteFile(file, dsName, metadata) {
           });
         }
         
-        console.log('[SQLite] Opening database with SQL.js...');
         const uInt8Array = new Uint8Array(arrayBuffer);
         const db = new SQL.Database(uInt8Array);
         
@@ -460,13 +462,10 @@ async loadSQLiteFile(file, dsName, metadata) {
         }
         
         const tableNames = tablesQuery[0].values.map(row => row[0]);
-        console.log('[SQLite] Found tables:', tableNames);
         
         const results = [];
         
         for (const tName of tableNames) {
-          console.log('[SQLite] Processing table:', tName);
-          
           // Get table data
           const dataQuery = db.exec(`SELECT * FROM "${tName}"`);
           
@@ -477,8 +476,6 @@ async loadSQLiteFile(file, dsName, metadata) {
           
           const columns = dataQuery[0].columns;
           const values = dataQuery[0].values;
-          
-          console.log(`[SQLite] Table ${tName}: ${columns.length} columns, ${values.length} rows`);
           
           // Convert to array of objects
           const rows = values.map(row => {
@@ -526,8 +523,6 @@ async loadSQLiteFile(file, dsName, metadata) {
           const cleanRows = this.removeODataColumns(rows);
           const tableName = normalizeDataSourceName(dsName) + '_' + (toPascalCase(tName) || tName);
           
-          console.log(`[SQLite] Created table ${tableName} with ${cleanRows.length} rows`);
-          
           results.push({
             tableName,
             data: cleanRows,
@@ -556,12 +551,10 @@ async loadSQLiteFile(file, dsName, metadata) {
           throw new Error('No valid tables could be read from SQLite database');
         }
 
-        console.log('[SQLite] Successfully loaded', results.length, 'tables');
         if (foreignKeys.length > 0) console.log('[SQLite] Found', foreignKeys.length, 'foreign key(s)');
         resolve({ tables: results, foreignKeys });
         
       } catch (err) {
-        console.error('[SQLite] Loading failed:', err);
         reject(new Error('SQLite loading failed: ' + err.message));
       }
     };
@@ -579,6 +572,7 @@ async loadSQLiteFile(file, dsName, metadata) {
    * Returns: { tableName, data, fields, metadata } or { tables: [...] } for SQLite
    */
   async loadRemoteFile(url, dsName, fileType) {
+    console.log('DEBUG: loadRemoteFile() called with URL:', url, 'DataSource Name:', dsName, 'File Type:', fileType);
     const metadata = {
       sourceType: fileType,
       fileName: url.split('/').pop() || ('remote.' + fileType),
@@ -586,6 +580,7 @@ async loadSQLiteFile(file, dsName, metadata) {
       url
     };
     try {
+      console.log('DEBUG: Attempting to load with AlaSQL...');
       return await this.loadWithAlaSQL(url, dsName, fileType, metadata);
     } catch (alasqlErr) {
       console.warn('[CyberdynePipeline] AlaSQL loading failed, trying fetch fallback:', alasqlErr.message);
@@ -594,37 +589,86 @@ async loadSQLiteFile(file, dsName, metadata) {
   },
 
   /** Try loading with AlaSQL built-in mechanisms */
-  async loadWithAlaSQL(url, dsName, fileType, metadata) {
-    let rows;
-    switch (fileType) {
-      case 'csv':
-      case 'tsv': {
-        const sep = fileType === 'tsv' ? '\\t' : ',';
-        try { rows = alasql(`SELECT * FROM CSV("${url}", {headers:true, separator:"${sep}"})`); }
-        catch (_) { rows = alasql(`SELECT * FROM CSV("${url}", {headers:true})`); }
-        break;
+async loadWithAlaSQL(url, dsName, fileType, metadata) {
+  let rows;
+
+  switch (fileType.toLowerCase()) {
+    case 'tsv':
+    case 'csv': {
+      const sep = fileType === 'tsv' ? '\\t' : ',';
+      try {
+        rows = await alasql.promise(
+          `SELECT * FROM CSV("${url}", {headers:true, separator:"${sep}"})`
+        );
+      } catch (e1) {
+        try{
+          // Retry without separator
+         rows = await alasql.promise(
+           `SELECT * FROM CSV("${url}", {headers:true})`
+         );
+        } catch (e2) {
+          // Retry without headers
+          rows = await alasql.promise(
+            `SELECT * FROM CSV("${url}", {headers:false})`
+          );
+        }
       }
-      case 'json':
-        rows = alasql(`SELECT * FROM JSON("${url}")`);
-        break;
-      case 'xlsx': case 'xls':
-        rows = alasql(`SELECT * FROM XLSX("${url}", {headers:true})`);
-        break;
-      case 'xml':
-        throw new Error('XML requires fetch fallback');
-      case 'sqlite':
-        throw new Error('SQLite requires fetch fallback');
-      default:
-        throw new Error('Unsupported file type for AlaSQL: ' + fileType);
+      break;
     }
-    if (!rows || rows.length === 0) throw new Error('AlaSQL returned no rows');
-    rows = this.extractFromODataWrapper(rows);
-    rows = this.removeODataColumns(rows);
-    let fields = this.inferFieldTypes(rows);
-    const processed = this.addSyntheticFields(rows, fields);
-    const tableName = normalizeDataSourceName(dsName) + '_Data';
-    return { tableName, data: processed.rows, fields: processed.fields, metadata: { ...metadata, rowCount: processed.rows.length } };
-  },
+
+    case 'json':
+      rows = await alasql.promise(`SELECT * FROM JSON("${url}")`);
+      break;
+
+    case 'xlsx':
+    case 'xls': {
+      try{
+        rows = await alasql.promise(
+        `SELECT * FROM XLSX("${url}", {headers:true})`
+        );
+      } catch (e1) {
+        try {
+          // Retry without headers
+          rows = await alasql.promise(
+            `SELECT * FROM XLSX("${url}", {headers:false})`
+          );
+        } catch (e2) {
+          // Retry with SHEET option to specify first sheet
+          rows = await alasql.promise(
+            `SELECT * FROM XLSX("${url}", {sheet:1, headers:true})`
+          );
+        }
+      }
+      break;
+    }
+
+    case 'xml':
+      throw new Error('XML requires fetch fallback');
+
+    case 'sqlite':
+      throw new Error('SQLite requires fetch fallback');
+
+    default:
+      throw new Error('Unsupported file type for AlaSQL: ' + fileType);
+  }
+
+
+  if (!rows || rows.length === 0) throw new Error('AlaSQL returned no rows');
+
+  rows = this.extractFromODataWrapper(rows);
+  rows = this.removeODataColumns(rows);
+  let fields = this.inferFieldTypes(rows);
+  // No synthetic expansion — FieldExpander handles it via the VIEW layer
+  const tableName = normalizeDataSourceName(dsName) + '_Data';
+
+  return {
+    tableName,
+    data: rows,
+    fields,
+    metadata: { ...metadata, rowCount: rows.length }
+  };
+},
+
 
   /** Load remote file using fetch fallbacks */
   async loadWithFetch(url, dsName, fileType, metadata) {
@@ -635,8 +679,8 @@ async loadSQLiteFile(file, dsName, metadata) {
       const parsed = parseCSV(text);
       let rows = this.removeODataColumns(parsed.rows);
       let fields = this.inferFieldTypes(rows);
-      const processed = this.addSyntheticFields(rows, fields);
-      return { tableName, data: processed.rows, fields: processed.fields, metadata: { ...metadata, rowCount: processed.rows.length } };
+      // No synthetic expansion — FieldExpander handles it via the VIEW layer
+      return { tableName, data: rows, fields, metadata: { ...metadata, rowCount: rows.length } };
     }
 
     if (fileType === 'json' || fileType === 'json5') {
@@ -644,8 +688,8 @@ async loadSQLiteFile(file, dsName, metadata) {
       let rows = this.extractFromODataWrapper(jsonData);
       rows = this.removeODataColumns(rows);
       let fields = this.inferFieldTypes(rows);
-      const processed = this.addSyntheticFields(rows, fields);
-      return { tableName, data: processed.rows, fields: processed.fields, metadata: { ...metadata, rowCount: processed.rows.length } };
+      // No synthetic expansion — FieldExpander handles it via the VIEW layer
+      return { tableName, data: rows, fields, metadata: { ...metadata, rowCount: rows.length } };
     }
 
     // For binary formats: fetch as blob → File object → use uploaded file handlers

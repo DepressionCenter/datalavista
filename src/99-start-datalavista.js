@@ -1,9 +1,9 @@
 /* ============================================================
-This file is part of DataLaVista
-99-start-datalavista.js: DataLaVista app entry point and initialization.
+This file is part of DataLaVista™
+99-start-datalavista.js: DataLaVista™ app entry point and initialization.
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 Created: 2026-03-24
-Last Modified: 2026-03-24
+Last Modified: 2026-04-04
 Summary: App initialization, lazy init guard, and report URL loading.
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
@@ -23,7 +23,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 
 // Self-init
 (function startDataLaVista() {
-    console.log("*** Starting DataLaVista ***");
+    console.log("*** Starting DataLaVista™ ***");
     try {      
       init();
     } catch (e) {

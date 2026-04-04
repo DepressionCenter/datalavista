@@ -1,6 +1,6 @@
 ==================================================================================
 This file is part of DataLaVista™
-DataLaVista Logo (Asciiart)
+DataLaVista™ Logo (Asciiart)
 Author(s): Gabriel Mongefranco.
 Created: 2026-03-10
 Last Modified: 2026-03-20

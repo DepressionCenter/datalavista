@@ -1,9 +1,9 @@
 ﻿/* ============================================================
-This file is part of DataLaVista
+This file is part of DataLaVista™
 22-alasql.js: AlaSQL in-browser SQL engine setup and custom functions.
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 Created: 2026-03-24
-Last Modified: 2026-03-31
+Last Modified: 2026-04-04
 Summary: AlaSQL in-browser SQL engine setup and custom functions.
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
@@ -81,6 +81,195 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           member?.id?.toString() === keyStr
         );
       };
+
+      // ── DLV_PROP: extract a named property from an object ──────────────────
+      alasql.fn.DLV_PROP = function(obj, prop) {
+        if (obj === null || obj === undefined) return null;
+        if (typeof obj !== 'object' || Array.isArray(obj)) return null;
+        const v = obj[prop];
+        return v !== undefined ? v : null;
+      };
+
+      // ── DLV_DISPLAY: human-readable display value from any field value ──────
+      alasql.fn.DLV_DISPLAY = function(val) {
+        if (val === null || val === undefined) return null;
+        if (typeof val === 'string' || typeof val === 'number' || typeof val === 'boolean') return val;
+        if (Array.isArray(val)) {
+          const parts = val.map(v => {
+            if (typeof v === 'object' && v !== null) {
+              return v.Title || v.Label || v.Name || v.Value || v.lookupValue || JSON.stringify(v);
+            }
+            return v != null ? String(v) : null;
+          }).filter(s => s != null && s !== '');
+          return parts.length > 0 ? parts.join('; ') : null;
+        }
+        if (typeof val === 'object') {
+          // Un-expanded SP deferred reference — no data available yet
+          if (val.__deferred) return null;
+          if (val.TermGuid !== undefined) return val.Label || val.Title || null;
+          if (val.results && Array.isArray(val.results)) {
+            const parts = val.results.map(r => r.Label || r.Title || r.Name || r.lookupValue || JSON.stringify(r)).filter(s => s);
+            return parts.length > 0 ? parts.join('; ') : null;
+          }
+          // SP URL field: return the URL, not the Description
+          if (val.Url !== undefined) return val.Url || null;
+          return val.Title || val.Label || val.Name || val.lookupValue || val.Value || null;
+        }
+        return String(val);
+      };
+
+      // ── DLV_IDS: extract Id/ID from an array of objects, join with '; ' ─────
+      alasql.fn.DLV_IDS = function(arr) {
+        if (!Array.isArray(arr)) return null;
+        const ids = arr.map(v => {
+          if (typeof v === 'object' && v !== null) {
+            return v.Id !== undefined ? v.Id : (v.ID !== undefined ? v.ID : null);
+          }
+          return null;
+        }).filter(id => id != null);
+        return ids.length > 0 ? ids.join('; ') : null;
+      };
+
+      // ── DLV_JOIN: map array elements to a property and join with '; ' ────────
+      alasql.fn.DLV_JOIN = function(arr, prop) {
+        if (!Array.isArray(arr)) return null;
+        const parts = arr.map(v => {
+          if (typeof v === 'object' && v !== null) {
+            if (prop) {
+              const pv = v[prop];
+              if (pv != null) return String(pv);
+            }
+            return v.Title || v.Label || v.Name || v.Value || v.lookupValue || JSON.stringify(v);
+          }
+          return v != null ? String(v) : null;
+        }).filter(s => s != null && s !== '');
+        return parts.length > 0 ? parts.join('; ') : null;
+      };
+
+      // ── DLV_EMAIL: extract email address from a SharePoint claims string ─────
+      alasql.fn.DLV_EMAIL = function(claimsStr) {
+        if (!claimsStr) return '';
+        const match = String(claimsStr).match(/([a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/i);
+        return match ? match[1] : '';
+      };
+
+      // ── DLV_EMAILS: extract emails from an array of SP user objects ──────────
+      alasql.fn.DLV_EMAILS = function(arr) {
+        if (!Array.isArray(arr)) return null;
+        const emails = arr.map(v => {
+          const name = (typeof v === 'object' && v !== null) ? (v.Name || '') : '';
+          const match = name.match(/([a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/i);
+          return match ? match[1] : null;
+        }).filter(e => e);
+        return emails.length > 0 ? emails.join('; ') : null;
+      };
+
+      // ── DLV_PICTURE_URL: build SP user photo URL from claims string ──────────
+      alasql.fn.DLV_PICTURE_URL = function(claimsStr, siteBase) {
+        if (!claimsStr) return '';
+        const base = (siteBase || '..').replace(/\/$/, '');
+        return `${base}/_layouts/15/userphoto.aspx?size=L&accountname=${encodeURIComponent(claimsStr)}`;
+      };
+
+      // ── DLV_NORMALIZE_DATE: normalize date strings to 'YYYY-MM-DD [HH:mm:ss]'─
+      alasql.fn.DLV_NORMALIZE_DATE = function(val) {
+        if (val === null || val === undefined || val === '') return val;
+        const str = String(val).trim();
+        // ISO with T separator: 2026-01-15T14:30:00Z or 2026-01-15T00:00:00
+        if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(str)) {
+          let d = str.replace('T', ' ').replace('Z', '').replace(/\.\d+$/, '');
+          if (d.endsWith(' 00:00:00')) d = d.replace(' 00:00:00', '');
+          return d;
+        }
+        // Already ISO date: 2026-01-15
+        if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
+        // Already ISO datetime without T: 2026-01-15 14:30:00
+        if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(str)) {
+          return str.endsWith(' 00:00:00') ? str.replace(' 00:00:00', '') : str;
+        }
+        // Oracle: 15-JAN-2026 or 15-JAN-26
+        const ORACLE_MONTHS = {JAN:1,FEB:2,MAR:3,APR:4,MAY:5,JUN:6,JUL:7,AUG:8,SEP:9,OCT:10,NOV:11,DEC:12};
+        const oracleM = str.match(/^(\d{2})-([A-Z]{3})-(\d{2,4})$/i);
+        if (oracleM) {
+          const day = oracleM[1].padStart(2, '0');
+          const mon = String(ORACLE_MONTHS[oracleM[2].toUpperCase()] || 1).padStart(2, '0');
+          let yr = parseInt(oracleM[3], 10);
+          if (yr < 100) yr += yr < 30 ? 2000 : 1900;
+          return `${yr}-${mon}-${day}`;
+        }
+        // MM/DD/YYYY or M/D/YY
+        const slashM = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+        if (slashM) {
+          let yr = parseInt(slashM[3], 10);
+          if (yr < 100) yr += yr < 30 ? 2000 : 1900;
+          const mon = String(slashM[1]).padStart(2, '0');
+          const day = String(slashM[2]).padStart(2, '0');
+          return `${yr}-${mon}-${day}`;
+        }
+        // Unix epoch (10 digits)
+        if (/^\d{10}$/.test(str)) {
+          const n = parseInt(str, 10);
+          if (n > 946684800 && n < 9999999999) {
+            let d = new Date(n * 1000).toISOString().replace('T', ' ').replace('Z', '').replace(/\.\d+$/, '');
+            return d.endsWith(' 00:00:00') ? d.replace(' 00:00:00', '') : d;
+          }
+        }
+        // Unix epoch ms (13 digits)
+        if (/^\d{13}$/.test(str)) {
+          const n = parseInt(str, 10);
+          if (n > 946684800000 && n < 9999999999999) {
+            let d = new Date(n).toISOString().replace('T', ' ').replace('Z', '').replace(/\.\d+$/, '');
+            return d.endsWith(' 00:00:00') ? d.replace(' 00:00:00', '') : d;
+          }
+        }
+        // Scientific notation epoch (e.g. 1.7116e+12 ms)
+        if (/^\d+\.?\d*[eE][+-]?\d+$/.test(str)) {
+          const n = parseFloat(str);
+          if (n > 9.46e11 && n < 9.99e12) {
+            let d = new Date(n).toISOString().replace('T', ' ').replace('Z', '').replace(/\.\d+$/, '');
+            return d.endsWith(' 00:00:00') ? d.replace(' 00:00:00', '') : d;
+          }
+        }
+        return val; // return original if no pattern matched
+      };
+
+      // ── DLV_TAX_LABELS: get taxonomy labels joined with '; ' ─────────────────
+      alasql.fn.DLV_TAX_LABELS = function(val) {
+        if (val === null || val === undefined) return null;
+        if (Array.isArray(val)) {
+          const labels = val.map(v => (typeof v === 'object' && v !== null) ? (v.Label || v.Term || v.Title || '') : String(v)).filter(l => l);
+          return labels.length > 0 ? labels.join('; ') : null;
+        }
+        if (typeof val === 'object') {
+          if (val.TermGuid !== undefined) return val.Label || val.Title || null;
+          if (val.results && Array.isArray(val.results)) {
+            const labels = val.results.map(r => r.Label || r.Term || r.Title || '').filter(l => l);
+            return labels.length > 0 ? labels.join('; ') : null;
+          }
+        }
+        return typeof val === 'string' ? val : null;
+      };
+
+      // ── DLV_TAX_IDS: get 'Label|TermGuid' strings joined with '; ' ──────────
+      alasql.fn.DLV_TAX_IDS = function(val) {
+        if (val === null || val === undefined) return null;
+        if (Array.isArray(val)) {
+          const ids = val.map(v => {
+            if (typeof v === 'object' && v !== null) {
+              const label = v.Label || v.Term || v.Title || '';
+              const guid = v.TermGuid || v.WssId || '';
+              return `${label}|${guid}`;
+            }
+            return String(v);
+          }).filter(s => s && s !== '|');
+          return ids.length > 0 ? ids.join('; ') : null;
+        }
+        if (typeof val === 'object' && val !== null) {
+          if (val.TermGuid !== undefined) return `${val.Label || ''}|${val.TermGuid || ''}`;
+          if (val.results && Array.isArray(val.results)) return alasql.fn.DLV_TAX_IDS(val.results);
+        }
+        return null;
+      };
     }
 
     // ── SELECT column helpers ────────────────────────────────────────────────────
@@ -157,6 +346,9 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
     }
 
     // Map a raw data row into our internal format.
+    // @deprecated Since view-layer refactor. Raw SP objects are now stored directly in
+    // _raw_* tables and all transformation is handled by FieldExpander UDFs in the VIEW layer.
+    // This function is kept for backward compatibility only.
     function mapDataRow(tableName, row, fieldDefs) {
       const mapped = {};
       const processingRow = { ...row };

@@ -1,9 +1,9 @@
 # ============================================================
-#  This file is part of DataLaVista
-#  build.ps1: DataLaVista build script (Windows PowerShell).
+#  This file is part of DataLaVista™
+#  build.ps1: DataLaVista™ build script (Windows PowerShell).
 #  Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 #  Created: 2026-03-24
-#  Last Modified: 2026-03-31
+#  Last Modified: 2026-04-04
 #  Summary: Generates datalavista.js, DataLaVista.html, DataLaVista-nojs.html, DataLaVista-dev.html.
 #  Notes: See README file for documentation and full license information.
 #  Website: https://github.com/DepressionCenter/datalavista

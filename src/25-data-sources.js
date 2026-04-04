@@ -1,9 +1,9 @@
 ﻿/* ============================================================
-This file is part of DataLaVista
+This file is part of DataLaVista™
 25-data-sources.js: Data source connection popup, remote fetch guards, and source loaders.
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 Created: 2026-03-24
-Last Modified: 2026-03-31
+Last Modified: 2026-04-04
 Summary: Data source connection popup, remote fetch guards, and source loaders.
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
@@ -710,13 +710,16 @@ async function loadSharePointListsSource(siteUrl, dsName, newAuth='current', new
   const lists = await fetchSPLists(siteUrl, dsName);
   let loadedCount = 0;
 
+  // Capture which tables were already fully loaded before refresh, so we can re-fetch them
+  const prevLoadedKeys = new Set(
+    (DataLaVistaState.dataSources[dsName]?.tables || [])
+      .filter(k => DataLaVistaState.tables[k]?.loaded)
+  );
+
   for (const list of lists) {
     try {
       const isDocLib = list.BaseType === 1;
       const fields = await fetchSPFields(siteUrl, list.Id, isDocLib);
-      const fieldMetas = fields
-        .filter(f => !shouldSkipField(f))
-        .map(f => buildFieldMeta(f));
 
       // Strip SharePoint's "List" / "ListItem" suffix from EntityTypeName for cleaner keys
       const rawEntityType = list.EntityTypeName || (list.Title || 'List').replace(/[^A-Za-z0-9_]/g, '');
@@ -724,6 +727,21 @@ async function loadSharePointListsSource(siteUrl, dsName, newAuth='current', new
 
       // tableKey = DSInternalName_EntityTypeName — immutable forever
       const tableKey = dsName + '_' + entityTypeName;
+
+      // Preserve user-renamed field aliases from the existing table state
+      const existingFieldAliases = {};
+      for (const ef of (DataLaVistaState.tables[tableKey]?.fields || [])) {
+        if (ef.alias && ef.internalName) existingFieldAliases[ef.internalName] = ef.alias;
+      }
+
+      const fieldMetas = fields
+        .filter(f => !shouldSkipField(f))
+        .map(f => {
+          const fm = buildFieldMeta(f);
+          if (existingFieldAliases[fm.internalName]) fm.alias = existingFieldAliases[fm.internalName];
+          return fm;
+        });
+
       // User-facing alias: PascalCase of Title (no "List" suffix)
       const tableAlias = toPascalCase(list.Title || entityTypeName);
 
@@ -763,6 +781,13 @@ async function loadSharePointListsSource(siteUrl, dsName, newAuth='current', new
 
   // Register lookup-field relationships now that all lists are known
   CyberdynePipeline.registerSpLookupRelationships(dsName);
+
+  // Re-fetch data for tables that were fully loaded before refresh (don't make users re-run queries)
+  for (const tableKey of prevLoadedKeys) {
+    if (DataLaVistaState.tables[tableKey]) {
+      fetchTableData(tableKey, true).catch(e => console.warn('[loadSharePointListsSource] Re-fetch failed:', tableKey, e.message));
+    }
+  }
 
   if(DataLaVistaState.reportMode !== 'view') {
     setStatus(`Loaded ${loadedCount} lists from SharePoint (${dsName})`, 'success');

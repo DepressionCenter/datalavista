@@ -1,9 +1,9 @@
 ﻿/* ============================================================
-This file is part of DataLaVista
+This file is part of DataLaVista™
 70-preview.js: Preview tab, CSV download, and report generation.
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 Created: 2026-03-24
-Last Modified: 2026-03-31
+Last Modified: 2026-04-04
 Summary: Preview tab, CSV download, and report generation.
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
@@ -35,14 +35,14 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           for (const tname of referencedTables) {
             const t = DataLaVistaState.tables[tname];
             if (!t || !t.data.length) continue;
-            alasql(`DROP TABLE IF EXISTS [${tname}]`);
-            alasql(`CREATE TABLE [${tname}]`);
-            alasql.tables[tname].data = t.data;
-            // Also register by alias so QB-generated SQL (FROM alias) works in preview
-            if (t.alias && t.alias !== tname) {
-              alasql(`DROP TABLE IF EXISTS [${t.alias}]`);
-              alasql(`CREATE TABLE [${t.alias}]`);
-              alasql.tables[t.alias].data = t.data;
+            // Register the raw _raw_tname TABLE (safe regardless of VIEW state)
+            registerTableInAlaSQL(tname);
+            // Rebuild the FieldExpander VIEW so the SQL can use alias column names + UDFs
+            const viewName = t.viewName || CyberdynePipeline.getViewForTable(tname);
+            if (viewName) {
+              try { CyberdynePipeline.updateViewSQL(viewName); }
+              catch (e) { console.warn('[DLV] [refreshDashboardPreview] updateViewSQL:', viewName, e.message); }
+												   
             }
           }
 
@@ -52,10 +52,14 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           const results = alasql(processedSQL);
 
           alasql('DROP TABLE IF EXISTS [dlv_results]');
+													  
           alasql('DROP VIEW  IF EXISTS [dlv_active]');
           alasql('CREATE TABLE [dlv_results]');
           alasql.tables['dlv_results'].data = results;     // O(1) reference assignment
+																					
+																					   
           alasql('CREATE VIEW [dlv_active] AS SELECT * FROM [dlv_results]');
+																				   
           DataLaVistaState.previewFilters = {};
           DataLaVistaState.design.previewFilteredData = null;
           DataLaVistaState.queryColumns = results.length ? Object.keys(results[0]) : DataLaVistaState.queryColumns;
@@ -215,6 +219,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       // ============================================================
       // DOWNLOAD CSV
       // ============================================================
+      // TODO: This may need to be changed after VIEW restructuring.
       async function downloadCSV() {
         let results = (alasql.tables && alasql.tables['dlv_results'])
           ? alasql('SELECT * FROM [dlv_results]')
@@ -377,5 +382,3 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         }
         navigator.clipboard.writeText(url).then(() => toast('URL copied to clipboard', 'success'));
       }
-
-      
