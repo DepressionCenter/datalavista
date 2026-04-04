@@ -187,11 +187,6 @@ function stripODataMetadata(rows, quickCheck = false) {
       return rows;
     }
 
-    // Rule 3, 6, 7, 8, 9, 10: Fetch and filter structure
-    const EXCLUDED_FIELDS = [
-      'ItemChildCount', 'FolderChildCount', 'MetaInfo', 'DocIcon', 'AppAuthor', 'AppEditor', 'Edit', 'ContentType', 'TemplateUrl', 'xd_ProgID', 'xd_Signature', 'HTML_x0020_File_x0020_Type', '_ModerationStatus', '_ModerationComments', 'InstanceID', 'Order', 'GUID', 'WorkflowVersion', 'WorkflowInstanceID', 'ParentVersionString', 'ParentLeafName', 'CheckedOutUserId', 'IsCheckedoutToLocal', 'UniqueId', 'SyncClientId', 'ProgId', 'ScopeId', 'FileRef', 'FileDirRef', 'Last_x0020_Modified', 'Created_x0020_Date', 'FSObjType', 'SortBehavior', 'OriginatorId', 'NoExecute', 'ContentVersion', 'UIVersionString', 'AccessPolicy', '_UIVersionString', 'ParentUniqueId', '_Level', 'IsCurrentVersion', 'ColorTag', '_ColorTag', '_IsRecord', '_LabelAppliedBy', '_LabelSetting', 'ComplianceAssetId', '_ComplianceFlags', '_ComplianceTag', '_ComplianceTagWrittenTime', '_ComplianceTagUserId', 'OData__SysVersion', 'OData__SysFlow', 'OData__SysProfile', '_SysVersion', '_SysFlow', '_SysProfile', 'odata.id', 'odata.etag', 'odata.type', 'odata.link', 'odata.editLink', 'odata.navigationLinkUrl', 'Author@odata.navigationLinkUrl', 'Editor@odata.navigationLinkUrl'
-    ];
-
 
     async function fetchSPFields(siteUrl, listGuid, isDocLib = false) {
   // Excludes Hidden, Computed, underscore-prefixed, and dependent lookup fields
@@ -205,8 +200,8 @@ function stripODataMetadata(rows, quickCheck = false) {
 
   // EXCLUDE system/metadata fields AND projected lookups (_x003a_)
   fields = fields.filter(f =>
-    !EXCLUDED_FIELDS.includes(f.InternalName) &&
-    !EXCLUDED_FIELDS.includes(f.Title) &&
+    !SKIP_FIELDS.has(f.InternalName) &&
+    !SKIP_FIELDS.has(f.Title) &&
     !f.InternalName.includes('_x003a_') &&
     !f.IsDependentLookup
   );

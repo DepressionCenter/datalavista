@@ -146,12 +146,11 @@ const CyberdynePipeline = {
 
   /**
    * Remove OData metadata keys and SP system columns from a single row object.
-   * Uses the existing EXCLUDED_FIELDS array (23-sharepoint.js) and SKIP_FIELDS Set (10-constants.js).
+   * Uses the existing SKIP_FIELDS Set (10-constants.js).
    */
   stripODataRow(row) {
     if (!row || typeof row !== 'object') return row;
     const isExcluded = (k) =>
-      EXCLUDED_FIELDS.includes(k) ||
       SKIP_FIELDS.has(k) ||
       k === '__metadata' ||
       k.startsWith('@odata.') ||
