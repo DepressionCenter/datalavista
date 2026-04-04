@@ -12731,18 +12731,25 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         }
       }
 
+      // Find all tables referenced in the SQL query by matching against both raw table keys and view names
       function findReferencedTables(sql) {
-        const found = [];
-        for (const [tkey] of Object.entries(DataLaVistaState.tables)) {
-          // Match by the immutable table key only (e.g. SP_EngagementHistory)
-          // The alias form (SP_Contacts) appears in SQL as a FROM alias, not a table name
-          const esc = tkey.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-          const re = new RegExp(`\\[${esc}\\]|\\b${esc}\\b`, 'i');
-          if (re.test(sql)) found.push(tkey);
-        }
-        return found;
+        // Users write SQL against view names only (e.g. SP_People, Depres_Consultations).
+        // Map every view name → its raw table key, then scan the SQL once.
+        const nameToKey = {};
+        for (const [viewName, tkey] of Object.entries(CyberdynePipeline.viewToRawTable))
+          nameToKey[viewName] = tkey;
+        if (!Object.keys(nameToKey).length) return [];
+ 
+        const esc = n => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const pattern = Object.keys(nameToKey).map(n => `\\[${esc(n)}\\]|\\b${esc(n)}\\b`).join('|');
+        const seen = new Set();
+        for (const m of (sql.match(new RegExp(pattern, 'gi')) || []))
+          seen.add(nameToKey[m.replace(/^\[|\]$/g, '')]);
+        seen.delete(undefined);
+        return [...seen];
       }
 
+      // Show query results preview in the Query Builder tab, and enable "Use in Design" if there are results
       function showQueryPreview(results) {
         const wrap  = document.getElementById('preview-table-wrap');
         const count = document.getElementById('preview-row-count');
