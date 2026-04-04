@@ -346,14 +346,20 @@ async function loadConfig(cfg) {
  
   // Restore view definitions (gracefully skipped for legacy configs without views)
   if (cfg.views && typeof cfg.views === 'object' && Object.keys(cfg.views).length) {
+    console.log('DEBUG: loadConfig: Restoring views from config:', Object.keys(cfg.views));
     CyberdynePipeline.restoreViewsFromConfig(cfg.views);
+    console.log('DEBUG: loadConfig: Completed restoring views from config. Current views in pipeline:', Object.keys(CyberdynePipeline.views));
+  } else {
+    console.log('DEBUG: loadConfig: No views found in config, rebuilding from tables metadata');
   }
  
   // Back-fill baseFields from table meta for views that don't have them yet
   // (handles legacy configs where views.baseFields wasn't saved, and new configs
   //  where table.baseFields is more authoritative than the view entry)
   for (const [tkey, tmeta] of Object.entries(DataLaVistaState.tables)) {
+    console.log(`DEBUG: loadConfig: Processing table ${tkey} for baseFields backfill`);
     const viewName = CyberdynePipeline.rawTableToView[tkey];
+    console.log(`DEBUG: loadConfig: Found view name "${viewName}" for table ${tkey}`);
     if (!viewName) continue;
     const view = CyberdynePipeline.views[viewName];
     if (!view) continue;
@@ -362,11 +368,39 @@ async function loadConfig(cfg) {
       view.baseFields = sourceFields;
     }
   }
- 
+
+  // ── Backward-compat: reconstruct view registry from table metadata
+  //    for configs saved before the view-layer refactor (no cfg.views key).
+  if (!cfg.views || !Object.keys(cfg.views).length) {
+    console.log('DEBUG: No views found in config, reconstructing views from tables metadata');
+      for (const [tkey, tmeta] of Object.entries(DataLaVistaState.tables)) {
+          if (CyberdynePipeline.rawTableToView[tkey]) continue; // already registered
+          const fields = tmeta.baseFields || tmeta.originalFields || tmeta.fields || [];
+          const viewName = tmeta.alias && tmeta.alias !== tkey ? tmeta.alias : tkey;
+          try {
+              console.log(`DEBUG: Reconstructing view for table ${tkey}`);
+              if (tmeta.sourceType === 'sharepoint') {
+                  console.log(`DEBUG: Registering SharePoint list view for table ${tkey} with data source ${tmeta.dataSource}`);
+                  CyberdynePipeline.registerSharePointList(
+                      tmeta.dataSource || tkey, tkey, tmeta.displayName || tkey, fields
+                  );
+              } else {
+                  console.log(`DEBUG: Registering generic view for table ${tkey}`);
+                  const finalViewName = CyberdynePipeline.createView(tkey, viewName, fields);
+                  console.log(`DEBUG: Registered view (finalViewName) "${finalViewName}" for table ${tkey}`);
+                  DataLaVistaState.tables[tkey].viewName = finalViewName;
+              }
+          } catch (e) {
+              console.warn('[loadConfig] Failed to reconstruct view for', tkey, e.message);
+          }
+      }
+  }
+
   // Background fetch for referenced tables
   if (DataLaVistaState.sql) {
     const referencedTables = findReferencedTables(DataLaVistaState.sql);
     for (const tname of referencedTables) {
+      console.log(`DEBUG: Ensuring data for referenced table "${tname}" is loaded in background after config load`);
       await ensureTableData(tname, true)
     }
   }

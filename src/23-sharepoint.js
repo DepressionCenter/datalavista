@@ -301,8 +301,8 @@ async function fetchTableData(tableName, fetchAll = false) {
   // Create the fetch sequence and store it in the table state
   t.fetchPromise = (async (tableName) => {
     try {
-      if (!fetchAll) setStatus(`Fetching preview for ${tableName}...`, 'loading');
-      if (fetchAll) { setStatus(`Loading data for ${tableName}...`, 'loading'); toast(`Fetching data for ${tableName}...`, 'info'); }
+      if (!fetchAll && DataLaVistaState.reportMode!=='view') { setStatus(`Fetching preview for ${tableName}...`, 'loading'); }
+      if (fetchAll && DataLaVistaState.reportMode!=='view') { setStatus(`Loading data for ${tableName}...`, 'loading'); toast(`Fetching data for ${tableName}...`, 'info'); }
  
       const spFields = t.originalFields || t.fields;
       let rawData = [];

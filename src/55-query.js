@@ -101,7 +101,14 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         // Map every view name → its raw table key, then scan the SQL once.
         const nameToKey = {};
         for (const [viewName, tkey] of Object.entries(CyberdynePipeline.viewToRawTable))
-          nameToKey[viewName] = tkey;
+            nameToKey[viewName] = tkey;
+
+        // Fallback: if no views registered yet, try matching raw table keys directly
+        // (works for SP where viewName === tableKey, handles remaining legacy configs)
+        if (!Object.keys(nameToKey).length) {
+            for (const tkey of Object.keys(DataLaVistaState.tables))
+                nameToKey[tkey] = tkey;
+        }
         if (!Object.keys(nameToKey).length) return [];
  
         const esc = n => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');

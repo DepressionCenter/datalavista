@@ -74,19 +74,25 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         showLoadingPopup('⚠ Unable to load report data.');
         throw new Error('Report config contains no SQL query.');
       }
+
+      
       await refreshDashboardPreview();
 
-      // ── Step 4: Switch to preview and maximise ─────────────────────
-      document.body.classList.add('dlv-report-mode');
-      setStatus('Report ready', 'success');
-      toast('Report loaded', 'success');
+      if(DataLaVistaState.reportLoaded) {
+        setStatus('Report ready', 'success');
+        toast('Report loaded', 'success');
+      } else {
+        throw new Error('Report data failed to load.');
+      }
 
     } catch (err) {
       showLoadingPopup('⚠ Unable to load report data.');
-      toast('Unable to load report. :(', 'error');
+      toast('Unable to load report.', 'error');
       console.log('❌ DataLaVista was unable to load the report: \n ' + err.message);
       setStatus('DataLaVista was unable to load the report. See console for details', 'error');
     } finally {
+      // Switch to preview and maximise it to show the error message if loading failed, or the report if loading succeeded.
+      document.body.classList.add('dlv-report-mode');
       hideLoadingPopup();
     }
   }

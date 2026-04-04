@@ -24,17 +24,22 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       // PREVIEW TAB
       // ============================================================
       async function refreshDashboardPreview() {
+        DataLaVistaState.reportLoaded = false;
         if (!DataLaVistaState.sql.trim()) { toast('Please build a query first', 'error'); return; }
         if(DataLaVistaState.reportMode != 'view') setStatus('Loading preview data...', 'loading');
 
         try {
           const referencedTables = findReferencedTables(DataLaVistaState.sql);
+          console.log('DEBUG: Referenced tables for preview:', referencedTables);
+          // TODO: DEBUG: This appears to refresh sharepoint sources only but not remote files.
           for (const tname of referencedTables) {
             await ensureTableData(tname, true); // Load all rows
           }
           for (const tname of referencedTables) {
             const t = DataLaVistaState.tables[tname];
-            if (!t || !t.data.length) continue;
+            if (!t || !t.data.length) {
+              continue;
+            }
             // Register the raw _raw_tname TABLE (safe regardless of VIEW state)
             registerTableInAlaSQL(tname);
             // Rebuild the FieldExpander VIEW so the SQL can use alias column names + UDFs
@@ -51,13 +56,10 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           const processedSQL = preprocessSQL(DataLaVistaState.sql);
           const results = alasql(processedSQL);
 
-          alasql('DROP TABLE IF EXISTS [dlv_results]');
-													  
+          alasql('DROP TABLE IF EXISTS [dlv_results]');													  
           alasql('DROP VIEW  IF EXISTS [dlv_active]');
           alasql('CREATE TABLE [dlv_results]');
-          alasql.tables['dlv_results'].data = results;     // O(1) reference assignment
-																					
-																					   
+          alasql.tables['dlv_results'].data = results;
           alasql('CREATE VIEW [dlv_active] AS SELECT * FROM [dlv_results]');
 																				   
           DataLaVistaState.previewFilters = {};
@@ -67,11 +69,14 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           renderPreviewTab();
           
           if(DataLaVistaState.reportMode !== 'view') setStatus(`Preview: ${results.length} rows`, 'success');
+          DataLaVistaState.reportLoaded = true;
         } catch (err) {
+          console.error('[DLV] refreshDashboardPreview failed:', err);
           if(DataLaVistaState.reportMode !== 'view') {
           toast('Preview error: ' + err.message, 'error');
           setStatus('Preview error', 'error');
           } else {
+            toast('Unable to load report data.', 'error');
            setStatus('Report error', 'error');
           }
         }
