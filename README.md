@@ -89,7 +89,7 @@ Most enterprise data is trapped behind bloated frameworks or expensive BI tools.
 
 
 ## Documentation
-+ The full documentation is not yet available, but it will be coming to: https://michmed.org/efdc-kb
++ The full documentation is available at: [https://michmed.org/efdc-kb](https://teamdynamix.umich.edu/TDClient/210/DepressionCenter/KB/ArticleDet?ID=15179)
 
 ### Background History
 Data La Vista was an idea conceived out of necessity. When our IT department was being too slow to roll out BI tools, the members of the [Automators Anonumous](https://github.com/DepressionCenter/AutomatorsAnonymous) group (a.k.a. Power Automate Lab) at UMich got together and created this tool through many, many iterations of AI prompts! Some of the prompts are included in this project for referene and to give you ideas of what's possible.
