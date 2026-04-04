@@ -4439,7 +4439,6 @@ async loadSQLiteFile(file, dsName, metadata) {
    * Returns: { tableName, data, fields, metadata } or { tables: [...] } for SQLite
    */
   async loadRemoteFile(url, dsName, fileType) {
-    console.log('DEBUG: loadRemoteFile() called with URL:', url, 'DataSource Name:', dsName, 'File Type:', fileType);
     const metadata = {
       sourceType: fileType,
       fileName: url.split('/').pop() || ('remote.' + fileType),
@@ -4447,7 +4446,6 @@ async loadSQLiteFile(file, dsName, metadata) {
       url
     };
     try {
-      console.log('DEBUG: Attempting to load with AlaSQL...');
       return await this.loadWithAlaSQL(url, dsName, fileType, metadata);
     } catch (alasqlErr) {
       console.warn('[CyberdynePipeline] AlaSQL loading failed, trying fetch fallback:', alasqlErr.message);

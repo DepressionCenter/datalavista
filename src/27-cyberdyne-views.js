@@ -766,7 +766,6 @@ _applyViewSQL(viewName) {
     },
 
     _expandUrlField(field, outKey, rawCol) {
-      console.log('DEBUG: _expandUrlField() called for field', field);
       return [
         this._vc(outKey,           field.internalName, `DLV_PROP(${rawCol}, 'Url')`,         'text',   'text',   false, field.internalName),
         this._vc(outKey + 'Label', field.internalName, `DLV_PROP(${rawCol}, 'Description')`, 'text',   'text',   true,  field.internalName),
