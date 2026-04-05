@@ -495,6 +495,12 @@ function rankSuggestions(rules, cols, meta) {
         if (event.currentTarget === event.target) event.currentTarget.classList.remove('drag-over');
       }
 
+      // TODO: Use new heuristic functions scoreRule() and rankSuggestions()
+      // to auto-suggest best widget type and fields based on the dropped item
+      // (e.g. date → line chart with date on x-axis, number → bar chart, etc.).
+      // The CHART_TYPE_RULES const needs revision as some heuristics that use
+      // field names changed to just data types during de-duplication.
+      // See AI prompt #4 in the archive folder.
       function onDropToCanvas(event) {
         event.preventDefault();
         event.currentTarget.classList.remove('drag-over');

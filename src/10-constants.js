@@ -269,6 +269,8 @@ const QB_AGGS = [
 ];
 
 
+// TODO: The CHART_TYPE_RULES const needs revision as some heuristics that use field names changed to just data types during de-duplication.
+// See AI prompt #4 in the archive folder.
 const CHART_TYPE_RULES = [
     {
         "id": "rule_006",
