@@ -3,7 +3,7 @@ This file is part of DataLaVista™
 95-public-api.js: Public API (window.dlv) and app self-initialization entry point.
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 Created: 2026-03-24
-Last Modified: 2026-04-04
+Last Modified: 2026-04-05
 Summary: Public API (window.dlv) and app self-initialization entry point.
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
@@ -265,5 +265,11 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         showHelp,
         loadReportFromUrl,
         widgetUpdateYSeriesType,
+        applyDrillFilter,
+        clearDrillFilter,
+        clearAllDrillFilters,
+        _rebuildActiveView,
+        _renderAllDrillChips,
+        _renderDrillChipsIn,
         init
       };

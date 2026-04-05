@@ -3,7 +3,7 @@ This file is part of DataLaVista™
 70-preview.js: Preview tab, CSV download, and report generation.
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 Created: 2026-03-24
-Last Modified: 2026-04-04
+Last Modified: 2026-04-05
 Summary: Preview tab, CSV download, and report generation.
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
@@ -128,9 +128,10 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         for (const w of DataLaVistaState.design.widgets) {
           const el = document.createElement('div');
           el.className = 'widget';
-          el.style.cssText = `width:${w.widthPct}%;height:${w.heightVh}vh;min-height:120px;border-color:${w.borderColor};border-width:${w.borderSize}px`;
+          const titleStyle = `background:${w.titleBackgroundColor||'#fefefe'};font-size:${w.titleFontSize||14}px;color:${w.titleFontColor||'#323130'}`;
+          el.style.cssText = `width:${w.widthPct}%;height:${w.heightVh}vh;min-height:120px;border-color:${w.borderColor};border-width:${w.borderSize}px;background:${w.widgetBackgroundColor||'#fefefe'}`;
           el.innerHTML = `
-            <div class="widget-header"><span class="widget-title">${w.title}</span></div>
+            <div class="widget-header${w.showTitle === false ? ' hidden' : ''}" style="${titleStyle}"><span class="widget-title">${w.title}</span></div>
             <div class="widget-content" id="prev-wcontent-${w.id}">
               ${getPrevWidgetContent(w)}
             </div>
@@ -176,26 +177,36 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
   const chartData = buildWidgetData(w);
   const option = _buildChartOption(w, chartData);
   if (!option) {
-    chart.setOption({ title: { text: 'No data', left: 'center', top: 'middle', textStyle: { color: '#a19f9d', fontSize: 13 } } });
+    chart.setOption({ backgroundColor: w.chartBackgroundColor || 'transparent', title: { text: 'No data', left: 'center', top: 'middle', textStyle: { color: '#a19f9d', fontSize: 13 } } });
     return;
   }
+  option.backgroundColor = w.chartBackgroundColor || 'transparent';
   chart.setOption(option);
+  // Cross-widget click filter
+  chart.on('click', (params) => {
+    if (params.componentType !== 'series') return;
+    const filterField = w.xField;
+    let filterValue = params.name;
+    if (w.type === 'scatter' && Array.isArray(params.data)) filterValue = String(params.data[0]);
+    if (filterField && filterValue != null) applyDrillFilter(filterField, String(filterValue));
+  });
 }
 
       function applyPreviewFilterAndRender(field, value) {
         if (value === '(All)') delete DataLaVistaState.previewFilters[field];
         else DataLaVistaState.previewFilters[field] = value;
 
-        // Rebuild the [dlv_active] view — a filter layer on top of [dlv_results].
-        // Per-widget SQL (buildWidgetData) will query FROM [dlv_active] automatically.
+        // Rebuild [dlv_active] using combined previewFilters + drillFilters
         alasql('DROP VIEW IF EXISTS [dlv_active]');
-        const whereClauses = Object.entries(DataLaVistaState.previewFilters)
-          .map(([f, v]) => `[${f}] = '${String(v).replace(/'/g, "''")}'`);
+        const allFilters = { ...(DataLaVistaState.previewFilters || {}), ...(DataLaVistaState.drillFilters || {}) };
+        const whereClauses = Object.entries(allFilters).map(([f, v]) => `[${f}] = '${String(v).replace(/'/g, "''")}'`);
         if (whereClauses.length) {
           alasql(`CREATE VIEW [dlv_active] AS SELECT * FROM [dlv_results] WHERE ${whereClauses.join(' AND ')}`);
+        } else {
+          alasql(`CREATE VIEW [dlv_active] AS SELECT * FROM [dlv_results]`);
         }
 
-        DataLaVistaState.design.previewFilteredData = null; // view handles all filtering
+        DataLaVistaState.design.previewFilteredData = null;
 
         // Re-render each widget
         const canvas = document.getElementById('preview-canvas');

@@ -3,7 +3,7 @@ This file is part of DataLaVista™
 10-constants.js: Constants, state object, and core DataLaVista objects.
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 Created: 2026-03-24
-Last Modified: 2026-04-04
+Last Modified: 2026-04-05
 Summary: Constants, state object, and core DataLaVista objects.
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
@@ -144,6 +144,7 @@ const DataLaVistaState = {
   reportMode: 'view', // 'view' or 'edit' (can be set via ?reportMode=<val> param; defaults to 'view')
   reportUrl: null, // if ?report=<url> param is provided, this holds the URL of the report being edited
   relationships: [], // auto-detected and manual relationships: [{ id, source, childTableKey, childField, parentTableKey, parentField, joinType, spLookupField }]
+  drillFilters: {},  // cross-widget click filters: { fieldName: value } — rebuilt on every chart/table click
   _initialized: false
 }; // End dlvRawState
 

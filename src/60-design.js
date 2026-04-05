@@ -3,7 +3,7 @@ This file is part of DataLaVista™
 60-design.js: Design canvas, widget rendering, data transforms, and widget properties.
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 Created: 2026-03-24
-Last Modified: 2026-04-04
+Last Modified: 2026-04-05
 Summary: Design canvas, widget rendering, data transforms, and widget properties.
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
@@ -419,6 +419,25 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 
       function addWidgetToCanvas(widgetType, fields, tableName) {
         const id = 'w_' + Date.now();
+
+        // Smart default Y field for chart widgets
+        const _smartY = (() => {
+          if (fields && fields.length > 1) return { yField: fields[1], yFields: [fields[1]], yAgg: '' };
+          const qcols = DataLaVistaState.queryColumns;
+          // 1. ID/Id field → COUNT DISTINCT
+          const idCol = qcols.find(c => /^(id|ID|Id)$/i.test(c));
+          if (idCol) return { yField: idCol, yFields: [idCol], yAgg: 'COUNT_DISTINCT' };
+          // 2. Numeric → SUM
+          const numCol = qcols.find(c => sniffType(c) === 'number');
+          if (numCol) return { yField: numCol, yFields: [numCol], yAgg: 'SUM' };
+          // 3. Date → MAX
+          const dateCol = qcols.find(c => sniffType(c) === 'date');
+          if (dateCol) return { yField: dateCol, yFields: [dateCol], yAgg: 'MAX' };
+          const fb = qcols[1] || qcols[0] || '';
+          return { yField: fb, yFields: fb ? [fb] : [], yAgg: '' };
+        })();
+        const _initFieldAggs = _smartY.yAgg ? { [_smartY.yField]: _smartY.yAgg } : {};
+
         const widget = {
           id,
           type: widgetType,
@@ -428,13 +447,13 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           widthPct: 45,
           heightVh: 30,
           fields: fields || (DataLaVistaState.queryColumns.length ? (widgetType === 'kpi' ? [DataLaVistaState.queryColumns[0]] : DataLaVistaState.queryColumns.slice(0, 8)) : []),
-          xField: (fields && fields.length>0) ? fields[0] : DataLaVistaState.queryColumns[0] || '', // TODO: guess x and y based on dataType
-          yField: (fields && fields.length>1) ? fields[1] : DataLaVistaState.queryColumns[1] || '', // legacy
-          yFields: (fields && fields.length>1) ? [fields[1]] : (DataLaVistaState.queryColumns[1] ? [DataLaVistaState.queryColumns[1]] : []),
+          xField: (fields && fields.length > 0) ? fields[0] : DataLaVistaState.queryColumns[0] || '',
+          yField: _smartY.yField,  // legacy compat
+          yFields: _smartY.yFields,
           aggregation: '',
-          fieldAggs: {},     // per-field aggregate: { [col]: 'SUM' | 'AVG' | ... }
-          conditions: [],    // per-widget WHERE: [{ conj, field, op, value }]
-          sorts: [],         // per-widget ORDER BY: [{ field, dir }]
+          fieldAggs: _initFieldAggs,
+          conditions: [],
+          sorts: [],
           fillColor: '#0078d4',
           widgetBackgroundColor: '#fefefe',
           chartBackgroundColor: '#fefefe',
@@ -448,14 +467,17 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           borderSize: 1,
           fontSize: 13,
           fontColor: '#323130',
+          kpiMetricFontSize: 36,
+          kpiLabelFontSize: 13,
+          kpiLabelOverride: '',
           textContent: 'Enter text or HTML here...',
           imageUrl: '',
           filters: [],
-          stacked: false,           // bar/line: stack all series
-          showTrendLine: false,     // overlay linear-regression trend line on each series
-          ySeriesTypes: {},         // per-Y override: { [fieldName]: 'bar'|'line'|'scatter' }
-          bubbleSizeField: '',      // scatter only: field → bubble radius
-          bubbleColorField: ''      // scatter only: field → bubble color (visualMap)
+          stacked: false,
+          showTrendLine: false,
+          ySeriesTypes: {},
+          bubbleSizeField: '',
+          bubbleColorField: ''
         };
 
         // Normalize yFields from legacy yField
@@ -603,7 +625,23 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         const sorts      = (w.sorts     || []).filter(s => s.field);
         const anyAgg     = cols.some(c => fieldAggs[c]);
 
-        if (!conditions.length && !sorts.length && !anyAgg) return base;
+        // DISTINCT applies for non-aggregated table/bar/line/pie
+        const needsDistinct = !anyAgg && ['table', 'bar', 'line', 'pie'].includes(w.type);
+
+        if (!conditions.length && !sorts.length && !anyAgg) {
+          if (!needsDistinct) return base;
+          // Only DISTINCT needed — build minimal query
+          const from2 = fromSrc || '?';
+          const selD = cols.map(col => `[${col}]`);
+          const sqlD = `SELECT DISTINCT ${selD.join(', ')} FROM ${from2}`;
+          try {
+            const rd = fromSrc ? alasql(sqlD) : alasql(sqlD, [base]);
+            return Array.isArray(rd) ? rd : base;
+          } catch (e) {
+            console.warn('buildWidgetData DISTINCT error:', e.message);
+            return base;
+          }
+        }
 
         // SELECT — preserve column name via AS so downstream code keeps working
         const selParts = cols.map(col => {
@@ -638,7 +676,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 
         // Use named view when available (no array binding needed); fall back to ?
         const from = fromSrc || '?';
-        let sql = `SELECT ${selParts.join(', ')} FROM ${from}`;
+        const selectKw = (needsDistinct && !anyAgg) ? 'SELECT DISTINCT' : 'SELECT';
+        let sql = `${selectKw} ${selParts.join(', ')} FROM ${from}`;
         if (whereParts.length) sql += ` WHERE ${whereParts.join(' ')}`;
         if (groupParts.length) sql += ` GROUP BY ${groupParts.join(', ')}`;
         if (orderParts.length) sql += ` ORDER BY ${orderParts.join(', ')}`;
@@ -654,15 +693,13 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 
       function renderKPIContent(w) {
         let value = '—';
-        const field = w.fields[0] || '';
+        const field = (w.fields && w.fields[0]) || '';
         const kpiData = buildWidgetData(w);
         if (kpiData && kpiData.length && field) {
           const fieldAgg = (w.fieldAggs || {})[field];
           if (fieldAgg) {
-            // buildWidgetData ran SQL aggregation — first row has the result
             value = kpiData[0][field] ?? '—';
           } else {
-            // No per-field agg set — fall back to legacy w.aggregation JS aggregation
             const agg = w.aggregation || 'SUM';
             const vals = kpiData.map(r => parseFloat(r[field]) || 0);
             if (agg === 'COUNT') value = kpiData.length;
@@ -671,7 +708,10 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
             else value = kpiData[0][field] ?? '—';
           }
         }
-        return `<div class="kpi-card"><div class="kpi-value" style="color:${w.fillColor}">${value}</div><div class="kpi-label">${field}</div></div>`;
+        const metricSize  = w.kpiMetricFontSize || 36;
+        const labelSize   = w.kpiLabelFontSize  || 13;
+        const labelText   = (w.kpiLabelOverride && w.kpiLabelOverride.trim()) ? w.kpiLabelOverride : field;
+        return `<div class="kpi-card"><div class="kpi-value" style="color:${w.fillColor};font-size:${metricSize}px">${value}</div><div class="kpi-label" style="font-size:${labelSize}px">${labelText}</div></div>`;
       }
 
 
@@ -686,9 +726,13 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         const hdrStyle = `background:${w.headersBackgroundColor||'#f3f2f1'};font-size:${w.headersFontSize||12}px;color:${w.headersFontColor||'#323130'}`;
         const thHtml = cols.map(c => `<th style="${hdrStyle}">${c}</th>`).join('');
         const theadHtml = w.showHeaders === false ? '' : `<thead><tr>${thHtml}</tr></thead>`;
+        const drillField = cols[0];
         let html = `<div style="overflow:auto;max-height:100%"><table class="widget-table">${theadHtml}<tbody>`;
         for (const row of tableData) {
-          html += '<tr>' + cols.map(function(c) { return '<td>' + (row[c] != null ? row[c] : '') + '</td>'; }).join('') + '</tr>';
+          const drillVal = String(row[drillField] ?? '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+          html += `<tr style="cursor:pointer" title="Click to filter by ${drillField}" onclick="applyDrillFilter('${drillField.replace(/'/g,"\\'")}','${drillVal}')">`;
+          html += cols.map(c => '<td>' + (row[c] != null ? row[c] : '') + '</td>').join('');
+          html += '</tr>';
         }
         html += '</tbody></table></div>';
         return html;
@@ -1017,6 +1061,14 @@ function _buildChartOption(w, chartData) {
   }
   option.backgroundColor = w.chartBackgroundColor || 'transparent';
   chart.setOption(option);
+  // Cross-widget click filter
+  chart.on('click', (params) => {
+    if (params.componentType !== 'series') return;
+    const filterField = w.xField;
+    let filterValue = params.name; // works for bar/line/pie
+    if (w.type === 'scatter' && Array.isArray(params.data)) filterValue = String(params.data[0]);
+    if (filterField && filterValue != null) applyDrillFilter(filterField, String(filterValue));
+  });
 }
 
       // Resize charts on window resize
@@ -1142,15 +1194,24 @@ function _buildChartOption(w, chartData) {
 
 function _renderScatterOptionsHTML(w, wid, cols) {
   if (w.type !== 'scatter') return '';
-  const szOpts  = cols.map(c => '<option value="' + c + '"' + (c === w.bubbleSizeField  ? ' selected' : '') + '>' + c + '</option>').join('');
-  const clrOpts = cols.map(c => '<option value="' + c + '"' + (c === w.bubbleColorField ? ' selected' : '') + '>' + c + '</option>').join('');
+  const _scatterFieldRow = (label, propName, currentField) => {
+    const opts = cols.map(c => '<option value="' + c + '"' + (c === currentField ? ' selected' : '') + '>' + c + '</option>').join('');
+    const agg  = currentField ? ((w.fieldAggs || {})[currentField] || '') : '';
+    const aggBtn = currentField
+      ? '<button class="adv-agg-btn' + (agg ? ' has-agg' : '') + '" title="' + (agg || 'No aggregate') + '"'
+        + ' onclick="event.stopPropagation();showWidgetFieldAggPopup(\'' + wid + '\',\'' + currentField.replace(/'/g, "\\'") + '\',this)">'
+        + (agg ? getAggIcon(agg) : '∑') + '</button>'
+      : '';
+    return '<div class="props-row"><label>' + label + '</label>'
+      + '<div style="display:flex;gap:4px;flex:1">'
+      + '<select class="form-input" style="flex:1;height:22px;font-size:11px"'
+      + ' onchange="updateWidgetProp(\'' + wid + '\',\'' + propName + '\',this.value);renderWidgetProperties(\'' + wid + '\')">'
+      + '<option value="">(none)</option>' + opts + '</select>'
+      + aggBtn + '</div></div>';
+  };
   return '<div class="adv-node-section-hdr" style="margin-top:8px"><span>BUBBLE / COLOR</span></div>'
-    + '<div class="props-row"><label>Size field</label>'
-    + '<select class="form-input" style="height:22px;font-size:11px" onchange="updateWidgetProp(\'' + wid + '\',\'bubbleSizeField\',this.value)">'
-    + '<option value="">(none)</option>' + szOpts + '</select></div>'
-    + '<div class="props-row"><label>Color field</label>'
-    + '<select class="form-input" style="height:22px;font-size:11px" onchange="updateWidgetProp(\'' + wid + '\',\'bubbleColorField\',this.value)">'
-    + '<option value="">(none)</option>' + clrOpts + '</select></div>'
+    + _scatterFieldRow('Size field',  'bubbleSizeField',  w.bubbleSizeField)
+    + _scatterFieldRow('Color field', 'bubbleColorField', w.bubbleColorField)
     + '<div class="props-row"><label>Trend lines</label>'
     + '<input type="checkbox"' + (w.showTrendLine ? ' checked' : '') + ' onchange="updateWidgetProp(\'' + wid + '\',\'showTrendLine\',this.checked)"/></div>';
 }
@@ -1461,7 +1522,15 @@ function _renderBarLineOptionsHTML(w, wid) {
 																												 
 	   
 	   
-            ${isKPI ? fieldRow('', w.fields[0] || cols[0] || '', `updateWidgetProp('${wid}','fields',[this.value]);renderWidgetProperties('${wid}')`) : ''}
+            ${isKPI ? fieldRow('', w.fields[0] || cols[0] || '', `updateWidgetProp('${wid}','fields',[this.value]);renderWidgetProperties('${wid}')`)
+              + `<div class="adv-node-section-hdr" style="margin-top:8px"><span>KPI DISPLAY</span></div>
+              <div class="props-row"><label>Metric size</label>
+                <input type="number" class="form-input" min="8" max="120" value="${w.kpiMetricFontSize||36}" oninput="updateWidgetProp('${wid}','kpiMetricFontSize',+this.value)" style="width:60px"/></div>
+              <div class="props-row"><label>Label size</label>
+                <input type="number" class="form-input" min="8" max="48" value="${w.kpiLabelFontSize||13}" oninput="updateWidgetProp('${wid}','kpiLabelFontSize',+this.value)" style="width:60px"/></div>
+              <div class="props-row"><label>Label text</label>
+                <input type="text" class="form-input" value="${(w.kpiLabelOverride||'').replace(/"/g,'&quot;')}" placeholder="${(w.fields[0]||'field name').replace(/"/g,'&quot;')}" oninput="updateWidgetProp('${wid}','kpiLabelOverride',this.value)"/></div>`
+            : ''}
             ${isTable ? (w.fields.length
                 ? w.fields.map((f,i) => tableFieldRow(f,i)).join('')
                 : `<div style="font-size:11px;color:var(--text-disabled);padding:4px 0">Drop fields from the left panel</div>`) : ''}
@@ -1509,7 +1578,7 @@ function _renderBarLineOptionsHTML(w, wid) {
         const titleEl = el.querySelector('.widget-title');
 
         if (prop === 'title' && titleEl) titleEl.textContent = value;
-        if (prop === 'showTitle' && hdr) hdr.hidden = !value;
+        if (prop === 'showTitle' && hdr) { hdr.hidden = !value; hdr.style.opacity = value ? '' : '0.3'; }
         if (prop === 'widthPct') el.style.width = value + '%';
         if (prop === 'heightVh') { el.style.height = value + 'vh'; if (DataLaVistaState.charts[wid]) DataLaVistaState.charts[wid].resize(); }
         if (prop === 'borderColor') el.style.borderColor = value;
@@ -1527,7 +1596,9 @@ function _renderBarLineOptionsHTML(w, wid) {
         if (['xField', 'yField', 'yFields', 'aggregation', 'fieldAggs', 'fillColor', 'fields',
              'stacked', 'showTrendLine', 'ySeriesTypes', 'bubbleSizeField', 'bubbleColorField',
              'chartBackgroundColor'].includes(prop) && ['bar', 'line', 'pie', 'scatter'].includes(w.type)) renderChart(w);
-        if (['xField', 'yField', 'aggregation', 'fieldAggs', 'fillColor', 'fields'].includes(prop) && w.type === 'kpi') el.querySelector('.widget-content').innerHTML = renderKPIContent(w);
+        if (['xField', 'yField', 'aggregation', 'fieldAggs', 'fillColor', 'fields',
+             'kpiMetricFontSize', 'kpiLabelFontSize', 'kpiLabelOverride'].includes(prop) && w.type === 'kpi')
+          el.querySelector('.widget-content').innerHTML = renderKPIContent(w);
       }
 
       function changeWidgetType(wid, newType) {
@@ -1650,6 +1721,8 @@ function _renderBarLineOptionsHTML(w, wid) {
           wrap.appendChild(lbl); wrap.appendChild(sel); wrap.appendChild(del);
           bar.appendChild(wrap);
         });
+        // Append any active drill filter chips
+        _renderDrillChipsIn('filter-drop-zone');
       }
 
       function removeFilterFromBar(field) {
@@ -1664,20 +1737,116 @@ function _renderBarLineOptionsHTML(w, wid) {
       }
 
       function refreshWidgets() {
-        // Rebuild [dlv_active] as a filtered view on top of [dlv_results] (view path),
-        // or fall back to JS-filtered array when no view exists (design tab before first run).
         const hasView = !!(alasql.tables && alasql.tables['dlv_results']);
-        const whereClauses = Object.entries(DataLaVistaState.previewFilters)
-          .map(([f, v]) => `[${f}] = '${String(v).replace(/'/g, "''")}'`);
         if (hasView) {
+          const allFilters = { ...(DataLaVistaState.previewFilters || {}), ...(DataLaVistaState.drillFilters || {}) };
+          const whereClauses = Object.entries(allFilters).map(([f, v]) => `[${f}] = '${String(v).replace(/'/g, "''")}'`);
           alasql('DROP VIEW IF EXISTS [dlv_active]');
           const where = whereClauses.length ? ` WHERE ${whereClauses.join(' AND ')}` : '';
           alasql(`CREATE VIEW [dlv_active] AS SELECT * FROM [dlv_results]${where}`);
-          DataLaVistaState.design.previewFilteredData = null; // view handles filtering
+          DataLaVistaState.design.previewFilteredData = null;
         } else {
           DataLaVistaState.design.previewFilteredData = null;
         }
         DataLaVistaState.design.widgets.forEach(w => updateWidgetContent(w.id));
+      }
+
+      // ============================================================
+      // CROSS-WIDGET DRILL FILTER (click-to-filter)
+      // ============================================================
+
+      /** Apply a drill filter from a chart/table click, rebuild active view, re-render all widgets. */
+      function applyDrillFilter(field, value) {
+        if (!DataLaVistaState.drillFilters) DataLaVistaState.drillFilters = {};
+        DataLaVistaState.drillFilters[field] = value;
+        _rebuildActiveView();
+        _renderAllDrillChips();
+        DataLaVistaState.design.widgets.forEach(w => updateWidgetContent(w.id));
+        // Also update preview canvas if it's populated
+        _refreshPreviewCanvasWidgets();
+      }
+
+      function clearDrillFilter(field) {
+        if (DataLaVistaState.drillFilters) delete DataLaVistaState.drillFilters[field];
+        _rebuildActiveView();
+        _renderAllDrillChips();
+        DataLaVistaState.design.widgets.forEach(w => updateWidgetContent(w.id));
+        _refreshPreviewCanvasWidgets();
+      }
+
+      function clearAllDrillFilters() {
+        DataLaVistaState.drillFilters = {};
+        _rebuildActiveView();
+        _renderAllDrillChips();
+        DataLaVistaState.design.widgets.forEach(w => updateWidgetContent(w.id));
+        _refreshPreviewCanvasWidgets();
+      }
+
+      /** Rebuild [dlv_active] using combined previewFilters + drillFilters. */
+      function _rebuildActiveView() {
+        if (!(alasql.tables && alasql.tables['dlv_results'])) return;
+        const allFilters = { ...(DataLaVistaState.previewFilters || {}), ...(DataLaVistaState.drillFilters || {}) };
+        alasql('DROP VIEW IF EXISTS [dlv_active]');
+        const whereClauses = Object.entries(allFilters).map(([f, v]) => `[${f}] = '${String(v).replace(/'/g, "''")}'`);
+        const where = whereClauses.length ? ` WHERE ${whereClauses.join(' AND ')}` : '';
+        alasql(`CREATE VIEW [dlv_active] AS SELECT * FROM [dlv_results]${where}`);
+        DataLaVistaState.design.previewFilteredData = null;
+      }
+
+      /** Render drill chips into both design and preview filter bars. */
+      function _renderAllDrillChips() {
+        _renderDrillChipsIn('filter-drop-zone');
+        _renderDrillChipsIn('preview-filter-bar');
+      }
+
+      function _renderDrillChipsIn(barId) {
+        const bar = document.getElementById(barId);
+        if (!bar) return;
+        // Remove stale drill chips
+        bar.querySelectorAll('.dlv-drill-chip').forEach(el => el.remove());
+        const drills = Object.entries(DataLaVistaState.drillFilters || {});
+        if (!drills.length) return;
+        bar.classList.remove('hidden');
+        for (const [field, value] of drills) {
+          const chip = document.createElement('div');
+          chip.className = 'filter-pill dlv-drill-chip';
+          chip.style.cssText = 'display:flex;align-items:center;gap:5px;background:var(--accent-light,#deecf9);border:1px solid var(--accent,#0078d4);padding:4px 8px;border-radius:var(--radius,4px)';
+          const safeField = field.replace(/</g,'&lt;').replace(/>/g,'&gt;');
+          const safeValue = String(value).replace(/</g,'&lt;').replace(/>/g,'&gt;');
+          const escField  = field.replace(/'/g,"\\'");
+          chip.innerHTML = `<span style="font-size:10px">🔍</span>`
+            + `<span style="font-size:12px;font-weight:600;color:var(--accent,#0078d4)">${safeField}</span>`
+            + `<span style="font-size:11px;color:var(--text-secondary)">=</span>`
+            + `<span style="font-size:11px;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${safeValue}">${safeValue}</span>`
+            + `<button class="btn btn-ghost btn-sm btn-icon" style="padding:0 2px;font-size:10px" title="Clear drill filter for ${safeField}" onclick="clearDrillFilter('${escField}')">✕</button>`;
+          bar.appendChild(chip);
+        }
+        // Show "clear all" if >1 drill
+        if (drills.length > 1) {
+          const clearAll = document.createElement('button');
+          clearAll.className = 'btn btn-ghost btn-sm dlv-drill-chip';
+          clearAll.style.cssText = 'font-size:11px;color:var(--accent,#0078d4)';
+          clearAll.textContent = 'Clear all filters';
+          clearAll.onclick = () => clearAllDrillFilters();
+          bar.appendChild(clearAll);
+        }
+      }
+
+      /** Re-render preview canvas widgets in-place after a drill filter change. */
+      function _refreshPreviewCanvasWidgets() {
+        const canvas = document.getElementById('preview-canvas');
+        if (!canvas || !canvas.querySelector('.widget')) return;
+        const widgetEls = canvas.querySelectorAll('.widget');
+        DataLaVistaState.design.widgets.forEach((w, i) => {
+          const el = widgetEls[i];
+          if (!el) return;
+          const content = el.querySelector('.widget-content');
+          if (!content) return;
+          content.innerHTML = getPrevWidgetContent(w);
+          if (['bar', 'line', 'pie', 'scatter'].includes(w.type)) {
+            requestAnimationFrame(() => renderPreviewChart(w));
+          }
+        });
       }
 
       function widgetAddYField(wid) {
