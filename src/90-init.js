@@ -187,7 +187,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         // Another fallback: check for legacyPageMode class which is present in classic pages in edit mode
         DataLaVistaState.spPageMode = true;
       } else {
-        spEditMode = false;  // Default to false if we can't detect
+        DataLaVistaState.spPageMode = false;  // Default to false if we can't detect
       }
     }
 

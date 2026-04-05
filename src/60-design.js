@@ -164,7 +164,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
     else delete DataLaVistaState.design.fieldAggs[col];
     syncDesignGroupBySection();
     // Update the select's active styling inline without full re-render
-    const sel = document.querySelector(`.design-agg-select`);
+    const sel = document.querySelector('.design-agg-select');
     // Re-render fields panel to update agg-active class
     renderDesignFieldsPanel();
   }
@@ -207,32 +207,31 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 
       const row = document.createElement('div');
       row.className = 'qb-condition-row';
-      row.innerHTML = `
-        ${i === 0
-          ? `<span class="qb-where-badge">WHERE</span>`
+	  row.innerHTML = (i === 0 ? `<span class="qb-where-badge">WHERE</span>`
           : `<select class="form-input qb-conj-select" onchange="DataLaVistaState.design.conditions[${i}].conj=this.value">
                <option ${c.conj==='AND'?'selected':''}>AND</option>
                <option ${c.conj==='OR'?'selected':''}>OR</option>
-             </select>`}
-        <select class="form-input qb-field-select"
-          onchange="DataLaVistaState.design.conditions[${i}].field=this.value; renderDesignConditions()">
-          ${cols.map(f=>`<option value="${f}" ${f===c.field?'selected':''}>${f}</option>`).join('')}
-        </select>
-        <select class="form-input qb-op-select" style="width:${isDate?'150px':'112px'}!important"
-          onchange="DataLaVistaState.design.conditions[${i}].op=this.value; renderDesignConditions()">
-          ${ops.map(o=>`<option value="${o.val}" ${o.val===c.op?'selected':''}>${o.label}</option>`).join('')}
-        </select>
-        ${needsValue
+             </select>` );
+	  row.innerHTML += `<select class="form-input qb-field-select"
+          onchange="DataLaVistaState.design.conditions[${i}].field=this.value; renderDesignConditions()">`;
+	  row.innerHTML += cols.map(f=>`<option value="${f}" ${f===c.field?'selected':''}>${f}</option>`).join('');
+	  row.innerHTML == `</select>`;
+	  row.innerHTML += `<select class="form-input qb-op-select" style="width:${isDate?'150px':'112px'}!important"
+          onchange="DataLaVistaState.design.conditions[${i}].op=this.value; renderDesignConditions()">`;
+	  row.innerHTML += ops.map(o=>`<option value="${o.val}" ${o.val===c.op?'selected':''}>${o.label}</option>`).join('');
+	  row.innerHTML += `</select>`;
+	  row.innerHTML += (needsValue
           ? `<input type="${isMacro?'number':'text'}" class="form-input qb-val-input"
                placeholder="${valPlaceholder}" min="1"
                value="${(c.value||'').replace(/"/g,'&quot;')}"
                oninput="DataLaVistaState.design.conditions[${i}].value=this.value"/>`
-          : `<span class="qb-val-blank"></span>`}
-        <button class="btn btn-ghost btn-sm btn-icon qb-remove-btn" onclick="removeDesignCondition(${i})">✕</button>
-      `;
-      area.appendChild(row);
+          : `<span class="qb-val-blank"></span>`);
+	  row.innerHTML += `<button class="btn btn-ghost btn-sm btn-icon qb-remove-btn" onclick="removeDesignCondition(${i})">✕</button>`;
+	  row.innerHTML += ``;
+	  area.appendChild(row);
     });
   }
+
 
   // ── Design sorts ──────────────────────────────────────────────────────────
   function addDesignSort() {
@@ -262,16 +261,14 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
     sorts.forEach((s, i) => {
       const row = document.createElement('div');
       row.className = 'qb-sort-row';
-      row.innerHTML = `
-        <select class="form-input qb-field-select" onchange="DataLaVistaState.design.sorts[${i}].field=this.value">
-          ${cols.map(f=>`<option value="${f}" ${f===s.field?'selected':''}>${f}</option>`).join('')}
-        </select>
+      row.innerHTML = `<select class="form-input qb-field-select" onchange="DataLaVistaState.design.sorts[${i}].field=this.value">`;
+	  row.innerHTML += cols.map(f=>`<option value="${f}" ${f===s.field?'selected':''}>${f}</option>`).join('');
+      row.innerHTML += `</select>
         <select class="form-input qb-dir-select" onchange="DataLaVistaState.design.sorts[${i}].dir=this.value">
           <option ${s.dir==='ASC'?'selected':''}>ASC</option>
           <option ${s.dir==='DESC'?'selected':''}>DESC</option>
         </select>
-        <button class="btn btn-ghost btn-sm btn-icon qb-remove-btn" onclick="removeDesignSort(${i})">✕</button>
-      `;
+        <button class="btn btn-ghost btn-sm btn-icon qb-remove-btn" onclick="removeDesignSort(${i})">✕</button>`;
       area.appendChild(row);
     });
   }
@@ -304,12 +301,9 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
     groups.forEach((g, i) => {
       const row = document.createElement('div');
       row.className = 'qb-sort-row';
-      row.innerHTML = `
-        <select class="form-input qb-field-select" onchange="DataLaVistaState.design.groupBy[${i}]=this.value">
-          ${cols.map(f=>`<option value="${f}" ${f===g?'selected':''}>${f}</option>`).join('')}
-        </select>
-        <button class="btn btn-ghost btn-sm btn-icon qb-remove-btn" onclick="removeDesignGroupBy(${i})">✕</button>
-      `;
+      row.innerHTML = `<select class="form-input qb-field-select" onchange="DataLaVistaState.design.groupBy[${i}]=this.value">`;
+	  row.innerHTML += cols.map(f=>`<option value="${f}" ${f===g?'selected':''}>${f}</option>`).join('');
+      row.innerHTML += `</select><button class="btn btn-ghost btn-sm btn-icon qb-remove-btn" onclick="removeDesignGroupBy(${i})">✕</button>`;
       area.appendChild(row);
     });
   }
@@ -350,17 +344,19 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 
       function initToolbox() {
         const grid = document.getElementById('widget-types-grid');
-        grid.innerHTML = '';
-        for (const wt of WIDGET_TYPES) {
-          const btn = document.createElement('div');
-          btn.className = 'widget-type-btn';
-          btn.draggable = true;
-          btn.innerHTML = `<span class="icon">${wt.icon}</span><span>${wt.label}</span>`;
-          btn.addEventListener('dragstart', e => {
-            safeDragSet(e, { type: 'widget-type', widgetType: wt.id });
-          });
-          btn.addEventListener('click', () => { addWidgetToCanvas(wt.id, null, null); }); // TODO: Does this conflict with another event?
-          grid.appendChild(btn);
+        if(grid) {
+            grid.innerHTML = '';
+            for (const wt of WIDGET_TYPES) {
+              const btn = document.createElement('div');
+              btn.className = 'widget-type-btn';
+              btn.draggable = true;
+              btn.innerHTML = `<span class="icon">${wt.icon}</span><span>${wt.label}</span>`;
+              btn.addEventListener('dragstart', e => {
+                safeDragSet(e, { type: 'widget-type', widgetType: wt.id });
+              });
+              btn.addEventListener('click', () => { addWidgetToCanvas(wt.id, null, null); }); // TODO: Does this conflict with another event?
+              grid.appendChild(btn);
+            }
         }
       }
 
@@ -427,8 +423,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           id,
           type: widgetType,
           title: getDefaultTitle(widgetType),
-          showTitle: true, // TODO: Implement per-widget title toggle in UI and to hide/show title
-          showHeaders: true, // TODO: Implement per-widget title toggle in UI and to hide/show table headers
+          showTitle: true,
+          showHeaders: true,
           widthPct: 45,
           heightVh: 30,
           fields: fields || (DataLaVistaState.queryColumns.length ? (widgetType === 'kpi' ? [DataLaVistaState.queryColumns[0]] : DataLaVistaState.queryColumns.slice(0, 8)) : []),
@@ -440,21 +436,26 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           conditions: [],    // per-widget WHERE: [{ conj, field, op, value }]
           sorts: [],         // per-widget ORDER BY: [{ field, dir }]
           fillColor: '#0078d4',
-          widgetBackgroundColor: '#fefefe', // TODO: Implement per-widget background color in UI and apply to widget element style
-          chartBackgroundColor: '#fefefe', // TODO: Implement per-widget chart background color in UI and apply to chart options
-          titleBackgroundColor: '#fefefe', // TODO: Implement per-widget title background color in UI and apply to widget element style
-          titleFontSize: 14, // TODO: Implement per-widget title font size in UI and apply to widget element style
-          titleFontColor: '#323130', // TODO: Implement per-widget title font color in UI and apply to widget element style
-          headersBackgroundColor: '#f3f2f1', // TODO: Implement per-widget header background color in UI and apply to table header style
-          headersFontSize: 12, // TODO: Implement per-widget header font size in UI and apply to table header style
-          headersFontColor: '#323130', // TODO: Implement per-widget header font color in UI and apply to table header style
+          widgetBackgroundColor: '#fefefe',
+          chartBackgroundColor: '#fefefe',
+          titleBackgroundColor: '#fefefe',
+          titleFontSize: 14,
+          titleFontColor: '#323130',
+          headersBackgroundColor: '#f3f2f1',
+          headersFontSize: 12,
+          headersFontColor: '#323130',
           borderColor: '#edebe9',
           borderSize: 1,
           fontSize: 13,
           fontColor: '#323130',
           textContent: 'Enter text or HTML here...',
           imageUrl: '',
-          filters: []
+          filters: [],
+          stacked: false,           // bar/line: stack all series
+          showTrendLine: false,     // overlay linear-regression trend line on each series
+          ySeriesTypes: {},         // per-Y override: { [fieldName]: 'bar'|'line'|'scatter' }
+          bubbleSizeField: '',      // scatter only: field → bubble radius
+          bubbleColorField: ''      // scatter only: field → bubble color (visualMap)
         };
 
         // Normalize yFields from legacy yField
@@ -480,6 +481,16 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       // ============================================================
       // DESIGN CANVAS RENDERING
       // ============================================================
+      function getWidgetContentHTML(w) {
+        if (w.type === 'text') return `<div class="text-widget" style="font-size:${w.fontSize}px;color:${w.fontColor}">${w.textContent}</div>`;
+        if (w.type === 'placeholder') return '';
+        if (w.type === 'kpi') return renderKPIContent(w);
+        if (w.type === 'table') return renderTableContent(w);
+        if (['bar', 'line', 'pie', 'scatter'].includes(w.type)) return `<div id="chart-${w.id}" style="width:100%;height:100%;min-height:200px"></div>`;
+        return '';
+      }
+	  
+	  
       function renderDesignCanvas() {
         const canvas = document.getElementById('canvas-drop-zone');
         const hint = document.getElementById('canvas-empty-hint');
@@ -518,33 +529,24 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         const el = document.createElement('div');
         el.className = 'widget';
         el.id = 'widget-' + w.id;
-        el.style.cssText = `width:${w.widthPct}%;height:${w.heightVh}vh;min-height:120px;border-color:${w.borderColor};border-width:${w.borderSize}px`;
+        el.style.cssText = `width:${w.widthPct}%;height:${w.heightVh}vh;min-height:120px;border-color:${w.borderColor};border-width:${w.borderSize}px;background:${w.widgetBackgroundColor||'#fefefe'}`;
 
-        const actions = `
-    <div class="widget-actions">
+        const actions = `<div class="widget-actions">
       <button class="btn btn-ghost btn-icon btn-sm" onclick="moveWidget('${w.id}', -1)" title="Move left">←</button>
       <button class="btn btn-ghost btn-icon btn-sm" onclick="moveWidget('${w.id}', 1)" title="Move right">→</button>
-      <button class="btn btn-danger btn-icon btn-sm" onclick="deleteWidget('${w.id}')" title="Delete">✕</button>
-    </div>
-  `;
+      <button class="btn btn-danger btn-icon btn-sm" onclick="deleteWidget('${w.id}')" title="Delete">✕</button></div>`;
 
-        el.innerHTML = `
-    <div class="widget-header">
-      <span class="widget-title">${w.title || ''}</span>
-      ${actions}
-    </div>
-    <div class="widget-content" id="wcontent-${w.id}">
-      ${getWidgetContentHTML(w)}
-    </div>
-    <div class="widget-resize-handle"></div>
-  `;
-
+        const titleStyle = `background:${w.titleBackgroundColor||'#fefefe'};font-size:${w.titleFontSize||14}px;color:${w.titleFontColor||'#323130'}`;
+		el.innerHTML = `<div class="widget-header" style="${titleStyle}"><span class="widget-title">${w.title || ''}</span>${actions}</div>
+  <div class="widget-content" id="wcontent-${w.id}">${getWidgetContentHTML(w)}</div><div class="widget-resize-handle"></div>`;
+		// Set hidden via DOM property — safe from SharePoint HTML sanitizer
+		if (w.showTitle === false) {
+		  el.querySelector('.widget-header').hidden = true;
+		}
         el.addEventListener('click', e => { if (!e.target.closest('button')) selectWidget(w.id); });
-
         // Resize handle
         const rh = el.querySelector('.widget-resize-handle');
         rh.addEventListener('mousedown', e => startWidgetResize(e, w.id, el));
-
         return el;
       }
 
@@ -672,6 +674,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         return `<div class="kpi-card"><div class="kpi-value" style="color:${w.fillColor}">${value}</div><div class="kpi-label">${field}</div></div>`;
       }
 
+
       function renderTableContent(w) {
         const tableData = buildWidgetData(w);
         if (!tableData || !tableData.length) {
@@ -680,20 +683,58 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         const allCols = Object.keys(tableData[0]);
         const cols = w.fields.filter(f => allCols.includes(f));
         if (!cols.length) return '<div class="text-muted text-sm" style="padding:12px">No fields selected — add columns in the properties panel</div>';
-        let html = '<div style="overflow:auto;max-height:100%"><table class="widget-table"><thead><tr>' + cols.map(c => `<th>${c}</th>`).join('') + '</tr></thead><tbody>';
+        const hdrStyle = `background:${w.headersBackgroundColor||'#f3f2f1'};font-size:${w.headersFontSize||12}px;color:${w.headersFontColor||'#323130'}`;
+        const thHtml = cols.map(c => `<th style="${hdrStyle}">${c}</th>`).join('');
+        const theadHtml = w.showHeaders === false ? '' : `<thead><tr>${thHtml}</tr></thead>`;
+        let html = `<div style="overflow:auto;max-height:100%"><table class="widget-table">${theadHtml}<tbody>`;
         for (const row of tableData) {
-          html += '<tr>' + cols.map(c => `<td>${row[c] ?? ''}</td>`).join('') + '</tr>';
+          html += '<tr>' + cols.map(function(c) { return '<td>' + (row[c] != null ? row[c] : '') + '</td>'; }).join('') + '</tr>';
         }
         html += '</tbody></table></div>';
         return html;
       }
 
-      function _buildChartOption(w, chartData) {
+
+      // Linear regression (indexed x)
+      function _chartOptLinReg(ys) {
+  const n = ys.length;
+  if (n < 2) return ys.map(function() { return null; });
+  const sumX  = (n * (n - 1)) / 2;
+  const sumY  = ys.reduce(function(a, b) { return a + b; }, 0);
+  const sumXY = ys.reduce(function(s, y, i) { return s + i * y; }, 0);
+  const sumX2 = (n * (n - 1) * (2 * n - 1)) / 6;
+  const denom = n * sumX2 - sumX * sumX;
+  if (!denom) return ys.map(function() { return sumY / n; });
+  const slope     = (n * sumXY - sumX * sumY) / denom;
+  const intercept = (sumY - slope * sumX) / n;
+  return ys.map(function(unused, i) { return parseFloat((slope * i + intercept).toFixed(6)); });
+}
+
+  // Linear regression (numeric x values) for scatter
+  function _chartOptLinRegXY(xs, ys) {
+    const n = xs.length;
+    if (n < 2) return [];
+    const sumX  = xs.reduce(function(a, b) { return a + b; }, 0);
+    const sumY  = ys.reduce(function(a, b) { return a + b; }, 0);
+    const sumXY = xs.reduce(function(s, x, i) { return s + x * ys[i]; }, 0);
+    const sumX2 = xs.reduce(function(s, x) { return s + x * x; }, 0);
+    const denom = n * sumX2 - sumX * sumX;
+    if (!denom) return [];
+    const slope     = (n * sumXY - sumX * sumY) / denom;
+    const intercept = (sumY - slope * sumX) / n;
+    const minX = xs.reduce(function(a, b) { return a < b ? a : b; });
+    const maxX = xs.reduce(function(a, b) { return a > b ? a : b; });
+    return [
+      [minX, parseFloat((slope * minX + intercept).toFixed(6))],
+      [maxX, parseFloat((slope * maxX + intercept).toFixed(6))]
+    ];
+  }
+
+function _buildChartOption(w, chartData) {
   if (!chartData || !chartData.length) return null;
   const allCols = Object.keys(chartData[0]);
   const xField  = w.xField || allCols[0] || '';
 
-  // Multi-series: yFields array takes priority over legacy yField
   const yFields = (Array.isArray(w.yFields) && w.yFields.length)
     ? w.yFields
     : (w.yField ? [w.yField] : (allCols.slice(1) || []));
@@ -704,78 +745,259 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
     '#038387','#0078d4','#ff8c00','#e3008c','#00b7c3'
   ];
 
-  if (w.type === 'bar') {
+  const stacked       = !!w.stacked;
+  const showTrendLine = !!w.showTrendLine;
+  const ySeriesTypes  = w.ySeriesTypes || {};
+
+  // ── BAR / LINE ────────────────────────────────────────────────────────────
+  if (w.type === 'bar' || w.type === 'line') {
+    var barSeries = [];
+
+    for (var bi = 0; bi < yFields.length; bi++) {
+      var byf = yFields[bi];
+      var bst = ySeriesTypes[byf] || w.type;
+      var bs  = {
+        name      : byf,
+        type      : bst,
+        data      : chartData.map(function(r) { return parseFloat(r[byf]) || 0; }),
+        itemStyle : { color: colors[bi % colors.length] }
+      };
+      if (bst === 'line') bs.smooth = true;
+      if (stacked) bs.stack = 'total';
+      barSeries.push(bs);
+
+      if (showTrendLine) {
+        var bvals  = chartData.map(function(r) { return parseFloat(r[byf]) || 0; });
+        var bn     = bvals.length;
+        var bsumX  = (bn * (bn - 1)) / 2;
+        var bsumY  = 0;
+        var bsumXY = 0;
+        var bsumX2 = (bn * (bn - 1) * (2 * bn - 1)) / 6;
+        for (var bti = 0; bti < bn; bti++) {
+          bsumY  += bvals[bti];
+          bsumXY += bti * bvals[bti];
+        }
+        var bdenom     = bn * bsumX2 - bsumX * bsumX;
+        var btrendData = [];
+        if (!bdenom || bn < 2) {
+          for (var bti2 = 0; bti2 < bn; bti2++) {
+            btrendData.push(bn > 0 ? bsumY / bn : 0);
+          }
+        } else {
+          var bslope     = (bn * bsumXY - bsumX * bsumY) / bdenom;
+          var bintercept = (bsumY - bslope * bsumX) / bn;
+          for (var bti3 = 0; bti3 < bn; bti3++) {
+            btrendData.push(parseFloat((bslope * bti3 + bintercept).toFixed(6)));
+          }
+        }
+        barSeries.push({
+          name      : byf + ' trend',
+          type      : 'line',
+          data      : btrendData,
+          smooth    : false,
+          symbol    : 'none',
+          lineStyle : { type: 'dashed', color: colors[bi % colors.length], width: 2, opacity: 0.8 },
+          itemStyle : { color: colors[bi % colors.length] },
+          zlevel    : 10
+        });
+      }
+    }
+
+    var barHasLegend = yFields.length > 1 || showTrendLine;
     return {
-      tooltip: { trigger: 'axis' },
-      legend: yFields.length > 1 ? { bottom: 0, type: 'scroll', textStyle: { fontSize: 11 } } : undefined,
-      xAxis: { type: 'category', data: chartData.map(r => r[xField]), axisLabel: { rotate: 30, fontSize: 11 } },
-      yAxis: { type: 'value' },
-      series: yFields.map((yf, i) => ({
-        name: yf,
-        type: 'bar',
-        data: chartData.map(r => parseFloat(r[yf]) || 0),
-        itemStyle: { color: colors[i % colors.length] }
-      })),
-      grid: { left: 40, right: 20, top: 20, bottom: yFields.length > 1 ? 80 : 60 }
+      tooltip : { trigger: 'axis' },
+      legend  : barHasLegend ? { bottom: 0, type: 'scroll', textStyle: { fontSize: 11 } } : undefined,
+      xAxis   : { type: 'category', data: chartData.map(function(r) { return r[xField]; }), axisLabel: { rotate: 30, fontSize: 11 } },
+      yAxis   : { type: 'value' },
+      series  : barSeries,
+      grid    : { left: 40, right: 20, top: 20, bottom: barHasLegend ? 80 : 60 }
     };
   }
 
-  if (w.type === 'line') {
-    return {
-      tooltip: { trigger: 'axis' },
-      legend: yFields.length > 1 ? { bottom: 0, type: 'scroll', textStyle: { fontSize: 11 } } : undefined,
-      xAxis: { type: 'category', data: chartData.map(r => r[xField]), axisLabel: { rotate: 30, fontSize: 11 } },
-      yAxis: { type: 'value' },
-      series: yFields.map((yf, i) => ({
-        name: yf,
-        type: 'line',
-        data: chartData.map(r => parseFloat(r[yf]) || 0),
-        itemStyle: { color: colors[i % colors.length] },
-        smooth: true
-      })),
-      grid: { left: 40, right: 20, top: 20, bottom: yFields.length > 1 ? 80 : 60 }
-    };
-  }
-
+  // ── PIE ───────────────────────────────────────────────────────────────────
   if (w.type === 'pie') {
-    // Pie: one slice per row (xField=label, yField=value) OR one pie per yField
     if (yFields.length === 1) {
       return {
-        tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
-        series: [{ type: 'pie', data: chartData.map(r => ({ name: String(r[xField] ?? ''), value: parseFloat(r[yFields[0]]) || 0 })), radius: ['30%', '65%'], label: { fontSize: 11 } }]
+        tooltip : { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
+        series  : [{
+          type   : 'pie',
+          data   : chartData.map(function(r) {
+            return { name: String(r[xField] != null ? r[xField] : ''), value: parseFloat(r[yFields[0]]) || 0 };
+          }),
+          radius : ['30%', '65%'],
+          label  : { fontSize: 11 }
+        }]
       };
     }
-    // Multi-Y pie: one donut per yField, laid out side by side
-    const step = Math.floor(100 / yFields.length);
+    var pieStep = Math.floor(100 / yFields.length);
     return {
-      tooltip: { trigger: 'item', formatter: '{a}<br/>{b}: {c} ({d}%)' },
-      series: yFields.map((yf, i) => ({
-        name: yf,
-        type: 'pie',
-        radius: ['20%', '40%'],
-        center: [`${Math.round(step * i + step / 2)}%`, '50%'],
-        data: chartData.map(r => ({ name: String(r[xField] ?? ''), value: parseFloat(r[yf]) || 0 })),
-        label: { fontSize: 10, formatter: '{b}' },
-        title: { text: yf }
-      }))
+      tooltip : { trigger: 'item', formatter: '{a}<br/>{b}: {c} ({d}%)' },
+      series  : yFields.map(function(pyf, pi) {
+        return {
+          name   : pyf,
+          type   : 'pie',
+          radius : ['20%', '40%'],
+          center : [Math.round(pieStep * pi + pieStep / 2) + '%', '50%'],
+          data   : chartData.map(function(r) {
+            return { name: String(r[xField] != null ? r[xField] : ''), value: parseFloat(r[pyf]) || 0 };
+          }),
+          label  : { fontSize: 10, formatter: '{b}' }
+        };
+      })
     };
   }
 
+  // ── SCATTER / BUBBLE ──────────────────────────────────────────────────────
   if (w.type === 'scatter') {
-    // Scatter: xField vs each yField as separate series
-    return {
-      tooltip: { trigger: 'item' },
-      legend: yFields.length > 1 ? { bottom: 0, textStyle: { fontSize: 11 } } : undefined,
-      xAxis: { type: 'value' },
-      yAxis: { type: 'value' },
-      series: yFields.map((yf, i) => ({
-        name: yf,
-        type: 'scatter',
-        data: chartData.map(r => [parseFloat(r[xField]) || 0, parseFloat(r[yf]) || 0]),
-        itemStyle: { color: colors[i % colors.length] }
-      })),
-      grid: { left: 40, right: 20, top: 20, bottom: yFields.length > 1 ? 60 : 40 }
+    var szField   = w.bubbleSizeField  || '';
+    var clrField  = w.bubbleColorField || '';
+    var hasBubble = szField  !== '';
+    var hasClrFld = clrField !== '';
+
+    // Bubble size scale
+    var sizeVals = [];
+    var maxSz    = 1;
+    if (hasBubble) {
+      for (var svi = 0; svi < chartData.length; svi++) {
+        var sv = Math.abs(parseFloat(chartData[svi][szField]) || 0);
+        sizeVals.push(sv);
+        if (sv > maxSz) maxSz = sv;
+      }
+    }
+
+    // Color field values for visualMap range
+    var clrVals = [];
+    var minC = 0;
+    var maxC = 1;
+    if (hasClrFld) {
+      for (var cvi = 0; cvi < chartData.length; cvi++) {
+        var cv = parseFloat(chartData[cvi][clrField]) || 0;
+        clrVals.push(cv);
+      }
+      if (clrVals.length) {
+        minC = clrVals[0];
+        maxC = clrVals[0];
+        for (var cvi2 = 1; cvi2 < clrVals.length; cvi2++) {
+          if (clrVals[cvi2] < minC) minC = clrVals[cvi2];
+          if (clrVals[cvi2] > maxC) maxC = clrVals[cvi2];
+        }
+      }
+    }
+
+    var scatterSeries = [];
+
+    for (var sci = 0; sci < yFields.length; sci++) {
+      var scyf    = yFields[sci];
+      var scData  = [];
+      for (var sdi = 0; sdi < chartData.length; sdi++) {
+        var xv = parseFloat(chartData[sdi][xField])  || 0;
+        var yv = parseFloat(chartData[sdi][scyf])    || 0;
+        var szv = hasBubble  ? (sizeVals[sdi] || 0)                        : 0;
+        var cv2  = hasClrFld ? (parseFloat(chartData[sdi][clrField]) || 0) : 0;
+        if (hasBubble || hasClrFld) {
+          scData.push([xv, yv, szv, cv2]);
+        } else {
+          scData.push([xv, yv]);
+        }
+      }
+
+      var scSeries = {
+        name      : scyf,
+        type      : 'scatter',
+        data      : scData,
+        itemStyle : { color: colors[sci % colors.length], opacity: 0.75 }
+      };
+
+      if (hasBubble) {
+        var scMaxSz = maxSz;
+        scSeries.symbolSize = function(d) {
+          return Math.max(6, Math.sqrt(Math.abs(d[2]) / scMaxSz) * 60);
+        };
+      } else {
+        scSeries.symbolSize = 8;
+      }
+
+      scatterSeries.push(scSeries);
+
+      if (showTrendLine) {
+        var sxs  = [];
+        var sys2 = [];
+        for (var sti2 = 0; sti2 < chartData.length; sti2++) {
+          sxs.push(parseFloat(chartData[sti2][xField]) || 0);
+          sys2.push(parseFloat(chartData[sti2][scyf])  || 0);
+        }
+        var sn = sxs.length;
+        if (sn >= 2) {
+          var ssumX = 0, ssumY = 0, ssumXY = 0, ssumX2 = 0;
+          for (var sti3 = 0; sti3 < sn; sti3++) {
+            ssumX  += sxs[sti3];
+            ssumY  += sys2[sti3];
+            ssumXY += sxs[sti3] * sys2[sti3];
+            ssumX2 += sxs[sti3] * sxs[sti3];
+          }
+          var sdenom = sn * ssumX2 - ssumX * ssumX;
+          if (sdenom) {
+            var sslope     = (sn * ssumXY - ssumX * ssumY) / sdenom;
+            var sintercept = (ssumY - sslope * ssumX) / sn;
+            var sminX = sxs[0];
+            var smaxX = sxs[0];
+            for (var smi = 1; smi < sn; smi++) {
+              if (sxs[smi] < sminX) sminX = sxs[smi];
+              if (sxs[smi] > smaxX) smaxX = sxs[smi];
+            }
+            scatterSeries.push({
+              name      : scyf + ' trend',
+              type      : 'line',
+              data      : [
+                [sminX, parseFloat((sslope * sminX + sintercept).toFixed(6))],
+                [smaxX, parseFloat((sslope * smaxX + sintercept).toFixed(6))]
+              ],
+              smooth    : false,
+              symbol    : 'none',
+              lineStyle : { type: 'dashed', color: colors[sci % colors.length], width: 2, opacity: 0.8 },
+              itemStyle : { color: colors[sci % colors.length] }
+            });
+          }
+        }
+      }
+    }
+
+    // Remove per-series itemStyle colors when visualMap controls coloring
+    if (hasClrFld) {
+      for (var vsi = 0; vsi < scatterSeries.length; vsi++) {
+        if (scatterSeries[vsi].type === 'scatter') {
+          delete scatterSeries[vsi].itemStyle;
+        }
+      }
+    }
+
+    var scHasLegend = yFields.length > 1 || showTrendLine;
+    var scOption = {
+      tooltip : { trigger: 'item' },
+      legend  : scHasLegend ? { bottom: 0, textStyle: { fontSize: 11 } } : undefined,
+      xAxis   : { type: 'value', name: xField, nameLocation: 'middle', nameGap: 28 },
+      yAxis   : { type: 'value' },
+      series  : scatterSeries,
+      grid    : { left: 50, right: hasClrFld ? 80 : 20, top: 20, bottom: scHasLegend ? 60 : 40 }
     };
+
+    if (hasClrFld) {
+      var vmDimension = hasBubble ? 3 : 2;
+      scOption.visualMap = {
+        type      : 'continuous',
+        min       : minC,
+        max       : maxC,
+        text      : [String(maxC), String(minC)],
+        dimension : vmDimension,
+        right     : 0,
+        top       : 'middle',
+        inRange   : { color: ['#91c7ae', '#d48265', '#ca8622'] },
+        textStyle : { fontSize: 10 },
+        itemWidth : 14
+      };
+    }
+
+    return scOption;
   }
 
   return null;
@@ -785,14 +1007,15 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
   const chartEl = document.getElementById('chart-' + w.id);
   if (!chartEl) return;
   if (DataLaVistaState.charts[w.id]) { try { DataLaVistaState.charts[w.id].dispose(); } catch(e){} }
-  const chart = echarts.init(chartEl);
+  const chart = echarts.init(chartEl, null, { renderer: 'canvas' });
   DataLaVistaState.charts[w.id] = chart;
   const chartData = buildWidgetData(w);
   const option = _buildChartOption(w, chartData);
   if (!option) {
-    chart.setOption({ title: { text: 'No data', left: 'center', top: 'middle', textStyle: { color: '#a19f9d', fontSize: 13 } } });
+    chart.setOption({ backgroundColor: w.chartBackgroundColor || 'transparent', title: { text: 'No data', left: 'center', top: 'middle', textStyle: { color: '#a19f9d', fontSize: 13 } } });
     return;
   }
+  option.backgroundColor = w.chartBackgroundColor || 'transparent';
   chart.setOption(option);
 }
 
@@ -866,6 +1089,80 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         renderWidgetProperties(wid);
         updateWidgetContent(wid);
       }
+
+      function _renderYFieldsHTML(w, wid, cols) {
+        const yfs = (Array.isArray(w.yFields) && w.yFields.length) ? w.yFields : (w.yField ? [w.yField] : []);
+				
+								   
+        const isMixed = w.type === 'bar' || w.type === 'line';
+        const yst = w.ySeriesTypes || {};
+        let returnVal;
+
+        if (!yfs.length) {
+          returnVal = '<div style="font-size:11px;color:var(--text-disabled);padding:4px 0">No Y fields — click + Add</div>';
+        } else {
+
+            returnVal = yfs.map((yf, yi) => {
+            const ti = DataLaVistaCore.FIELD_TYPE_ICONS[sniffType(yf)] || DataLaVistaCore.FIELD_TYPE_ICONS.default;
+												  
+            const agg = (w.fieldAggs || {})[yf] || '';
+            const escapedYf = yf.replace(/'/g, "\\'");
+
+            const colOptions = cols.map(c => 
+              '<option value="' + c + '"' + (c === yf ? ' selected' : '') + '>' + c + '</option>'
+            ).join('');
+
+            let mixedSelect = '';
+            if (isMixed) {
+              mixedSelect = '<select class="form-input" style="width:52px;height:22px;font-size:10px" title="Series type"'
+                + ' onchange="widgetUpdateYSeriesType(\'' + wid + '\',\'' + escapedYf + '\',this.value)">'
+                + '<option value=""' + (!yst[yf] ? ' selected' : '') + '>auto</option>'
+                + '<option value="bar"' + (yst[yf] === 'bar' ? ' selected' : '') + '>bar</option>'
+                + '<option value="line"' + (yst[yf] === 'line' ? ' selected' : '') + '>line</option>'
+                + '</select>';
+            }
+
+            return '<div class="adv-field-row selected">'
+              + '<span class="field-type-icon ' + ti.cls + '">' + ti.icon + '</span>'
+              + '<select class="form-input" style="flex:1;height:22px;font-size:11px"'
+              + ' onchange="widgetUpdateYField(\'' + wid + '\',' + yi + ',this.value)">'
+              + colOptions + '</select>'
+              + mixedSelect
+              + '<button class="adv-agg-btn' + (agg ? ' has-agg' : '') + '" title="' + (agg || 'No aggregate') + '"'
+              + ' onclick="event.stopPropagation();showWidgetFieldAggPopup(\'' + wid + '\',\'' + escapedYf + '\',this)">'
+              + (agg ? getAggIcon(agg) : '∑') + '</button>'
+              + '<button class="btn btn-ghost btn-sm btn-icon" style="padding:0 4px"'
+              + ' onclick="widgetRemoveYField(\'' + wid + '\',' + yi + ')">✕</button>'
+              + '</div>';
+          }).join('');
+        }
+
+        return returnVal;
+      }
+
+function _renderScatterOptionsHTML(w, wid, cols) {
+  if (w.type !== 'scatter') return '';
+  const szOpts  = cols.map(c => '<option value="' + c + '"' + (c === w.bubbleSizeField  ? ' selected' : '') + '>' + c + '</option>').join('');
+  const clrOpts = cols.map(c => '<option value="' + c + '"' + (c === w.bubbleColorField ? ' selected' : '') + '>' + c + '</option>').join('');
+  return '<div class="adv-node-section-hdr" style="margin-top:8px"><span>BUBBLE / COLOR</span></div>'
+    + '<div class="props-row"><label>Size field</label>'
+    + '<select class="form-input" style="height:22px;font-size:11px" onchange="updateWidgetProp(\'' + wid + '\',\'bubbleSizeField\',this.value)">'
+    + '<option value="">(none)</option>' + szOpts + '</select></div>'
+    + '<div class="props-row"><label>Color field</label>'
+    + '<select class="form-input" style="height:22px;font-size:11px" onchange="updateWidgetProp(\'' + wid + '\',\'bubbleColorField\',this.value)">'
+    + '<option value="">(none)</option>' + clrOpts + '</select></div>'
+    + '<div class="props-row"><label>Trend lines</label>'
+    + '<input type="checkbox"' + (w.showTrendLine ? ' checked' : '') + ' onchange="updateWidgetProp(\'' + wid + '\',\'showTrendLine\',this.checked)"/></div>';
+}
+
+function _renderBarLineOptionsHTML(w, wid) {
+  if (w.type !== 'bar' && w.type !== 'line') return '';
+  return '<div class="adv-node-section-hdr" style="margin-top:8px"><span>CHART OPTIONS</span></div>'
+    + '<div class="props-row"><label>Stacked</label>'
+    + '<input type="checkbox"' + (w.stacked ? ' checked' : '') + ' onchange="updateWidgetProp(\'' + wid + '\',\'stacked\',this.checked)"/></div>'
+    + '<div class="props-row"><label>Trend lines</label>'
+    + '<input type="checkbox"' + (w.showTrendLine ? ' checked' : '') + ' onchange="updateWidgetProp(\'' + wid + '\',\'showTrendLine\',this.checked)"/></div>';
+}
 
       /** Opens an aggregate-picker popup anchored to btn, for a specific widget field. */
       function showWidgetFieldAggPopup(wid, field, btn) {
@@ -1062,6 +1359,10 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
             <div class="adv-node-section-hdr">GENERAL</div>
             <div class="props-row"><label>Title</label>
               <input type="text" class="form-input" value="${w.title.replace(/"/g,'&quot;')}" oninput="updateWidgetProp('${wid}','title',this.value)"/></div>
+            <div class="props-row"><label>Show title</label>
+              <input type="checkbox" ${w.showTitle!==false?'checked':''} onchange="updateWidgetProp('${wid}','showTitle',this.checked)"/></div>
+            ${isTable ? `<div class="props-row"><label>Show headers</label>
+              <input type="checkbox" ${w.showHeaders!==false?'checked':''} onchange="updateWidgetProp('${wid}','showHeaders',this.checked)"/></div>` : ''}
             <div class="props-row"><label>Type</label>
               <select class="form-input" onchange="changeWidgetType('${wid}',this.value)">
                 ${WIDGET_TYPES.map(t=>`<option value="${t.id}" ${t.id===w.type?'selected':''}>${t.label}</option>`).join('')}
@@ -1074,6 +1375,22 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 
           <div class="adv-node-section">
             <div class="adv-node-section-hdr">APPEARANCE</div>
+            <div class="props-row"><label>Widget bg</label>
+              <div class="color-input-wrap">
+                <input type="color" value="${w.widgetBackgroundColor||'#fefefe'}" oninput="updateWidgetProp('${wid}','widgetBackgroundColor',this.value)"/>
+                <input type="text" class="form-input" value="${w.widgetBackgroundColor||'#fefefe'}" oninput="updateWidgetProp('${wid}','widgetBackgroundColor',this.value)"/>
+              </div></div>
+            <div class="props-row"><label>Title bg</label>
+              <div class="color-input-wrap">
+                <input type="color" value="${w.titleBackgroundColor||'#fefefe'}" oninput="updateWidgetProp('${wid}','titleBackgroundColor',this.value)"/>
+                <input type="text" class="form-input" value="${w.titleBackgroundColor||'#fefefe'}" oninput="updateWidgetProp('${wid}','titleBackgroundColor',this.value)"/>
+              </div></div>
+            <div class="props-row"><label>Title font</label>
+              <div class="color-input-wrap">
+                <input type="number" class="form-input" min="8" max="48" value="${w.titleFontSize||14}" oninput="updateWidgetProp('${wid}','titleFontSize',+this.value)" style="width:50px" title="Title font size"/>
+                <input type="color" value="${w.titleFontColor||'#323130'}" oninput="updateWidgetProp('${wid}','titleFontColor',this.value)" title="Title font color"/>
+                <input type="text" class="form-input" value="${w.titleFontColor||'#323130'}" oninput="updateWidgetProp('${wid}','titleFontColor',this.value)"/>
+              </div></div>
             <div class="props-row"><label>Fill/Accent</label>
               <div class="color-input-wrap">
                 <input type="color" value="${w.fillColor}" oninput="updateWidgetProp('${wid}','fillColor',this.value)"/>
@@ -1084,6 +1401,24 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
                 <input type="color" value="${w.borderColor}" oninput="updateWidgetProp('${wid}','borderColor',this.value)"/>
                 <input type="number" class="form-input" value="${w.borderSize}" min="0" max="10" oninput="updateWidgetProp('${wid}','borderSize',+this.value)" style="width:50px"/>
               </div></div>
+            ${isChart ? `<div class="props-row"><label>Chart bg</label>
+              <div class="color-input-wrap">
+                <input type="color" value="${w.chartBackgroundColor||'#fefefe'}" oninput="updateWidgetProp('${wid}','chartBackgroundColor',this.value)"/>
+                <input type="text" class="form-input" value="${w.chartBackgroundColor||'#fefefe'}" oninput="updateWidgetProp('${wid}','chartBackgroundColor',this.value)"/>
+              </div></div>` : ''}
+            ${isTable ? `
+            <div class="props-row"><label>Header bg</label>
+              <div class="color-input-wrap">
+                <input type="color" value="${w.headersBackgroundColor||'#f3f2f1'}" oninput="updateWidgetProp('${wid}','headersBackgroundColor',this.value)"/>
+                <input type="text" class="form-input" value="${w.headersBackgroundColor||'#f3f2f1'}" oninput="updateWidgetProp('${wid}','headersBackgroundColor',this.value)"/>
+              </div></div>
+            <div class="props-row"><label>Header font</label>
+              <div class="color-input-wrap">
+                <input type="number" class="form-input" min="8" max="32" value="${w.headersFontSize||12}" oninput="updateWidgetProp('${wid}','headersFontSize',+this.value)" style="width:50px" title="Header font size"/>
+                <input type="color" value="${w.headersFontColor||'#323130'}" oninput="updateWidgetProp('${wid}','headersFontColor',this.value)" title="Header font color"/>
+                <input type="text" class="form-input" value="${w.headersFontColor||'#323130'}" oninput="updateWidgetProp('${wid}','headersFontColor',this.value)"/>
+              </div></div>
+            ` : ''}
             ${isText ? `
             <div class="props-row"><label>Font size</label>
               <input type="number" class="form-input" min="8" max="72" value="${w.fontSize}" oninput="updateWidgetProp('${wid}','fontSize',+this.value)"/></div>
@@ -1102,30 +1437,30 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
             <div class="adv-node-section-hdr">
               <span>FIELDS</span>
             </div>
-            ${isChart ? `
-  ${fieldRow('X', w.xField, `updateWidgetProp('${wid}','xField',this.value);renderWidgetProperties('${wid}')`)}
-  <div class="adv-node-section-hdr" style="margin-top:6px">
-    <span>Y FIELDS</span>
-    <button class="btn btn-ghost btn-sm" onclick="widgetAddYField('${wid}')">+ Add</button>
-  </div>
-  ${(() => {
-    const yfs = (Array.isArray(w.yFields) && w.yFields.length) ? w.yFields : (w.yField ? [w.yField] : []);
-    return yfs.length
-      ? yfs.map((yf, yi) => `
-          <div class="adv-field-row selected">
-            <span class="field-type-icon ${(DataLaVistaCore.FIELD_TYPE_ICONS[sniffType(yf)]||DataLaVistaCore.FIELD_TYPE_ICONS.default).cls}">${(DataLaVistaCore.FIELD_TYPE_ICONS[sniffType(yf)]||DataLaVistaCore.FIELD_TYPE_ICONS.default).icon}</span>
-            <select class="form-input" style="flex:1;height:22px;font-size:11px"
-              onchange="widgetUpdateYField('${wid}',${yi},this.value)">
-              ${cols.map(c=>`<option value="${c}" ${c===yf?'selected':''}>${c}</option>`).join('')}
-            </select>
-            <button class="adv-agg-btn${((w.fieldAggs||{})[yf])?' has-agg':''}" title="${(w.fieldAggs||{})[yf]||'No aggregate'}"
-              onclick="event.stopPropagation();showWidgetFieldAggPopup('${wid}','${yf.replace(/'/g,"\\'")}',this)">${(w.fieldAggs||{})[yf]?getAggIcon((w.fieldAggs||{})[yf]):'∑'}</button>
-            <button class="btn btn-ghost btn-sm btn-icon" style="padding:0 4px"
-              onclick="widgetRemoveYField('${wid}',${yi})">✕</button>
-          </div>`).join('')
-      : `<div style="font-size:11px;color:var(--text-disabled);padding:4px 0">No Y fields — click + Add</div>`;
-  })()}
-` : ''}
+						 
+            ${isChart ? fieldRow('X', w.xField, `updateWidgetProp('${wid}','xField',this.value);renderWidgetProperties('${wid}')`)
+          + '<div class="adv-node-section-hdr" style="margin-top:6px"><span>Y FIELDS</span>'
+						 
+          + '<button class="btn btn-ghost btn-sm" onclick="widgetAddYField(\'' + wid + '\')">+ Add</button></div>'
+          + _renderYFieldsHTML(w, wid, cols)
+          + _renderBarLineOptionsHTML(w, wid)
+          + _renderScatterOptionsHTML(w, wid, cols)
+        : ''}
+							 
+											  
+																																																													   
+																				
+																	   
+																								   
+					 
+																																
+																																															
+																			   
+																	   
+						   
+																												 
+	   
+	   
             ${isKPI ? fieldRow('', w.fields[0] || cols[0] || '', `updateWidgetProp('${wid}','fields',[this.value]);renderWidgetProperties('${wid}')`) : ''}
             ${isTable ? (w.fields.length
                 ? w.fields.map((f,i) => tableFieldRow(f,i)).join('')
@@ -1162,6 +1497,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         `;
       }
 
+
       function updateWidgetProp(wid, prop, value) {
         const w = DataLaVistaState.design.widgets.find(x => x.id === wid);
         if (!w) return;
@@ -1169,15 +1505,28 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         // Live-update element
         const el = document.getElementById('widget-' + wid);
         if (!el) return;
-        if (prop === 'title') el.querySelector('.widget-title').textContent = value;
+        const hdr = el.querySelector('.widget-header');
+        const titleEl = el.querySelector('.widget-title');
+
+        if (prop === 'title' && titleEl) titleEl.textContent = value;
+        if (prop === 'showTitle' && hdr) hdr.hidden = !value;
         if (prop === 'widthPct') el.style.width = value + '%';
         if (prop === 'heightVh') { el.style.height = value + 'vh'; if (DataLaVistaState.charts[wid]) DataLaVistaState.charts[wid].resize(); }
         if (prop === 'borderColor') el.style.borderColor = value;
         if (prop === 'borderSize') el.style.borderWidth = value + 'px';
+        if (prop === 'widgetBackgroundColor') el.style.background = value;
+        if (prop === 'titleBackgroundColor' && hdr) hdr.style.background = value;
+        if (prop === 'titleFontSize' && hdr) hdr.style.fontSize = value + 'px';
+        if (prop === 'titleFontColor' && hdr) hdr.style.color = value;
         if (prop === 'textContent' && w.type === 'text') el.querySelector('.text-widget').innerHTML = value;
         if (prop === 'fontSize' && w.type === 'text') el.querySelector('.text-widget').style.fontSize = value + 'px';
         if (prop === 'fontColor' && w.type === 'text') el.querySelector('.text-widget').style.color = value;
-        if (['xField', 'yField', 'yFields', 'aggregation', 'fieldAggs', 'fillColor', 'fields'].includes(prop) && ['bar', 'line', 'pie', 'scatter'].includes(w.type)) renderChart(w);
+        // Table-specific: re-render for header style / visibility changes
+        if (['showHeaders','headersBackgroundColor','headersFontSize','headersFontColor','fields'].includes(prop) && w.type === 'table')
+          el.querySelector('.widget-content').innerHTML = renderTableContent(w);
+        if (['xField', 'yField', 'yFields', 'aggregation', 'fieldAggs', 'fillColor', 'fields',
+             'stacked', 'showTrendLine', 'ySeriesTypes', 'bubbleSizeField', 'bubbleColorField',
+             'chartBackgroundColor'].includes(prop) && ['bar', 'line', 'pie', 'scatter'].includes(w.type)) renderChart(w);
         if (['xField', 'yField', 'aggregation', 'fieldAggs', 'fillColor', 'fields'].includes(prop) && w.type === 'kpi') el.querySelector('.widget-content').innerHTML = renderKPIContent(w);
       }
 
@@ -1358,3 +1707,11 @@ function widgetRemoveYField(wid, idx) {
   _widgetRefresh(wid);
 }
 
+function widgetUpdateYSeriesType(wid, fieldName, seriesType) {
+  const w = DataLaVistaState.design.widgets.find(x => x.id === wid);
+  if (!w) return;
+  if (!w.ySeriesTypes) w.ySeriesTypes = {};
+  if (seriesType) w.ySeriesTypes[fieldName] = seriesType;
+  else delete w.ySeriesTypes[fieldName];
+  _widgetRefresh(wid);
+}

@@ -182,6 +182,8 @@ function buildConfig() {
     id: w.id,
     type: w.type,
     title: w.title || '',
+    showTitle: w.showTitle !== false,
+    showHeaders: w.showHeaders !== false,
     widthPct: w.widthPct || 48,
     heightVh: w.heightVh || 33,
     fields: Array.isArray(w.fields) ? [...w.fields] : [],
@@ -192,6 +194,19 @@ function buildConfig() {
     fillColor: w.fillColor || '#0078d4',
     borderColor: w.borderColor || '#edebe9',
     borderSize: w.borderSize != null ? w.borderSize : 1,
+    widgetBackgroundColor: w.widgetBackgroundColor || '#fefefe',
+    chartBackgroundColor: w.chartBackgroundColor || '#fefefe',
+    titleBackgroundColor: w.titleBackgroundColor || '#fefefe',
+    titleFontSize: w.titleFontSize || 14,
+    titleFontColor: w.titleFontColor || '#323130',
+    headersBackgroundColor: w.headersBackgroundColor || '#f3f2f1',
+    headersFontSize: w.headersFontSize || 12,
+    headersFontColor: w.headersFontColor || '#323130',
+    stacked: !!w.stacked,
+    showTrendLine: !!w.showTrendLine,
+    ySeriesTypes: Object.assign({}, w.ySeriesTypes || {}),
+    bubbleSizeField: w.bubbleSizeField || '',
+    bubbleColorField: w.bubbleColorField || '',
     fontSize: w.fontSize || 13,
     fontColor: w.fontColor || '#323130',
     textContent: w.textContent || '',
@@ -298,7 +313,6 @@ function buildConfig() {
 
 // Load a config file (saved report) into the current state. This is called on initial load if a config URL or file param is detected, and can also be used to load a local config file via the "Load Config" button in the UI.
 async function loadConfig(cfg) {
-  if (!cfg._license) throw new Error('Invalid report config — missing _license key');
   if (!cfg.dataSources || typeof cfg.dataSources != 'object'|| !cfg.tables || typeof cfg.tables != 'object') throw new Error('Invalid report config — missing data sources or tables.');
   // If the config provided is a string, try parsing it safely as JSON
   if (cfg && typeof cfg == 'string')
@@ -314,10 +328,10 @@ async function loadConfig(cfg) {
         throw new Error('Invalid report config — the report JSON is invalid.');
       }
     }
-  
-    // At this point, cfg should be an object. If it's not, throw an error.
-    if (cfg && typeof cfg !== 'object') throw new Error('Invalid report config — no report JSON detected.');
- 
+  // At this point, cfg should be an object. If it's not, throw an error.
+  if (cfg && typeof cfg !== 'object') throw new Error('Invalid report config — no report JSON detected.');
+
+  if (!cfg._license) throw new Error('Invalid report config — missing _license key');
   // Basic validation passed — now clear the existing state and load the config values
   CyberdynePipeline.clearAllViews(); // drop any existing AlaSQL views before reloading
   //{ ...cfg.dataSource } || { type: 'sharepoint', url: '', auth: 'current' };
@@ -341,11 +355,27 @@ async function loadConfig(cfg) {
     fieldAggs: loadedDesign.fieldAggs || {},
     transformedResults: null
   };
-  // Migrate legacy single-yField to yFields array
+  // Migrate legacy single-yField to yFields array + backfill new widget defaults
 for (const w of DataLaVistaState.design.widgets) {
-  if (!Array.isArray(w.yFields)) {
-    w.yFields = w.yField ? [w.yField] : [];
-  }
+  if (!Array.isArray(w.yFields))     w.yFields = w.yField ? [w.yField] : [];
+  if (w.stacked          == null)    w.stacked = false;
+  if (w.showTrendLine    == null)    w.showTrendLine = false;
+  if (!w.ySeriesTypes)               w.ySeriesTypes = {};
+  if (w.bubbleSizeField  == null)    w.bubbleSizeField = '';
+  if (w.bubbleColorField == null)    w.bubbleColorField = '';
+  if (w.showTitle        == null)    w.showTitle = true;
+  if (w.showHeaders      == null)    w.showHeaders = true;
+  if (w.widgetBackgroundColor == null) w.widgetBackgroundColor = '#fefefe';
+  if (w.chartBackgroundColor  == null) w.chartBackgroundColor  = '#fefefe';
+  if (w.titleBackgroundColor  == null) w.titleBackgroundColor  = '#fefefe';
+  if (w.titleFontSize    == null)    w.titleFontSize = 14;
+  if (w.titleFontColor   == null)    w.titleFontColor = '#323130';
+  if (w.headersBackgroundColor == null) w.headersBackgroundColor = '#f3f2f1';
+  if (w.headersFontSize  == null)    w.headersFontSize = 12;
+  if (w.headersFontColor == null)    w.headersFontColor = '#323130';
+  if (w.fontSize         == null)    w.fontSize = 13;
+  if (w.fontColor        == null)    w.fontColor = '#323130';
+  if (w.textContent      == null)    w.textContent = '';
 }
   DataLaVistaState.previewFilters = cfg.previewFilters || {};
   // Normalize legacy tab name ('previewData' was renamed to 'dataPreview')
@@ -445,192 +475,192 @@ for (const w of DataLaVistaState.design.widgets) {
     
 }
 
-      // ============================================================
-      // FIELDS PANEL RENDERING — grouped by data source
-      // ============================================================
-      function renderFieldsPanel() {
-        const body = document.getElementById('fields-panel-body');
-        body.innerHTML = '';
-        const dsNames = Object.keys(DataLaVistaState.dataSources).sort((a, b) => a.localeCompare(b));
-        if (!dsNames.length) {
-          body.innerHTML = '<div class="text-muted text-sm" style="padding:12px 10px">No tables loaded</div>';
-          renderDesignFieldsPanel();
-          return;
-        }
+// ============================================================
+// FIELDS PANEL RENDERING — grouped by data source
+// ============================================================
+function renderFieldsPanel() {
+  const body = document.getElementById('fields-panel-body');
+  body.innerHTML = '';
+  const dsNames = Object.keys(DataLaVistaState.dataSources).sort((a, b) => a.localeCompare(b));
+  if (!dsNames.length) {
+    body.innerHTML = '<div class="text-muted text-sm" style="padding:12px 10px">No tables loaded</div>';
+    renderDesignFieldsPanel();
+    return;
+  }
 
-        for (const dsName of dsNames) {
-          const ds = DataLaVistaState.dataSources[dsName];
-          const dsAlias = ds.alias || dsName;
+  for (const dsName of dsNames) {
+    const ds = DataLaVistaState.dataSources[dsName];
+    const dsAlias = ds.alias || dsName;
 
-          // Determine tooltip for DS header
-          let dsTitle = (ds.isFileUpload) ? (ds.fileName || ds.url || dsName) : (ds.url || dsName);
+    // Determine tooltip for DS header
+    let dsTitle = (ds.isFileUpload) ? (ds.fileName || ds.url || dsName) : (ds.url || dsName);
 
-          // Sort tables alphabetically
-          const tableKeys = (ds.tables || [])
-            .filter(k => DataLaVistaState.tables[k])
-            .sort((a, b) => {
-              const da = DataLaVistaState.tables[a].alias || DataLaVistaState.tables[a].displayName || a;
-              const db = DataLaVistaState.tables[b].alias || DataLaVistaState.tables[b].displayName || b;
-              return da.localeCompare(db);
-            });
+    // Sort tables alphabetically
+    const tableKeys = (ds.tables || [])
+      .filter(k => DataLaVistaState.tables[k])
+      .sort((a, b) => {
+        const da = DataLaVistaState.tables[a].alias || DataLaVistaState.tables[a].displayName || a;
+        const db = DataLaVistaState.tables[b].alias || DataLaVistaState.tables[b].displayName || b;
+        return da.localeCompare(db);
+      });
 
-          const dsGroup = document.createElement('div');
-          dsGroup.className = 'ds-group';
-          dsGroup.dataset.dsName = dsName;
+    const dsGroup = document.createElement('div');
+    dsGroup.className = 'ds-group';
+    dsGroup.dataset.dsName = dsName;
 
-          // DS header row
-          const dsHeader = document.createElement('div');
-          dsHeader.className = 'ds-group-header';
-          dsHeader.title = dsTitle;
-          dsHeader.innerHTML = `
-            <span class="ds-group-toggle open" id="ds-toggle-${CSS.escape(dsName)}">▶</span>
-            <span class="ds-group-name" id="ds-label-${CSS.escape(dsName)}">${dsAlias}</span>
-            <span style="font-size:10px;color:var(--text-disabled);margin-left:2px">${tableKeys.length}</span>
-          `;
-          // Click toggle
-          dsHeader.querySelector('.ds-group-toggle').addEventListener('click', (e) => {
-            e.stopPropagation();
-            toggleDsGroupExpand(dsName);
-          });
-          // Right-click
-          dsHeader.addEventListener('contextmenu', (e) => {
-            e.preventDefault();
-            showCtxMenu(e, { level: 'ds', dsName, isFileUpload: ds.isFileUpload || false});
-          });
+    // DS header row
+    const dsHeader = document.createElement('div');
+    dsHeader.className = 'ds-group-header';
+    dsHeader.title = dsTitle;
+    dsHeader.innerHTML = `
+      <span class="ds-group-toggle open" id="ds-toggle-${CSS.escape(dsName)}">▶</span>
+      <span class="ds-group-name" id="ds-label-${CSS.escape(dsName)}">${dsAlias}</span>
+      <span style="font-size:10px;color:var(--text-disabled);margin-left:2px">${tableKeys.length}</span>
+    `;
+    // Click toggle
+    dsHeader.querySelector('.ds-group-toggle').addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleDsGroupExpand(dsName);
+    });
+    // Right-click
+    dsHeader.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      showCtxMenu(e, { level: 'ds', dsName, isFileUpload: ds.isFileUpload || false});
+    });
 
-          dsGroup.appendChild(dsHeader);
+    dsGroup.appendChild(dsHeader);
 
-          // Tables container (DS groups expanded, table fields collapsed by default)
-          const tablesWrap = document.createElement('div');
-          tablesWrap.className = 'ds-group-tables';
-          tablesWrap.id = 'ds-tables-' + CSS.escape(dsName);
+    // Tables container (DS groups expanded, table fields collapsed by default)
+    const tablesWrap = document.createElement('div');
+    tablesWrap.className = 'ds-group-tables';
+    tablesWrap.id = 'ds-tables-' + CSS.escape(dsName);
 
-          for (const tkey of tableKeys) {
-            const t = DataLaVistaState.tables[tkey];
-            // Show the short alias (view name minus DS prefix); fall back to full view name
-            const viewName = CyberdynePipeline.rawTableToView[tkey];
-            const tAlias   = t.alias || viewName || t.displayName || tkey;
-            const tIcon = getTableIcon(t);
+    for (const tkey of tableKeys) {
+      const t = DataLaVistaState.tables[tkey];
+      // Show the short alias (view name minus DS prefix); fall back to full view name
+      const viewName = CyberdynePipeline.rawTableToView[tkey];
+      const tAlias   = t.alias || viewName || t.displayName || tkey;
+      const tIcon = getTableIcon(t);
 
-            const node = document.createElement('div');
-            node.className = 'table-node';
+      const node = document.createElement('div');
+      node.className = 'table-node';
 
-            node.innerHTML = `
-              <div class="table-node-header" draggable="true" data-table="${tkey}" style="padding-left:6px">
-                <span class="toggle-arrow" id="arrow-${CSS.escape(tkey)}">▶</span>
-                <span class="table-icon" title="${tIcon.title}" style="font-size:12px">${tIcon.icon}</span>
-                <span class="table-name" id="tlabel-${CSS.escape(tkey)}" title="${tkey}" style="font-size:11px;font-weight:700">${tAlias}</span>
-                <span class="table-count">${t.itemCount || (t.data && t.data.length) || 0}</span>
-              </div>
-              <div class="fields-list hidden" id="fields-${CSS.escape(tkey)}"></div>
-            `;
+      node.innerHTML = `
+        <div class="table-node-header" draggable="true" data-table="${tkey}" style="padding-left:6px">
+          <span class="toggle-arrow" id="arrow-${CSS.escape(tkey)}">▶</span>
+          <span class="table-icon" title="${tIcon.title}" style="font-size:12px">${tIcon.icon}</span>
+          <span class="table-name" id="tlabel-${CSS.escape(tkey)}" title="${tkey}" style="font-size:11px;font-weight:700">${tAlias}</span>
+          <span class="table-count">${t.itemCount || (t.data && t.data.length) || 0}</span>
+        </div>
+        <div class="fields-list hidden" id="fields-${CSS.escape(tkey)}"></div>
+      `;
 
-            const header = node.querySelector('.table-node-header');
-            header.addEventListener('click', () => toggleTableExpand(tkey));
-            header.addEventListener('dragstart', e => {
-              safeDragSet(e, { type: 'table', table: tkey });
-            });
-            // Right-click on table header
-            header.addEventListener('contextmenu', (e) => {
-              e.preventDefault();
-              showCtxMenu(e, { level: 'table', tableKey: tkey, dsName, isFileUpload: ds.isFileUpload || false });
-            });
+      const header = node.querySelector('.table-node-header');
+      header.addEventListener('click', () => toggleTableExpand(tkey));
+      header.addEventListener('dragstart', e => {
+        safeDragSet(e, { type: 'table', table: tkey });
+      });
+      // Right-click on table header
+      header.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        showCtxMenu(e, { level: 'table', tableKey: tkey, dsName, isFileUpload: ds.isFileUpload || false });
+      });
 
-            // Build fields list, sorted alphabetically
-            const flist = node.querySelector('.fields-list');
-            const sortedFields = [...t.fields]
-              .sort((a, b) => (a.alias || a.displayName || '').localeCompare(b.alias || b.displayName || ''));
-              //TODO: removed this from above .sort:  .filter(f => !f.isAutoId)
+      // Build fields list, sorted alphabetically
+      const flist = node.querySelector('.fields-list');
+      const sortedFields = [...t.fields]
+        .sort((a, b) => (a.alias || a.displayName || '').localeCompare(b.alias || b.displayName || ''));
+        //TODO: removed this from above .sort:  .filter(f => !f.isAutoId)
 
-            for (const f of sortedFields) {
-              const ti = DataLaVistaCore.FIELD_TYPE_ICONS[f.displayType] || DataLaVistaCore.FIELD_TYPE_ICONS.default;
-              const fitem = document.createElement('div');
-              fitem.className = 'field-item';
-              fitem.draggable = true;
-              fitem.style.paddingLeft = '14px';
-              fitem.innerHTML = `
-                <span class="field-type-icon ${ti.cls}" title="${f.displayName || f.alias}">${ti.icon}</span>
-                <span class="field-label" id="flabel-${CSS.escape(tkey)}-${CSS.escape(f.alias)}" title="${f.displayName || f.alias}">${f.alias}</span>
-              `;
-              fitem.addEventListener('dragstart', e => {
-                safeDragSet(e, { type: 'field', table: tkey, field: f.alias, internalName: f.internalName });
-                e.stopPropagation();
-              });
-              // Right-click on field: only "Rename"
-              fitem.addEventListener('contextmenu', (e) => {
-                e.preventDefault();
-                showCtxMenu(e, { level: 'field', tableKey: tkey, fieldAlias: f.alias });
-              });
-              flist.appendChild(fitem);
-            }
-
-            // Tables start collapsed by default
-
-            tablesWrap.appendChild(node);
-          }
-
-          dsGroup.appendChild(tablesWrap);
-          body.appendChild(dsGroup);
-        }
-
-        renderDesignFieldsPanel();
-      }
-
-      function toggleDsGroupExpand(dsName) {
-        const wrap = document.getElementById('ds-tables-' + CSS.escape(dsName));
-        const toggle = document.getElementById('ds-toggle-' + CSS.escape(dsName));
-        if (!wrap) return;
-        const isOpen = toggle && toggle.classList.contains('open');
-        if (wrap) wrap.style.display = isOpen ? 'none' : '';
-        if (toggle) toggle.classList.toggle('open', !isOpen);
-      }
-
-      function toggleTableExpand(tkey) {
-        const flist = document.getElementById('fields-' + CSS.escape(tkey));
-        const arrow = document.getElementById('arrow-' + CSS.escape(tkey));
-        if (!flist) return;
-        const isOpen = !flist.classList.contains('hidden');
-        flist.classList.toggle('hidden', isOpen);
-        if (arrow) { arrow.classList.toggle('open', !isOpen); }
-      }
-
-      function expandAllTables() {
-        // First click: expand DS groups only. Second click (all DS already expanded): also expand table fields.
-        const allDsExpanded = Object.keys(DataLaVistaState.dataSources).every(ds => {
-          const wrap = document.getElementById('ds-tables-' + CSS.escape(ds));
-          return !wrap || wrap.style.display !== 'none';
+      for (const f of sortedFields) {
+        const ti = DataLaVistaCore.FIELD_TYPE_ICONS[f.displayType] || DataLaVistaCore.FIELD_TYPE_ICONS.default;
+        const fitem = document.createElement('div');
+        fitem.className = 'field-item';
+        fitem.draggable = true;
+        fitem.style.paddingLeft = '14px';
+        fitem.innerHTML = `
+          <span class="field-type-icon ${ti.cls}" title="${f.displayName || f.alias}">${ti.icon}</span>
+          <span class="field-label" id="flabel-${CSS.escape(tkey)}-${CSS.escape(f.alias)}" title="${f.displayName || f.alias}">${f.alias}</span>
+        `;
+        fitem.addEventListener('dragstart', e => {
+          safeDragSet(e, { type: 'field', table: tkey, field: f.alias, internalName: f.internalName });
+          e.stopPropagation();
         });
-        if (!allDsExpanded) {
-          Object.keys(DataLaVistaState.dataSources).forEach(ds => {
-            const wrap = document.getElementById('ds-tables-' + CSS.escape(ds));
-            const toggle = document.getElementById('ds-toggle-' + CSS.escape(ds));
-            if (wrap) wrap.style.display = '';
-            if (toggle) toggle.classList.add('open');
-          });
-        } else {
-          Object.keys(DataLaVistaState.tables).forEach(t => {
-            document.getElementById('fields-' + CSS.escape(t))?.classList.remove('hidden');
-            document.getElementById('arrow-' + CSS.escape(t))?.classList.add('open');
-          });
-        }
-      }
-      function collapseAllTables() {
-        // First click: collapse table fields only. Second click (all fields already collapsed): also collapse DS groups.
-        const anyFieldExpanded = Object.keys(DataLaVistaState.tables).some(t => {
-          const el = document.getElementById('fields-' + CSS.escape(t));
-          return el && !el.classList.contains('hidden');
+        // Right-click on field: only "Rename"
+        fitem.addEventListener('contextmenu', (e) => {
+          e.preventDefault();
+          showCtxMenu(e, { level: 'field', tableKey: tkey, fieldAlias: f.alias });
         });
-        if (anyFieldExpanded) {
-          Object.keys(DataLaVistaState.tables).forEach(t => {
-            document.getElementById('fields-' + CSS.escape(t))?.classList.add('hidden');
-            document.getElementById('arrow-' + CSS.escape(t))?.classList.remove('open');
-          });
-        } else {
-          Object.keys(DataLaVistaState.dataSources).forEach(ds => {
-            const wrap = document.getElementById('ds-tables-' + CSS.escape(ds));
-            const toggle = document.getElementById('ds-toggle-' + CSS.escape(ds));
-            if (wrap) wrap.style.display = 'none';
-            if (toggle) toggle.classList.remove('open');
-          });
-        }
+        flist.appendChild(fitem);
       }
+
+      // Tables start collapsed by default
+
+      tablesWrap.appendChild(node);
+    }
+
+    dsGroup.appendChild(tablesWrap);
+    body.appendChild(dsGroup);
+  }
+
+  renderDesignFieldsPanel();
+}
+
+function toggleDsGroupExpand(dsName) {
+  const wrap = document.getElementById('ds-tables-' + CSS.escape(dsName));
+  const toggle = document.getElementById('ds-toggle-' + CSS.escape(dsName));
+  if (!wrap) return;
+  const isOpen = toggle && toggle.classList.contains('open');
+  if (wrap) wrap.style.display = isOpen ? 'none' : '';
+  if (toggle) toggle.classList.toggle('open', !isOpen);
+}
+
+function toggleTableExpand(tkey) {
+  const flist = document.getElementById('fields-' + CSS.escape(tkey));
+  const arrow = document.getElementById('arrow-' + CSS.escape(tkey));
+  if (!flist) return;
+  const isOpen = !flist.classList.contains('hidden');
+  flist.classList.toggle('hidden', isOpen);
+  if (arrow) { arrow.classList.toggle('open', !isOpen); }
+}
+
+function expandAllTables() {
+  // First click: expand DS groups only. Second click (all DS already expanded): also expand table fields.
+  const allDsExpanded = Object.keys(DataLaVistaState.dataSources).every(ds => {
+    const wrap = document.getElementById('ds-tables-' + CSS.escape(ds));
+    return !wrap || wrap.style.display !== 'none';
+  });
+  if (!allDsExpanded) {
+    Object.keys(DataLaVistaState.dataSources).forEach(ds => {
+      const wrap = document.getElementById('ds-tables-' + CSS.escape(ds));
+      const toggle = document.getElementById('ds-toggle-' + CSS.escape(ds));
+      if (wrap) wrap.style.display = '';
+      if (toggle) toggle.classList.add('open');
+    });
+  } else {
+    Object.keys(DataLaVistaState.tables).forEach(t => {
+      document.getElementById('fields-' + CSS.escape(t))?.classList.remove('hidden');
+      document.getElementById('arrow-' + CSS.escape(t))?.classList.add('open');
+    });
+  }
+}
+function collapseAllTables() {
+  // First click: collapse table fields only. Second click (all fields already collapsed): also collapse DS groups.
+  const anyFieldExpanded = Object.keys(DataLaVistaState.tables).some(t => {
+    const el = document.getElementById('fields-' + CSS.escape(t));
+    return el && !el.classList.contains('hidden');
+  });
+  if (anyFieldExpanded) {
+    Object.keys(DataLaVistaState.tables).forEach(t => {
+      document.getElementById('fields-' + CSS.escape(t))?.classList.add('hidden');
+      document.getElementById('arrow-' + CSS.escape(t))?.classList.remove('open');
+    });
+  } else {
+    Object.keys(DataLaVistaState.dataSources).forEach(ds => {
+      const wrap = document.getElementById('ds-tables-' + CSS.escape(ds));
+      const toggle = document.getElementById('ds-toggle-' + CSS.escape(ds));
+      if (wrap) wrap.style.display = 'none';
+      if (toggle) toggle.classList.remove('open');
+    });
+  }
+}
