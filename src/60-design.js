@@ -23,6 +23,130 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
   // ============================================================
   // DESIGN FIELDS PANEL  (fields with agg dropdowns + filter/sort/group sections)
   // ============================================================
+
+  
+
+/**
+ * Scores a given ECharts widget suggestion rule based on the provided dataset metadata.
+ * Higher scores indicate a better fit for the dataset.
+ * * @param {Object} rule - A single rule object from CHART_TYPE_RULES
+ * @param {Array} cols - Array of column metadata: [{name, type, cardinality, nullPct}]
+ * @param {Object} meta - Dataset metadata: {rowCount, totalCols}
+ * @returns {number} The calculated priority score
+ */
+function scoreRule(rule, cols, meta) {
+  let score = 0;
+  const suggestion = rule.suggestion || {};
+  
+  // 1. Chart type resolution (handle structural variations in rules)
+  const ruleString = JSON.stringify(rule).toLowerCase();
+  const chartType = (suggestion.chartType || '').toLowerCase();
+  
+  const isPie = chartType === 'pie' || ruleString.includes('"type":"pie"') || ruleString.includes('"pie":{');
+  const isLine = chartType === 'line' || chartType === 'area' || ruleString.includes('"type":"line"');
+  const isScatter = chartType === 'scatter' || ruleString.includes('"type":"scatter"');
+  const isGauge = chartType === 'gauge' || chartType === 'kpi' || ruleString.includes('"gauge":{');
+  const isRadar = chartType === 'radar' || ruleString.includes('"type":"radar"');
+
+  // Baseline Score based on rule Priority (1 is highest/best)
+  const priority = suggestion.priority || 3;
+  score += (4 - priority) * 20; // Priority 1 = +60, Priority 2 = +40, Priority 3 = +20
+
+  // Resolve requested fields safely
+  const xField = suggestion.xField;
+  const yFields = Array.isArray(suggestion.yFields) ? suggestion.yFields : (suggestion.yFields ? [suggestion.yFields] : []);
+  const seriesField = suggestion.seriesField;
+
+  // FACTOR 1: How many columns does the rule use? (More specific = higher score)
+  let colsUsed = 0;
+  if (xField) colsUsed++;
+  if (seriesField) colsUsed++;
+  
+  // Handle wildcard/magic fields like '__NUM_ALL__' or 'number'
+  const yFieldStr = yFields.join(',').toLowerCase();
+  if (yFieldStr.includes('all') || yFieldStr.includes('number')) {
+    colsUsed += cols.filter(c => c.type === 'number').length || 1;
+  } else {
+    colsUsed += yFields.length;
+  }
+  score += (colsUsed * 5); // Reward rules that utilize more of the dataset dimensions
+
+  // FACTOR 2 & 4: Matches primary apparent purpose & named column hints
+  // Dynamic scanning: If the rule explicitly hardcodes or looks for domain-specific words 
+  // (like 'ticket', 'assignee', 'glucose', 'status') and the dataset actually has them.
+  cols.forEach(c => {
+    const cname = c.name.toLowerCase();
+    if (cname.length > 2 && ruleString.includes(cname)) {
+      score += 15; // Bonus for each exact column name / keyword match
+    }
+  });
+
+  // FACTOR 3: Is the chart type appropriate for the row count?
+  const rc = meta.rowCount || 0;
+  if (rc === 1) {
+    if (isGauge) score += 40;
+    if (isLine || isScatter) score -= 50; // Lines/scatters are useless with 1 row
+  } else if (rc > 50) {
+    if (isPie || isRadar) score -= 30; // Pies/Radars become unreadable
+    if (isScatter || isLine) score += 20; // Dense data looks great here
+  }
+
+  // FACTOR 5: Penalize pie charts if cardinality > 6
+  if (isPie) {
+    // Try to find the dimension column being used to group the pie
+    const dimCol = cols.find(c => c.name === xField || c.name === seriesField) || cols.find(c => c.type === 'text');
+    const card = dimCol ? dimCol.cardinality : rc;
+    if (card > 6) {
+      score -= (card - 6) * 5; // Progressive penalty (-5 points per excess slice)
+    }
+  }
+
+  // FACTOR 6: Bonus for temporal data being shown as line/area
+  const hasDate = cols.some(c => c.type === 'date');
+  if (hasDate && isLine) {
+    score += 30; 
+  }
+
+  // FACTOR 7: Penalize if >30% null values in key fields
+  const keyFieldNames = [xField, ...yFields, seriesField].filter(Boolean).map(f => String(f).toLowerCase());
+  let nullPenalty = 0;
+  
+  cols.forEach(c => {
+    // Check if the dataset column matches a requested field by name or primitive type
+    if (keyFieldNames.includes(c.name.toLowerCase()) || keyFieldNames.includes(c.type.toLowerCase())) {
+      if (c.nullPct > 0.3) {
+        nullPenalty += Math.floor(c.nullPct * 50); // e.g., 60% nulls = -30 point penalty
+      }
+    }
+  });
+  score -= nullPenalty;
+
+  return score;
+}
+
+/**
+ * Evaluates all matched rules against the dataset and returns the top 5 suggestions.
+ * * @param {Array} rules - Array of matching rule objects
+ * @param {Array} cols - Array of column metadata
+ * @param {Object} meta - Dataset metadata
+ * @returns {Array} Top 5 rule objects sorted by best fit
+ */
+function rankSuggestions(rules, cols, meta) {
+  if (!rules || !rules.length) return [];
+
+  // Map rules to their scores
+  const scoredRules = rules.map(rule => ({
+    rule: rule,
+    score: scoreRule(rule, cols, meta)
+  }));
+
+  // Sort descending (highest score first)
+  scoredRules.sort((a, b) => b.score - a.score);
+
+  // Return the top 5 raw rule objects
+  return scoredRules.slice(0, 5).map(item => item.rule);
+}
+
   function renderDesignFieldsPanel() {
     const body = document.getElementById('design-fields-body');
     if (!DataLaVistaState.queryColumns.length) {
