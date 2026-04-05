@@ -1,10 +1,10 @@
 <!--
-This file is part of DataLaVista
+This file is part of DataLaVista™
 AI Code Generation Prompts
 Author(s): Gabriel Mongefranco, Jeremy Gluskin, Shelley Boa.
 Created: 2026-03-10
 Last Modified: 2026-03-20
-Summary: DataLaVista is a ightweight, client-side reporting and dashboard toolkit.
+Summary: DataLaVista™ is a ightweight, client-side reporting and dashboard toolkit.
 Notes: See README file for documentation and full license information.
 
 Copyright © 2026 The Regents of the University of Michigan
@@ -26,14 +26,14 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 
        /|____________|\
       ||  /--------\  ||    ___       _          _            _    _ _     _
-      ||_|__________| ||   |   \ __ _| |_ __ _  | |   __ _  | \  / (_) ___| |_ __  
+      ||_|__________| ||   |   \ __ _| |_ __ _  | |   __ _  | \  / (_) ___| |_ __ TM
       ||              ||   | |) / _` |  _/ _` | | |__/ _` |  \ \/ /| (_-<  _/ _` |
       | \____________/ |   |___/\__,_|\__\__,_| |____\__,_|   \__/ |_/__/\__\__,_|
        \  |_|_|_|_|  / 
-        \___________/         🕶️ "The BI Terminator" 🕶️
+        \___________/         🕶️ "The BI Terminator" ™ 🕶️
 ```
 
-# 🕶️ Data La Vista
+# 🕶️ DataLaVista™
 ***🕶️ Tell your expensive BI tools: "Data la vista, baby!"***
 
 ## Description
