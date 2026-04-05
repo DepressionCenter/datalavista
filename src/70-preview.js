@@ -167,35 +167,20 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       }
 
       function renderPreviewChart(w) {
-        const chartEl = document.getElementById('prevchart-' + w.id);
-        if (!chartEl) return;
-        const id = 'prev_' + w.id;
-        if (DataLaVistaState.charts[id]) { try { DataLaVistaState.charts[id].dispose(); } catch (e) { } }
-        const chart = echarts.init(chartEl);
-        DataLaVistaState.charts[id] = chart;
-
-        const chartData = buildWidgetData(w);
-        if (!chartData || !chartData.length) {
-          chart.setOption({ title: { text: 'No data', left: 'center', top: 'middle', textStyle: { color: '#a19f9d', fontSize: 13 } } });
-          return;
-        }
-
-        const allCols = Object.keys(chartData[0]);
-        const xField = w.xField || allCols[0];
-        const yField = w.yField || allCols[1] || allCols[0];
-        let option = {};
-
-        if (w.type === 'bar') {
-          option = { tooltip: { trigger: 'axis' }, xAxis: { type: 'category', data: chartData.map(r => r[xField]), axisLabel: { rotate: 30, fontSize: 11 } }, yAxis: { type: 'value' }, series: [{ type: 'bar', data: chartData.map(r => parseFloat(r[yField]) || 0), itemStyle: { color: w.fillColor } }], grid: { left: 40, right: 20, top: 20, bottom: 60 } };
-        } else if (w.type === 'line') {
-          option = { tooltip: { trigger: 'axis' }, xAxis: { type: 'category', data: chartData.map(r => r[xField]), axisLabel: { rotate: 30, fontSize: 11 } }, yAxis: { type: 'value' }, series: [{ type: 'line', data: chartData.map(r => parseFloat(r[yField]) || 0), itemStyle: { color: w.fillColor }, smooth: true }], grid: { left: 40, right: 20, top: 20, bottom: 60 } };
-        } else if (w.type === 'pie') {
-          option = { tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' }, series: [{ type: 'pie', data: chartData.map(r => ({ name: String(r[xField] || ''), value: parseFloat(r[yField]) || 0 })), radius: ['30%', '65%'], label: { fontSize: 11 } }] };
-        } else if (w.type === 'scatter') {
-          option = { tooltip: { trigger: 'item' }, xAxis: { type: 'value' }, yAxis: { type: 'value' }, series: [{ type: 'scatter', data: chartData.map(r => [parseFloat(r[xField]) || 0, parseFloat(r[yField]) || 0]), itemStyle: { color: w.fillColor } }], grid: { left: 40, right: 20, top: 20, bottom: 40 } };
-        }
-        chart.setOption(option);
-      }
+  const chartEl = document.getElementById('prevchart-' + w.id);
+  if (!chartEl) return;
+  const id = 'prev_' + w.id;
+  if (DataLaVistaState.charts[id]) { try { DataLaVistaState.charts[id].dispose(); } catch(e){} }
+  const chart = echarts.init(chartEl);
+  DataLaVistaState.charts[id] = chart;
+  const chartData = buildWidgetData(w);
+  const option = _buildChartOption(w, chartData);
+  if (!option) {
+    chart.setOption({ title: { text: 'No data', left: 'center', top: 'middle', textStyle: { color: '#a19f9d', fontSize: 13 } } });
+    return;
+  }
+  chart.setOption(option);
+}
 
       function applyPreviewFilterAndRender(field, value) {
         if (value === '(All)') delete DataLaVistaState.previewFilters[field];

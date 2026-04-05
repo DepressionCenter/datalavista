@@ -60,18 +60,19 @@ function generateWidgetSQL(w, tableRef = '_results') {
   }
 
   if (['bar', 'line', 'pie'].includes(w.type)) {
-    const xField = w.xField;
-    const yField = w.yField;
-    if (!xField) return `SELECT * FROM ${q}${where}`;
-    const agg = (w.aggregation || '').toUpperCase();
-    if (!yField || !agg || agg === 'NONE') {
-      return `SELECT [${xField}] FROM ${q}${where}`;
-    }
-    const yExpr = agg === 'COUNT'
-      ? `COUNT(*) AS [${yField}]`
-      : `${agg}([${yField}]) AS [${yField}]`;
-    return `SELECT [${xField}], ${yExpr} FROM ${q}${where} GROUP BY [${xField}]`;
+  const xField = w.xField;
+  const yFields = (Array.isArray(w.yFields) && w.yFields.length) ? w.yFields : (w.yField ? [w.yField] : []);
+  if (!xField) return `SELECT * FROM ${q}${where}`;
+  if (!yFields.length) return `SELECT [${xField}] FROM ${q}${where}`;
+  const agg = (w.aggregation || '').toUpperCase();
+  if (!agg || agg === 'NONE') {
+    return `SELECT [${xField}], ${yFields.map(f=>`[${f}]`).join(', ')} FROM ${q}${where}`;
   }
+  const yExprs = yFields.map(f =>
+    agg === 'COUNT' ? `COUNT(*) AS [${f}]` : `${agg}([${f}]) AS [${f}]`
+  ).join(', ');
+  return `SELECT [${xField}], ${yExprs} FROM ${q}${where} GROUP BY [${xField}]`;
+}
 
   if (w.type === 'scatter') {
     const xField = w.xField;
@@ -181,11 +182,12 @@ function buildConfig() {
     id: w.id,
     type: w.type,
     title: w.title || '',
-    widthPct: w.widthPct || 45,
-    heightVh: w.heightVh || 30,
+    widthPct: w.widthPct || 48,
+    heightVh: w.heightVh || 33,
     fields: Array.isArray(w.fields) ? [...w.fields] : [],
     xField: w.xField || '',
-    yField: w.yField || '',
+    yField: w.yField || '', // legacy single yField for backward compatibility
+    yFields: Array.isArray(w.yFields) ? [...w.yFields] : [],
     aggregation: w.aggregation || '',
     fillColor: w.fillColor || '#0078d4',
     borderColor: w.borderColor || '#edebe9',
@@ -339,6 +341,12 @@ async function loadConfig(cfg) {
     fieldAggs: loadedDesign.fieldAggs || {},
     transformedResults: null
   };
+  // Migrate legacy single-yField to yFields array
+for (const w of DataLaVistaState.design.widgets) {
+  if (!Array.isArray(w.yFields)) {
+    w.yFields = w.yField ? [w.yField] : [];
+  }
+}
   DataLaVistaState.previewFilters = cfg.previewFilters || {};
   // Normalize legacy tab name ('previewData' was renamed to 'dataPreview')
   DataLaVistaState.qmTab = (cfg.qmTab === 'previewData') ? 'dataPreview' : (cfg.qmTab || 'qb');
