@@ -55,26 +55,77 @@ const DataLaVistaCore = {
     default: { icon: '⏹️', title: 'Table' }
   },
 
-  DATE_MACRO_OPS: [
-    { val: 'TODAY', label: '= ☀️ Today', hasInput: false },
-    { val: 'THIS_WEEK', label: '= 📆 This Week', hasInput: false },
-    { val: 'LAST_WEEK', label: '= 📆 Last Week', hasInput: false },
-    { val: 'THIS_BIZ_WEEK', label: '= 👩🏾‍💼 This Business Week', hasInput: false },
-    { val: 'LAST_BIZ_WEEK', label: '= 👨🏻‍💼 Last Businss Week', hasInput: false },
-    { val: 'THIS_MONTH', label: '= 📅 This Month', hasInput: false },
-    { val: 'LAST_MONTH', label: '= 📅 Last Month', hasInput: false },
-    { val: 'THIS_YEAR', label: '= 🎂 This Year', hasInput: false },
-    { val: 'LAST_YEAR', label: '= 🎂 Last Year', hasInput: false },
-    { val: 'THIS_FISCAL', label: '= 📒 This Fiscal Year', hasInput: false },
-    { val: 'LAST_FISCAL', label: '= 📒 Last Fiscal Year', hasInput: false },
-    { val: 'THIS_ACADEMIC', label: '= 🎓 This Academic Year', hasInput: false },
-    { val: 'LAST_ACADEMIC', label: '= 🎓 Last Academic Year', hasInput: false },
-    { val: 'PAST_X_DAYS', label: '= ⏳☀️ Past X Days', hasInput: true },
-    { val: 'PAST_X_MONTHS', label: '= ⏳📅 Past X Months', hasInput: true },
-    { val: 'PAST_X_YEARS', label: '= ⏳🎂 Past X Years', hasInput: true },
-    { val: 'PAST_X_FISCAL', label: '= ⏳📒 Past X Fiscal years', hasInput: true }
-  ],
+  ALASQL_KEYWORDS: [
+  'ATTACH', 'DETACH', 'SHOW', 'TABLES', 'DATABASES', 'FROM', 'SELECT', 'WHERE',
+  'GROUP', 'BY', 'ORDER', 'HAVING', 'LIMIT', 'OFFSET', 'JOIN', 'LEFT', 'RIGHT',
+  'INNER', 'OUTER', 'FULL', 'CROSS', 'ON', 'AS', 'DISTINCT', 'ALL', 'UNION',
+  'INTERSECT', 'EXCEPT', 'INSERT', 'INTO', 'VALUES', 'UPDATE', 'SET', 'DELETE',
+  'CREATE', 'TABLE', 'DROP', 'ALTER', 'ADD', 'COLUMN', 'INDEX', 'VIEW', 'IF',
+  'EXISTS', 'NOT', 'AND', 'OR', 'IN', 'IS', 'NULL', 'LIKE', 'BETWEEN', 'CASE',
+  'WHEN', 'THEN', 'ELSE', 'END', 'CAST', 'CONVERT', 'TOP', 'WITH', 'ROLLUP',
+  'CUBE', 'GROUPING', 'SETS', 'PIVOT', 'UNPIVOT', 'OVER', 'PARTITION', 'ROWS',
+  'RANGE', 'PRECEDING', 'FOLLOWING', 'UNBOUNDED', 'CURRENT', 'ROW', 'FILTER',
+  'WITHIN', 'RECURSIVE', 'LATERAL', 'APPLY', 'TABLESAMPLE', 'PERCENT',
+  'TIES', 'FETCH', 'FIRST', 'NEXT', 'ONLY', 'ROWS', 'ONLY', 'SKIP', 'ARRAY',
+  'MATRIX', 'OF', 'STRING', 'NUMBER', 'DATE', 'BOOLEAN', 'OBJECT', 'SEARCH',
+  'REPLACE', 'REMOVE', 'RENAME', 'MODIFY', 'REINDEX', 'TRUNCATE', 'BEGIN',
+  'COMMIT', 'ROLLBACK', 'TRANSACTION', 'SAVEPOINT', 'RELEASE',
+  'INCLUDES', 'DLV_DROP', 'DLV_DISPLAY', 'DLV_IDS', 'DLV_JOIN', 'DLV_EMAIL',
+  'DLV_EMAILS', 'DLV_PICTURE_URL','DLV_NORMALIZE_DATE','DLV_TAX_LABELS',
+  'DLV_TAX_IDS','DLV_PARSE_BOOL', 'DLV_PARSE_DATE'
+],
 
+// Base Aggregation Options for Query Builder (used in field picker dropdowns and design-level aggregates)
+QB_AGGS: [
+  { val: '', label: '— none —', types: 'all' },
+  { val: 'COUNT', label: 'COUNT', types: 'all' },
+  { val: 'COUNT_DISTINCT', label: 'COUNT DISTINCT', types: 'all' },
+  { val: 'FIRST', label: 'FIRST', types: 'all' },
+  { val: 'LAST', label: 'LAST', types: 'all' },
+  { val: 'MAX', label: 'MAX  (Maximum)', types: 'ordered' },
+  { val: 'MIN', label: 'MIN  (Minimum)', types: 'ordered' },
+  { val: 'SUM', label: 'SUM  (Sum)', types: 'numeric' },
+  { val: 'AVG', label: 'AVG  (Average)', types: 'numeric' },
+  { val: 'MEDIAN', label: 'MEDIAN', types: 'numeric' },
+  { val: 'VAR', label: 'VAR  (Variance)', types: 'numeric' },
+  { val: 'STDEV', label: 'STDEV  (Std Dev)', types: 'numeric' }
+],
+
+// Base Filter Conditions
+QB_OPS: [
+{ val: '=', label: '= equals' },
+{ val: '!=', label: '≠ not equals' },
+{ val: '>', label: '> greater than' },
+{ val: '<', label: '< less than' },
+{ val: '>=', label: '≥ greater or equal' },
+{ val: '<=', label: '≤ less or equal' },
+{ val: 'LIKE', label: '~ contains' },
+{ val: 'NULL', label: '∅ is blank' },
+{ val: 'NOTNULL', label: '✓ is not blank' },
+],
+
+// Additional filter options, applicable only to date data types
+DATE_MACRO_OPS: [
+{ val: 'TODAY', label: '= ☀️ Today', hasInput: false },
+{ val: 'THIS_WEEK', label: '= 📆 This Week', hasInput: false },
+{ val: 'LAST_WEEK', label: '= 📆 Last Week', hasInput: false },
+{ val: 'THIS_BIZ_WEEK', label: '= 👩🏾‍💼 This Business Week', hasInput: false },
+{ val: 'LAST_BIZ_WEEK', label: '= 👨🏻‍💼 Last Businss Week', hasInput: false },
+{ val: 'THIS_MONTH', label: '= 📅 This Month', hasInput: false },
+{ val: 'LAST_MONTH', label: '= 📅 Last Month', hasInput: false },
+{ val: 'THIS_YEAR', label: '= 🎂 This Year', hasInput: false },
+{ val: 'LAST_YEAR', label: '= 🎂 Last Year', hasInput: false },
+{ val: 'THIS_FISCAL', label: '= 📒 This Fiscal Year', hasInput: false },
+{ val: 'LAST_FISCAL', label: '= 📒 Last Fiscal Year', hasInput: false },
+{ val: 'THIS_ACADEMIC', label: '= 🎓 This Academic Year', hasInput: false },
+{ val: 'LAST_ACADEMIC', label: '= 🎓 Last Academic Year', hasInput: false },
+{ val: 'PAST_X_DAYS', label: '= ⏳☀️ Past X Days', hasInput: true },
+{ val: 'PAST_X_MONTHS', label: '= ⏳📅 Past X Months', hasInput: true },
+{ val: 'PAST_X_YEARS', label: '= ⏳🎂 Past X Years', hasInput: true },
+{ val: 'PAST_X_FISCAL', label: '= ⏳📒 Past X Fiscal years', hasInput: true }
+],
+
+  // Work around for Set lookup since DATE_MACRO_OPS is an array of objects
   DATE_MACRO_VALS: new Set([
     'TODAY',
     'THIS_WEEK',
@@ -93,102 +144,12 @@ const DataLaVistaCore = {
     'PAST_X_MONTHS',
     'PAST_X_YEARS',
     'PAST_X_FISCAL'
-  ])
-  
-} // End DataLaVistaCore
+  ]),
 
-
-/* ===== STATE ===== */
-//const dlvRawState = {
-const DataLaVistaState = {
-  dataSources: {},   // dsName -> { type, url, auth, token, fileName, alias, tables: [internalTableKeys] },											  
-  tables: {},        // internalName -> { displayName, alias, fields: [], data: [], loaded: false }
-  queryMode: 'basic',
-  basicQB: { // Basic Query Builder
-    tableName: null,
-    selectedFields: [],
-    fieldAggs: {},
-    conditions: [],
-    sorts: [],
-    groupBy: [],
-    rowLimit: 500
-  },
-  advancedQB: { // Advanced Query Builder
-    nodes: {},
-    joins: [],
-    activeJoinIdx: -1,
-    rowLimit: 500
-  },
-  sql: '',
-  sqlLocked: false,
-  queryColumns: [],
-  design: {
-    title: '',
-    showDashboardTitle: true,   // whether the title bar is visible in preview/report mode
-    dashboardTitleTooltip: '',  // optional HTML tooltip (sanitized) shown via info icon next to title
-    widgets: [],     // widget objects
-    filters: [],     // { field, label, position }  — preview filter bar chips
-    conditions: [],  // { conj, field, op, value }  — design-level data filter
-    sorts: [],       // { field, dir }              — design-level sort
-    groupBy: [],     // string[]                    — design-level group by
-    fieldAggs: {},   // { [col]: aggVal }           — design-level aggregates
-    transformedResults: null  // cached result of applyDesignTransforms()
-  },
-  currentWidgetId: null,
-  previewFilters: {},  // field -> value
-  activeTab: 'query',
-  qbCollapsed: false,
-  qbSectionHeight: 60,  // percent
-  charts: {},   // widgetId -> echarts instance
-  isSpSite: false, // true if we detect we're running inside a SharePoint site (based on URL and/or presence of SharePoint JS objects)
-  spSiteUrl: null, // if isSpSite=true, this holds the detected SharePoint site URL; otherwise null
-  spPageMode: null,  // 'view' or 'edit' (only relevant if isSpSite=true)
-  reportMode: 'view', // 'view' or 'edit' (can be set via ?reportMode=<val> param; defaults to 'view')
-  reportUrl: null, // if ?report=<url> param is provided, this holds the URL of the report being edited
-  relationships: [], // auto-detected and manual relationships: [{ id, source, childTableKey, childField, parentTableKey, parentField, joinType, spLookupField }]
-  drillFilters: {},  // cross-widget click filters: { fieldName: value } — rebuilt on every chart/table click
-  _initialized: false
-}; // End dlvRawState
-
-
-
-
-
-// ============================================================
-// CONSTANTS
-// ============================================================
-const ALASQL_KEYWORDS = [
-  'ATTACH', 'DETACH', 'SHOW', 'TABLES', 'DATABASES', 'FROM', 'SELECT', 'WHERE',
-  'GROUP', 'BY', 'ORDER', 'HAVING', 'LIMIT', 'OFFSET', 'JOIN', 'LEFT', 'RIGHT',
-  'INNER', 'OUTER', 'FULL', 'CROSS', 'ON', 'AS', 'DISTINCT', 'ALL', 'UNION',
-  'INTERSECT', 'EXCEPT', 'INSERT', 'INTO', 'VALUES', 'UPDATE', 'SET', 'DELETE',
-  'CREATE', 'TABLE', 'DROP', 'ALTER', 'ADD', 'COLUMN', 'INDEX', 'VIEW', 'IF',
-  'EXISTS', 'NOT', 'AND', 'OR', 'IN', 'IS', 'NULL', 'LIKE', 'BETWEEN', 'CASE',
-  'WHEN', 'THEN', 'ELSE', 'END', 'CAST', 'CONVERT', 'TOP', 'WITH', 'ROLLUP',
-  'CUBE', 'GROUPING', 'SETS', 'PIVOT', 'UNPIVOT', 'OVER', 'PARTITION', 'ROWS',
-  'RANGE', 'PRECEDING', 'FOLLOWING', 'UNBOUNDED', 'CURRENT', 'ROW', 'FILTER',
-  'WITHIN', 'RECURSIVE', 'LATERAL', 'APPLY', 'TABLESAMPLE', 'PERCENT',
-  'TIES', 'FETCH', 'FIRST', 'NEXT', 'ONLY', 'ROWS', 'ONLY', 'SKIP', 'ARRAY',
-  'MATRIX', 'OF', 'STRING', 'NUMBER', 'DATE', 'BOOLEAN', 'OBJECT', 'SEARCH',
-  'REPLACE', 'REMOVE', 'RENAME', 'MODIFY', 'REINDEX', 'TRUNCATE', 'BEGIN',
-  'COMMIT', 'ROLLBACK', 'TRANSACTION', 'SAVEPOINT', 'RELEASE', 'INCLUDES'
-];
-
-const AGG_OPTIONS = ['', 'COUNT', 'COUNT(DISTINCT)', 'SUM', 'AVG', 'MEDIAN', 'MIN', 'MAX', 'FIRST', 'LAST', 'STDEV', 'VAR'];
-
-
-
-/** Returns the TABLE_SOURCE_ICONS entry for a table object from DataLaVistaState.tables. */
-function getTableIcon(t) {
-  if (t.sourceType === 'sharepoint') {
-    return DataLaVistaCore.TABLE_SOURCE_ICONS.sharepoint[t.isDocLib ? 'library' : 'list'];
-  }
-  return DataLaVistaCore.TABLE_SOURCE_ICONS[t.sourceType] || DataLaVistaCore.TABLE_SOURCE_ICONS.default;
-}
-
-
-
-const SKIP_FIELDS = new Set([
+// Fields to skip when auto-detecting field types and relationships in SharePoint lists/libraries and JSON,
+// as they are typically non-informative for visualization and can cause noise in type/relationship
+// inference due to their special formats and values.
+SKIP_FIELDS: new Set([
   "AccessPolicy",
   "AppAuthor",
   "AppEditor",
@@ -253,26 +214,120 @@ const SKIP_FIELDS = new Set([
   "odata.type",
   "xd_ProgID",
   "xd_Signature"
-]);
+])
 
-const QB_AGGS = [
-  { val: '', label: '— none —', types: 'all' },
-  { val: 'COUNT', label: 'COUNT', types: 'all' },
-  { val: 'COUNT_DISTINCT', label: 'COUNT DISTINCT', types: 'all' },
-  { val: 'FIRST', label: 'FIRST', types: 'all' },
-  { val: 'LAST', label: 'LAST', types: 'all' },
-  { val: 'MAX', label: 'MAX  (Maximum)', types: 'ordered' },
-  { val: 'MIN', label: 'MIN  (Minimum)', types: 'ordered' },
-  { val: 'SUM', label: 'SUM  (Sum)', types: 'numeric' },
-  { val: 'AVG', label: 'AVG  (Average)', types: 'numeric' },
-  { val: 'MEDIAN', label: 'MEDIAN', types: 'numeric' },
-  { val: 'VAR', label: 'VAR  (Variance)', types: 'numeric' },
-  { val: 'STDEV', label: 'STDEV  (Std Dev)', types: 'numeric' }
-];
+  
+} // End DataLaVistaCore
 
+
+/* ===== STATE ===== */
+//const dlvRawState = {
+const DataLaVistaState = {
+  dataSources: {},   // dsName -> { type, url, auth, token, fileName, alias, tables: [internalTableKeys] },											  
+  tables: {},        // internalName -> { displayName, alias, fields: [], data: [], loaded: false }
+  queryMode: 'basic',
+  basicQB: { // Basic Query Builder
+    tableName: null,
+    selectedFields: [],
+    fieldAggs: {},
+    conditions: [],
+    sorts: [],
+    groupBy: [],
+    rowLimit: 500
+  },
+  advancedQB: { // Advanced Query Builder
+    nodes: {},
+    joins: [],
+    activeJoinIdx: -1,
+    rowLimit: 500
+  },
+  sql: '',
+  sqlLocked: false,
+  queryColumns: [],
+  design: {
+    title: '',
+    showDashboardTitle: true,   // whether the title bar is visible in preview/report mode
+    dashboardTitleTooltip: '',  // optional HTML tooltip (sanitized) shown via info icon next to title
+    widgets: [],     // widget objects
+    filters: [],     // { field, label, position }  — preview filter bar chips
+    conditions: [],  // { conj, field, op, value }  — design-level data filter
+    sorts: [],       // { field, dir }              — design-level sort
+    groupBy: [],     // string[]                    — design-level group by
+    fieldAggs: {},   // { [col]: aggVal }           — design-level aggregates
+    transformedResults: null  // cached result of applyDesignTransforms()
+  },
+  currentWidgetId: null,
+  previewFilters: {},  // field -> value
+  activeTab: 'query',
+  qbCollapsed: false,
+  qbSectionHeight: 60,  // percent
+  charts: {},   // widgetId -> echarts instance
+  isSpSite: false, // true if we detect we're running inside a SharePoint site (based on URL and/or presence of SharePoint JS objects)
+  spSiteUrl: null, // if isSpSite=true, this holds the detected SharePoint site URL; otherwise null
+  spPageMode: null,  // 'view' or 'edit' (only relevant if isSpSite=true)
+  reportMode: 'view', // 'view' or 'edit' (can be set via ?reportMode=<val> param; defaults to 'view')
+  reportUrl: null, // if ?report=<url> param is provided, this holds the URL of the report being edited
+  relationships: [], // auto-detected and manual relationships: [{ id, source, childTableKey, childField, parentTableKey, parentField, joinType, spLookupField }]
+  drillFilters: {},  // cross-widget click filters: { fieldName: value } — rebuilt on every chart/table click
+  _initialized: false
+}; // End dlvRawState
+
+/** Returns the TABLE_SOURCE_ICONS entry for a table object from DataLaVistaState.tables. */
+function getTableIcon(t) {
+  if (t.sourceType === 'sharepoint') {
+    return DataLaVistaCore.TABLE_SOURCE_ICONS.sharepoint[t.isDocLib ? 'library' : 'list'];
+  }
+  return DataLaVistaCore.TABLE_SOURCE_ICONS[t.sourceType] || DataLaVistaCore.TABLE_SOURCE_ICONS.default;
+}
+
+/**
+ * Return the appropriate operator list for a given field display type.
+ * - Hides "~ contains" (LIKE) for boolean and date fields.
+ * - Appends date macro operators for date fields.
+ */
+function getFilterOps(displayType = 'text') {
+const hideContains = (displayType === 'boolean' || displayType ==='date');
+const base = hideContains ? DataLaVistaCore.QB_OPS.filter(o => o.val !== 'LIKE') : DataLaVistaCore.QB_OPS;
+return (displayType ==='date') ? [...base, ...DataLaVistaCore.DATE_MACRO_OPS] : base;
+}
+
+/**
+ * Build the value-input HTML for a filter condition row.
+ * - boolean  → True/False <select> (values stored as Yes/No to match normalizeRow output)
+ * - date     → <input type="date"> (native calendar picker; value is YYYY-MM-DD)
+ * - macro w/ numeric input → <input type="number">
+ * - default  → <input type="text">
+ * @param {string}   displayType  Field displayType ('boolean','date','number','text',…)
+ * @param {boolean}  isMacro      True when c.op is a date-macro operator
+ * @param {object}   macroMeta    DATE_MACRO_OPS entry (may be undefined)
+ * @param {string}   value        Current condition value
+ * @param {string}   handlerJS    JS expression for the event handler (uses this.value)
+ */
+function buildFilterValueInput(displayType, isMacro, macroMeta, value, handlerJS) {
+const safeVal = (value || '').replace(/"/g, '&quot;');
+
+if (displayType === 'boolean') {
+    return `<select class="form-input qb-val-input" onchange="${handlerJS}">
+    <option value=""     ${!value              ? 'selected' : ''}>—</option>
+    <option value="true" ${value === 'true'    ? 'selected' : ''}>True</option>
+    <option value="false"${value === 'false'   ? 'selected' : ''}>False</option>
+    </select>`;
+}
+if (isMacro) {
+    return macroMeta?.hasInput
+    ? `<input type="number" class="form-input qb-val-input" placeholder="e.g. 3" min="1" value="${safeVal}" oninput="${handlerJS}"/>`
+    : `<span class="qb-val-blank"></span>`;
+}
+if (displayType === 'date') {
+    // Native date picker; value attribute expects YYYY-MM-DD
+    return `<input type="date" class="form-input qb-val-input" value="${safeVal}" onchange="${handlerJS}"/>`;
+}
+return `<input type="text" class="form-input qb-val-input" placeholder="value" value="${safeVal}" oninput="${handlerJS}"/>`;
+}
 
 // TODO: The CHART_TYPE_RULES const needs revision as some heuristics that use field names changed to just data types during de-duplication.
-// See AI prompt #4 in the archive folder.
+// See AI prompt #4 or 5 in the archive folder.
+// Need to move to its own file as well.
 const CHART_TYPE_RULES = [
     {
         "id": "rule_006",

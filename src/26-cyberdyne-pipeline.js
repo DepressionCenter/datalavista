@@ -151,7 +151,7 @@ const CyberdynePipeline = {
   stripODataRow(row) {
     if (!row || typeof row !== 'object') return row;
     const isExcluded = (k) =>
-      SKIP_FIELDS.has(k) ||
+      DataLaVistaCore.SKIP_FIELDS.has(k) ||
       k === '__metadata' ||
       k.startsWith('@odata.') ||
       k.startsWith('odata.') ||

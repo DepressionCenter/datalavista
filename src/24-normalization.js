@@ -111,12 +111,26 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           out[f.alias] = results.join(', ');
         }
         // Date
-        else if (f.type === 'date') {
+        else if (
+          f.type.startsWith('date') ||
+          (f.type === 'calculated' && f.calculatedFieldType === 'date')
+        ) {
           out[f.alias] = normalizeDate(val);
         }
         // Boolean
-        else if (f.type.startsWith('bool')) {
-          out[f.alias] = val === true || val === 'Yes' || val === 1 ? 'Yes' : 'No';
+        else if (
+            f.type.startsWith('bool') ||
+            f.type.toLowerCase() === 'yesno' ||
+            f.type.toLowerCase() === 'yes/no' ||
+            (f.type === 'calculated' && f.calculatedFieldType === 'boolean')
+            ) {
+            out[f.alias] = (
+              (typeof val === 'boolean' && val === true) ||
+              (typeof val === 'string' && val.toString().toLowerCase() === 'yes') ||
+              (typeof val === 'string' && val.toString().toLowerCase() === 'true') ||
+              (typeof val === 'number' && val === 1) ||
+              (typeof val === 'string' && val.toString() === '1')
+            ) ? true : false;
         }
         // Default
         else {
@@ -205,7 +219,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
     function shouldSkipField(f) {
       const name = f.InternalName || '';
       if (name.startsWith('_')) return true;
-      if (SKIP_FIELDS.has(name)) return true;
+      if (DataLaVistaCore.SKIP_FIELDS.has(name)) return true;
       if (f.Hidden || f.IsHidden) return true;
       const type = parseFieldType(f.TypeAsString, name);
       if (type === 'html' && name !== 'Comments' && name !== 'Body') return true;

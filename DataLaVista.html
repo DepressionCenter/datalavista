@@ -3832,26 +3832,77 @@ const DataLaVistaCore = {
     default: { icon: '⏹️', title: 'Table' }
   },
 
-  DATE_MACRO_OPS: [
-    { val: 'TODAY', label: '= ☀️ Today', hasInput: false },
-    { val: 'THIS_WEEK', label: '= 📆 This Week', hasInput: false },
-    { val: 'LAST_WEEK', label: '= 📆 Last Week', hasInput: false },
-    { val: 'THIS_BIZ_WEEK', label: '= 👩🏾‍💼 This Business Week', hasInput: false },
-    { val: 'LAST_BIZ_WEEK', label: '= 👨🏻‍💼 Last Businss Week', hasInput: false },
-    { val: 'THIS_MONTH', label: '= 📅 This Month', hasInput: false },
-    { val: 'LAST_MONTH', label: '= 📅 Last Month', hasInput: false },
-    { val: 'THIS_YEAR', label: '= 🎂 This Year', hasInput: false },
-    { val: 'LAST_YEAR', label: '= 🎂 Last Year', hasInput: false },
-    { val: 'THIS_FISCAL', label: '= 📒 This Fiscal Year', hasInput: false },
-    { val: 'LAST_FISCAL', label: '= 📒 Last Fiscal Year', hasInput: false },
-    { val: 'THIS_ACADEMIC', label: '= 🎓 This Academic Year', hasInput: false },
-    { val: 'LAST_ACADEMIC', label: '= 🎓 Last Academic Year', hasInput: false },
-    { val: 'PAST_X_DAYS', label: '= ⏳☀️ Past X Days', hasInput: true },
-    { val: 'PAST_X_MONTHS', label: '= ⏳📅 Past X Months', hasInput: true },
-    { val: 'PAST_X_YEARS', label: '= ⏳🎂 Past X Years', hasInput: true },
-    { val: 'PAST_X_FISCAL', label: '= ⏳📒 Past X Fiscal years', hasInput: true }
-  ],
+  ALASQL_KEYWORDS: [
+  'ATTACH', 'DETACH', 'SHOW', 'TABLES', 'DATABASES', 'FROM', 'SELECT', 'WHERE',
+  'GROUP', 'BY', 'ORDER', 'HAVING', 'LIMIT', 'OFFSET', 'JOIN', 'LEFT', 'RIGHT',
+  'INNER', 'OUTER', 'FULL', 'CROSS', 'ON', 'AS', 'DISTINCT', 'ALL', 'UNION',
+  'INTERSECT', 'EXCEPT', 'INSERT', 'INTO', 'VALUES', 'UPDATE', 'SET', 'DELETE',
+  'CREATE', 'TABLE', 'DROP', 'ALTER', 'ADD', 'COLUMN', 'INDEX', 'VIEW', 'IF',
+  'EXISTS', 'NOT', 'AND', 'OR', 'IN', 'IS', 'NULL', 'LIKE', 'BETWEEN', 'CASE',
+  'WHEN', 'THEN', 'ELSE', 'END', 'CAST', 'CONVERT', 'TOP', 'WITH', 'ROLLUP',
+  'CUBE', 'GROUPING', 'SETS', 'PIVOT', 'UNPIVOT', 'OVER', 'PARTITION', 'ROWS',
+  'RANGE', 'PRECEDING', 'FOLLOWING', 'UNBOUNDED', 'CURRENT', 'ROW', 'FILTER',
+  'WITHIN', 'RECURSIVE', 'LATERAL', 'APPLY', 'TABLESAMPLE', 'PERCENT',
+  'TIES', 'FETCH', 'FIRST', 'NEXT', 'ONLY', 'ROWS', 'ONLY', 'SKIP', 'ARRAY',
+  'MATRIX', 'OF', 'STRING', 'NUMBER', 'DATE', 'BOOLEAN', 'OBJECT', 'SEARCH',
+  'REPLACE', 'REMOVE', 'RENAME', 'MODIFY', 'REINDEX', 'TRUNCATE', 'BEGIN',
+  'COMMIT', 'ROLLBACK', 'TRANSACTION', 'SAVEPOINT', 'RELEASE',
+  'INCLUDES', 'DLV_DROP', 'DLV_DISPLAY', 'DLV_IDS', 'DLV_JOIN', 'DLV_EMAIL',
+  'DLV_EMAILS', 'DLV_PICTURE_URL','DLV_NORMALIZE_DATE','DLV_TAX_LABELS',
+  'DLV_TAX_IDS','DLV_PARSE_BOOL', 'DLV_PARSE_DATE'
+],
 
+// Base Aggregation Options for Query Builder (used in field picker dropdowns and design-level aggregates)
+QB_AGGS: [
+  { val: '', label: '— none —', types: 'all' },
+  { val: 'COUNT', label: 'COUNT', types: 'all' },
+  { val: 'COUNT_DISTINCT', label: 'COUNT DISTINCT', types: 'all' },
+  { val: 'FIRST', label: 'FIRST', types: 'all' },
+  { val: 'LAST', label: 'LAST', types: 'all' },
+  { val: 'MAX', label: 'MAX  (Maximum)', types: 'ordered' },
+  { val: 'MIN', label: 'MIN  (Minimum)', types: 'ordered' },
+  { val: 'SUM', label: 'SUM  (Sum)', types: 'numeric' },
+  { val: 'AVG', label: 'AVG  (Average)', types: 'numeric' },
+  { val: 'MEDIAN', label: 'MEDIAN', types: 'numeric' },
+  { val: 'VAR', label: 'VAR  (Variance)', types: 'numeric' },
+  { val: 'STDEV', label: 'STDEV  (Std Dev)', types: 'numeric' }
+],
+
+// Base Filter Conditions
+QB_OPS: [
+{ val: '=', label: '= equals' },
+{ val: '!=', label: '≠ not equals' },
+{ val: '>', label: '> greater than' },
+{ val: '<', label: '< less than' },
+{ val: '>=', label: '≥ greater or equal' },
+{ val: '<=', label: '≤ less or equal' },
+{ val: 'LIKE', label: '~ contains' },
+{ val: 'NULL', label: '∅ is blank' },
+{ val: 'NOTNULL', label: '✓ is not blank' },
+],
+
+// Additional filter options, applicable only to date data types
+DATE_MACRO_OPS: [
+{ val: 'TODAY', label: '= ☀️ Today', hasInput: false },
+{ val: 'THIS_WEEK', label: '= 📆 This Week', hasInput: false },
+{ val: 'LAST_WEEK', label: '= 📆 Last Week', hasInput: false },
+{ val: 'THIS_BIZ_WEEK', label: '= 👩🏾‍💼 This Business Week', hasInput: false },
+{ val: 'LAST_BIZ_WEEK', label: '= 👨🏻‍💼 Last Businss Week', hasInput: false },
+{ val: 'THIS_MONTH', label: '= 📅 This Month', hasInput: false },
+{ val: 'LAST_MONTH', label: '= 📅 Last Month', hasInput: false },
+{ val: 'THIS_YEAR', label: '= 🎂 This Year', hasInput: false },
+{ val: 'LAST_YEAR', label: '= 🎂 Last Year', hasInput: false },
+{ val: 'THIS_FISCAL', label: '= 📒 This Fiscal Year', hasInput: false },
+{ val: 'LAST_FISCAL', label: '= 📒 Last Fiscal Year', hasInput: false },
+{ val: 'THIS_ACADEMIC', label: '= 🎓 This Academic Year', hasInput: false },
+{ val: 'LAST_ACADEMIC', label: '= 🎓 Last Academic Year', hasInput: false },
+{ val: 'PAST_X_DAYS', label: '= ⏳☀️ Past X Days', hasInput: true },
+{ val: 'PAST_X_MONTHS', label: '= ⏳📅 Past X Months', hasInput: true },
+{ val: 'PAST_X_YEARS', label: '= ⏳🎂 Past X Years', hasInput: true },
+{ val: 'PAST_X_FISCAL', label: '= ⏳📒 Past X Fiscal years', hasInput: true }
+],
+
+  // Work around for Set lookup since DATE_MACRO_OPS is an array of objects
   DATE_MACRO_VALS: new Set([
     'TODAY',
     'THIS_WEEK',
@@ -3870,102 +3921,12 @@ const DataLaVistaCore = {
     'PAST_X_MONTHS',
     'PAST_X_YEARS',
     'PAST_X_FISCAL'
-  ])
-  
-} // End DataLaVistaCore
+  ]),
 
-
-/* ===== STATE ===== */
-//const dlvRawState = {
-const DataLaVistaState = {
-  dataSources: {},   // dsName -> { type, url, auth, token, fileName, alias, tables: [internalTableKeys] },											  
-  tables: {},        // internalName -> { displayName, alias, fields: [], data: [], loaded: false }
-  queryMode: 'basic',
-  basicQB: { // Basic Query Builder
-    tableName: null,
-    selectedFields: [],
-    fieldAggs: {},
-    conditions: [],
-    sorts: [],
-    groupBy: [],
-    rowLimit: 500
-  },
-  advancedQB: { // Advanced Query Builder
-    nodes: {},
-    joins: [],
-    activeJoinIdx: -1,
-    rowLimit: 500
-  },
-  sql: '',
-  sqlLocked: false,
-  queryColumns: [],
-  design: {
-    title: '',
-    showDashboardTitle: true,   // whether the title bar is visible in preview/report mode
-    dashboardTitleTooltip: '',  // optional HTML tooltip (sanitized) shown via info icon next to title
-    widgets: [],     // widget objects
-    filters: [],     // { field, label, position }  — preview filter bar chips
-    conditions: [],  // { conj, field, op, value }  — design-level data filter
-    sorts: [],       // { field, dir }              — design-level sort
-    groupBy: [],     // string[]                    — design-level group by
-    fieldAggs: {},   // { [col]: aggVal }           — design-level aggregates
-    transformedResults: null  // cached result of applyDesignTransforms()
-  },
-  currentWidgetId: null,
-  previewFilters: {},  // field -> value
-  activeTab: 'query',
-  qbCollapsed: false,
-  qbSectionHeight: 60,  // percent
-  charts: {},   // widgetId -> echarts instance
-  isSpSite: false, // true if we detect we're running inside a SharePoint site (based on URL and/or presence of SharePoint JS objects)
-  spSiteUrl: null, // if isSpSite=true, this holds the detected SharePoint site URL; otherwise null
-  spPageMode: null,  // 'view' or 'edit' (only relevant if isSpSite=true)
-  reportMode: 'view', // 'view' or 'edit' (can be set via ?reportMode=<val> param; defaults to 'view')
-  reportUrl: null, // if ?report=<url> param is provided, this holds the URL of the report being edited
-  relationships: [], // auto-detected and manual relationships: [{ id, source, childTableKey, childField, parentTableKey, parentField, joinType, spLookupField }]
-  drillFilters: {},  // cross-widget click filters: { fieldName: value } — rebuilt on every chart/table click
-  _initialized: false
-}; // End dlvRawState
-
-
-
-
-
-// ============================================================
-// CONSTANTS
-// ============================================================
-const ALASQL_KEYWORDS = [
-  'ATTACH', 'DETACH', 'SHOW', 'TABLES', 'DATABASES', 'FROM', 'SELECT', 'WHERE',
-  'GROUP', 'BY', 'ORDER', 'HAVING', 'LIMIT', 'OFFSET', 'JOIN', 'LEFT', 'RIGHT',
-  'INNER', 'OUTER', 'FULL', 'CROSS', 'ON', 'AS', 'DISTINCT', 'ALL', 'UNION',
-  'INTERSECT', 'EXCEPT', 'INSERT', 'INTO', 'VALUES', 'UPDATE', 'SET', 'DELETE',
-  'CREATE', 'TABLE', 'DROP', 'ALTER', 'ADD', 'COLUMN', 'INDEX', 'VIEW', 'IF',
-  'EXISTS', 'NOT', 'AND', 'OR', 'IN', 'IS', 'NULL', 'LIKE', 'BETWEEN', 'CASE',
-  'WHEN', 'THEN', 'ELSE', 'END', 'CAST', 'CONVERT', 'TOP', 'WITH', 'ROLLUP',
-  'CUBE', 'GROUPING', 'SETS', 'PIVOT', 'UNPIVOT', 'OVER', 'PARTITION', 'ROWS',
-  'RANGE', 'PRECEDING', 'FOLLOWING', 'UNBOUNDED', 'CURRENT', 'ROW', 'FILTER',
-  'WITHIN', 'RECURSIVE', 'LATERAL', 'APPLY', 'TABLESAMPLE', 'PERCENT',
-  'TIES', 'FETCH', 'FIRST', 'NEXT', 'ONLY', 'ROWS', 'ONLY', 'SKIP', 'ARRAY',
-  'MATRIX', 'OF', 'STRING', 'NUMBER', 'DATE', 'BOOLEAN', 'OBJECT', 'SEARCH',
-  'REPLACE', 'REMOVE', 'RENAME', 'MODIFY', 'REINDEX', 'TRUNCATE', 'BEGIN',
-  'COMMIT', 'ROLLBACK', 'TRANSACTION', 'SAVEPOINT', 'RELEASE', 'INCLUDES'
-];
-
-const AGG_OPTIONS = ['', 'COUNT', 'COUNT(DISTINCT)', 'SUM', 'AVG', 'MEDIAN', 'MIN', 'MAX', 'FIRST', 'LAST', 'STDEV', 'VAR'];
-
-
-
-/** Returns the TABLE_SOURCE_ICONS entry for a table object from DataLaVistaState.tables. */
-function getTableIcon(t) {
-  if (t.sourceType === 'sharepoint') {
-    return DataLaVistaCore.TABLE_SOURCE_ICONS.sharepoint[t.isDocLib ? 'library' : 'list'];
-  }
-  return DataLaVistaCore.TABLE_SOURCE_ICONS[t.sourceType] || DataLaVistaCore.TABLE_SOURCE_ICONS.default;
-}
-
-
-
-const SKIP_FIELDS = new Set([
+// Fields to skip when auto-detecting field types and relationships in SharePoint lists/libraries and JSON,
+// as they are typically non-informative for visualization and can cause noise in type/relationship
+// inference due to their special formats and values.
+SKIP_FIELDS: new Set([
   "AccessPolicy",
   "AppAuthor",
   "AppEditor",
@@ -4030,26 +3991,120 @@ const SKIP_FIELDS = new Set([
   "odata.type",
   "xd_ProgID",
   "xd_Signature"
-]);
+])
 
-const QB_AGGS = [
-  { val: '', label: '— none —', types: 'all' },
-  { val: 'COUNT', label: 'COUNT', types: 'all' },
-  { val: 'COUNT_DISTINCT', label: 'COUNT DISTINCT', types: 'all' },
-  { val: 'FIRST', label: 'FIRST', types: 'all' },
-  { val: 'LAST', label: 'LAST', types: 'all' },
-  { val: 'MAX', label: 'MAX  (Maximum)', types: 'ordered' },
-  { val: 'MIN', label: 'MIN  (Minimum)', types: 'ordered' },
-  { val: 'SUM', label: 'SUM  (Sum)', types: 'numeric' },
-  { val: 'AVG', label: 'AVG  (Average)', types: 'numeric' },
-  { val: 'MEDIAN', label: 'MEDIAN', types: 'numeric' },
-  { val: 'VAR', label: 'VAR  (Variance)', types: 'numeric' },
-  { val: 'STDEV', label: 'STDEV  (Std Dev)', types: 'numeric' }
-];
+  
+} // End DataLaVistaCore
 
+
+/* ===== STATE ===== */
+//const dlvRawState = {
+const DataLaVistaState = {
+  dataSources: {},   // dsName -> { type, url, auth, token, fileName, alias, tables: [internalTableKeys] },											  
+  tables: {},        // internalName -> { displayName, alias, fields: [], data: [], loaded: false }
+  queryMode: 'basic',
+  basicQB: { // Basic Query Builder
+    tableName: null,
+    selectedFields: [],
+    fieldAggs: {},
+    conditions: [],
+    sorts: [],
+    groupBy: [],
+    rowLimit: 500
+  },
+  advancedQB: { // Advanced Query Builder
+    nodes: {},
+    joins: [],
+    activeJoinIdx: -1,
+    rowLimit: 500
+  },
+  sql: '',
+  sqlLocked: false,
+  queryColumns: [],
+  design: {
+    title: '',
+    showDashboardTitle: true,   // whether the title bar is visible in preview/report mode
+    dashboardTitleTooltip: '',  // optional HTML tooltip (sanitized) shown via info icon next to title
+    widgets: [],     // widget objects
+    filters: [],     // { field, label, position }  — preview filter bar chips
+    conditions: [],  // { conj, field, op, value }  — design-level data filter
+    sorts: [],       // { field, dir }              — design-level sort
+    groupBy: [],     // string[]                    — design-level group by
+    fieldAggs: {},   // { [col]: aggVal }           — design-level aggregates
+    transformedResults: null  // cached result of applyDesignTransforms()
+  },
+  currentWidgetId: null,
+  previewFilters: {},  // field -> value
+  activeTab: 'query',
+  qbCollapsed: false,
+  qbSectionHeight: 60,  // percent
+  charts: {},   // widgetId -> echarts instance
+  isSpSite: false, // true if we detect we're running inside a SharePoint site (based on URL and/or presence of SharePoint JS objects)
+  spSiteUrl: null, // if isSpSite=true, this holds the detected SharePoint site URL; otherwise null
+  spPageMode: null,  // 'view' or 'edit' (only relevant if isSpSite=true)
+  reportMode: 'view', // 'view' or 'edit' (can be set via ?reportMode=<val> param; defaults to 'view')
+  reportUrl: null, // if ?report=<url> param is provided, this holds the URL of the report being edited
+  relationships: [], // auto-detected and manual relationships: [{ id, source, childTableKey, childField, parentTableKey, parentField, joinType, spLookupField }]
+  drillFilters: {},  // cross-widget click filters: { fieldName: value } — rebuilt on every chart/table click
+  _initialized: false
+}; // End dlvRawState
+
+/** Returns the TABLE_SOURCE_ICONS entry for a table object from DataLaVistaState.tables. */
+function getTableIcon(t) {
+  if (t.sourceType === 'sharepoint') {
+    return DataLaVistaCore.TABLE_SOURCE_ICONS.sharepoint[t.isDocLib ? 'library' : 'list'];
+  }
+  return DataLaVistaCore.TABLE_SOURCE_ICONS[t.sourceType] || DataLaVistaCore.TABLE_SOURCE_ICONS.default;
+}
+
+/**
+ * Return the appropriate operator list for a given field display type.
+ * - Hides "~ contains" (LIKE) for boolean and date fields.
+ * - Appends date macro operators for date fields.
+ */
+function getFilterOps(displayType = 'text') {
+const hideContains = (displayType === 'boolean' || displayType ==='date');
+const base = hideContains ? DataLaVistaCore.QB_OPS.filter(o => o.val !== 'LIKE') : DataLaVistaCore.QB_OPS;
+return (displayType ==='date') ? [...base, ...DataLaVistaCore.DATE_MACRO_OPS] : base;
+}
+
+/**
+ * Build the value-input HTML for a filter condition row.
+ * - boolean  → True/False <select> (values stored as Yes/No to match normalizeRow output)
+ * - date     → <input type="date"> (native calendar picker; value is YYYY-MM-DD)
+ * - macro w/ numeric input → <input type="number">
+ * - default  → <input type="text">
+ * @param {string}   displayType  Field displayType ('boolean','date','number','text',…)
+ * @param {boolean}  isMacro      True when c.op is a date-macro operator
+ * @param {object}   macroMeta    DATE_MACRO_OPS entry (may be undefined)
+ * @param {string}   value        Current condition value
+ * @param {string}   handlerJS    JS expression for the event handler (uses this.value)
+ */
+function buildFilterValueInput(displayType, isMacro, macroMeta, value, handlerJS) {
+const safeVal = (value || '').replace(/"/g, '&quot;');
+
+if (displayType === 'boolean') {
+    return `<select class="form-input qb-val-input" onchange="${handlerJS}">
+    <option value=""     ${!value              ? 'selected' : ''}>—</option>
+    <option value="true" ${value === 'true'    ? 'selected' : ''}>True</option>
+    <option value="false"${value === 'false'   ? 'selected' : ''}>False</option>
+    </select>`;
+}
+if (isMacro) {
+    return macroMeta?.hasInput
+    ? `<input type="number" class="form-input qb-val-input" placeholder="e.g. 3" min="1" value="${safeVal}" oninput="${handlerJS}"/>`
+    : `<span class="qb-val-blank"></span>`;
+}
+if (displayType === 'date') {
+    // Native date picker; value attribute expects YYYY-MM-DD
+    return `<input type="date" class="form-input qb-val-input" value="${safeVal}" onchange="${handlerJS}"/>`;
+}
+return `<input type="text" class="form-input qb-val-input" placeholder="value" value="${safeVal}" oninput="${handlerJS}"/>`;
+}
 
 // TODO: The CHART_TYPE_RULES const needs revision as some heuristics that use field names changed to just data types during de-duplication.
-// See AI prompt #4 in the archive folder.
+// See AI prompt #4 or 5 in the archive folder.
+// Need to move to its own file as well.
 const CHART_TYPE_RULES = [
     {
         "id": "rule_006",
@@ -9946,8 +10001,8 @@ function stripODataMetadata(rows, quickCheck = false) {
 
     // EXCLUDE system/metadata fields AND projected lookups (_x003a_)
     fields = fields.filter(f =>
-      !SKIP_FIELDS.has(f.InternalName) &&
-      !SKIP_FIELDS.has(f.Title) &&
+      !DataLaVistaCore.SKIP_FIELDS.has(f.InternalName) &&
+      !DataLaVistaCore.SKIP_FIELDS.has(f.Title) &&
       !f.InternalName.includes('_x003a_') &&
       !f.IsDependentLookup
     );
@@ -11210,12 +11265,26 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           out[f.alias] = results.join(', ');
         }
         // Date
-        else if (f.type === 'date') {
+        else if (
+          f.type.startsWith('date') ||
+          (f.type === 'calculated' && f.calculatedFieldType === 'date')
+        ) {
           out[f.alias] = normalizeDate(val);
         }
         // Boolean
-        else if (f.type.startsWith('bool')) {
-          out[f.alias] = val === true || val === 'Yes' || val === 1 ? 'Yes' : 'No';
+        else if (
+            f.type.startsWith('bool') ||
+            f.type.toLowerCase() === 'yesno' ||
+            f.type.toLowerCase() === 'yes/no' ||
+            (f.type === 'calculated' && f.calculatedFieldType === 'boolean')
+            ) {
+            out[f.alias] = (
+              (typeof val === 'boolean' && val === true) ||
+              (typeof val === 'string' && val.toString().toLowerCase() === 'yes') ||
+              (typeof val === 'string' && val.toString().toLowerCase() === 'true') ||
+              (typeof val === 'number' && val === 1) ||
+              (typeof val === 'string' && val.toString() === '1')
+            ) ? true : false;
         }
         // Default
         else {
@@ -11304,7 +11373,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
     function shouldSkipField(f) {
       const name = f.InternalName || '';
       if (name.startsWith('_')) return true;
-      if (SKIP_FIELDS.has(name)) return true;
+      if (DataLaVistaCore.SKIP_FIELDS.has(name)) return true;
       if (f.Hidden || f.IsHidden) return true;
       const type = parseFieldType(f.TypeAsString, name);
       if (type === 'html' && name !== 'Comments' && name !== 'Body') return true;
@@ -12784,7 +12853,7 @@ const CyberdynePipeline = {
   stripODataRow(row) {
     if (!row || typeof row !== 'object') return row;
     const isExcluded = (k) =>
-      SKIP_FIELDS.has(k) ||
+      DataLaVistaCore.SKIP_FIELDS.has(k) ||
       k === '__metadata' ||
       k.startsWith('@odata.') ||
       k.startsWith('odata.') ||
@@ -15439,7 +15508,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           'UNION', 'INTERSECT', 'EXCEPT', 'INSERT', 'UPDATE', 'DELETE', 'CREATE', 'DROP',
           'TABLE', 'VIEW', 'INDEX', 'AND', 'OR', 'NOT', 'IN', 'IS', 'NULL', 'LIKE', 'BETWEEN',
           'CASE', 'WHEN', 'THEN', 'ELSE', 'END', 'CAST', 'COALESCE', 'NULLIF', 'IIF',
-          ...ALASQL_KEYWORDS
+          ...DataLaVistaCore.ALASQL_KEYWORDS
         ];
 
         // Suggest view names (user-facing table aliases) and view.fieldAlias for column refs.
@@ -15517,7 +15586,7 @@ This file is part of DataLaVista
 50-qb-basic.js: Basic query builder - field selection, filters, sorts, and SQL generation.
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 Created: 2026-03-24
-Last Modified: 2026-03-31
+Last Modified: 2026-04-06
 Summary: Basic query builder - field selection, filters, sorts, and SQL generation.
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
@@ -15808,7 +15877,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         // text, lookup, bool, array → only 'all' tier
         // date → 'all' + 'ordered'
         // number → all tiers
-        return QB_AGGS.filter(a => {
+        return DataLaVistaCore.QB_AGGS.filter(a => {
           if (a.types === 'all') return true;
           if (a.types === 'ordered') return isNumeric || isDate;
           if (a.types === 'numeric') return isNumeric;
@@ -15867,7 +15936,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           const raw = c.value || '';
           const val = c.op === 'LIKE'
             ? `'%${raw}%'`
-            : (raw !== '' && !isNaN(raw) ? raw : `'${raw.replace(/'/g, "''")}'`);
+            : (raw === 'true' || raw === 'false' ? raw
+              : (raw !== '' && !isNaN(raw) ? raw : `'${raw.replace(/'/g, "''")}'`));
           return conj + `${col} ${c.op} ${val}`;
         });
 
@@ -16049,19 +16119,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         document.getElementById('qb-basic-drop').style.display = 'flex';
       }
 
-      // ── Conditions ────────────────────────────────────────────────────────────────
-      const QB_OPS = [
-        { val: '=', label: '= equals' },
-        { val: '!=', label: '≠ not equals' },
-        { val: '>', label: '> greater than' },
-        { val: '<', label: '< less than' },
-        { val: '>=', label: '≥ greater or equal' },
-        { val: '<=', label: '≤ less or equal' },
-        { val: 'LIKE', label: '~ contains' },
-        { val: 'NULL', label: '∅ is blank' },
-        { val: 'NOTNULL', label: '✓ is not blank' },
-      ];
-
       function addBasicCondition() {
         const t = DataLaVistaState.tables[DataLaVistaState.basicQB.tableName];
         if (!t) return;
@@ -16092,14 +16149,13 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 
         DataLaVistaState.basicQB.conditions.forEach((c, i) => {
           // Determine if the selected field is a date type
-          const fieldMeta = fields.find(f => f.alias === c.field);
-          const isDate = fieldMeta && fieldMeta.displayType === 'date';
-          const ops = isDate ? [...QB_OPS, ...DataLaVistaCore.DATE_MACRO_OPS] : QB_OPS;
+          const fieldMeta  = fields.find(f => f.alias === c.field);
+          const isDate     = fieldMeta?.displayType === 'date';
+          const ops        = getFilterOps(fieldMeta?.displayType);
           // A date macro has no free-text value; only NULL/NOTNULL/macros hide the input
-          const isMacro = DataLaVistaCore.DATE_MACRO_VALS.has(c.op);
-          const macroMeta = DataLaVistaCore.DATE_MACRO_OPS.find(o => o.val === c.op);
+          const isMacro    = DataLaVistaCore.DATE_MACRO_VALS.has(c.op);
+          const macroMeta  = DataLaVistaCore.DATE_MACRO_OPS.find(o => o.val === c.op);
           const needsValue = c.op !== 'NULL' && c.op !== 'NOTNULL' && !(isMacro && !macroMeta?.hasInput);
-          const valPlaceholder = isMacro && macroMeta?.hasInput ? 'e.g. 3' : 'value';
 
           const row = document.createElement('div');
           row.className = 'qb-condition-row';
@@ -16118,9 +16174,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         ${ops.map(o => `<option value="${o.val}" ${o.val === c.op ? 'selected' : ''}>${o.label}</option>`).join('')}
       </select>
       ${needsValue
-              ? `<input type="${isMacro ? 'number' : 'text'}" class="form-input qb-val-input" placeholder="${valPlaceholder}"
-             min="1" value="${(c.value || '').replace(/"/g, '&quot;')}"
-             oninput="DataLaVistaState.basicQB.conditions[${i}].value=this.value; rebuildBasicSQL()"/>`
+              ? buildFilterValueInput(fieldMeta?.displayType, isMacro, macroMeta, c.value,
+                  `DataLaVistaState.basicQB.conditions[${i}].value=this.value; rebuildBasicSQL()`)
               : `<span class="qb-val-blank"></span>`
             }
       <button class="btn btn-ghost btn-sm btn-icon qb-remove-btn" onclick="removeBasicCondition(${i})">✕</button>
@@ -16234,14 +16289,12 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       function removeBasicFilter(i) { removeBasicCondition(i); }
       function renderBasicFilters() { renderBasicConditions(); }
       function selectBasicField(tname, alias) { basicQBSelectField(tname, alias); }
-
-
 /* ============================================================
 This file is part of DataLaVista
 52-qb-advanced.js: Advanced query builder - visual join graph, nodes, and options panel.
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 Created: 2026-03-24
-Last Modified: 2026-03-31
+Last Modified: 2026-04-06
 Summary: Advanced query builder - visual join graph, nodes, and options panel.
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
@@ -17318,7 +17371,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
             return nd.conditions.map((c, ci) => {
               const fieldMeta = fields.find(f => f.alias === c.field);
               const isDate = fieldMeta?.displayType === 'date';
-              const ops = isDate ? [...QB_OPS, ...DataLaVistaCore.DATE_MACRO_OPS] : QB_OPS;
+              const ops = getFilterOps(fieldMeta?.displayType);
               const isMacro = DataLaVistaCore.DATE_MACRO_VALS.has(c.op);
               const macroMeta = DataLaVistaCore.DATE_MACRO_OPS.find(o => o.val === c.op);
               const needsValue = c.op !== 'NULL' && c.op !== 'NOTNULL' && !(isMacro && !macroMeta?.hasInput);
@@ -17337,8 +17390,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
                   ${ops.map(o=>`<option value="${o.val}" ${o.val===c.op?'selected':''}>${o.label}</option>`).join('')}
                 </select>
                 ${needsValue
-                  ? `<input type="${isMacro?'number':'text'}" class="form-input qb-val-input" value="${(c.value||'').replace(/"/g,'&quot;')}"
-                       oninput="advNodeCond('${id}',${ci},'value',this.value)"/>`
+                  ? buildFilterValueInput(fieldMeta?.displayType, isMacro, macroMeta, c.value,
+                      `advNodeCond('${id}',${ci},'value',this.value)`)
                   : `<span class="qb-val-blank"></span>`}
                 <button class="btn btn-ghost btn-sm btn-icon qb-remove-btn" onclick="advNodeRemoveCond('${id}',${ci})">✕</button>
               </div>`;
@@ -18002,7 +18055,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           if (DataLaVistaCore.DATE_MACRO_VALS.has(c.op)) return conj + dateMacroToSQL(c.op, c.value, col);
           if (c.op === 'LIKE') return conj + `${col} LIKE '%${c.value}%'`;
           const raw = c.value || '';
-          const val = (raw !== '' && !isNaN(raw)) ? raw : `'${raw.replace(/'/g, "''")}'`;
+          const val = (raw === 'true' || raw === 'false') ? raw
+            : ((raw !== '' && !isNaN(raw)) ? raw : `'${raw.replace(/'/g, "''")}'`);
           return conj + `${col} ${c.op} ${val}`;
         }).join(' ');
       }
@@ -18020,8 +18074,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           if (DataLaVistaState.queryMode === 'advanced') renderAdvancedQB();
         }
       }
-
-
 /* ============================================================
 This file is part of DataLaVista™
 55-query.js: Query execution, result type detection, and query preview.
@@ -18208,17 +18260,24 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
     // Fallback: sniff type from first row of the materialized results table
     const firstRow = (() => {
       if (alasql.tables && alasql.tables['dlv_results']) {
-        try { return alasql('SELECT * FROM [dlv_results]')[0] || null; } catch (_) { return null; }
+        try { return alasql('SELECT * FROM [dlv_results] WHERE ' + col + ' IS NOT NULL')[0] || null; } catch (_) { return null; }
       }
       return null;
     })();
+
     if (!firstRow) return 'default';
     const v = firstRow[col];
     if (Array.isArray(v)) return 'array';
     if (typeof v === 'number') return 'number';
-    if (typeof v === 'boolean') return 'boolean';
+    if (typeof v === 'boolean' ||
+      (typeof v === 'string' &&
+        (v.toLowerCase() === 'true' || v.toLowerCase() === 'false' || v === 'yes' || v === 'no')
+      )
+    ) return 'boolean';
     if (typeof v === 'object') return 'object';
-    if (typeof v === 'string' && ISO_DATE_RE.test(v)) return 'date';
+    if (typeof v === 'date' || 
+      (typeof v === 'string' && ISO_DATE_RE.test(v))
+    ) return 'date';
     return 'text';
   }
 /* ============================================================
@@ -18226,7 +18285,7 @@ This file is part of DataLaVista™
 60-design.js: Design canvas, widget rendering, data transforms, and widget properties.
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 Created: 2026-03-24
-Last Modified: 2026-04-05
+Last Modified: 2026-04-06
 Summary: Design canvas, widget rendering, data transforms, and widget properties.
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
@@ -18592,7 +18651,7 @@ function rankSuggestions(rules, cols, meta) {
       const raw = c.value || '';
       const val = c.op === 'LIKE'
         ? `'%${raw}%'`
-        : (raw !== '' && !isNaN(raw) ? raw : `'${raw.replace(/'/g, "''")}'`);
+        : (raw === 'true' || raw === 'false' ? raw : (raw !== '' && !isNaN(raw) ? raw : `'${raw.replace(/'/g, "''")}'`));
       return conj + `${col} ${c.op} ${val}`;
     });
 
@@ -18668,12 +18727,10 @@ function rankSuggestions(rules, cols, meta) {
 
     conds.forEach((c, i) => {
       const dt = sniffType(c.field);
-      const isDate = dt === 'date';
-      const ops = isDate ? [...QB_OPS, ...DataLaVistaCore.DATE_MACRO_OPS] : QB_OPS;
+      const ops = getFilterOps(dt);
       const isMacro = DataLaVistaCore.DATE_MACRO_VALS.has(c.op);
       const macroMeta = DataLaVistaCore.DATE_MACRO_OPS.find(o => o.val === c.op);
       const needsValue = c.op !== 'NULL' && c.op !== 'NOTNULL' && !(isMacro && !macroMeta?.hasInput);
-      const valPlaceholder = isMacro && macroMeta?.hasInput ? 'e.g. 3' : 'value';
 
       const row = document.createElement('div');
       row.className = 'qb-condition-row';
@@ -18686,15 +18743,13 @@ function rankSuggestions(rules, cols, meta) {
           onchange="DataLaVistaState.design.conditions[${i}].field=this.value; renderDesignConditions()">`;
 	  row.innerHTML += cols.map(f=>`<option value="${f}" ${f===c.field?'selected':''}>${f}</option>`).join('');
 	  row.innerHTML == `</select>`;
-	  row.innerHTML += `<select class="form-input qb-op-select" style="width:${isDate?'150px':'112px'}!important"
+	  row.innerHTML += `<select class="form-input qb-op-select" style="width:${dt==='date'?'150px':'112px'}!important"
           onchange="DataLaVistaState.design.conditions[${i}].op=this.value; renderDesignConditions()">`;
 	  row.innerHTML += ops.map(o=>`<option value="${o.val}" ${o.val===c.op?'selected':''}>${o.label}</option>`).join('');
 	  row.innerHTML += `</select>`;
 	  row.innerHTML += (needsValue
-          ? `<input type="${isMacro?'number':'text'}" class="form-input qb-val-input"
-               placeholder="${valPlaceholder}" min="1"
-               value="${(c.value||'').replace(/"/g,'&quot;')}"
-               oninput="DataLaVistaState.design.conditions[${i}].value=this.value"/>`
+          ? buildFilterValueInput(dt, isMacro, macroMeta, c.value,
+              `DataLaVistaState.design.conditions[${i}].value=this.value`)
           : `<span class="qb-val-blank"></span>`);
 	  row.innerHTML += `<button class="btn btn-ghost btn-sm btn-icon qb-remove-btn" onclick="removeDesignCondition(${i})">✕</button>`;
 	  row.innerHTML += ``;
@@ -19140,7 +19195,7 @@ function rankSuggestions(rules, cols, meta) {
           const raw = c.value || '';
           const val = c.op === 'LIKE'
             ? `'%${raw}%'`
-            : (raw !== '' && !isNaN(raw) ? raw : `'${raw.replace(/'/g, "''")}'`);
+            : (raw === 'true' || raw === 'false' ? raw : (raw !== '' && !isNaN(raw) ? raw : `'${raw.replace(/'/g, "''")}'`));
           return conj + `${col} ${c.op} ${val}`;
         });
 
@@ -19837,8 +19892,8 @@ function _renderBarLineOptionsHTML(w, wid) {
           if (!conditions.length)
             return '<div style="font-size:11px;color:var(--text-disabled);padding:2px 0">No filters — click + Add</div>';
           return conditions.map((c, ci) => {
-            const isDate = sniffType(c.field) === 'date';
-            const ops    = isDate ? [...QB_OPS, ...DataLaVistaCore.DATE_MACRO_OPS] : QB_OPS;
+            const fieldType  = sniffType(c.field);
+            const ops        = getFilterOps(fieldType);
             const isMacro    = DataLaVistaCore.DATE_MACRO_VALS.has(c.op);
             const macroMeta  = DataLaVistaCore.DATE_MACRO_OPS.find(o => o.val === c.op);
             const needsValue = c.op !== 'NULL' && c.op !== 'NOTNULL' && !(isMacro && !macroMeta?.hasInput);
@@ -19851,13 +19906,13 @@ function _renderBarLineOptionsHTML(w, wid) {
               <select class="form-input qb-field-select" onchange="widgetUpdateCond('${wid}',${ci},'field',this.value)">
                 ${cols.map(col=>`<option value="${col}" ${col===c.field?'selected':''}>${col}</option>`).join('')}
               </select>
-              <select class="form-input qb-op-select" style="width:${isDate?'150px':'112px'}!important"
+              <select class="form-input qb-op-select" style="width:${fieldType === 'date' ? '150px' : '112px'}!important"
                 onchange="widgetUpdateCond('${wid}',${ci},'op',this.value)">
                 ${ops.map(o=>`<option value="${o.val}" ${o.val===c.op?'selected':''}>${o.label}</option>`).join('')}
               </select>
               ${needsValue
-                ? `<input type="${isMacro?'number':'text'}" class="form-input qb-val-input" value="${(c.value||'').replace(/"/g,'&quot;')}"
-                     oninput="widgetUpdateCond('${wid}',${ci},'value',this.value)"/>`
+                ? buildFilterValueInput(fieldType, isMacro, macroMeta, c.value,
+                    `widgetUpdateCond('${wid}',${ci},'value',this.value)`)
                 : `<span class="qb-val-blank"></span>`}
               <button class="btn btn-ghost btn-sm btn-icon qb-remove-btn" onclick="widgetRemoveCond('${wid}',${ci})">✕</button>
             </div>`;
@@ -20154,47 +20209,66 @@ function _renderBarLineOptionsHTML(w, wid) {
         }
 
         DataLaVistaState.design.filters.forEach(f => {
-          let uniqueVals = [];
-          if (alasql.tables && alasql.tables['dlv_results']) {
-            uniqueVals = [...new Set(alasql('SELECT * FROM [dlv_results]').map(r => r[f.field]).filter(v => v !== null && v !== undefined))].sort();
-          }
+          const fieldType = sniffType(f.field);
+          const isBoolean = fieldType === 'boolean';
+          const isDate    = fieldType === 'date';
 
           const wrap = document.createElement('div');
           wrap.className = 'filter-pill';
-          wrap.style.display = 'flex';
-          wrap.style.alignItems = 'center';
-          wrap.style.gap = '6px';
-          wrap.style.background = 'var(--surface)';
-          wrap.style.border = '1px solid var(--border-strong)';
-          wrap.style.padding = '4px 8px';
-          wrap.style.borderRadius = 'var(--radius)';
+          wrap.style.cssText = 'display:flex;align-items:center;gap:6px;background:var(--surface);border:1px solid var(--border-strong);padding:4px 8px;border-radius:var(--radius)';
 
           const lbl = document.createElement('span');
-          lbl.style.fontSize = '12px';
-          lbl.style.fontWeight = '600';
+          lbl.style.cssText = 'font-size:12px;font-weight:600';
           lbl.innerText = f.label || f.field;
 
-          const sel = document.createElement('select');
-          sel.className = 'form-input';
-          sel.style.height = '24px';
-          sel.style.padding = '0 24px 0 6px';
-          sel.innerHTML = `<option value="(All)">(All)</option>` +
-            uniqueVals.map(v => `<option value="${v}">${v}</option>`).join('');
-
-          sel.value = DataLaVistaState.previewFilters[f.field] || '(All)';
-          sel.onchange = (e) => {
-            if (e.target.value === '(All)') delete DataLaVistaState.previewFilters[f.field];
-            else DataLaVistaState.previewFilters[f.field] = e.target.value;
-            refreshWidgets();
-          };
+          let input;
+          if (isBoolean) {
+            input = document.createElement('select');
+            input.className = 'form-input';
+            input.style.cssText = 'height:24px;padding:0 24px 0 6px';
+            input.innerHTML = `<option value="(All)">(All)</option>
+              <option value="true"  ${DataLaVistaState.previewFilters[f.field]==='true'  ?'selected':''}>True</option>
+              <option value="false" ${DataLaVistaState.previewFilters[f.field]==='false' ?'selected':''}>False</option>`;
+            input.onchange = (e) => {
+              if (e.target.value === '(All)') delete DataLaVistaState.previewFilters[f.field];
+              else DataLaVistaState.previewFilters[f.field] = e.target.value;
+              refreshWidgets();
+            };
+          } else if (isDate) {
+            input = document.createElement('input');
+            input.type = 'date';
+            input.className = 'form-input';
+            input.style.cssText = 'height:24px;padding:0 4px';
+            input.value = DataLaVistaState.previewFilters[f.field] || '';
+            input.onchange = (e) => {
+              if (!e.target.value) delete DataLaVistaState.previewFilters[f.field];
+              else DataLaVistaState.previewFilters[f.field] = e.target.value;
+              refreshWidgets();
+            };
+          } else {
+            let uniqueVals = [];
+            if (alasql.tables && alasql.tables['dlv_results']) {
+              uniqueVals = [...new Set(alasql('SELECT * FROM [dlv_results]').map(r => r[f.field]).filter(v => v !== null && v !== undefined))].sort();
+            }
+            input = document.createElement('select');
+            input.className = 'form-input';
+            input.style.cssText = 'height:24px;padding:0 24px 0 6px';
+            input.innerHTML = `<option value="(All)">(All)</option>` +
+              uniqueVals.map(v => `<option value="${v}">${v}</option>`).join('');
+            input.value = DataLaVistaState.previewFilters[f.field] || '(All)';
+            input.onchange = (e) => {
+              if (e.target.value === '(All)') delete DataLaVistaState.previewFilters[f.field];
+              else DataLaVistaState.previewFilters[f.field] = e.target.value;
+              refreshWidgets();
+            };
+          }
 
           const del = document.createElement('span');
           del.innerHTML = '✕';
-          del.style.cursor = 'pointer';
-          del.style.fontSize = '10px';
+          del.style.cssText = 'cursor:pointer;font-size:10px';
           del.onclick = () => removeFilterFromBar(f.field);
 
-          wrap.appendChild(lbl); wrap.appendChild(sel); wrap.appendChild(del);
+          wrap.appendChild(lbl); wrap.appendChild(input); wrap.appendChild(del);
           bar.appendChild(wrap);
         });
         // Append any active drill filter chips
@@ -21788,6 +21862,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         onDropFieldToWidget,
         onDropFilterToWidget,
         updateWidgetContent,
+        getFilterOps,
+        buildFilterValueInput,
         renderFilterBar,
         removeFilterFromBar,
         sniffType,

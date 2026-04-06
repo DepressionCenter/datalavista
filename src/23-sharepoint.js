@@ -201,8 +201,8 @@ function stripODataMetadata(rows, quickCheck = false) {
 
     // EXCLUDE system/metadata fields AND projected lookups (_x003a_)
     fields = fields.filter(f =>
-      !SKIP_FIELDS.has(f.InternalName) &&
-      !SKIP_FIELDS.has(f.Title) &&
+      !DataLaVistaCore.SKIP_FIELDS.has(f.InternalName) &&
+      !DataLaVistaCore.SKIP_FIELDS.has(f.Title) &&
       !f.InternalName.includes('_x003a_') &&
       !f.IsDependentLookup
     );

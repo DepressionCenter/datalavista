@@ -184,16 +184,23 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
     // Fallback: sniff type from first row of the materialized results table
     const firstRow = (() => {
       if (alasql.tables && alasql.tables['dlv_results']) {
-        try { return alasql('SELECT * FROM [dlv_results]')[0] || null; } catch (_) { return null; }
+        try { return alasql('SELECT * FROM [dlv_results] WHERE ' + col + ' IS NOT NULL')[0] || null; } catch (_) { return null; }
       }
       return null;
     })();
+
     if (!firstRow) return 'default';
     const v = firstRow[col];
     if (Array.isArray(v)) return 'array';
     if (typeof v === 'number') return 'number';
-    if (typeof v === 'boolean') return 'boolean';
+    if (typeof v === 'boolean' ||
+      (typeof v === 'string' &&
+        (v.toLowerCase() === 'true' || v.toLowerCase() === 'false' || v === 'yes' || v === 'no')
+      )
+    ) return 'boolean';
     if (typeof v === 'object') return 'object';
-    if (typeof v === 'string' && ISO_DATE_RE.test(v)) return 'date';
+    if (typeof v === 'date' || 
+      (typeof v === 'string' && ISO_DATE_RE.test(v))
+    ) return 'date';
     return 'text';
   }

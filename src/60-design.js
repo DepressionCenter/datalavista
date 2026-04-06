@@ -3,7 +3,7 @@ This file is part of DataLaVista™
 60-design.js: Design canvas, widget rendering, data transforms, and widget properties.
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 Created: 2026-03-24
-Last Modified: 2026-04-05
+Last Modified: 2026-04-06
 Summary: Design canvas, widget rendering, data transforms, and widget properties.
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
@@ -369,7 +369,7 @@ function rankSuggestions(rules, cols, meta) {
       const raw = c.value || '';
       const val = c.op === 'LIKE'
         ? `'%${raw}%'`
-        : (raw !== '' && !isNaN(raw) ? raw : `'${raw.replace(/'/g, "''")}'`);
+        : (raw === 'true' || raw === 'false' ? raw : (raw !== '' && !isNaN(raw) ? raw : `'${raw.replace(/'/g, "''")}'`));
       return conj + `${col} ${c.op} ${val}`;
     });
 
@@ -445,12 +445,10 @@ function rankSuggestions(rules, cols, meta) {
 
     conds.forEach((c, i) => {
       const dt = sniffType(c.field);
-      const isDate = dt === 'date';
-      const ops = isDate ? [...QB_OPS, ...DataLaVistaCore.DATE_MACRO_OPS] : QB_OPS;
+      const ops = getFilterOps(dt);
       const isMacro = DataLaVistaCore.DATE_MACRO_VALS.has(c.op);
       const macroMeta = DataLaVistaCore.DATE_MACRO_OPS.find(o => o.val === c.op);
       const needsValue = c.op !== 'NULL' && c.op !== 'NOTNULL' && !(isMacro && !macroMeta?.hasInput);
-      const valPlaceholder = isMacro && macroMeta?.hasInput ? 'e.g. 3' : 'value';
 
       const row = document.createElement('div');
       row.className = 'qb-condition-row';
@@ -463,15 +461,13 @@ function rankSuggestions(rules, cols, meta) {
           onchange="DataLaVistaState.design.conditions[${i}].field=this.value; renderDesignConditions()">`;
 	  row.innerHTML += cols.map(f=>`<option value="${f}" ${f===c.field?'selected':''}>${f}</option>`).join('');
 	  row.innerHTML == `</select>`;
-	  row.innerHTML += `<select class="form-input qb-op-select" style="width:${isDate?'150px':'112px'}!important"
+	  row.innerHTML += `<select class="form-input qb-op-select" style="width:${dt==='date'?'150px':'112px'}!important"
           onchange="DataLaVistaState.design.conditions[${i}].op=this.value; renderDesignConditions()">`;
 	  row.innerHTML += ops.map(o=>`<option value="${o.val}" ${o.val===c.op?'selected':''}>${o.label}</option>`).join('');
 	  row.innerHTML += `</select>`;
 	  row.innerHTML += (needsValue
-          ? `<input type="${isMacro?'number':'text'}" class="form-input qb-val-input"
-               placeholder="${valPlaceholder}" min="1"
-               value="${(c.value||'').replace(/"/g,'&quot;')}"
-               oninput="DataLaVistaState.design.conditions[${i}].value=this.value"/>`
+          ? buildFilterValueInput(dt, isMacro, macroMeta, c.value,
+              `DataLaVistaState.design.conditions[${i}].value=this.value`)
           : `<span class="qb-val-blank"></span>`);
 	  row.innerHTML += `<button class="btn btn-ghost btn-sm btn-icon qb-remove-btn" onclick="removeDesignCondition(${i})">✕</button>`;
 	  row.innerHTML += ``;
@@ -917,7 +913,7 @@ function rankSuggestions(rules, cols, meta) {
           const raw = c.value || '';
           const val = c.op === 'LIKE'
             ? `'%${raw}%'`
-            : (raw !== '' && !isNaN(raw) ? raw : `'${raw.replace(/'/g, "''")}'`);
+            : (raw === 'true' || raw === 'false' ? raw : (raw !== '' && !isNaN(raw) ? raw : `'${raw.replace(/'/g, "''")}'`));
           return conj + `${col} ${c.op} ${val}`;
         });
 
@@ -1614,8 +1610,8 @@ function _renderBarLineOptionsHTML(w, wid) {
           if (!conditions.length)
             return '<div style="font-size:11px;color:var(--text-disabled);padding:2px 0">No filters — click + Add</div>';
           return conditions.map((c, ci) => {
-            const isDate = sniffType(c.field) === 'date';
-            const ops    = isDate ? [...QB_OPS, ...DataLaVistaCore.DATE_MACRO_OPS] : QB_OPS;
+            const fieldType  = sniffType(c.field);
+            const ops        = getFilterOps(fieldType);
             const isMacro    = DataLaVistaCore.DATE_MACRO_VALS.has(c.op);
             const macroMeta  = DataLaVistaCore.DATE_MACRO_OPS.find(o => o.val === c.op);
             const needsValue = c.op !== 'NULL' && c.op !== 'NOTNULL' && !(isMacro && !macroMeta?.hasInput);
@@ -1628,13 +1624,13 @@ function _renderBarLineOptionsHTML(w, wid) {
               <select class="form-input qb-field-select" onchange="widgetUpdateCond('${wid}',${ci},'field',this.value)">
                 ${cols.map(col=>`<option value="${col}" ${col===c.field?'selected':''}>${col}</option>`).join('')}
               </select>
-              <select class="form-input qb-op-select" style="width:${isDate?'150px':'112px'}!important"
+              <select class="form-input qb-op-select" style="width:${fieldType === 'date' ? '150px' : '112px'}!important"
                 onchange="widgetUpdateCond('${wid}',${ci},'op',this.value)">
                 ${ops.map(o=>`<option value="${o.val}" ${o.val===c.op?'selected':''}>${o.label}</option>`).join('')}
               </select>
               ${needsValue
-                ? `<input type="${isMacro?'number':'text'}" class="form-input qb-val-input" value="${(c.value||'').replace(/"/g,'&quot;')}"
-                     oninput="widgetUpdateCond('${wid}',${ci},'value',this.value)"/>`
+                ? buildFilterValueInput(fieldType, isMacro, macroMeta, c.value,
+                    `widgetUpdateCond('${wid}',${ci},'value',this.value)`)
                 : `<span class="qb-val-blank"></span>`}
               <button class="btn btn-ghost btn-sm btn-icon qb-remove-btn" onclick="widgetRemoveCond('${wid}',${ci})">✕</button>
             </div>`;
@@ -1931,47 +1927,66 @@ function _renderBarLineOptionsHTML(w, wid) {
         }
 
         DataLaVistaState.design.filters.forEach(f => {
-          let uniqueVals = [];
-          if (alasql.tables && alasql.tables['dlv_results']) {
-            uniqueVals = [...new Set(alasql('SELECT * FROM [dlv_results]').map(r => r[f.field]).filter(v => v !== null && v !== undefined))].sort();
-          }
+          const fieldType = sniffType(f.field);
+          const isBoolean = fieldType === 'boolean';
+          const isDate    = fieldType === 'date';
 
           const wrap = document.createElement('div');
           wrap.className = 'filter-pill';
-          wrap.style.display = 'flex';
-          wrap.style.alignItems = 'center';
-          wrap.style.gap = '6px';
-          wrap.style.background = 'var(--surface)';
-          wrap.style.border = '1px solid var(--border-strong)';
-          wrap.style.padding = '4px 8px';
-          wrap.style.borderRadius = 'var(--radius)';
+          wrap.style.cssText = 'display:flex;align-items:center;gap:6px;background:var(--surface);border:1px solid var(--border-strong);padding:4px 8px;border-radius:var(--radius)';
 
           const lbl = document.createElement('span');
-          lbl.style.fontSize = '12px';
-          lbl.style.fontWeight = '600';
+          lbl.style.cssText = 'font-size:12px;font-weight:600';
           lbl.innerText = f.label || f.field;
 
-          const sel = document.createElement('select');
-          sel.className = 'form-input';
-          sel.style.height = '24px';
-          sel.style.padding = '0 24px 0 6px';
-          sel.innerHTML = `<option value="(All)">(All)</option>` +
-            uniqueVals.map(v => `<option value="${v}">${v}</option>`).join('');
-
-          sel.value = DataLaVistaState.previewFilters[f.field] || '(All)';
-          sel.onchange = (e) => {
-            if (e.target.value === '(All)') delete DataLaVistaState.previewFilters[f.field];
-            else DataLaVistaState.previewFilters[f.field] = e.target.value;
-            refreshWidgets();
-          };
+          let input;
+          if (isBoolean) {
+            input = document.createElement('select');
+            input.className = 'form-input';
+            input.style.cssText = 'height:24px;padding:0 24px 0 6px';
+            input.innerHTML = `<option value="(All)">(All)</option>
+              <option value="true"  ${DataLaVistaState.previewFilters[f.field]==='true'  ?'selected':''}>True</option>
+              <option value="false" ${DataLaVistaState.previewFilters[f.field]==='false' ?'selected':''}>False</option>`;
+            input.onchange = (e) => {
+              if (e.target.value === '(All)') delete DataLaVistaState.previewFilters[f.field];
+              else DataLaVistaState.previewFilters[f.field] = e.target.value;
+              refreshWidgets();
+            };
+          } else if (isDate) {
+            input = document.createElement('input');
+            input.type = 'date';
+            input.className = 'form-input';
+            input.style.cssText = 'height:24px;padding:0 4px';
+            input.value = DataLaVistaState.previewFilters[f.field] || '';
+            input.onchange = (e) => {
+              if (!e.target.value) delete DataLaVistaState.previewFilters[f.field];
+              else DataLaVistaState.previewFilters[f.field] = e.target.value;
+              refreshWidgets();
+            };
+          } else {
+            let uniqueVals = [];
+            if (alasql.tables && alasql.tables['dlv_results']) {
+              uniqueVals = [...new Set(alasql('SELECT * FROM [dlv_results]').map(r => r[f.field]).filter(v => v !== null && v !== undefined))].sort();
+            }
+            input = document.createElement('select');
+            input.className = 'form-input';
+            input.style.cssText = 'height:24px;padding:0 24px 0 6px';
+            input.innerHTML = `<option value="(All)">(All)</option>` +
+              uniqueVals.map(v => `<option value="${v}">${v}</option>`).join('');
+            input.value = DataLaVistaState.previewFilters[f.field] || '(All)';
+            input.onchange = (e) => {
+              if (e.target.value === '(All)') delete DataLaVistaState.previewFilters[f.field];
+              else DataLaVistaState.previewFilters[f.field] = e.target.value;
+              refreshWidgets();
+            };
+          }
 
           const del = document.createElement('span');
           del.innerHTML = '✕';
-          del.style.cursor = 'pointer';
-          del.style.fontSize = '10px';
+          del.style.cssText = 'cursor:pointer;font-size:10px';
           del.onclick = () => removeFilterFromBar(f.field);
 
-          wrap.appendChild(lbl); wrap.appendChild(sel); wrap.appendChild(del);
+          wrap.appendChild(lbl); wrap.appendChild(input); wrap.appendChild(del);
           bar.appendChild(wrap);
         });
         // Append any active drill filter chips

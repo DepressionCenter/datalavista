@@ -3,7 +3,7 @@ This file is part of DataLaVista
 50-qb-basic.js: Basic query builder - field selection, filters, sorts, and SQL generation.
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 Created: 2026-03-24
-Last Modified: 2026-03-31
+Last Modified: 2026-04-06
 Summary: Basic query builder - field selection, filters, sorts, and SQL generation.
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
@@ -294,7 +294,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         // text, lookup, bool, array → only 'all' tier
         // date → 'all' + 'ordered'
         // number → all tiers
-        return QB_AGGS.filter(a => {
+        return DataLaVistaCore.QB_AGGS.filter(a => {
           if (a.types === 'all') return true;
           if (a.types === 'ordered') return isNumeric || isDate;
           if (a.types === 'numeric') return isNumeric;
@@ -353,7 +353,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           const raw = c.value || '';
           const val = c.op === 'LIKE'
             ? `'%${raw}%'`
-            : (raw !== '' && !isNaN(raw) ? raw : `'${raw.replace(/'/g, "''")}'`);
+            : (raw === 'true' || raw === 'false' ? raw
+              : (raw !== '' && !isNaN(raw) ? raw : `'${raw.replace(/'/g, "''")}'`));
           return conj + `${col} ${c.op} ${val}`;
         });
 
@@ -535,19 +536,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         document.getElementById('qb-basic-drop').style.display = 'flex';
       }
 
-      // ── Conditions ────────────────────────────────────────────────────────────────
-      const QB_OPS = [
-        { val: '=', label: '= equals' },
-        { val: '!=', label: '≠ not equals' },
-        { val: '>', label: '> greater than' },
-        { val: '<', label: '< less than' },
-        { val: '>=', label: '≥ greater or equal' },
-        { val: '<=', label: '≤ less or equal' },
-        { val: 'LIKE', label: '~ contains' },
-        { val: 'NULL', label: '∅ is blank' },
-        { val: 'NOTNULL', label: '✓ is not blank' },
-      ];
-
       function addBasicCondition() {
         const t = DataLaVistaState.tables[DataLaVistaState.basicQB.tableName];
         if (!t) return;
@@ -578,14 +566,13 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 
         DataLaVistaState.basicQB.conditions.forEach((c, i) => {
           // Determine if the selected field is a date type
-          const fieldMeta = fields.find(f => f.alias === c.field);
-          const isDate = fieldMeta && fieldMeta.displayType === 'date';
-          const ops = isDate ? [...QB_OPS, ...DataLaVistaCore.DATE_MACRO_OPS] : QB_OPS;
+          const fieldMeta  = fields.find(f => f.alias === c.field);
+          const isDate     = fieldMeta?.displayType === 'date';
+          const ops        = getFilterOps(fieldMeta?.displayType);
           // A date macro has no free-text value; only NULL/NOTNULL/macros hide the input
-          const isMacro = DataLaVistaCore.DATE_MACRO_VALS.has(c.op);
-          const macroMeta = DataLaVistaCore.DATE_MACRO_OPS.find(o => o.val === c.op);
+          const isMacro    = DataLaVistaCore.DATE_MACRO_VALS.has(c.op);
+          const macroMeta  = DataLaVistaCore.DATE_MACRO_OPS.find(o => o.val === c.op);
           const needsValue = c.op !== 'NULL' && c.op !== 'NOTNULL' && !(isMacro && !macroMeta?.hasInput);
-          const valPlaceholder = isMacro && macroMeta?.hasInput ? 'e.g. 3' : 'value';
 
           const row = document.createElement('div');
           row.className = 'qb-condition-row';
@@ -604,9 +591,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         ${ops.map(o => `<option value="${o.val}" ${o.val === c.op ? 'selected' : ''}>${o.label}</option>`).join('')}
       </select>
       ${needsValue
-              ? `<input type="${isMacro ? 'number' : 'text'}" class="form-input qb-val-input" placeholder="${valPlaceholder}"
-             min="1" value="${(c.value || '').replace(/"/g, '&quot;')}"
-             oninput="DataLaVistaState.basicQB.conditions[${i}].value=this.value; rebuildBasicSQL()"/>`
+              ? buildFilterValueInput(fieldMeta?.displayType, isMacro, macroMeta, c.value,
+                  `DataLaVistaState.basicQB.conditions[${i}].value=this.value; rebuildBasicSQL()`)
               : `<span class="qb-val-blank"></span>`
             }
       <button class="btn btn-ghost btn-sm btn-icon qb-remove-btn" onclick="removeBasicCondition(${i})">✕</button>
@@ -720,4 +706,3 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       function removeBasicFilter(i) { removeBasicCondition(i); }
       function renderBasicFilters() { renderBasicConditions(); }
       function selectBasicField(tname, alias) { basicQBSelectField(tname, alias); }
-

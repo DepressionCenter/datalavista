@@ -233,6 +233,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         onDropFieldToWidget,
         onDropFilterToWidget,
         updateWidgetContent,
+        getFilterOps,
+        buildFilterValueInput,
         renderFilterBar,
         removeFilterFromBar,
         sniffType,

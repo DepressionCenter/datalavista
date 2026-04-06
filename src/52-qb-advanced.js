@@ -3,7 +3,7 @@ This file is part of DataLaVista
 52-qb-advanced.js: Advanced query builder - visual join graph, nodes, and options panel.
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 Created: 2026-03-24
-Last Modified: 2026-03-31
+Last Modified: 2026-04-06
 Summary: Advanced query builder - visual join graph, nodes, and options panel.
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
@@ -1080,7 +1080,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
             return nd.conditions.map((c, ci) => {
               const fieldMeta = fields.find(f => f.alias === c.field);
               const isDate = fieldMeta?.displayType === 'date';
-              const ops = isDate ? [...QB_OPS, ...DataLaVistaCore.DATE_MACRO_OPS] : QB_OPS;
+              const ops = getFilterOps(fieldMeta?.displayType);
               const isMacro = DataLaVistaCore.DATE_MACRO_VALS.has(c.op);
               const macroMeta = DataLaVistaCore.DATE_MACRO_OPS.find(o => o.val === c.op);
               const needsValue = c.op !== 'NULL' && c.op !== 'NOTNULL' && !(isMacro && !macroMeta?.hasInput);
@@ -1099,8 +1099,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
                   ${ops.map(o=>`<option value="${o.val}" ${o.val===c.op?'selected':''}>${o.label}</option>`).join('')}
                 </select>
                 ${needsValue
-                  ? `<input type="${isMacro?'number':'text'}" class="form-input qb-val-input" value="${(c.value||'').replace(/"/g,'&quot;')}"
-                       oninput="advNodeCond('${id}',${ci},'value',this.value)"/>`
+                  ? buildFilterValueInput(fieldMeta?.displayType, isMacro, macroMeta, c.value,
+                      `advNodeCond('${id}',${ci},'value',this.value)`)
                   : `<span class="qb-val-blank"></span>`}
                 <button class="btn btn-ghost btn-sm btn-icon qb-remove-btn" onclick="advNodeRemoveCond('${id}',${ci})">✕</button>
               </div>`;
@@ -1764,7 +1764,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           if (DataLaVistaCore.DATE_MACRO_VALS.has(c.op)) return conj + dateMacroToSQL(c.op, c.value, col);
           if (c.op === 'LIKE') return conj + `${col} LIKE '%${c.value}%'`;
           const raw = c.value || '';
-          const val = (raw !== '' && !isNaN(raw)) ? raw : `'${raw.replace(/'/g, "''")}'`;
+          const val = (raw === 'true' || raw === 'false') ? raw
+            : ((raw !== '' && !isNaN(raw)) ? raw : `'${raw.replace(/'/g, "''")}'`);
           return conj + `${col} ${c.op} ${val}`;
         }).join(' ');
       }
@@ -1782,4 +1783,3 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           if (DataLaVistaState.queryMode === 'advanced') renderAdvancedQB();
         }
       }
-

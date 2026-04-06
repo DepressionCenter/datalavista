@@ -556,7 +556,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           'UNION', 'INTERSECT', 'EXCEPT', 'INSERT', 'UPDATE', 'DELETE', 'CREATE', 'DROP',
           'TABLE', 'VIEW', 'INDEX', 'AND', 'OR', 'NOT', 'IN', 'IS', 'NULL', 'LIKE', 'BETWEEN',
           'CASE', 'WHEN', 'THEN', 'ELSE', 'END', 'CAST', 'COALESCE', 'NULLIF', 'IIF',
-          ...ALASQL_KEYWORDS
+          ...DataLaVistaCore.ALASQL_KEYWORDS
         ];
 
         // Suggest view names (user-facing table aliases) and view.fieldAlias for column refs.
