@@ -75,7 +75,6 @@ Object.assign(CyberdynePipeline, {
 
   /** Build and execute the AlaSQL CREATE VIEW statement for a view */
 _applyViewSQL(viewName) {
-    console.log(`DEBUG: _applyViewSQL called for view "${viewName}"`);
     const view = this.views[viewName];
     if (!view) return;
  
@@ -87,14 +86,12 @@ _applyViewSQL(viewName) {
     // Filter out any already-synthetic fields that may have leaked in from old configs
     const baseFields = (view.baseFields || []).filter(f => !f.isSynthetic && !f.isAutoId);
     if (baseFields.length > 0) {
-      console.log(`DEBUG: _applyViewSQL: Expanding view "${viewName}" with baseFields:`, baseFields);
       const sourceType = (t && t.sourceType) ? t.sourceType : 'unknown';
       const siteUrl   = (t && t.siteUrl)    ? t.siteUrl    : (DataLaVistaState.spSiteUrl || '');
       const sampleRows = (t && t.data)       ? t.data.slice(0, 100) : [];
  
       const virtualCols = [];
       const seenAliases = new Set();
-      console.log(`DEBUG: _applyViewSQL: Expanding fields for view "${viewName}" using FieldExpander with sourceType "${sourceType}" and siteUrl "${siteUrl}"`);
       for (const field of baseFields) {
         const expanded = this.FieldExpander.expand(field, sampleRows, rawTableRef, { sourceType, siteUrl });
         for (const vc of expanded) {
@@ -104,21 +101,14 @@ _applyViewSQL(viewName) {
           }
         }
       }
-
-      console.log(`DEBUG: _applyViewSQL: Generated virtual columns for view "${viewName}":`, virtualCols);
-      if (virtualCols.length === 0) return;
- 
+      if (virtualCols.length === 0) return; 
       const selectParts = virtualCols.map(vc => `${vc.sqlExpr} AS [${vc.alias}]`);
-      console.log(`DEBUG: _applyViewSQL: Final SELECT parts for view "${viewName}":`, selectParts);
       try { alasql(`DROP VIEW IF EXISTS [${viewName}]`); } catch (_) {}
-      console.log(`DEBUG: _applyViewSQL: Creating view "${viewName}" with SQL: SELECT ${selectParts.join(', ')} FROM ${rawTableRef}`);
       alasql(`CREATE VIEW [${viewName}] AS SELECT ${selectParts.join(', ')} FROM ${rawTableRef}`);
-      console.log(`DEBUG: _applyViewSQL: View "${viewName}" created successfully`);
  
       // Rebuild view metadata from expanded virtual columns
       view.columnMappings = {};
       view.fields = [];
-      console.log(`DEBUG: _applyViewSQL: Building view metadata for "${viewName}" from virtual columns`);
       for (const vc of virtualCols) {
         view.columnMappings[vc.alias] = vc.internalName;
         view.fields.push({
@@ -133,18 +123,13 @@ _applyViewSQL(viewName) {
         });
       }
  
-      console.log(`DEBUG: _applyViewSQL: Updated view metadata for "${viewName}":`, view.fields);
       // Sync t.fields so renderFieldsPanel and QB show the expanded field list
       if (t && t.data && t.data.length > 0) t.fields = view.fields;
-      console.log(`DEBUG: _applyViewSQL: Exited _applyViewSQL for view "${viewName}"`);
       return;
-    } else {
-      console.log(`DEBUG: _applyViewSQL: No base fields found for view "${viewName}"`);
-    }
+    } else { }
 
     // ── Fallback: legacy columnMappings (old configs without baseFields) ───
     const cols = [];
-    console.log(`DEBUG: _applyViewSQL: Building view "${viewName}" using legacy columnMappings:`, view.columnMappings);
     for (const [alias, internalName] of Object.entries(view.columnMappings)) {
       cols.push(`[${internalName}] AS [${alias}]`);
     }
@@ -658,17 +643,14 @@ _applyViewSQL(viewName) {
 
   /** Restore views from a saved config */
   restoreViewsFromConfig(viewDefs) {
-    console.log('DEBUG: Entered restoreViewsFromConfig Restoring views from config:', Object.keys(viewDefs || {}));
     if (!viewDefs) return;
     for (const [viewName, viewDef] of Object.entries(viewDefs)) {
-      console.log(`DEBUG: restoreViewsFromConfig: Restoring view "${viewName}" with raw table "${viewDef.rawTable}" and fields:`, viewDef.fields);
       // Always restore the in-memory view metadata (viewToRawTable / rawTableToView maps,
       // baseFields, columnMappings, etc.).  This is safe even before data is loaded —
       // findReferencedTables, updateViewSQL, and ensureTableData all depend on it.
       this.views[viewName] = { ...viewDef, createdAt: new Date().toISOString() };
       this.viewToRawTable[viewName] = viewDef.rawTable;
       this.rawTableToView[viewDef.rawTable] = viewName;
-      console.log('DEBUG: restoreViewsFromConfig: Registered view metadata for', viewName, 'with raw table', viewDef.rawTable);
 
       // Only attempt the AlaSQL CREATE VIEW statement if the corresponding _raw_ table
       // already exists in AlaSQL (i.e. data was loaded in a previous session or by a
@@ -679,15 +661,11 @@ _applyViewSQL(viewName) {
       const rawTableExists = !!(alasql.tables && alasql.tables[rawAlasqlName]);
       if (rawTableExists) {
         try {
-          console.log('DEBUG: restoreViewsFromConfig: Raw table already loaded — applying view SQL for', viewName);
           this._applyViewSQL(viewName);
-          console.log('DEBUG: restoreViewsFromConfig: Successfully applied view SQL for', viewName);
         } catch (e) {
           console.warn('[CyberdynePipeline] restoreViewsFromConfig: _applyViewSQL failed for', viewName, e.message);
         }
-      } else {
-        console.log(`DEBUG: restoreViewsFromConfig: Deferring AlaSQL VIEW for "${viewName}" — _raw_${viewDef.rawTable} not loaded yet; will be created by ensureTableData`);
-      }
+      } else { }
     }
   },
 

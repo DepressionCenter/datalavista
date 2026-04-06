@@ -147,6 +147,129 @@ function rankSuggestions(rules, cols, meta) {
   return scoredRules.slice(0, 5).map(item => item.rule);
 }
 
+  // ============================================================
+  // HTML SANITIZER  (strip scripts / event handlers; allow safe markup)
+  // Used for dashboard title tooltip which accepts user-supplied HTML.
+  // ============================================================
+  function sanitizeHTML(html) {
+    if (!html) return '';
+    let doc;
+    try {
+      doc = (new DOMParser()).parseFromString('<div>' + html + '</div>', 'text/html');
+    } catch (e) {
+      return '';
+    }
+    const ALLOWED = new Set(['p','br','b','i','strong','em','span','div','ul','ol','li',
+      'a','h1','h2','h3','h4','h5','h6','code','pre','hr','table','tr','td','th',
+      'thead','tbody','small','sup','sub','mark','blockquote']);
+    const BLOCKED = new Set(['script','iframe','object','embed','form','input','button',
+      'style','link','meta','base','frame','frameset','noscript','template']);
+    const SAFE_ATTRS = new Set(['href','title','target','class','style','rel',
+      'colspan','rowspan','width','height','alt','id']);
+
+    function clean(node) {
+      if (node.nodeType === 3) return document.createTextNode(node.textContent);
+      if (node.nodeType !== 1) return null;
+      const tag = node.tagName.toLowerCase();
+      if (BLOCKED.has(tag)) return null;
+      const out = document.createElement(ALLOWED.has(tag) ? tag : 'span');
+      for (const attr of Array.from(node.attributes)) {
+        const n = attr.name.toLowerCase();
+        if (n.startsWith('on')) continue;
+        if ((n === 'href' || n === 'src') && /^\s*javascript:/i.test(attr.value)) continue;
+        if (SAFE_ATTRS.has(n)) out.setAttribute(n, attr.value);
+      }
+      // Force links to open safely
+      if (tag === 'a') { out.setAttribute('target', '_blank'); out.setAttribute('rel', 'noopener noreferrer'); }
+      for (const child of Array.from(node.childNodes)) {
+        const c = clean(child);
+        if (c) out.appendChild(c);
+      }
+      return out;
+    }
+
+    const root = doc.body.firstChild;
+    if (!root) return '';
+    const cleaned = clean(root);
+    return cleaned ? cleaned.innerHTML : '';
+  }
+
+  // ============================================================
+  // DASHBOARD TITLE PROPERTIES PANEL
+  // Shown when the user clicks the title-input element in design mode.
+  // ============================================================
+
+  /** Update an inline info-icon next to title-input when a tooltip is configured. */
+  function updateDashboardTitleTooltipIcon() {
+    const titleBar = document.getElementById('title-bar');
+    if (!titleBar) return;
+    let icon = document.getElementById('dlv-title-tooltip-icon');
+    const tip = DataLaVistaState.design.dashboardTitleTooltip || '';
+    if (!tip.trim()) {
+      if (icon) icon.remove();
+      return;
+    }
+    if (!icon) {
+      icon = document.createElement('span');
+      icon.id = 'dlv-title-tooltip-icon';
+      icon.style.cssText = 'font-size:11px;cursor:help;vertical-align:super;margin-left:4px;user-select:none;opacity:0.7';
+      icon.textContent = 'ℹ️';
+      const inp = document.getElementById('title-input');
+      if (inp) inp.parentNode.insertBefore(icon, inp.nextSibling);
+      else titleBar.appendChild(icon);
+    }
+    dlvTooltip.update(icon, sanitizeHTML(tip), { placement: 'bottom', maxWidth: '400px', delay: 200 });
+    dlvTooltip.attach(icon, sanitizeHTML(tip), { placement: 'bottom', maxWidth: '400px', delay: 200 });
+  }
+
+  function updateDashboardTitleProp(prop, value) {
+    if (prop === 'showDashboardTitle') DataLaVistaState.design.showDashboardTitle = value;
+    else if (prop === 'title') {
+      DataLaVistaState.design.title = value;
+      const inp = document.getElementById('title-input');
+      if (inp && inp.value !== value) inp.value = value;
+    } else if (prop === 'dashboardTitleTooltip') {
+      DataLaVistaState.design.dashboardTitleTooltip = value;
+      updateDashboardTitleTooltipIcon();
+    }
+    // Re-render the props panel to reflect the checkbox live
+    renderDashboardTitleProperties();
+  }
+
+  function renderDashboardTitleProperties() {
+    const section = document.getElementById('props-section');
+    if (!section) return;
+    const show = DataLaVistaState.design.showDashboardTitle !== false;
+    const tip  = (DataLaVistaState.design.dashboardTitleTooltip || '').replace(/"/g, '&quot;');
+    const title = (DataLaVistaState.design.title || '').replace(/"/g, '&quot;');
+    section.innerHTML = `
+      <div class="adv-node-section">
+        <div class="adv-node-section-hdr">DASHBOARD TITLE</div>
+        <div class="props-row">
+          <label>Show dashboard title</label>
+          <input type="checkbox" ${show ? 'checked' : ''}
+            onchange="updateDashboardTitleProp('showDashboardTitle',this.checked)"/>
+        </div>
+      </div>
+      <div class="adv-node-section">
+        <div class="adv-node-section-hdr">TITLE TOOLTIP</div>
+        <div style="font-size:11px;color:var(--text-secondary);margin-bottom:6px;padding:0 2px">
+          Optional HTML tooltip shown as an ℹ️ icon next to the title in preview/live mode.
+          JavaScript is not allowed.
+        </div>
+        <div class="props-row" style="flex-direction:column;align-items:flex-start">
+          <label style="margin-bottom:4px">Tooltip HTML</label>
+          <textarea class="form-input" rows="6" style="width:100%;font-size:11px;font-family:monospace"
+            placeholder="<b>About this dashboard:</b><br>Enter description here..."
+            onblur="updateDashboardTitleProp('dashboardTitleTooltip',this.value)">${(DataLaVistaState.design.dashboardTitleTooltip || '').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</textarea>
+        </div>
+      </div>
+    `;
+    // Deselect any widget
+    document.querySelectorAll('.widget').forEach(w => w.classList.remove('selected'));
+    DataLaVistaState.currentWidgetId = null;
+  }
+
   function renderDesignFieldsPanel() {
     const body = document.getElementById('design-fields-body');
     if (!DataLaVistaState.queryColumns.length) {

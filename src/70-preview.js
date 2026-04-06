@@ -30,7 +30,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 
         try {
           const referencedTables = findReferencedTables(DataLaVistaState.sql);
-          console.log('DEBUG: Referenced tables for preview:', referencedTables);
           // TODO: DEBUG: This appears to refresh sharepoint sources only but not remote files.
           for (const tname of referencedTables) {
             await ensureTableData(tname, true); // Load all rows
@@ -92,8 +91,27 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         } else {
           document.getElementById('preview-toolbar').classList.add('hidden');
         }
-        document.getElementById('preview-title-bar').textContent = DataLaVistaState.design.title || 'DataLaVista Report';
-        document.getElementById('preview-title-bar').classList.remove('hidden');
+        const titleBarEl = document.getElementById('preview-title-bar');
+        const titleText  = DataLaVistaState.design.title || 'DataLaVista Report';
+        const titleTip   = DataLaVistaState.design.dashboardTitleTooltip || '';
+
+        if (DataLaVistaState.design.showDashboardTitle === false) {
+          titleBarEl.classList.add('hidden');
+        } else {
+          titleBarEl.classList.remove('hidden');
+          // Build title HTML — add info icon if tooltip is configured
+          if (titleTip.trim()) {
+            const safeTitle = titleText.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            titleBarEl.innerHTML = `${safeTitle}<sup id="prev-title-tip-icon" style="font-size:60%;margin-left:5px;cursor:help;opacity:0.8">ℹ️</sup>`;
+            // Wire tooltip after DOM settles
+            requestAnimationFrame(() => {
+              const icon = document.getElementById('prev-title-tip-icon');
+              if (icon) dlvTooltip.attach(icon, sanitizeHTML(titleTip), { placement: 'bottom', maxWidth: '440px', delay: 200 });
+            });
+          } else {
+            titleBarEl.textContent = titleText;
+          }
+        }
         // Filter bar
         const filterBar = document.getElementById('preview-filter-bar');
         filterBar.innerHTML = '';
@@ -149,6 +167,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       }
 
       function getPrevWidgetContent(w) {
+        // Note: text widgets don't have their html sanitized with sanitizeHTML() since they're meant to allow basic formatting via HTML tags.
+        // If this becomes a problem, we can add a separate "allowHTML" flag to widget properties and sanitize conditionally.
         if (w.type === 'text') return `<div class="text-widget" style="font-size:${w.fontSize}px;color:${w.fontColor}">${w.textContent}</div>`;
         if (w.type === 'placeholder') return '';
         if (w.type === 'kpi') return renderPrevKPI(w);

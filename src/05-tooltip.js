@@ -43,7 +43,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
   Options (third argument object):
     placement   'top' | 'bottom' | 'left' | 'right' | 'auto'  (default 'auto')
     delay       number in ms before showing  (default 500)
-    maxWidth    CSS string  (default '280px')
+    maxWidth    CSS string  (default '360px')
     theme       'default' | 'info' | 'success' | 'warning' | 'error'
 */
 
@@ -74,6 +74,8 @@ const dlvTooltip = (() => {
 
     const _body = document.createElement('div');
     _body.className = 'dlv-tooltip-body';
+    // Ensure rich HTML content wraps properly
+    _body.style.cssText = 'white-space:normal;word-break:break-word;overflow-wrap:break-word;line-height:1.5';
     _tip.appendChild(_body);
 
     document.body.appendChild(_tip);
@@ -153,7 +155,7 @@ const dlvTooltip = (() => {
     _showTimer = setTimeout(() => {
       const body = _tip.querySelector('.dlv-tooltip-body');
       body.innerHTML = html;
-      _tip.style.maxWidth = opts.maxWidth || '280px';
+      _tip.style.maxWidth = (opts.maxWidth ? opts.maxWidth.replace('px','').trim() + 'px' : '360px');
       _tip.dataset.theme = opts.theme || '';
       _tip.className = 'dlv-tooltip'; // reset before measuring
       _tip.classList.add('dlv-tip-measuring');

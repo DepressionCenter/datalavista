@@ -124,6 +124,8 @@ const DataLaVistaState = {
   queryColumns: [],
   design: {
     title: '',
+    showDashboardTitle: true,   // whether the title bar is visible in preview/report mode
+    dashboardTitleTooltip: '',  // optional HTML tooltip (sanitized) shown via info icon next to title
     widgets: [],     // widget objects
     filters: [],     // { field, label, position }  — preview filter bar chips
     conditions: [],  // { conj, field, op, value }  — design-level data filter

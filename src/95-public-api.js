@@ -273,5 +273,9 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         _renderDrillChipsIn,
         scoreRule,
         rankSuggestions,
+        sanitizeHTML,
+        renderDashboardTitleProperties,
+        updateDashboardTitleProp,
+        updateDashboardTitleTooltipIcon,
         init
       };

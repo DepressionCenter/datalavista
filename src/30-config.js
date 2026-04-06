@@ -188,7 +188,7 @@ function buildConfig() {
     heightVh: w.heightVh || 33,
     fields: Array.isArray(w.fields) ? [...w.fields] : [],
     xField: w.xField || '',
-    yField: w.yField || '', // legacy single yField for backward compatibility
+    yField: w.yField || '',
     yFields: Array.isArray(w.yFields) ? [...w.yFields] : [],
     aggregation: w.aggregation || '',
     fillColor: w.fillColor || '#0078d4',
@@ -202,16 +202,21 @@ function buildConfig() {
     headersBackgroundColor: w.headersBackgroundColor || '#f3f2f1',
     headersFontSize: w.headersFontSize || 12,
     headersFontColor: w.headersFontColor || '#323130',
+    fontSize: w.fontSize || 13,
+    fontColor: w.fontColor || '#323130',
+    kpiMetricFontSize: w.kpiMetricFontSize || 36,
+    kpiLabelFontSize: w.kpiLabelFontSize || 13,
+    kpiLabelOverride: w.kpiLabelOverride || '',
     stacked: !!w.stacked,
     showTrendLine: !!w.showTrendLine,
     ySeriesTypes: Object.assign({}, w.ySeriesTypes || {}),
     bubbleSizeField: w.bubbleSizeField || '',
     bubbleColorField: w.bubbleColorField || '',
-    fontSize: w.fontSize || 13,
-    fontColor: w.fontColor || '#323130',
     textContent: w.textContent || '',
     imageUrl: w.imageUrl || '',
     fieldAggs: Object.assign({}, w.fieldAggs || {}),
+    conditions: (w.conditions || []).map(c => ({ conj: c.conj || 'AND', field: c.field || '', op: c.op || '=', value: c.value || '' })),
+    sorts: (w.sorts || []).map(s => ({ field: s.field || '', dir: s.dir || 'ASC' })),
     filters: (w.filters || []).map(f => ({
       field: f.field || '',
       operator: f.operator || '=',
@@ -223,6 +228,8 @@ function buildConfig() {
  
   const cleanDesign = {
     title: DataLaVistaState.design.title || '',
+    showDashboardTitle: DataLaVistaState.design.showDashboardTitle !== false,
+    dashboardTitleTooltip: DataLaVistaState.design.dashboardTitleTooltip || '',
     widgets: cleanWidgets,
     filters: (DataLaVistaState.design.filters || []).map(f => ({
       field: f.field || '',
@@ -336,17 +343,16 @@ async function loadConfig(cfg) {
   CyberdynePipeline.clearAllViews(); // drop any existing AlaSQL views before reloading
   //{ ...cfg.dataSource } || { type: 'sharepoint', url: '', auth: 'current' };
   DataLaVistaState.activeTab = (DataLaVistaState.reportMode==='view')?'dataPreview':'design';
-  console.log('DEBUG: loadConfig: advancedQB:', cfg.advancedQB);
   DataLaVistaState.advancedQB = cfg.advancedQB || {};
-   console.log('DEBUG: loadConfig: advancedQB.nodeAliases:', cfg.advancedQB.nodeAliases);
   DataLaVistaState.advancedQB.nodeAliases ??= {};
-   console.log('DEBUG: loadConfig: basicQB:', cfg.basicQB);
   DataLaVistaState.basicQB = cfg.basicQB || {};
   DataLaVistaState.currentWidgetId = null;
   DataLaVistaState.dataSources = cfg.dataSources || {};
   const loadedDesign = cfg.design || {};
   DataLaVistaState.design = {
     title: loadedDesign.title || 'DataLaVista Report',
+    showDashboardTitle: loadedDesign.showDashboardTitle !== false,
+    dashboardTitleTooltip: loadedDesign.dashboardTitleTooltip || '',
     widgets: loadedDesign.widgets || [],
     filters: loadedDesign.filters || [],
     conditions: loadedDesign.conditions || [],
@@ -357,25 +363,31 @@ async function loadConfig(cfg) {
   };
   // Migrate legacy single-yField to yFields array + backfill new widget defaults
 for (const w of DataLaVistaState.design.widgets) {
-  if (!Array.isArray(w.yFields))     w.yFields = w.yField ? [w.yField] : [];
-  if (w.stacked          == null)    w.stacked = false;
-  if (w.showTrendLine    == null)    w.showTrendLine = false;
-  if (!w.ySeriesTypes)               w.ySeriesTypes = {};
-  if (w.bubbleSizeField  == null)    w.bubbleSizeField = '';
-  if (w.bubbleColorField == null)    w.bubbleColorField = '';
-  if (w.showTitle        == null)    w.showTitle = true;
-  if (w.showHeaders      == null)    w.showHeaders = true;
-  if (w.widgetBackgroundColor == null) w.widgetBackgroundColor = '#fefefe';
-  if (w.chartBackgroundColor  == null) w.chartBackgroundColor  = '#fefefe';
-  if (w.titleBackgroundColor  == null) w.titleBackgroundColor  = '#fefefe';
-  if (w.titleFontSize    == null)    w.titleFontSize = 14;
-  if (w.titleFontColor   == null)    w.titleFontColor = '#323130';
+  if (!Array.isArray(w.yFields))        w.yFields = w.yField ? [w.yField] : [];
+  if (w.stacked          == null)       w.stacked = false;
+  if (w.showTrendLine    == null)       w.showTrendLine = false;
+  if (!w.ySeriesTypes)                  w.ySeriesTypes = {};
+  if (w.bubbleSizeField  == null)       w.bubbleSizeField = '';
+  if (w.bubbleColorField == null)       w.bubbleColorField = '';
+  if (w.showTitle        == null)       w.showTitle = true;
+  if (w.showHeaders      == null)       w.showHeaders = true;
+  if (w.widgetBackgroundColor == null)  w.widgetBackgroundColor = '#fefefe';
+  if (w.chartBackgroundColor  == null)  w.chartBackgroundColor  = '#fefefe';
+  if (w.titleBackgroundColor  == null)  w.titleBackgroundColor  = '#fefefe';
+  if (w.titleFontSize    == null)       w.titleFontSize = 14;
+  if (w.titleFontColor   == null)       w.titleFontColor = '#323130';
   if (w.headersBackgroundColor == null) w.headersBackgroundColor = '#f3f2f1';
-  if (w.headersFontSize  == null)    w.headersFontSize = 12;
-  if (w.headersFontColor == null)    w.headersFontColor = '#323130';
-  if (w.fontSize         == null)    w.fontSize = 13;
-  if (w.fontColor        == null)    w.fontColor = '#323130';
-  if (w.textContent      == null)    w.textContent = '';
+  if (w.headersFontSize  == null)       w.headersFontSize = 12;
+  if (w.headersFontColor == null)       w.headersFontColor = '#323130';
+  if (w.fontSize         == null)       w.fontSize = 13;
+  if (w.fontColor        == null)       w.fontColor = '#323130';
+  if (w.kpiMetricFontSize == null)      w.kpiMetricFontSize = 36;
+  if (w.kpiLabelFontSize == null)       w.kpiLabelFontSize = 13;
+  if (w.kpiLabelOverride == null)       w.kpiLabelOverride = '';
+  if (w.textContent      == null)       w.textContent = '';
+  if (!w.fieldAggs)                     w.fieldAggs = {};
+  if (!w.conditions)                    w.conditions = [];
+  if (!w.sorts)                         w.sorts = [];
 }
   DataLaVistaState.previewFilters = cfg.previewFilters || {};
   // Normalize legacy tab name ('previewData' was renamed to 'dataPreview')
@@ -384,27 +396,20 @@ for (const w of DataLaVistaState.design.widgets) {
   DataLaVistaState.queryMode = (cfg.queryMode && cfg.queryMode != null && cfg.queryMode != undefined && cfg.queryMode != '') ? cfg.queryMode : 'sql';
   // Don't load reportMode or reportUrl from config - it's handled by init()
   DataLaVistaState.relationships = Array.isArray(cfg.relationships) ? cfg.relationships : [];
-   console.log('DEBUG: loadConfig: sql:', cfg.sql);
   DataLaVistaState.sql = cfg.sql || '';
   DataLaVistaState.sqlLocked = cfg.sqlLocked || false;
   DataLaVistaState.tables = cfg.tables || {};
  
   // Restore view definitions (gracefully skipped for legacy configs without views)
   if (cfg.views && typeof cfg.views === 'object' && Object.keys(cfg.views).length) {
-    console.log('DEBUG: loadConfig: Restoring views from config:', Object.keys(cfg.views));
     CyberdynePipeline.restoreViewsFromConfig(cfg.views);
-    console.log('DEBUG: loadConfig: Completed restoring views from config. Current views in pipeline:', Object.keys(CyberdynePipeline.views));
-  } else {
-    console.log('DEBUG: loadConfig: No views found in config, rebuilding from tables metadata');
-  }
+  } else { }
  
   // Back-fill baseFields from table meta for views that don't have them yet
   // (handles legacy configs where views.baseFields wasn't saved, and new configs
   //  where table.baseFields is more authoritative than the view entry)
   for (const [tkey, tmeta] of Object.entries(DataLaVistaState.tables)) {
-    console.log(`DEBUG: loadConfig: Processing table ${tkey} for baseFields backfill`);
     const viewName = CyberdynePipeline.rawTableToView[tkey];
-    console.log(`DEBUG: loadConfig: Found view name "${viewName}" for table ${tkey}`);
     if (!viewName) continue;
     const view = CyberdynePipeline.views[viewName];
     if (!view) continue;
@@ -417,22 +422,17 @@ for (const w of DataLaVistaState.design.widgets) {
   // ── Backward-compat: reconstruct view registry from table metadata
   //    for configs saved before the view-layer refactor (no cfg.views key).
   if (!cfg.views || !Object.keys(cfg.views).length) {
-    console.log('DEBUG: No views found in config, reconstructing views from tables metadata');
       for (const [tkey, tmeta] of Object.entries(DataLaVistaState.tables)) {
           if (CyberdynePipeline.rawTableToView[tkey]) continue; // already registered
           const fields = tmeta.baseFields || tmeta.originalFields || tmeta.fields || [];
           const viewName = tmeta.alias && tmeta.alias !== tkey ? tmeta.alias : tkey;
           try {
-              console.log(`DEBUG: Reconstructing view for table ${tkey}`);
               if (tmeta.sourceType === 'sharepoint') {
-                  console.log(`DEBUG: Registering SharePoint list view for table ${tkey} with data source ${tmeta.dataSource}`);
                   CyberdynePipeline.registerSharePointList(
                       tmeta.dataSource || tkey, tkey, tmeta.displayName || tkey, fields
                   );
               } else {
-                  console.log(`DEBUG: Registering generic view for table ${tkey}`);
                   const finalViewName = CyberdynePipeline.createView(tkey, viewName, fields);
-                  console.log(`DEBUG: Registered view (finalViewName) "${finalViewName}" for table ${tkey}`);
                   DataLaVistaState.tables[tkey].viewName = finalViewName;
               }
           } catch (e) {
@@ -445,7 +445,6 @@ for (const w of DataLaVistaState.design.widgets) {
   if (DataLaVistaState.sql) {
     const referencedTables = findReferencedTables(DataLaVistaState.sql);
     for (const tname of referencedTables) {
-      console.log(`DEBUG: Ensuring data for referenced table "${tname}" is loaded in background after config load`);
       await ensureTableData(tname, true)
     }
   }
@@ -458,6 +457,7 @@ for (const w of DataLaVistaState.design.widgets) {
   document.getElementById('btn-save-config').disabled = false;
  
   renderFilterBar();
+  updateDashboardTitleTooltipIcon(); // apply info icon if tooltip is set
   if(DataLaVistaState.reportMode !== 'view') {
     const titleInput = document.getElementById('title-input');
     if (titleInput) titleInput.value = DataLaVistaState.design.title || '';

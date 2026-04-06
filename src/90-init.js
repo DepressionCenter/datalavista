@@ -251,6 +251,14 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         initAdvOptsResizer();
         // Wire clear button as drag-drop target for AQB items
         setupClearButtonDrop();
+
+        // Clicking the title input shows Dashboard Title properties in the right panel
+        document.getElementById('title-input')?.addEventListener('click', () => {
+          renderDashboardTitleProperties();
+        });
+        document.getElementById('title-input')?.addEventListener('focus', () => {
+          renderDashboardTitleProperties();
+        });
         
         // Show the connect popup by default to encourage users to connect to their data,
         // but if we detect we're in SharePoint edit mode, hide it since it can interfere with page editing.
