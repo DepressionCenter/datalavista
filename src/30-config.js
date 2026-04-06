@@ -3,7 +3,7 @@ This file is part of DataLaVista™
 30-config.js: Widget SQL generation, configuration save/load, and fields panel rendering.
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 Created: 2026-03-24
-Last Modified: 2026-04-04
+Last Modified: 2026-04-06
 Summary: Widget SQL generation, configuration save/load, and fields panel rendering.
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
@@ -341,7 +341,6 @@ async function loadConfig(cfg) {
   if (!cfg._license) throw new Error('Invalid report config — missing _license key');
   // Basic validation passed — now clear the existing state and load the config values
   CyberdynePipeline.clearAllViews(); // drop any existing AlaSQL views before reloading
-  //{ ...cfg.dataSource } || { type: 'sharepoint', url: '', auth: 'current' };
   DataLaVistaState.activeTab = (DataLaVistaState.reportMode==='view')?'dataPreview':'design';
   DataLaVistaState.advancedQB = cfg.advancedQB || {};
   DataLaVistaState.advancedQB.nodeAliases ??= {};

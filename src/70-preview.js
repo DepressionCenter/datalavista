@@ -3,7 +3,7 @@ This file is part of DataLaVista™
 70-preview.js: Preview tab, CSV download, and report generation.
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 Created: 2026-03-24
-Last Modified: 2026-04-05
+Last Modified: 2026-04-06
 Summary: Preview tab, CSV download, and report generation.
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
@@ -30,7 +30,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 
         try {
           const referencedTables = findReferencedTables(DataLaVistaState.sql);
-          // TODO: DEBUG: This appears to refresh sharepoint sources only but not remote files.
           for (const tname of referencedTables) {
             await ensureTableData(tname, true); // Load all rows
           }

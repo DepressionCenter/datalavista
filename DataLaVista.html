@@ -9255,7 +9255,7 @@ This file is part of DataLaVista™
 22-alasql.js: AlaSQL in-browser SQL engine setup and custom functions.
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 Created: 2026-03-24
-Last Modified: 2026-04-04
+Last Modified: 2026-04-06
 Summary: AlaSQL in-browser SQL engine setup and custom functions.
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
@@ -9522,6 +9522,30 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         }
         return null;
       };
+
+      // Safely parse strings to Booleans (handles SharePoint's "Yes"/"1"/etc.)
+      alasql.fn.DLV_PARSE_BOOL = function(val) {
+        if (val === null || val === undefined) return false;
+        if (typeof val === 'boolean') return val;
+        
+        // Convert to string, trim, and lowercase for safe comparison
+        const strVal = String(val).trim().toLowerCase();
+        
+        return strVal === 'yes' || strVal === '1' || strVal === 'true';
+      };
+
+      // Safely parse strings to Floats (strips commas/currency symbols)
+      alasql.fn.DLV_PARSE_NUMBER = function(val) {
+        if (val === null || val === undefined || val === '') return null;
+        if (typeof val === 'number') return val;
+        
+        // Convert to string, strip out everything except digits, minus signs, and decimals
+        const cleanStr = String(val).replace(/[^0-9.-]+/g, '');
+        const parsed = parseFloat(cleanStr);
+        
+        // Return null if invalid to prevent NaN from breaking SQL math aggregates
+        return isNaN(parsed) ? null : parsed;
+      };
     }
 
     // ── SELECT column helpers ────────────────────────────────────────────────────
@@ -9724,7 +9748,7 @@ This file is part of DataLaVista™
 23-sharepoint.js: SharePoint REST API adapter and field structure loader.
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 Created: 2026-03-24
-Last Modified: 2026-04-04
+Last Modified: 2026-04-06
 Summary: SharePoint REST API adapter and field structure loader.
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
@@ -9909,46 +9933,75 @@ function stripODataMetadata(rows, quickCheck = false) {
     }
 
 
+    // Fetch field structure for a given SP list.
+    // Excludes Hidden, Computed, underscore-prefixed, and dependent lookup fields
     async function fetchSPFields(siteUrl, listGuid, isDocLib = false) {
-  // Excludes Hidden, Computed, underscore-prefixed, and dependent lookup fields
-  const filter = `(Hidden eq false and TypeAsString ne 'Computed' and startswith(InternalName,'_') eq false and (TypeAsString ne 'LookupMulti' or (TypeAsString eq 'LookupMulti' and ReadOnlyField eq false and IsDependentLookup eq false))) or InternalName eq 'Editor' or InternalName eq 'Author' or InternalName eq 'Created' or InternalName eq 'Modified' or InternalName eq 'ID' or InternalName eq 'Title' or InternalName eq 'TaxKeyword'`;
-  const select = `Id,InternalName,Title,TypeAsString,Description,Required,MaxLength,Choices,LookupField,LookupList,IsHidden,Hidden,ReadOnlyField,IsDependentLookup`;
-  const url = `${siteUrl}/_api/web/lists(guid'${listGuid}')/fields?$select=${select}&$filter=${filter}`;
+    const filter = `(Hidden eq false and TypeAsString ne 'Computed' and startswith(InternalName,'_') eq false and (TypeAsString ne 'LookupMulti' or (TypeAsString eq 'LookupMulti' and ReadOnlyField eq false and IsDependentLookup eq false))) or InternalName eq 'Editor' or InternalName eq 'Author' or InternalName eq 'Created' or InternalName eq 'Modified' or InternalName eq 'ID' or InternalName eq 'Title' or InternalName eq 'TaxKeyword'`;
+    const select = `Id,InternalName,Title,TypeAsString,Description,Required,MaxLength,Choices,LookupField,LookupList,IsHidden,Hidden,ReadOnlyField,IsDependentLookup`;
+    const url = `${siteUrl}/_api/web/lists(guid'${listGuid}')/fields?$select=${select}&$filter=${filter}`;
 
-  const json = await spFetch(url);
-  let rows = extractRows(json);
-  let fields = stripODataMetadata(rows);
+    const json = await spFetch(url);
+    let rows = extractRows(json);
+    let fields = stripODataMetadata(rows);
 
-  // EXCLUDE system/metadata fields AND projected lookups (_x003a_)
-  fields = fields.filter(f =>
-    !SKIP_FIELDS.has(f.InternalName) &&
-    !SKIP_FIELDS.has(f.Title) &&
-    !f.InternalName.includes('_x003a_') &&
-    !f.IsDependentLookup
-  );
+    // EXCLUDE system/metadata fields AND projected lookups (_x003a_)
+    fields = fields.filter(f =>
+      !SKIP_FIELDS.has(f.InternalName) &&
+      !SKIP_FIELDS.has(f.Title) &&
+      !f.InternalName.includes('_x003a_') &&
+      !f.IsDependentLookup
+    );
 
-  const mandatory = ['ID', 'Title', 'Created', 'Modified', 'Author', 'Editor'];
-  mandatory.forEach(mand => {
-    if (!fields.some(f => f.InternalName === mand)) {
-      let forcedType = 'Text';
-      if (mand === 'ID') forcedType = 'Counter';
-      if (mand === 'Author' || mand === 'Editor') forcedType = 'User';
-      if (mand === 'Created' || mand === 'Modified') forcedType = 'DateTime';
-      fields.push({ InternalName: mand, Title: mand, TypeAsString: forcedType });
+    // Check if list has any calculated fields, and retrieve the correct data type to replace TypeAsString
+    const hasCalculatedFields = fields.some(f => f.TypeAsString === 'Calculated');
+    if (hasCalculatedFields) {
+      const calcUrl = `${siteUrl}/_api/web/lists(guid'${listGuid}')/fields?$filter=FieldTypeKind eq 17&$select=InternalName,OutputType`;
+      const calcJson = await spFetch(calcUrl);
+      const calcRows = extractRows(calcJson);
+      const calcFields = stripODataMetadata(calcRows);
+      const calcMap = new Map();
+      calcFields.forEach(cf => { calcMap.set(cf.InternalName, cf.OutputType); });
+      // Map the OutputType integers to standard TypeAsString values
+      const outputTypeToString = {
+        2: 'Text',
+        4: 'DateTime',
+        8: 'Boolean',
+        9: 'Number',
+        10: 'Currency'
+      };
+      // Inject the mapped string as a new custom property CalculatedFieldTypeAsString
+      // (do not mutate TypeAsString since it identifies the field as calculated, needed for CAST)
+      fields.forEach(f => {
+      if (f.TypeAsString === 'Calculated' && calcMap.has(f.InternalName)) {
+        const typeInt = calcMap.get(f.InternalName);
+        // Add the new property, defaulting to 'Text' if the integer is unrecognized
+        f.CalculatedFieldTypeAsString = outputTypeToString[typeInt] || 'Text';
+      }
+      });
     }
-  });
 
-  // For document libraries, always include FileRef and FileLeafRef (not list items)
-  if (isDocLib) {
-    ['FileRef', 'FileLeafRef'].forEach(fn => {
-      if (!fields.some(f => f.InternalName === fn)) {
-        fields.push({ InternalName: fn, Title: fn, TypeAsString: 'Text' });
+    // Ensure mandatory fields are included (ID, Title, Created, Modified, Author, Editor) + FileRef/FileLeafRef for doc libs
+    const mandatory = ['ID', 'Title', 'Created', 'Modified', 'Author', 'Editor'];
+    mandatory.forEach(mand => {
+      if (!fields.some(f => f.InternalName === mand)) {
+        let forcedType = 'Text';
+        if (mand === 'ID') forcedType = 'Counter';
+        if (mand === 'Author' || mand === 'Editor') forcedType = 'User';
+        if (mand === 'Created' || mand === 'Modified') forcedType = 'DateTime';
+        fields.push({ InternalName: mand, Title: mand, TypeAsString: forcedType });
       }
     });
-  }
+    // For document libraries, always include FileRef and FileLeafRef (not list items)
+    if (isDocLib) {
+      ['FileRef', 'FileLeafRef'].forEach(fn => {
+        if (!fields.some(f => f.InternalName === fn)) {
+          fields.push({ InternalName: fn, Title: fn, TypeAsString: 'Text' });
+        }
+      });
+    }
 
-  return fields;
-}
+    return fields;
+  }
 
 // Rule 4 (Retrieval): Retry logic for missing columns + Pagination
 async function fetchSPItemsWithRetry(siteUrl, listGuid, selectStr, expandStr, top, retries = 10) {
@@ -11049,7 +11102,7 @@ This file is part of DataLaVista™
 24-normalization.js: Data normalization, field type parsing, and CSV parsing.
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 Created: 2026-03-24
-Last Modified: 2026-4-04
+Last Modified: 2026-4-06
 Summary: Data normalization, field type parsing, and CSV parsing.
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
@@ -11185,8 +11238,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       if (t === 'multichoice') return 'choice-multi';
       if (t.startsWith('bool') || t === 'yesno' || t === 'yes/no') return 'boolean';
       if (t === 'number' || t === 'currency' || t === 'integer') return 'number';
-      if (t === 'datetime') return 'date';
-      if (t === 'url') return 'url';
+      if (t === 'datetime' || t === 'date') return 'date';
+      if (t === 'url' || t === 'hyperlink' || t === 'link') return 'url';
       if (t === 'calculated') return 'text';
       if (t === 'note' || t === 'html') return 'html';
       return 'text';
@@ -11269,24 +11322,26 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 
       const displayName = spField.Title || decodeSpFieldName(internalName);
       const description = spField.Description || '';
-      const type = parseFieldType(spField.TypeAsString, internalName);
+      const fieldType = (spField.TypeAsString && spField.TypeAsString=='Calculated' ? 'Calculated' : parseFieldType(spField.TypeAsString, internalName));
+      const calculatedFieldType = (spField.CalculatedFieldTypeAsString ? parseFieldType(spField.CalculatedFieldTypeAsString, internalName) : null);
 
       // Build alias from display name (PascalCase, no spaces)
       let alias = toPascalCase(displayName);
       if (!alias || alias === internalName) alias = toPascalCase(decodeSpFieldName(internalName)) || internalName;
 
       return {
-        internalName,
-        displayName,
-        description,
-        alias,
-        type,
-        displayType: fieldDisplayType(type),
+        internalName : internalName,
+        displayName: displayName,
+        description: description,
+        alias: alias,
+        type: fieldType,
+        displayType: fieldDisplayType(calculatedFieldType || fieldType),
+        calculatedFieldType: calculatedFieldType,
         required: spField.Required,
         maxLength: spField.MaxLength,
         choices: spField.Choices ? (spField.Choices.results || spField.Choices) : null,
-        lookupList: (type === 'lookup' || type === 'lookup-multi') ? (spField.LookupList || null) : null,
-        lookupField: (type === 'lookup' || type === 'lookup-multi') ? (spField.LookupField || null) : null,
+        lookupList: (fieldType === 'lookup' || fieldType === 'lookup-multi') ? (spField.LookupList || null) : null,
+        lookupField: (fieldType === 'lookup' || fieldType === 'lookup-multi') ? (spField.LookupField || null) : null,
       };
     }
 
@@ -11341,7 +11396,7 @@ This file is part of DataLaVista™
 25-data-sources.js: Data source connection popup, remote fetch guards, and source loaders.
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 Created: 2026-03-24
-Last Modified: 2026-04-04
+Last Modified: 2026-04-06
 Summary: Data source connection popup, remote fetch guards, and source loaders.
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
@@ -12083,6 +12138,7 @@ async function loadSharePointListsSource(siteUrl, dsName, newAuth='current', new
       // User-facing alias: PascalCase of Title (no "List" suffix)
       const tableAlias = toPascalCase(list.Title || entityTypeName);
 
+      // Save the new table state, preserving any user-assigned alias
       setTableState(tableKey, {
         internalName: entityTypeName,
         displayName: list.Title || tableAlias || entityTypeName,
@@ -12094,7 +12150,7 @@ async function loadSharePointListsSource(siteUrl, dsName, newAuth='current', new
         data: [],
         loaded: false,
         sourceType: 'sharepoint',
-        isDocLib,
+        isDocLib: isDocLib || false,
         guid: list.Id,
         siteUrl: siteUrl,
         itemCount: list.ItemCount || 0,
@@ -12102,10 +12158,12 @@ async function loadSharePointListsSource(siteUrl, dsName, newAuth='current', new
         isFileUpload: false,
         keepRawData: false
       });
-
+      // Register table under data source in state
       if (!DataLaVistaState.dataSources[dsName].tables.includes(tableKey)) {
         DataLaVistaState.dataSources[dsName].tables.push(tableKey);
       }
+      // Register the table in AlaSQL (without data yet)
+      registerTableInAlaSQL(tableKey);
 
       // Register a view for this list so users see/query by the friendly list title
       CyberdynePipeline.registerSharePointList(dsName, tableKey, list.Title || tableAlias, fieldMetas);
@@ -13317,7 +13375,7 @@ This file is part of DataLaVista™
 27-cyberdyne-views.js: View management for CyberdynePipeline
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 Created: 2026-03-28
-Last Modified: 2026-04-04
+Last Modified: 2026-04-06
 Summary: AlaSQL view creation and management — maps raw tables to user-friendly aliases
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
@@ -13402,12 +13460,11 @@ _applyViewSQL(viewName) {
     if (baseFields.length > 0) {
       const sourceType = (t && t.sourceType) ? t.sourceType : 'unknown';
       const siteUrl   = (t && t.siteUrl)    ? t.siteUrl    : (DataLaVistaState.spSiteUrl || '');
-      const sampleRows = (t && t.data)       ? t.data.slice(0, 100) : [];
- 
+       
       const virtualCols = [];
       const seenAliases = new Set();
       for (const field of baseFields) {
-        const expanded = this.FieldExpander.expand(field, sampleRows, rawTableRef, { sourceType, siteUrl });
+        const expanded = this.FieldExpander.expand(field, rawTableRef, { sourceType, siteUrl });
         for (const vc of expanded) {
           if (!seenAliases.has(vc.alias)) {
             seenAliases.add(vc.alias);
@@ -13418,8 +13475,10 @@ _applyViewSQL(viewName) {
       if (virtualCols.length === 0) return; 
       const selectParts = virtualCols.map(vc => `${vc.sqlExpr} AS [${vc.alias}]`);
       try { alasql(`DROP VIEW IF EXISTS [${viewName}]`); } catch (_) {}
-      alasql(`CREATE VIEW [${viewName}] AS SELECT ${selectParts.join(', ')} FROM ${rawTableRef}`);
- 
+      try{
+        alasql(`CREATE VIEW [${viewName}] AS SELECT ${selectParts.join(', ')} FROM ${rawTableRef}`);
+    } catch (e) { console.warn(`[CyberdynePipeline] Failed to create view ${viewName}:`, e.message); }
+
       // Rebuild view metadata from expanded virtual columns
       view.columnMappings = {};
       view.fields = [];
@@ -13449,7 +13508,10 @@ _applyViewSQL(viewName) {
     }
     if (cols.length === 0) return; // Nothing to select yet (lazy SP list)
     try { alasql(`DROP VIEW IF EXISTS [${viewName}]`); } catch (_) {}
-    alasql(`CREATE VIEW [${viewName}] AS SELECT ${cols.join(', ')} FROM ${rawTableRef}`);
+    try{
+      console.log(`[CyberdynePipeline] Creating view cyberdyne-views.js Line 142 ${viewName} with columns:`, cols);
+       alasql(`CREATE VIEW [${viewName}] AS SELECT ${cols.join(', ')} FROM ${rawTableRef}`);
+    } catch (e) { console.warn(`[CyberdynePipeline] Failed to create view ${viewName}:`, e.message); }
   },
 
   /** Recreate the AlaSQL view with current column mappings (call after alias changes) */
@@ -13457,6 +13519,7 @@ _applyViewSQL(viewName) {
     try {
       alasql(`DROP VIEW IF EXISTS [${viewName}]`);
     } catch (_) {}
+    // TODO: DEBUG: shouldn't we save the new alias to state?
     this._applyViewSQL(viewName);
   },
 
@@ -13927,8 +13990,11 @@ _applyViewSQL(viewName) {
     const viewName = this.rawTableToView[rawTableName];
     if (!viewName || !this.views[viewName]) return;
     const view = this.views[viewName];
+    // If fetchTableData didn't pass new fields, use the ones we already saved
+    // during registerSharePointList.
+    const fieldsToUse = (fields && fields.length > 0) ? fields : view.baseFields;
     // Store only non-synthetic base fields as baseFields — FieldExpander generates synthetics
-    const baseOnly = (fields || []).filter(f => !f.isSynthetic && !f.isAutoId);
+    const baseOnly = (fieldsToUse || []).filter(f => !f.isSynthetic && !f.isAutoId);
     view.baseFields = [...baseOnly];
     view.columnMappings = {};
     for (const f of baseOnly) {
@@ -13966,20 +14032,13 @@ _applyViewSQL(viewName) {
       this.viewToRawTable[viewName] = viewDef.rawTable;
       this.rawTableToView[viewDef.rawTable] = viewName;
 
-      // Only attempt the AlaSQL CREATE VIEW statement if the corresponding _raw_ table
-      // already exists in AlaSQL (i.e. data was loaded in a previous session or by a
-      // prior doConnect call).  If not, skip silently — the AlaSQL view will be created
-      // by ensureTableData → fetchTableData → _registerRawTable + updateViewSQL once
-      // the data is actually loaded.
-      const rawAlasqlName = '_raw_' + viewDef.rawTable;
-      const rawTableExists = !!(alasql.tables && alasql.tables[rawAlasqlName]);
-      if (rawTableExists) {
-        try {
+      // Register the table in AlaSQL (without data yet)
+      registerTableInAlaSQL(viewDef.rawTable);
+      try {
           this._applyViewSQL(viewName);
         } catch (e) {
           console.warn('[CyberdynePipeline] restoreViewsFromConfig: _applyViewSQL failed for', viewName, e.message);
         }
-      } else { }
     }
   },
 
@@ -14003,11 +14062,11 @@ _applyViewSQL(viewName) {
    * VirtualColumn: { alias, internalName, sqlExpr, type, displayType, isSynthetic, parentField }
    */
   FieldExpander: {
-
-    expand(field, sampleRows, rawTableRef, opts) {
-      const ft = (field.type || 'text').toLowerCase();
+    expand(field, rawTableRef, opts) {
+      let ft = (field.type || 'text').toLowerCase();
       const typeStr = (field.TypeAsString || field.type || '').toLowerCase();
       const siteUrl = (opts && opts.siteUrl) ? opts.siteUrl : '';
+      
       // Output alias: use field.alias (already PascalCase from buildFieldMeta/inferFieldTypes)
       const outKey = field.alias || toPascalCase(field.internalName) || field.internalName;
       const rawCol = `[${field.internalName}]`;
@@ -14015,23 +14074,33 @@ _applyViewSQL(viewName) {
       // ── SP-specific types ──────────────────────────────────────────────────
       if (ft === 'user')        return this._expandUserSingle(field, outKey, rawCol, siteUrl);
       if (ft === 'user-multi')  return this._expandUserMulti(field, outKey, rawCol);
-
       if (ft === 'lookup')      return this._expandLookupSingle(field, outKey, rawCol);
       if (ft === 'lookup-multi') return this._expandLookupMulti(field, outKey, rawCol);
-
       if (ft === 'taxkeyword') {
         const isMulti = typeStr.includes('multi') || field.internalName === 'TaxKeyword';
         return isMulti
           ? this._expandTaxonomyMulti(field, outKey, rawCol)
           : this._expandTaxonomy(field, outKey, rawCol);
       }
-
       if (ft === 'url') return this._expandUrlField(field, outKey, rawCol);
+      if (typeStr === 'calculated' && (field.CalculatedTypeAsString || field.calculatedFieldType)) {
+        const newFieldType = parseFieldType(field.CalculatedTypeAsString || field.calculatedFieldType);
+        // Shallow-clone to avoid mutating the shared state field object
+        field = Object.assign({}, field, { type: newFieldType, displayType: fieldDisplayType(newFieldType) });
+        // Re-derive ft so subsequent type-branches route correctly
+        ft = newFieldType.toLowerCase();
+      }
 
       // ── Generic types inferred from data ───────────────────────────────────
       if (ft === 'object') return this._expandGenericObject(field, outKey, rawCol);
       if (ft === 'array')  return this._expandGenericArray(field, outKey, rawCol);
       if (ft === 'date')   return this._expandDateField(field, outKey, rawCol);
+
+      // ── Explicit Parsers for SharePoint Calculated Fields ONLY ─────────────
+      if (typeStr === 'calculated') {
+        if (ft === 'boolean') return this._expandBooleanField(field, outKey, rawCol);
+        if (ft === 'number' || ft === 'currency') return this._expandNumberField(field, outKey, rawCol);
+      }
 
       // ── Passthrough (number, boolean, text, choice, html, etc.) ───────────
       return this._expandPassthrough(field, outKey, rawCol);
@@ -14124,6 +14193,20 @@ _applyViewSQL(viewName) {
       ];
     },
 
+    // ── Boolean Fields ───────────────────────────────────────────
+    _expandBooleanField(field, outKey, rawCol) {
+      return [
+        this._vc(outKey, field.internalName, `DLV_PARSE_BOOL(${rawCol})`, 'boolean', 'boolean', false, field.internalName),
+      ];
+    },
+
+    // ── Number & Currency Fields ─────────────────────────────────
+    _expandNumberField(field, outKey, rawCol) {
+      return [
+        this._vc(outKey, field.internalName, `DLV_PARSE_NUMBER(${rawCol})`, 'number', field.displayType || field.type || 'number', false, field.internalName),
+      ];
+    },
+
     _expandPassthrough(field, outKey, rawCol) {
       return [
         this._vc(outKey, field.internalName, rawCol, field.type || 'text', field.displayType || 'text', false, field.internalName),
@@ -14138,7 +14221,7 @@ This file is part of DataLaVista™
 30-config.js: Widget SQL generation, configuration save/load, and fields panel rendering.
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 Created: 2026-03-24
-Last Modified: 2026-04-04
+Last Modified: 2026-04-06
 Summary: Widget SQL generation, configuration save/load, and fields panel rendering.
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
@@ -14476,7 +14559,6 @@ async function loadConfig(cfg) {
   if (!cfg._license) throw new Error('Invalid report config — missing _license key');
   // Basic validation passed — now clear the existing state and load the config values
   CyberdynePipeline.clearAllViews(); // drop any existing AlaSQL views before reloading
-  //{ ...cfg.dataSource } || { type: 'sharepoint', url: '', auth: 'current' };
   DataLaVistaState.activeTab = (DataLaVistaState.reportMode==='view')?'dataPreview':'design';
   DataLaVistaState.advancedQB = cfg.advancedQB || {};
   DataLaVistaState.advancedQB.nodeAliases ??= {};
@@ -20283,7 +20365,7 @@ This file is part of DataLaVista™
 70-preview.js: Preview tab, CSV download, and report generation.
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 Created: 2026-03-24
-Last Modified: 2026-04-05
+Last Modified: 2026-04-06
 Summary: Preview tab, CSV download, and report generation.
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
@@ -20310,7 +20392,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 
         try {
           const referencedTables = findReferencedTables(DataLaVistaState.sql);
-          // TODO: DEBUG: This appears to refresh sharepoint sources only but not remote files.
           for (const tname of referencedTables) {
             await ensureTableData(tname, true); // Load all rows
           }

@@ -3,7 +3,7 @@ This file is part of DataLaVista™
 24-normalization.js: Data normalization, field type parsing, and CSV parsing.
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 Created: 2026-03-24
-Last Modified: 2026-4-04
+Last Modified: 2026-4-06
 Summary: Data normalization, field type parsing, and CSV parsing.
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
@@ -139,8 +139,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       if (t === 'multichoice') return 'choice-multi';
       if (t.startsWith('bool') || t === 'yesno' || t === 'yes/no') return 'boolean';
       if (t === 'number' || t === 'currency' || t === 'integer') return 'number';
-      if (t === 'datetime') return 'date';
-      if (t === 'url') return 'url';
+      if (t === 'datetime' || t === 'date') return 'date';
+      if (t === 'url' || t === 'hyperlink' || t === 'link') return 'url';
       if (t === 'calculated') return 'text';
       if (t === 'note' || t === 'html') return 'html';
       return 'text';
@@ -223,24 +223,26 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 
       const displayName = spField.Title || decodeSpFieldName(internalName);
       const description = spField.Description || '';
-      const type = parseFieldType(spField.TypeAsString, internalName);
+      const fieldType = (spField.TypeAsString && spField.TypeAsString=='Calculated' ? 'Calculated' : parseFieldType(spField.TypeAsString, internalName));
+      const calculatedFieldType = (spField.CalculatedFieldTypeAsString ? parseFieldType(spField.CalculatedFieldTypeAsString, internalName) : null);
 
       // Build alias from display name (PascalCase, no spaces)
       let alias = toPascalCase(displayName);
       if (!alias || alias === internalName) alias = toPascalCase(decodeSpFieldName(internalName)) || internalName;
 
       return {
-        internalName,
-        displayName,
-        description,
-        alias,
-        type,
-        displayType: fieldDisplayType(type),
+        internalName : internalName,
+        displayName: displayName,
+        description: description,
+        alias: alias,
+        type: fieldType,
+        displayType: fieldDisplayType(calculatedFieldType || fieldType),
+        calculatedFieldType: calculatedFieldType,
         required: spField.Required,
         maxLength: spField.MaxLength,
         choices: spField.Choices ? (spField.Choices.results || spField.Choices) : null,
-        lookupList: (type === 'lookup' || type === 'lookup-multi') ? (spField.LookupList || null) : null,
-        lookupField: (type === 'lookup' || type === 'lookup-multi') ? (spField.LookupField || null) : null,
+        lookupList: (fieldType === 'lookup' || fieldType === 'lookup-multi') ? (spField.LookupList || null) : null,
+        lookupField: (fieldType === 'lookup' || fieldType === 'lookup-multi') ? (spField.LookupField || null) : null,
       };
     }
 

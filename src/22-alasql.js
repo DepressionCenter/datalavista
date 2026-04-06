@@ -3,7 +3,7 @@ This file is part of DataLaVista™
 22-alasql.js: AlaSQL in-browser SQL engine setup and custom functions.
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 Created: 2026-03-24
-Last Modified: 2026-04-04
+Last Modified: 2026-04-06
 Summary: AlaSQL in-browser SQL engine setup and custom functions.
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
@@ -269,6 +269,30 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           if (val.results && Array.isArray(val.results)) return alasql.fn.DLV_TAX_IDS(val.results);
         }
         return null;
+      };
+
+      // Safely parse strings to Booleans (handles SharePoint's "Yes"/"1"/etc.)
+      alasql.fn.DLV_PARSE_BOOL = function(val) {
+        if (val === null || val === undefined) return false;
+        if (typeof val === 'boolean') return val;
+        
+        // Convert to string, trim, and lowercase for safe comparison
+        const strVal = String(val).trim().toLowerCase();
+        
+        return strVal === 'yes' || strVal === '1' || strVal === 'true';
+      };
+
+      // Safely parse strings to Floats (strips commas/currency symbols)
+      alasql.fn.DLV_PARSE_NUMBER = function(val) {
+        if (val === null || val === undefined || val === '') return null;
+        if (typeof val === 'number') return val;
+        
+        // Convert to string, strip out everything except digits, minus signs, and decimals
+        const cleanStr = String(val).replace(/[^0-9.-]+/g, '');
+        const parsed = parseFloat(cleanStr);
+        
+        // Return null if invalid to prevent NaN from breaking SQL math aggregates
+        return isNaN(parsed) ? null : parsed;
       };
     }
 

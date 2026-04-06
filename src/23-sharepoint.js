@@ -3,7 +3,7 @@ This file is part of DataLaVista™
 23-sharepoint.js: SharePoint REST API adapter and field structure loader.
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 Created: 2026-03-24
-Last Modified: 2026-04-04
+Last Modified: 2026-04-06
 Summary: SharePoint REST API adapter and field structure loader.
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
@@ -188,46 +188,75 @@ function stripODataMetadata(rows, quickCheck = false) {
     }
 
 
+    // Fetch field structure for a given SP list.
+    // Excludes Hidden, Computed, underscore-prefixed, and dependent lookup fields
     async function fetchSPFields(siteUrl, listGuid, isDocLib = false) {
-  // Excludes Hidden, Computed, underscore-prefixed, and dependent lookup fields
-  const filter = `(Hidden eq false and TypeAsString ne 'Computed' and startswith(InternalName,'_') eq false and (TypeAsString ne 'LookupMulti' or (TypeAsString eq 'LookupMulti' and ReadOnlyField eq false and IsDependentLookup eq false))) or InternalName eq 'Editor' or InternalName eq 'Author' or InternalName eq 'Created' or InternalName eq 'Modified' or InternalName eq 'ID' or InternalName eq 'Title' or InternalName eq 'TaxKeyword'`;
-  const select = `Id,InternalName,Title,TypeAsString,Description,Required,MaxLength,Choices,LookupField,LookupList,IsHidden,Hidden,ReadOnlyField,IsDependentLookup`;
-  const url = `${siteUrl}/_api/web/lists(guid'${listGuid}')/fields?$select=${select}&$filter=${filter}`;
+    const filter = `(Hidden eq false and TypeAsString ne 'Computed' and startswith(InternalName,'_') eq false and (TypeAsString ne 'LookupMulti' or (TypeAsString eq 'LookupMulti' and ReadOnlyField eq false and IsDependentLookup eq false))) or InternalName eq 'Editor' or InternalName eq 'Author' or InternalName eq 'Created' or InternalName eq 'Modified' or InternalName eq 'ID' or InternalName eq 'Title' or InternalName eq 'TaxKeyword'`;
+    const select = `Id,InternalName,Title,TypeAsString,Description,Required,MaxLength,Choices,LookupField,LookupList,IsHidden,Hidden,ReadOnlyField,IsDependentLookup`;
+    const url = `${siteUrl}/_api/web/lists(guid'${listGuid}')/fields?$select=${select}&$filter=${filter}`;
 
-  const json = await spFetch(url);
-  let rows = extractRows(json);
-  let fields = stripODataMetadata(rows);
+    const json = await spFetch(url);
+    let rows = extractRows(json);
+    let fields = stripODataMetadata(rows);
 
-  // EXCLUDE system/metadata fields AND projected lookups (_x003a_)
-  fields = fields.filter(f =>
-    !SKIP_FIELDS.has(f.InternalName) &&
-    !SKIP_FIELDS.has(f.Title) &&
-    !f.InternalName.includes('_x003a_') &&
-    !f.IsDependentLookup
-  );
+    // EXCLUDE system/metadata fields AND projected lookups (_x003a_)
+    fields = fields.filter(f =>
+      !SKIP_FIELDS.has(f.InternalName) &&
+      !SKIP_FIELDS.has(f.Title) &&
+      !f.InternalName.includes('_x003a_') &&
+      !f.IsDependentLookup
+    );
 
-  const mandatory = ['ID', 'Title', 'Created', 'Modified', 'Author', 'Editor'];
-  mandatory.forEach(mand => {
-    if (!fields.some(f => f.InternalName === mand)) {
-      let forcedType = 'Text';
-      if (mand === 'ID') forcedType = 'Counter';
-      if (mand === 'Author' || mand === 'Editor') forcedType = 'User';
-      if (mand === 'Created' || mand === 'Modified') forcedType = 'DateTime';
-      fields.push({ InternalName: mand, Title: mand, TypeAsString: forcedType });
+    // Check if list has any calculated fields, and retrieve the correct data type to replace TypeAsString
+    const hasCalculatedFields = fields.some(f => f.TypeAsString === 'Calculated');
+    if (hasCalculatedFields) {
+      const calcUrl = `${siteUrl}/_api/web/lists(guid'${listGuid}')/fields?$filter=FieldTypeKind eq 17&$select=InternalName,OutputType`;
+      const calcJson = await spFetch(calcUrl);
+      const calcRows = extractRows(calcJson);
+      const calcFields = stripODataMetadata(calcRows);
+      const calcMap = new Map();
+      calcFields.forEach(cf => { calcMap.set(cf.InternalName, cf.OutputType); });
+      // Map the OutputType integers to standard TypeAsString values
+      const outputTypeToString = {
+        2: 'Text',
+        4: 'DateTime',
+        8: 'Boolean',
+        9: 'Number',
+        10: 'Currency'
+      };
+      // Inject the mapped string as a new custom property CalculatedFieldTypeAsString
+      // (do not mutate TypeAsString since it identifies the field as calculated, needed for CAST)
+      fields.forEach(f => {
+      if (f.TypeAsString === 'Calculated' && calcMap.has(f.InternalName)) {
+        const typeInt = calcMap.get(f.InternalName);
+        // Add the new property, defaulting to 'Text' if the integer is unrecognized
+        f.CalculatedFieldTypeAsString = outputTypeToString[typeInt] || 'Text';
+      }
+      });
     }
-  });
 
-  // For document libraries, always include FileRef and FileLeafRef (not list items)
-  if (isDocLib) {
-    ['FileRef', 'FileLeafRef'].forEach(fn => {
-      if (!fields.some(f => f.InternalName === fn)) {
-        fields.push({ InternalName: fn, Title: fn, TypeAsString: 'Text' });
+    // Ensure mandatory fields are included (ID, Title, Created, Modified, Author, Editor) + FileRef/FileLeafRef for doc libs
+    const mandatory = ['ID', 'Title', 'Created', 'Modified', 'Author', 'Editor'];
+    mandatory.forEach(mand => {
+      if (!fields.some(f => f.InternalName === mand)) {
+        let forcedType = 'Text';
+        if (mand === 'ID') forcedType = 'Counter';
+        if (mand === 'Author' || mand === 'Editor') forcedType = 'User';
+        if (mand === 'Created' || mand === 'Modified') forcedType = 'DateTime';
+        fields.push({ InternalName: mand, Title: mand, TypeAsString: forcedType });
       }
     });
-  }
+    // For document libraries, always include FileRef and FileLeafRef (not list items)
+    if (isDocLib) {
+      ['FileRef', 'FileLeafRef'].forEach(fn => {
+        if (!fields.some(f => f.InternalName === fn)) {
+          fields.push({ InternalName: fn, Title: fn, TypeAsString: 'Text' });
+        }
+      });
+    }
 
-  return fields;
-}
+    return fields;
+  }
 
 // Rule 4 (Retrieval): Retry logic for missing columns + Pagination
 async function fetchSPItemsWithRetry(siteUrl, listGuid, selectStr, expandStr, top, retries = 10) {

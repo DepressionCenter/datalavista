@@ -3,7 +3,7 @@ This file is part of DataLaVista™
 27-cyberdyne-views.js: View management for CyberdynePipeline
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 Created: 2026-03-28
-Last Modified: 2026-04-04
+Last Modified: 2026-04-06
 Summary: AlaSQL view creation and management — maps raw tables to user-friendly aliases
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
@@ -88,12 +88,11 @@ _applyViewSQL(viewName) {
     if (baseFields.length > 0) {
       const sourceType = (t && t.sourceType) ? t.sourceType : 'unknown';
       const siteUrl   = (t && t.siteUrl)    ? t.siteUrl    : (DataLaVistaState.spSiteUrl || '');
-      const sampleRows = (t && t.data)       ? t.data.slice(0, 100) : [];
- 
+       
       const virtualCols = [];
       const seenAliases = new Set();
       for (const field of baseFields) {
-        const expanded = this.FieldExpander.expand(field, sampleRows, rawTableRef, { sourceType, siteUrl });
+        const expanded = this.FieldExpander.expand(field, rawTableRef, { sourceType, siteUrl });
         for (const vc of expanded) {
           if (!seenAliases.has(vc.alias)) {
             seenAliases.add(vc.alias);
@@ -104,8 +103,10 @@ _applyViewSQL(viewName) {
       if (virtualCols.length === 0) return; 
       const selectParts = virtualCols.map(vc => `${vc.sqlExpr} AS [${vc.alias}]`);
       try { alasql(`DROP VIEW IF EXISTS [${viewName}]`); } catch (_) {}
-      alasql(`CREATE VIEW [${viewName}] AS SELECT ${selectParts.join(', ')} FROM ${rawTableRef}`);
- 
+      try{
+        alasql(`CREATE VIEW [${viewName}] AS SELECT ${selectParts.join(', ')} FROM ${rawTableRef}`);
+    } catch (e) { console.warn(`[CyberdynePipeline] Failed to create view ${viewName}:`, e.message); }
+
       // Rebuild view metadata from expanded virtual columns
       view.columnMappings = {};
       view.fields = [];
@@ -135,7 +136,10 @@ _applyViewSQL(viewName) {
     }
     if (cols.length === 0) return; // Nothing to select yet (lazy SP list)
     try { alasql(`DROP VIEW IF EXISTS [${viewName}]`); } catch (_) {}
-    alasql(`CREATE VIEW [${viewName}] AS SELECT ${cols.join(', ')} FROM ${rawTableRef}`);
+    try{
+      console.log(`[CyberdynePipeline] Creating view cyberdyne-views.js Line 142 ${viewName} with columns:`, cols);
+       alasql(`CREATE VIEW [${viewName}] AS SELECT ${cols.join(', ')} FROM ${rawTableRef}`);
+    } catch (e) { console.warn(`[CyberdynePipeline] Failed to create view ${viewName}:`, e.message); }
   },
 
   /** Recreate the AlaSQL view with current column mappings (call after alias changes) */
@@ -143,6 +147,7 @@ _applyViewSQL(viewName) {
     try {
       alasql(`DROP VIEW IF EXISTS [${viewName}]`);
     } catch (_) {}
+    // TODO: DEBUG: shouldn't we save the new alias to state?
     this._applyViewSQL(viewName);
   },
 
@@ -613,8 +618,11 @@ _applyViewSQL(viewName) {
     const viewName = this.rawTableToView[rawTableName];
     if (!viewName || !this.views[viewName]) return;
     const view = this.views[viewName];
+    // If fetchTableData didn't pass new fields, use the ones we already saved
+    // during registerSharePointList.
+    const fieldsToUse = (fields && fields.length > 0) ? fields : view.baseFields;
     // Store only non-synthetic base fields as baseFields — FieldExpander generates synthetics
-    const baseOnly = (fields || []).filter(f => !f.isSynthetic && !f.isAutoId);
+    const baseOnly = (fieldsToUse || []).filter(f => !f.isSynthetic && !f.isAutoId);
     view.baseFields = [...baseOnly];
     view.columnMappings = {};
     for (const f of baseOnly) {
@@ -652,20 +660,13 @@ _applyViewSQL(viewName) {
       this.viewToRawTable[viewName] = viewDef.rawTable;
       this.rawTableToView[viewDef.rawTable] = viewName;
 
-      // Only attempt the AlaSQL CREATE VIEW statement if the corresponding _raw_ table
-      // already exists in AlaSQL (i.e. data was loaded in a previous session or by a
-      // prior doConnect call).  If not, skip silently — the AlaSQL view will be created
-      // by ensureTableData → fetchTableData → _registerRawTable + updateViewSQL once
-      // the data is actually loaded.
-      const rawAlasqlName = '_raw_' + viewDef.rawTable;
-      const rawTableExists = !!(alasql.tables && alasql.tables[rawAlasqlName]);
-      if (rawTableExists) {
-        try {
+      // Register the table in AlaSQL (without data yet)
+      registerTableInAlaSQL(viewDef.rawTable);
+      try {
           this._applyViewSQL(viewName);
         } catch (e) {
           console.warn('[CyberdynePipeline] restoreViewsFromConfig: _applyViewSQL failed for', viewName, e.message);
         }
-      } else { }
     }
   },
 
@@ -689,11 +690,11 @@ _applyViewSQL(viewName) {
    * VirtualColumn: { alias, internalName, sqlExpr, type, displayType, isSynthetic, parentField }
    */
   FieldExpander: {
-
-    expand(field, sampleRows, rawTableRef, opts) {
-      const ft = (field.type || 'text').toLowerCase();
+    expand(field, rawTableRef, opts) {
+      let ft = (field.type || 'text').toLowerCase();
       const typeStr = (field.TypeAsString || field.type || '').toLowerCase();
       const siteUrl = (opts && opts.siteUrl) ? opts.siteUrl : '';
+      
       // Output alias: use field.alias (already PascalCase from buildFieldMeta/inferFieldTypes)
       const outKey = field.alias || toPascalCase(field.internalName) || field.internalName;
       const rawCol = `[${field.internalName}]`;
@@ -701,23 +702,33 @@ _applyViewSQL(viewName) {
       // ── SP-specific types ──────────────────────────────────────────────────
       if (ft === 'user')        return this._expandUserSingle(field, outKey, rawCol, siteUrl);
       if (ft === 'user-multi')  return this._expandUserMulti(field, outKey, rawCol);
-
       if (ft === 'lookup')      return this._expandLookupSingle(field, outKey, rawCol);
       if (ft === 'lookup-multi') return this._expandLookupMulti(field, outKey, rawCol);
-
       if (ft === 'taxkeyword') {
         const isMulti = typeStr.includes('multi') || field.internalName === 'TaxKeyword';
         return isMulti
           ? this._expandTaxonomyMulti(field, outKey, rawCol)
           : this._expandTaxonomy(field, outKey, rawCol);
       }
-
       if (ft === 'url') return this._expandUrlField(field, outKey, rawCol);
+      if (typeStr === 'calculated' && (field.CalculatedTypeAsString || field.calculatedFieldType)) {
+        const newFieldType = parseFieldType(field.CalculatedTypeAsString || field.calculatedFieldType);
+        // Shallow-clone to avoid mutating the shared state field object
+        field = Object.assign({}, field, { type: newFieldType, displayType: fieldDisplayType(newFieldType) });
+        // Re-derive ft so subsequent type-branches route correctly
+        ft = newFieldType.toLowerCase();
+      }
 
       // ── Generic types inferred from data ───────────────────────────────────
       if (ft === 'object') return this._expandGenericObject(field, outKey, rawCol);
       if (ft === 'array')  return this._expandGenericArray(field, outKey, rawCol);
       if (ft === 'date')   return this._expandDateField(field, outKey, rawCol);
+
+      // ── Explicit Parsers for SharePoint Calculated Fields ONLY ─────────────
+      if (typeStr === 'calculated') {
+        if (ft === 'boolean') return this._expandBooleanField(field, outKey, rawCol);
+        if (ft === 'number' || ft === 'currency') return this._expandNumberField(field, outKey, rawCol);
+      }
 
       // ── Passthrough (number, boolean, text, choice, html, etc.) ───────────
       return this._expandPassthrough(field, outKey, rawCol);
@@ -807,6 +818,20 @@ _applyViewSQL(viewName) {
     _expandDateField(field, outKey, rawCol) {
       return [
         this._vc(outKey, field.internalName, `DLV_NORMALIZE_DATE(${rawCol})`, 'date', 'date', false, field.internalName),
+      ];
+    },
+
+    // ── Boolean Fields ───────────────────────────────────────────
+    _expandBooleanField(field, outKey, rawCol) {
+      return [
+        this._vc(outKey, field.internalName, `DLV_PARSE_BOOL(${rawCol})`, 'boolean', 'boolean', false, field.internalName),
+      ];
+    },
+
+    // ── Number & Currency Fields ─────────────────────────────────
+    _expandNumberField(field, outKey, rawCol) {
+      return [
+        this._vc(outKey, field.internalName, `DLV_PARSE_NUMBER(${rawCol})`, 'number', field.displayType || field.type || 'number', false, field.internalName),
       ];
     },
 

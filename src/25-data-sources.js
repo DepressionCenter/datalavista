@@ -3,7 +3,7 @@ This file is part of DataLaVista™
 25-data-sources.js: Data source connection popup, remote fetch guards, and source loaders.
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 Created: 2026-03-24
-Last Modified: 2026-04-04
+Last Modified: 2026-04-06
 Summary: Data source connection popup, remote fetch guards, and source loaders.
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
@@ -745,6 +745,7 @@ async function loadSharePointListsSource(siteUrl, dsName, newAuth='current', new
       // User-facing alias: PascalCase of Title (no "List" suffix)
       const tableAlias = toPascalCase(list.Title || entityTypeName);
 
+      // Save the new table state, preserving any user-assigned alias
       setTableState(tableKey, {
         internalName: entityTypeName,
         displayName: list.Title || tableAlias || entityTypeName,
@@ -756,7 +757,7 @@ async function loadSharePointListsSource(siteUrl, dsName, newAuth='current', new
         data: [],
         loaded: false,
         sourceType: 'sharepoint',
-        isDocLib,
+        isDocLib: isDocLib || false,
         guid: list.Id,
         siteUrl: siteUrl,
         itemCount: list.ItemCount || 0,
@@ -764,10 +765,12 @@ async function loadSharePointListsSource(siteUrl, dsName, newAuth='current', new
         isFileUpload: false,
         keepRawData: false
       });
-
+      // Register table under data source in state
       if (!DataLaVistaState.dataSources[dsName].tables.includes(tableKey)) {
         DataLaVistaState.dataSources[dsName].tables.push(tableKey);
       }
+      // Register the table in AlaSQL (without data yet)
+      registerTableInAlaSQL(tableKey);
 
       // Register a view for this list so users see/query by the friendly list title
       CyberdynePipeline.registerSharePointList(dsName, tableKey, list.Title || tableAlias, fieldMetas);
