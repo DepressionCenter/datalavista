@@ -1,10 +1,10 @@
 <!--
 This file is part of DataLaVista™
-DataLaVista Introduction Animation
-Author(s): Gabriel Mongefranco.
+index.html: The landing page for DataLaVista, featuring an interactive terminal-inspired animation with links to repo and docs.
+Author(s): Gabriel Mongefranco, Jeremy Gluskin, Shelley Boa.
 Created: 2026-03-10
-Last Modified: 2026-03-31
-Summary: DataLaVista is a ightweight, client-side reporting and dashboard toolkit.
+Last Modified: 2026-04-06
+Summary: DataLaVista is a ightweight, client-side reporting and dashboard toolkit. This file is the main landing page.
 Notes: See README file for documentation and full license information.
 
 Copyright © 2026 The Regents of the University of Michigan
@@ -20,352 +20,715 @@ You should have received a copy of the GNU General Public License along
 with this program. If not, see <https://www.gnu.org/licenses/>.
 
 -->
-<html>
+<html lang="en">
 <head>
-  <!-- Begin Google Analytics. Remove this section when re-using this file -->
-<!-- Google tag (gtag.js) -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-3Q455XWS5F"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DataLaVista™ | The BI Tool Terminator</title>
+  <meta name="description" content="DataLaVista is a lightweight, client-side reporting and dashboard toolkit. Tell your expensive BI tools: 'Data la vista, baby!'">
+  
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-3Q455XWS5F"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-3Q455XWS5F');
+  </script>
 
-  gtag('config', 'G-3Q455XWS5F');
-</script>
-<!-- End Google Analytics -->
-<style>
-@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Share+Tech+Mono&family=Bebas+Neue&display=swap');
-*{margin:0;padding:0;box-sizing:border-box;}
-#stage{position:relative;width:100%;height:520px;background:#000;overflow:hidden;font-family:'Share Tech Mono','Courier New',monospace;}
-.abs{position:absolute;inset:0;}
-#scanlines{position:absolute;inset:0;z-index:200;pointer-events:none;background:repeating-linear-gradient(0deg,transparent 0,transparent 2px,rgba(0,0,0,0.06) 2px,rgba(0,0,0,0.06) 4px);}
-#vignette{position:absolute;inset:0;z-index:199;pointer-events:none;background:radial-gradient(ellipse 85% 85% at 50% 50%,transparent 35%,rgba(0,0,0,0.88) 100%);}
-#grain{position:absolute;inset:0;z-index:198;pointer-events:none;opacity:.055;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='220' height='220' filter='url(%23n)'/%3E%3C/svg%3E");background-size:220px 220px;animation:gsh .16s steps(1) infinite;}
-@keyframes gsh{0%{background-position:0 0}20%{background-position:-30px 20px}40%{background-position:20px -30px}60%{background-position:-20px 30px}80%{background-position:30px -20px}100%{background-position:-10px 10px}}
-.bar{position:absolute;left:0;right:0;z-index:197;background:#000;height:0;transition:height 1.2s cubic-bezier(.4,0,.2,1);}
-#bt{top:0;}#bb{bottom:0;}
-.bar.open{height:9%;}
-#flash{position:absolute;inset:0;z-index:190;background:#fff;opacity:0;pointer-events:none;transition:opacity .12s;}
-#lflash{position:absolute;inset:0;z-index:25;background:rgba(170,195,255,.78);opacity:0;pointer-events:none;}
-.scene{position:absolute;inset:0;z-index:10;opacity:0;pointer-events:none;display:flex;align-items:center;justify-content:center;}
-.scene.on{opacity:1;}
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&family=Bebas+Neue&family=Inter:wght@400;600&display=swap" rel="stylesheet">
 
-#start{position:absolute;inset:0;z-index:300;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;transition:opacity .6s;}
-.sl{font-family:'Bebas Neue','Impact',sans-serif;font-size:clamp(28px,7vw,68px);color:#ff2200;text-shadow:0 0 18px #ff2200,0 0 40px rgba(255,34,0,.4);letter-spacing:7px;}
-.st{font-family:'Share Tech Mono',monospace;font-size:clamp(9px,1.4vw,12px);color:#444;letter-spacing:5px;}
-.sbtn{margin-top:28px;padding:12px 44px;background:transparent;border:1.5px solid #ff2200;color:#ff2200;font-family:'Share Tech Mono',monospace;font-size:clamp(10px,1.5vw,14px);letter-spacing:5px;cursor:pointer;transition:background .3s,box-shadow .3s;animation:bp 2.5s ease-in-out infinite;}
-.sbtn:hover{background:rgba(255,34,0,.1);box-shadow:0 0 18px #ff2200;}
-@keyframes bp{0%,100%{box-shadow:none;}50%{box-shadow:0 0 10px #ff2200,0 0 22px rgba(255,34,0,.3);}}
-.snote{font-family:'Share Tech Mono',monospace;font-size:clamp(8px,1vw,10px);color:#2e2e2e;letter-spacing:3px;}
+  <style>
+    /* ==========================================================================
+       ACCESSIBILITY & BASE STYLES
+       ========================================================================== */
+    :root {
+      --bg-dark: #030508;
+      --bg-panel: #0a1118;
+      --text-main: #e0e6ed;
+      --text-muted: #8b9bb4;
+      --term-red: #ff2200;
+      --term-red-glow: rgba(255, 34, 0, 0.4);
+      --term-blue: #00eeff;
+      --focus-ring: #00eeff;
+    }
 
-#s1{background:#000;}
-.hud-wrap{position:relative;width:100%;height:100%;}
-.ret{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:clamp(130px,26vw,250px);height:clamp(130px,26vw,250px);}
-.ro{position:absolute;inset:0;border:1.5px solid #ff2200;border-radius:50%;box-shadow:0 0 7px #ff2200,inset 0 0 7px rgba(255,34,0,.15);animation:scw 5s linear infinite;}
-.ri{position:absolute;inset:17%;border:1px dashed rgba(255,34,0,.45);border-radius:50%;animation:sccw 3.2s linear infinite;}
-@keyframes scw{to{transform:rotate(360deg);}}
-@keyframes sccw{to{transform:rotate(-360deg);}}
-.rt{position:absolute;background:#ff2200;box-shadow:0 0 4px #ff2200;}
-.rt.h{width:100%;height:1px;top:50%;transform:translateY(-50%);}
-.rt.v{height:100%;width:1px;left:50%;transform:translateX(-50%);}
-.rc{position:absolute;width:16px;height:16px;border-color:#ff2200;border-style:solid;box-shadow:0 0 5px #ff2200;}
-.rc.tl{top:0;left:0;border-width:2px 0 0 2px;}
-.rc.tr{top:0;right:0;border-width:2px 2px 0 0;}
-.rc.bl{bottom:0;left:0;border-width:0 0 2px 2px;}
-.rc.br{bottom:0;right:0;border-width:0 2px 2px 0;}
-.rdot{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:6px;height:6px;background:#ff2200;border-radius:50%;box-shadow:0 0 8px #ff2200;animation:dp 1s ease-in-out infinite;}
-@keyframes dp{0%,100%{opacity:.5;transform:translate(-50%,-50%) scale(1);}50%{opacity:1;transform:translate(-50%,-50%) scale(1.6);}}
-#sbeam{position:absolute;inset:0;background:linear-gradient(to bottom,transparent,rgba(255,34,0,.1) 48%,rgba(255,34,0,.38) 50%,rgba(255,34,0,.1) 52%,transparent);transform:translateY(-110%);pointer-events:none;}
-#sbeam.sw{animation:dsw 1.8s ease-in-out forwards;}
-@keyframes dsw{to{transform:translateY(110%);}}
-.hp{position:absolute;font-size:clamp(7.5px,1.1vw,10.5px);color:#ff2200;text-shadow:0 0 5px #ff2200;letter-spacing:1.5px;line-height:1.9;opacity:0;transition:opacity .4s;}
-.hp.vis{opacity:1;}
-.hp-tl{top:14%;left:4%;}
-.hp-tr{top:14%;right:4%;text-align:right;}
-.hp-bl{bottom:14%;left:4%;}
-.hp-br{bottom:14%;right:4%;text-align:right;}
-.bst { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); font-family:'Orbitron',monospace; display:flex; flex-direction:column; align-items:center; gap:4px; text-align:center; opacity:0; pointer-events:none; white-space:nowrap; transition:opacity .15s; }
-.bst.amb{color:#ffaa00;text-shadow:0 0 10px #ffaa00,0 0 35px rgba(255,170,0,.45);}
+    * { margin: 0; padding: 0; box-sizing: border-box; }
 
-.bst-l1 { font-size: clamp(12px, 3.2vw, 32px); font-weight: 900; letter-spacing: 5px; color: #ff2200; text-shadow: 0 0 10px #ff2200, 0 0 35px rgba(255,34,0,.45); }
-.bst-l1.amb { color: #ffaa00; text-shadow: 0 0 10px #ffaa00, 0 0 35px rgba(255,170,0,.45); }
-.bst-l2 { font-size: clamp(9px, 2.4vw, 24px); letter-spacing: 4px; color: rgba(255,34,0,.62); font-weight: 700; }
-.bst-l2.amb { color: rgba(255,170,0,.62); }
+    html { scroll-behavior: smooth; }
 
-#s2{background:#030810;}
-#rcv{position:absolute;inset:0;width:100%;height:100%;}
-#sil{position:absolute;top:40px;left:50%;transform:translateX(-50%);width:clamp(120px,21vw,210px);opacity:0;transition:opacity 2.5s;}
-.dlg{position:absolute;bottom:clamp(32px,9vh,90px);left:50%;transform:translateX(-50%);width:80%;text-align:center;font-family:'Share Tech Mono',monospace;font-size:clamp(12px,2.1vw,20px);color:#b5c9e5;letter-spacing:2px;line-height:1.9;min-height:50px;}
-.hl{color:#ff5533;font-weight:bold;text-shadow:0 0 6px #ff3311;}
+    body {
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      font-family: 'Inter', sans-serif;
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
 
-#s3{background:#000;flex-direction:column;gap:10px;}
-.bnt{font-family:'Bebas Neue','Impact',sans-serif;font-size:clamp(28px,9.5vw,96px);color:#cc1000;text-shadow:0 0 10px #ff2200,0 0 28px #ff2200,0 0 70px rgba(255,0,0,.42);letter-spacing:5px;text-align:center;opacity:0;transform:scale(.82) translateY(9px);transition:opacity 2.2s ease,transform 2.2s ease;line-height:1;}
-.bnt.show{opacity:1;transform:scale(1) translateY(0);}
-.bsub{font-family:'Share Tech Mono',monospace;font-size:clamp(8px,1.3vw,13px);color:rgba(255,34,0,.68);letter-spacing:7px;text-align:center;opacity:0;transition:opacity 1.8s ease .7s;}
-.bsub.show{opacity:1;}
+    .skip-link {
+      position: absolute;
+      top: -40px;
+      left: 0;
+      background: var(--term-red);
+      color: #fff;
+      padding: 8px;
+      z-index: 9999;
+      transition: top 0.2s;
+    }
+    .skip-link:focus { top: 0; outline: 3px solid var(--focus-ring); }
 
-#rep{position:absolute;bottom:13%;left:50%;transform:translateX(-50%);z-index:400;padding:9px 28px;background:transparent;border:1px solid rgba(255,34,0,.35);color:rgba(255,34,0,.45);font-family:'Share Tech Mono',monospace;font-size:clamp(8px,1.1vw,11px);letter-spacing:4px;cursor:pointer;opacity:0;transition:opacity 1s,color .3s,border-color .3s;}
-#rep.show{opacity:1;}
-#rep:hover{color:#ff2200;border-color:#ff2200;}
-@keyframes gp{0%,100%{text-shadow:0 0 10px #ff2200,0 0 28px #ff2200,0 0 70px rgba(255,0,0,.42);}50%{text-shadow:0 0 18px #ff2200,0 0 50px #ff2200,0 0 110px rgba(255,0,0,.55),0 0 180px rgba(255,0,0,.2);}}
-@keyframes glanim{0%{clip-path:none;transform:translate(0,0);filter:none;}15%{clip-path:inset(20% 0 60% 0);transform:translate(-4px,1px);filter:hue-rotate(70deg) saturate(200%);}30%{clip-path:inset(60% 0 10% 0);transform:translate(4px,-2px);filter:hue-rotate(-50deg);}45%{clip-path:none;transform:translate(0,0);filter:none;}60%{clip-path:inset(38% 0 44% 0);transform:translate(3px,0);filter:hue-rotate(100deg);}75%{clip-path:none;transform:translate(-2px,1px);filter:none;}100%{clip-path:none;transform:translate(0,0);filter:none;}}
-.dogl{animation:glanim .22s steps(2) 2;}
+    a { color: var(--term-blue); text-decoration: none; transition: color 0.2s, text-shadow 0.2s; }
+    a:hover { color: #fff; text-shadow: 0 0 8px var(--term-blue); }
+    a:focus-visible, button:focus-visible { outline: 3px dashed var(--focus-ring); outline-offset: 4px; }
 
+    /* ==========================================================================
+       GITHUB FORK RIBBON
+       ========================================================================== */
+    .github-fork-ribbon {
+      width: 12.1em;
+      height: 12.1em;
+      position: absolute;
+      overflow: hidden;
+      top: 0;
+      right: 0;
+      z-index: 9999;
+      pointer-events: none;
+      font-size: 13px;
+      text-decoration: none;
+      text-indent: -999999px;
+    }
+    .github-fork-ribbon:before, .github-fork-ribbon:after {
+      position: absolute;
+      display: block;
+      width: 15.38em;
+      height: 1.54em;
+      top: 3.23em;
+      right: -3.23em;
+      box-sizing: content-box;
+      transform: rotate(45deg);
+    }
+    .github-fork-ribbon:before {
+      content: "";
+      padding: .38em 0;
+      background-color: var(--term-red);
+      background-image: linear-gradient(to bottom, rgba(0,0,0,0), rgba(0,0,0,0.15));
+      box-shadow: 0 .15em .23em 0 rgba(0,0,0,0.5);
+      pointer-events: auto;
+    }
+    .github-fork-ribbon:after {
+      content: "Fork me on GitHub";
+      color: #fff;
+      font-family: 'Share Tech Mono', monospace;
+      font-weight: 700;
+      line-height: 1.54em;
+      text-decoration: none;
+      text-align: center;
+      text-indent: 0;
+      padding: .15em 0;
+      margin: .15em 0;
+      border-width: .08em 0;
+      border-style: dotted;
+      border-color: rgba(255,255,255,0.7);
+    }
 
-@keyframes eyeon {
-  0%   { opacity: 0; transform: scale(0.05); }
-  70%  { opacity: 1; transform: scale(1.15); }
-  100% { opacity: 1; transform: scale(1); }
-}
-.eye-on {
-  animation: eyeon 1.5s ease-out forwards;
-  transform-box: fill-box;
-  transform-origin: center;
-}
+    /* ==========================================================================
+       NAVIGATION
+       ========================================================================== */
+    header {
+      background: rgba(3, 5, 8, 0.9);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid rgba(255, 34, 0, 0.3);
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+      padding: 1rem 11rem 1rem 5%;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .logo {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 1.5rem;
+      font-weight: 900;
+      color: #fff;
+      letter-spacing: 2px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .logo span { color: var(--term-red); }
+    nav ul {
+      list-style: none;
+      display: flex;
+      gap: 2rem;
+    }
+    nav ul li a {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 1rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-main);
+    }
+    nav ul li a:hover { color: var(--term-red); text-shadow: 0 0 8px var(--term-red-glow); }
 
-#copy{position:absolute;bottom:8px;right:12px;z-index:210;font-family:'Share Tech Mono',monospace;font-size:clamp(7px,0.9vw,10px);color:rgba(255,255,255,0.28);letter-spacing:1.5px;pointer-events:none;}
+    /* ==========================================================================
+       HERO ANIMATION (From original index.html)
+       ========================================================================== */
+    #stage{position:relative;width:100%;height:600px;background:#000;overflow:hidden;font-family:'Share Tech Mono','Courier New',monospace; border-bottom: 2px solid var(--term-red);}
+    .abs{position:absolute;inset:0;}
+    #scanlines{position:absolute;inset:0;z-index:200;pointer-events:none;background:repeating-linear-gradient(0deg,transparent 0,transparent 2px,rgba(0,0,0,0.06) 2px,rgba(0,0,0,0.06) 4px);}
+    #vignette{position:absolute;inset:0;z-index:199;pointer-events:none;background:radial-gradient(ellipse 85% 85% at 50% 50%,transparent 35%,rgba(0,0,0,0.88) 100%);}
+    #grain{position:absolute;inset:0;z-index:198;pointer-events:none;opacity:.055;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='220' height='220' filter='url(%23n)'/%3E%3C/svg%3E");background-size:220px 220px;animation:gsh .16s steps(1) infinite;}
+    @keyframes gsh{0%{background-position:0 0}20%{background-position:-30px 20px}40%{background-position:20px -30px}60%{background-position:-20px 30px}80%{background-position:30px -20px}100%{background-position:-10px 10px}}
+    .bar{position:absolute;left:0;right:0;z-index:197;background:#000;height:0;transition:height 1.2s cubic-bezier(.4,0,.2,1);}
+    #bt{top:0;}#bb{bottom:0;}
+    .bar.open{height:9%;}
+    #flash{position:absolute;inset:0;z-index:190;background:#fff;opacity:0;pointer-events:none;transition:opacity .12s;}
+    #lflash{position:absolute;inset:0;z-index:25;background:rgba(170,195,255,.78);opacity:0;pointer-events:none;}
+    .scene{position:absolute;inset:0;z-index:10;opacity:0;pointer-events:none;display:flex;align-items:center;justify-content:center;}
+    .scene.on{opacity:1;}
 
-</style>
+    #start{position:absolute;inset:0;z-index:300;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;transition:opacity .6s;}
+    .sl{font-family:'Bebas Neue','Impact',sans-serif;font-size:clamp(28px,7vw,68px);color:#ff2200;text-shadow:0 0 18px #ff2200,0 0 40px rgba(255,34,0,.4);letter-spacing:7px;}
+    .st{font-family:'Share Tech Mono',monospace;font-size:clamp(9px,1.4vw,14px);color:#888;letter-spacing:5px;}
+    .sbtn{margin-top:28px;padding:12px 44px;background:transparent;border:1.5px solid #ff2200;color:#ff2200;font-family:'Share Tech Mono',monospace;font-size:clamp(10px,1.5vw,16px);letter-spacing:5px;cursor:pointer;transition:background .3s,box-shadow .3s;animation:bp 2.5s ease-in-out infinite;}
+    .sbtn:hover, .sbtn:focus{background:rgba(255,34,0,.1);box-shadow:0 0 18px #ff2200; outline:none;}
+    @keyframes bp{0%,100%{box-shadow:none;}50%{box-shadow:0 0 10px #ff2200,0 0 22px rgba(255,34,0,.3);}}
+    .snote{font-family:'Share Tech Mono',monospace;font-size:clamp(8px,1vw,12px);color:#666;letter-spacing:3px;}
+
+    #s1{background:#000;}
+    .hud-wrap{position:relative;width:100%;height:100%;}
+    .ret{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:clamp(130px,26vw,250px);height:clamp(130px,26vw,250px);}
+    .ro{position:absolute;inset:0;border:1.5px solid #ff2200;border-radius:50%;box-shadow:0 0 7px #ff2200,inset 0 0 7px rgba(255,34,0,.15);animation:scw 5s linear infinite;}
+    .ri{position:absolute;inset:17%;border:1px dashed rgba(255,34,0,.45);border-radius:50%;animation:sccw 3.2s linear infinite;}
+    @keyframes scw{to{transform:rotate(360deg);}}
+    @keyframes sccw{to{transform:rotate(-360deg);}}
+    .rt{position:absolute;background:#ff2200;box-shadow:0 0 4px #ff2200;}
+    .rt.h{width:100%;height:1px;top:50%;transform:translateY(-50%);}
+    .rt.v{height:100%;width:1px;left:50%;transform:translateX(-50%);}
+    .rc{position:absolute;width:16px;height:16px;border-color:#ff2200;border-style:solid;box-shadow:0 0 5px #ff2200;}
+    .rc.tl{top:0;left:0;border-width:2px 0 0 2px;}
+    .rc.tr{top:0;right:0;border-width:2px 2px 0 0;}
+    .rc.bl{bottom:0;left:0;border-width:0 0 2px 2px;}
+    .rc.br{bottom:0;right:0;border-width:0 2px 2px 0;}
+    .rdot{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:6px;height:6px;background:#ff2200;border-radius:50%;box-shadow:0 0 8px #ff2200;animation:dp 1s ease-in-out infinite;}
+    @keyframes dp{0%,100%{opacity:.5;transform:translate(-50%,-50%) scale(1);}50%{opacity:1;transform:translate(-50%,-50%) scale(1.6);}}
+    #sbeam{position:absolute;inset:0;background:linear-gradient(to bottom,transparent,rgba(255,34,0,.1) 48%,rgba(255,34,0,.38) 50%,rgba(255,34,0,.1) 52%,transparent);transform:translateY(-110%);pointer-events:none;}
+    #sbeam.sw{animation:dsw 1.8s ease-in-out forwards;}
+    @keyframes dsw{to{transform:translateY(110%);}}
+    .hp{position:absolute;font-family:'Share Tech Mono',monospace;font-size:clamp(9px,1.1vw,12px);color:#ff2200;text-shadow:0 0 5px #ff2200;letter-spacing:1.5px;line-height:1.9;opacity:0;transition:opacity .4s;}
+    .hp.vis{opacity:1;}
+    .hp-tl{top:14%;left:4%;}
+    .hp-tr{top:14%;right:4%;text-align:right;}
+    .hp-bl{bottom:14%;left:4%;}
+    .hp-br{bottom:14%;right:4%;text-align:right;}
+    .bst { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); font-family:'Orbitron',monospace; display:flex; flex-direction:column; align-items:center; gap:4px; text-align:center; opacity:0; pointer-events:none; white-space:nowrap; transition:opacity .15s; }
+    .bst-l1 { font-size: clamp(14px, 3.2vw, 36px); font-weight: 900; letter-spacing: 5px; color: #ff2200; text-shadow: 0 0 10px #ff2200, 0 0 35px rgba(255,34,0,.45); }
+    .bst-l1.amb { color: #ffaa00; text-shadow: 0 0 10px #ffaa00, 0 0 35px rgba(255,170,0,.45); }
+    .bst-l2 { font-size: clamp(10px, 2.4vw, 26px); letter-spacing: 4px; color: rgba(255,34,0,.62); font-weight: 700; }
+    .bst-l2.amb { color: rgba(255,170,0,.62); }
+
+    #s2{background:#030810;}
+    #rcv{position:absolute;inset:0;width:100%;height:100%;}
+    #sil{position:absolute;top:40px;left:50%;transform:translateX(-50%);width:clamp(120px,21vw,210px);opacity:0;transition:opacity 2.5s;}
+    .dlg{position:absolute;bottom:clamp(32px,9vh,90px);left:50%;transform:translateX(-50%);width:80%;text-align:center;font-family:'Share Tech Mono',monospace;font-size:clamp(14px,2.1vw,24px);color:#b5c9e5;letter-spacing:2px;line-height:1.9;min-height:50px;}
+    .hl{color:#ff5533;font-weight:bold;text-shadow:0 0 6px #ff3311;}
+
+    #s3{background:#000;flex-direction:column;gap:10px;}
+    .bnt{font-family:'Bebas Neue','Impact',sans-serif;font-size:clamp(36px,9.5vw,110px);color:#cc1000;text-shadow:0 0 10px #ff2200,0 0 28px #ff2200,0 0 70px rgba(255,0,0,.42);letter-spacing:5px;text-align:center;opacity:0;transform:scale(.82) translateY(9px);transition:opacity 2.2s ease,transform 2.2s ease;line-height:1;}
+    .bnt.show{opacity:1;transform:scale(1) translateY(0);}
+    .bsub{font-family:'Share Tech Mono',monospace;font-size:clamp(10px,1.3vw,16px);color:rgba(255,34,0,.68);letter-spacing:7px;text-align:center;opacity:0;transition:opacity 1.8s ease .7s;}
+    .bsub.show{opacity:1;}
+
+    #rep{position:absolute;bottom:13%;left:50%;transform:translateX(-50%);z-index:400;padding:9px 28px;background:transparent;border:1px solid rgba(255,34,0,.35);color:rgba(255,34,0,.65);font-family:'Share Tech Mono',monospace;font-size:clamp(10px,1.1vw,14px);letter-spacing:4px;cursor:pointer;opacity:0;transition:opacity 1s,color .3s,border-color .3s;}
+    #rep.show{opacity:1;}
+    #rep:hover, #rep:focus{color:#ff2200;border-color:#ff2200; outline:none;}
+    @keyframes gp{0%,100%{text-shadow:0 0 10px #ff2200,0 0 28px #ff2200,0 0 70px rgba(255,0,0,.42);}50%{text-shadow:0 0 18px #ff2200,0 0 50px #ff2200,0 0 110px rgba(255,0,0,.55),0 0 180px rgba(255,0,0,.2);}}
+    @keyframes glanim{0%{clip-path:none;transform:translate(0,0);filter:none;}15%{clip-path:inset(20% 0 60% 0);transform:translate(-4px,1px);filter:hue-rotate(70deg) saturate(200%);}30%{clip-path:inset(60% 0 10% 0);transform:translate(4px,-2px);filter:hue-rotate(-50deg);}45%{clip-path:none;transform:translate(0,0);filter:none;}60%{clip-path:inset(38% 0 44% 0);transform:translate(3px,0);filter:hue-rotate(100deg);}75%{clip-path:none;transform:translate(-2px,1px);filter:none;}100%{clip-path:none;transform:translate(0,0);filter:none;}}
+    .dogl{animation:glanim .22s steps(2) 2;}
+
+    @keyframes eyeon { 0% { opacity: 0; transform: scale(0.05); } 70% { opacity: 1; transform: scale(1.15); } 100% { opacity: 1; transform: scale(1); } }
+    .eye-on { animation: eyeon 1.5s ease-out forwards; transform-box: fill-box; transform-origin: center; }
+
+    /* ==========================================================================
+       PAGE CONTENT STYLES
+       ========================================================================== */
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 4rem 2rem;
+    }
+
+    .section-title {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 2.5rem;
+      color: #fff;
+      margin-bottom: 1.5rem;
+      border-bottom: 2px solid var(--term-red);
+      display: inline-block;
+      padding-bottom: 0.5rem;
+    }
+
+    .lead-text {
+      font-size: 1.25rem;
+      color: var(--text-muted);
+      margin-bottom: 3rem;
+      max-width: 800px;
+    }
+    
+    .text-highlight { color: var(--term-red); font-weight: 600; }
+
+    /* Features Grid */
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 2rem;
+      margin-bottom: 4rem;
+    }
+
+    .feature-card {
+      background: var(--bg-panel);
+      border: 1px solid rgba(255, 34, 0, 0.2);
+      padding: 2rem;
+      border-radius: 8px;
+      transition: transform 0.3s, box-shadow 0.3s;
+    }
+    .feature-card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 10px 20px rgba(255, 34, 0, 0.1);
+      border-color: rgba(255, 34, 0, 0.5);
+    }
+    .feature-card h3 {
+      font-family: 'Share Tech Mono', monospace;
+      color: var(--term-red);
+      font-size: 1.5rem;
+      margin-bottom: 1rem;
+    }
+
+    /* Iframe Wrapper */
+    .dashboard-preview {
+      margin: 4rem 0;
+    }
+    .cyber-frame {
+      position: relative;
+      background: var(--bg-panel);
+      padding: 2px;
+      border-radius: 8px;
+      box-shadow: 0 0 30px rgba(0, 238, 255, 0.1);
+      border: 1px solid rgba(0, 238, 255, 0.3);
+    }
+    .cyber-frame::before {
+      content: 'LIVE DEMO: PROJECT HEALTH DASHBOARD';
+      position: absolute;
+      top: -12px;
+      left: 20px;
+      background: var(--bg-dark);
+      padding: 0 10px;
+      font-family: 'Share Tech Mono', monospace;
+      color: var(--term-blue);
+      font-size: 0.85rem;
+      letter-spacing: 1px;
+    }
+    .cyber-frame iframe {
+      width: 100%;
+      height: 700px;
+      border: none;
+      border-radius: 6px;
+      background: #ffffff; /* Assuming the dashboard itself has a light background based on the screenshots */
+    }
+
+    /* Footer */
+    footer {
+      background: #000;
+      border-top: 1px solid #222;
+      padding: 3rem 5%;
+      text-align: center;
+      font-size: 0.9rem;
+      color: var(--text-muted);
+    }
+    .footer-links {
+      display: flex;
+      justify-content: center;
+      gap: 2rem;
+      margin-bottom: 1.5rem;
+      flex-wrap: wrap;
+    }
+    .footer-links a { color: var(--text-muted); font-family: 'Share Tech Mono', monospace;}
+    .footer-links a:hover { color: var(--term-blue); }
+    .copyright { font-size: 0.8rem; opacity: 0.6; }
+
+    /* Buttons */
+    .btn {
+      display: inline-block;
+      padding: 12px 24px;
+      background: rgba(255, 34, 0, 0.1);
+      color: var(--term-red);
+      border: 1px solid var(--term-red);
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 1.1rem;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      cursor: pointer;
+      transition: all 0.3s;
+      margin-top: 1rem;
+    }
+    .btn:hover, .btn:focus {
+      background: var(--term-red);
+      color: #fff;
+      box-shadow: 0 0 15px var(--term-red-glow);
+      outline: none;
+    }
+    .btn-blue {
+      background: rgba(0, 238, 255, 0.1);
+      color: var(--term-blue);
+      border-color: var(--term-blue);
+    }
+    .btn-blue:hover, .btn-blue:focus {
+      background: var(--term-blue);
+      color: #000;
+      box-shadow: 0 0 15px rgba(0, 238, 255, 0.4);
+    }
+
+  </style>
 </head>
-<body style="background:#000;">
-<div id="stage">
-  <div id="scanlines"></div>
-  <div id="vignette"></div>
-  <div id="grain"></div>
-  <div class="bar" id="bt"></div>
-  <div class="bar" id="bb"></div>
-  <div id="flash"></div>
-  <div id="lflash"></div>
+<body>
 
-  <div id="start">
-    <div class="sl">DataLaVista™</div>
-    <div class="st">Dashboard Designer</div>
-    <button class="sbtn" id="startBtn">▶ &nbsp;&nbsp; ACTIVATE</button>
-    <div class="snote" style="margin-top:6px;">🔊 &nbsp; enable audio for full experience</div>
-  </div>
+  <a href="#main-content" class="skip-link">Skip to main content</a>
 
-  <div class="scene" id="s1">
-    <div class="hud-wrap">
-      <div id="sbeam"></div>
-      <div class="ret">
-        <div class="ro"></div>
-        <div class="ri"></div>
-        <div class="rt h"></div>
-        <div class="rt v"></div>
-        <div class="rc tl"></div>
-        <div class="rc tr"></div>
-        <div class="rc bl"></div>
-        <div class="rc br"></div>
-        <div class="rdot"></div>
+  <a class="github-fork-ribbon" href="https://github.com/DepressionCenter/datalavista/fork" data-ribbon="Fork me on GitHub" title="Fork me on GitHub" target="_blank" rel="noopener">Fork me on GitHub</a>
+
+  <header>
+    <div class="logo">
+      <span>🕶️</span> DataLaVista™
+    </div>
+    <nav aria-label="Main Navigation">
+      <ul>
+        <li><a href="https://code.depressioncenter.org/datalavista/DataLaVista.html" target="_blank" rel="noopener">Designer</a></li>
+        <li><a href="https://github.com/DepressionCenter/datalavista" target="_top" rel="noopener">Code</a></li>
+        <li><a href="https://teamdynamix.umich.edu/TDClient/210/DepressionCenter/KB/ArticleDet?ID=15179" target="_top" rel="noopener">Docs</a></li>
+        <li><a href="https://depressioncenter.org/mobiletech" target="_blank" rel="noopener">Contact</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <div id="stage" role="region" aria-label="Interactive Terminal Animation">
+    <div id="scanlines"></div>
+    <div id="vignette"></div>
+    <div id="grain"></div>
+    <div class="bar" id="bt"></div>
+    <div class="bar" id="bb"></div>
+    <div id="flash"></div>
+    <div id="lflash"></div>
+
+    <div id="start">
+      <h1 class="sl">DataLaVista™</h1>
+      <div class="st">Dashboard Designer</div>
+      <button class="sbtn" id="startBtn" aria-label="Activate intro animation">▶ &nbsp;&nbsp; ACTIVATE</button>
+      <div class="snote" style="margin-top:6px;">🔊 &nbsp; enable audio for full experience</div>
+    </div>
+
+    <div class="scene" id="s1" aria-hidden="true">
+      <div class="hud-wrap">
+        <div id="sbeam"></div>
+        <div class="ret">
+          <div class="ro"></div>
+          <div class="ri"></div>
+          <div class="rt h"></div>
+          <div class="rt v"></div>
+          <div class="rc tl"></div>
+          <div class="rc tr"></div>
+          <div class="rc bl"></div>
+          <div class="rc br"></div>
+          <div class="rdot"></div>
+        </div>
+        <div class="hp hp-tl" id="h1">CYBERDYNE SYS v2.4<br>NEURAL NET: ACTIVE<br>THREAT LEVEL: HIGH</div>
+        <div class="hp hp-tr" id="h2">TARGET SCAN<br>RANGE: <span id="rv">0.1</span>m<br>VEL: <span id="vv">0</span> km/h</div>
+        <div class="hp hp-bl" id="h3">MATCH CONF: 83%<br><span style="color:#ff4400">████████░░</span></div>
+        <div class="hp hp-br" id="h4">T-800 SERIES<br>CPU: ACTIVE<br>PWR: 100%</div>
+        <div class="bst" id="bs">
+          <div class="bst-l1" id="bs-l1"></div>
+          <div class="bst-l2" id="bs-l2"></div>
+        </div>
       </div>
-      <div class="hp hp-tl" id="h1">CYBERDYNE SYS v2.4<br>NEURAL NET: ACTIVE<br>THREAT LEVEL: HIGH</div>
-      <div class="hp hp-tr" id="h2">TARGET SCAN<br>RANGE: <span id="rv">0.1</span>m<br>VEL: <span id="vv">0</span> km/h</div>
-      <div class="hp hp-bl" id="h3">MATCH CONF: 83%<br><span style="color:#ff4400">████████░░</span></div>
-      <div class="hp hp-br" id="h4">T-800 SERIES<br>CPU: ACTIVE<br>PWR: 100%</div>
-      <div class="bst" id="bs">
-		  <div class="bst-l1" id="bs-l1"></div>
-		  <div class="bst-l2" id="bs-l2"></div>
-		</div>
     </div>
-  </div>
 
-  <div class="scene" id="s2">
-    <canvas id="rcv"></canvas>
-    <div id="sil">
-      <svg viewBox="0 -60 200 280" xmlns="http://www.w3.org/2000/svg">
-		  <defs>
-			<filter id="eg">
-			  <feGaussianBlur stdDeviation="6" result="b"/>
-			  <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
-			</filter>
-		  </defs>
-		  <path d="M65,10 Q100,-2 135,10 L158,35 L165,75 L160,105 L150,125 L150,175 L148,185 Q145,195 135,198 L135,215 L65,215 L65,198 Q55,195 52,185 L50,175 L50,125 L40,105 L35,75 L42,35 Z" fill="#1c2d3e" fill-opacity="0.57"/>
-		  <path d="M78,4 Q100,0 122,4 L132,22 Q100,14 68,22 Z" fill="#5e7c90" fill-opacity="0.27"/>
-		  <path d="M42,60 L38,110 L50,118 L50,70 Z" fill="#2a3f52" fill-opacity="0.38"/>
-		  <path d="M158,60 L162,110 L150,118 L150,70 Z" fill="#2a3f52" fill-opacity="0.38"/>
-		  <rect x="44" y="55" width="112" height="10" rx="2" fill="#354e62" fill-opacity="0.48"/>
-		  <rect x="52" y="46" width="96"  height="8"  rx="2" fill="#4a6275" fill-opacity="0.38"/>
-		  <ellipse cx="76"  cy="90" rx="32" ry="22" fill="#0a1218" fill-opacity="0.66"/>
-		  <ellipse cx="124" cy="90" rx="32" ry="22" fill="#0a1218" fill-opacity="0.66"/>
-		  <ellipse cx="76"  cy="90" rx="22" ry="14" fill="#ff2200" filter="url(#eg)" opacity="0" id="le"/>
-		  <ellipse cx="124" cy="90" rx="22" ry="14" fill="#ff2200" filter="url(#eg)" opacity="0" id="re"/>
-		  <path d="M90,122 L100,112 L110,122 L107,135 L93,135 Z" fill="#0a1218" fill-opacity="0.62"/>
-		  <line x1="44"  y1="120" x2="68"  y2="110" stroke="#5a7888" stroke-width="2" stroke-opacity="0.38"/>
-		  <line x1="156" y1="120" x2="132" y2="110" stroke="#5a7888" stroke-width="2" stroke-opacity="0.38"/>
-		  <ellipse cx="55"  cy="130" rx="12" ry="7" fill="#4a6878" fill-opacity="0.15"/>
-		  <ellipse cx="145" cy="130" rx="12" ry="7" fill="#4a6878" fill-opacity="0.15"/>
-		  <rect x="58" y="150" width="84" height="5" rx="1" fill="#354e62" fill-opacity="0.48"/>
-		  <rect x="64"  y="156" width="9"  height="13" rx="1" fill="#1c2d3e" fill-opacity="0.50"/>
-		  <rect x="76"  y="156" width="9"  height="15" rx="1" fill="#1c2d3e" fill-opacity="0.50"/>
-		  <rect x="88"  y="156" width="9"  height="16" rx="1" fill="#1c2d3e" fill-opacity="0.50"/>
-		  <rect x="100" y="156" width="9"  height="16" rx="1" fill="#1c2d3e" fill-opacity="0.50"/>
-		  <rect x="112" y="156" width="9"  height="15" rx="1" fill="#1c2d3e" fill-opacity="0.50"/>
-		  <rect x="124" y="156" width="9"  height="13" rx="1" fill="#1c2d3e" fill-opacity="0.50"/>
-		  <rect x="80" y="215" width="40" height="65" fill="#1c2d3e" fill-opacity="0.49"/>
-		  <rect x="84" y="223" width="32" height="4" rx="1" fill="#354e62" fill-opacity="0.36"/>
-		  <rect x="84" y="233" width="32" height="4" rx="1" fill="#354e62" fill-opacity="0.36"/>
-		  <rect x="84" y="243" width="32" height="4" rx="1" fill="#354e62" fill-opacity="0.36"/>
-	  </svg>
+    <div class="scene" id="s2" aria-hidden="true">
+      <canvas id="rcv"></canvas>
+      <div id="sil">
+        <svg viewBox="0 -60 200 280" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+          <filter id="eg">
+            <feGaussianBlur stdDeviation="6" result="b"/>
+            <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+          </defs>
+          <path d="M65,10 Q100,-2 135,10 L158,35 L165,75 L160,105 L150,125 L150,175 L148,185 Q145,195 135,198 L135,215 L65,215 L65,198 Q55,195 52,185 L50,175 L50,125 L40,105 L35,75 L42,35 Z" fill="#1c2d3e" fill-opacity="0.57"/>
+          <path d="M78,4 Q100,0 122,4 L132,22 Q100,14 68,22 Z" fill="#5e7c90" fill-opacity="0.27"/>
+          <path d="M42,60 L38,110 L50,118 L50,70 Z" fill="#2a3f52" fill-opacity="0.38"/>
+          <path d="M158,60 L162,110 L150,118 L150,70 Z" fill="#2a3f52" fill-opacity="0.38"/>
+          <rect x="44" y="55" width="112" height="10" rx="2" fill="#354e62" fill-opacity="0.48"/>
+          <rect x="52" y="46" width="96"  height="8"  rx="2" fill="#4a6275" fill-opacity="0.38"/>
+          <ellipse cx="76"  cy="90" rx="32" ry="22" fill="#0a1218" fill-opacity="0.66"/>
+          <ellipse cx="124" cy="90" rx="32" ry="22" fill="#0a1218" fill-opacity="0.66"/>
+          <ellipse cx="76"  cy="90" rx="22" ry="14" fill="#ff2200" filter="url(#eg)" opacity="0" id="le"/>
+          <ellipse cx="124" cy="90" rx="22" ry="14" fill="#ff2200" filter="url(#eg)" opacity="0" id="re"/>
+          <path d="M90,122 L100,112 L110,122 L107,135 L93,135 Z" fill="#0a1218" fill-opacity="0.62"/>
+          <line x1="44"  y1="120" x2="68"  y2="110" stroke="#5a7888" stroke-width="2" stroke-opacity="0.38"/>
+          <line x1="156" y1="120" x2="132" y2="110" stroke="#5a7888" stroke-width="2" stroke-opacity="0.38"/>
+          <ellipse cx="55"  cy="130" rx="12" ry="7" fill="#4a6878" fill-opacity="0.15"/>
+          <ellipse cx="145" cy="130" rx="12" ry="7" fill="#4a6878" fill-opacity="0.15"/>
+          <rect x="58" y="150" width="84" height="5" rx="1" fill="#354e62" fill-opacity="0.48"/>
+          <rect x="64"  y="156" width="9"  height="13" rx="1" fill="#1c2d3e" fill-opacity="0.50"/>
+          <rect x="76"  y="156" width="9"  height="15" rx="1" fill="#1c2d3e" fill-opacity="0.50"/>
+          <rect x="88"  y="156" width="9"  height="16" rx="1" fill="#1c2d3e" fill-opacity="0.50"/>
+          <rect x="100" y="156" width="9"  height="16" rx="1" fill="#1c2d3e" fill-opacity="0.50"/>
+          <rect x="112" y="156" width="9"  height="15" rx="1" fill="#1c2d3e" fill-opacity="0.50"/>
+          <rect x="124" y="156" width="9"  height="13" rx="1" fill="#1c2d3e" fill-opacity="0.50"/>
+          <rect x="80" y="215" width="40" height="65" fill="#1c2d3e" fill-opacity="0.49"/>
+          <rect x="84" y="223" width="32" height="4" rx="1" fill="#354e62" fill-opacity="0.36"/>
+          <rect x="84" y="233" width="32" height="4" rx="1" fill="#354e62" fill-opacity="0.36"/>
+          <rect x="84" y="243" width="32" height="4" rx="1" fill="#354e62" fill-opacity="0.36"/>
+        </svg>
+      </div>
+      <div class="dlg" id="dlg"></div>
     </div>
-    <div class="dlg" id="dlg"></div>
+
+    <div class="scene" id="s3" aria-hidden="true">
+      <div class="bnt" id="bn">DATA LA VISTA,&nbsp; BABY!</div>
+      <div class="bsub" id="bs2">· · · &nbsp; T H E&nbsp;&nbsp;&nbsp;B I&nbsp;&nbsp;&nbsp;T O O L&nbsp;&nbsp;&nbsp;T E R M I N A T O R &nbsp; · · ·</div>
+    </div>
+
+    <button id="rep" aria-label="Replay animation">↺ &nbsp; REPLAY</button>
   </div>
 
-  <div class="scene" id="s3">
-    <div class="bnt" id="bn">DATA LA VISTA,&nbsp; BABY!</div>
-    <div class="bsub" id="bs2">· · · &nbsp; T H E&nbsp;&nbsp;&nbsp;B I&nbsp;&nbsp;&nbsp;T O O L&nbsp;&nbsp;&nbsp;T E R M I N A T O R &nbsp; · · ·</div>
-	<a id="ghlink" href="https://github.com/DepressionCenter/datalavista" target="_blank"
-   style="font-family:'Share Tech Mono',monospace;font-size:clamp(8px,1.2vw,12px);color:rgba(255,120,80,.55);letter-spacing:3px;text-decoration:none;opacity:0;transition:opacity 1.8s ease 1.2s;margin-top:6px;pointer-events:all;">
-  https://github.com/DepressionCenter/datalavista
-</a>
-  </div>
+  <main id="main-content" class="container">
+    
+    <section>
+      <h2 class="section-title">Terminate Data Silos</h2>
+      <p class="lead-text">
+        Tell your expensive BI tools: <span class="text-highlight">"Data la vista, baby!"</span>™ DataLaVista™ is a lightweight, client-side reporting and dashboard toolkit. It brings the full power of SQL directly to your browser, allowing you to build high-performance visualizations without the need for expensive server-side licenses or complex backend infrastructure.
+      </p>
 
-  <button id="rep">↺ &nbsp; REPLAY</button>
-  <div id="copy">Copyright &copy; 2026 The Regents of the University of Michigan</div>
-</div>
+      <div class="features-grid">
+        <div class="feature-card">
+          <h3>[01] Zero Server Footprint</h3>
+          <p>100% JavaScript. Your browser is the engine. No backend installation required.</p>
+        </div>
+        <div class="feature-card">
+          <h3>[02] Full SQL Support</h3>
+          <p>Query your SharePoint lists and flat files as if they were a robust relational database.</p>
+        </div>
+        <div class="feature-card">
+          <h3>[03] Pluggable Architecture</h3>
+          <p>Designed to be a universal survivor. Works in SharePoint today; works in React, Vue, or vanilla HTML tomorrow.</p>
+        </div>
+      </div>
 
-<script>
-const $ = id => document.getElementById(id);
-const stage = $('stage');
+      <a href="https://code.depressioncenter.org/datalavista/DataLaVista.html" class="btn" target="_blank" rel="noopener">Launch Designer</a>
+      <a href="https://teamdynamix.umich.edu/TDClient/210/DepressionCenter/KB/ArticleDet?ID=15179" target="_top" class="btn btn-blue" rel="noopener">Read the Manual</a>
+    </section>
 
-const cv = $('rcv');
-const cx = cv.getContext('2d');
-let drops=[], rActive=false, rafId=null;
+    <section class="dashboard-preview">
+      <h2 class="section-title">Live Target Acquisition</h2>
+      <p class="lead-text" style="margin-bottom: 1rem;">Interact with a live, completely client-side dashboard rendering right now.</p>
+      
+      <div class="cyber-frame">
+        <iframe 
+          src="https://code.depressioncenter.org/datalavista/DataLaVista.html?reportMode=view&report=https://code.depressioncenter.org/datalavista/samples/reports/Project%20Health%20Dashboard.json" 
+          title="DataLaVista Interactive Dashboard Demo"
+          allowfullscreen>
+          <p style="padding: 2rem; color: #fff; text-align: center;">
+            Your browser does not support iframes. 
+            <a href="https://code.depressioncenter.org/datalavista/DataLaVista.html?reportMode=view&report=https://code.depressioncenter.org/datalavista/samples/reports/Project%20Health%20Dashboard.json" target="_blank" rel="noopener">View the Live Demo here</a>.
+          </p>
+        </iframe>
+      </div>
+      
+      <div style="text-align: right; margin-top: 1rem;">
+        <a href="https://code.depressioncenter.org/datalavista/DataLaVista.html?reportMode=view&report=https://code.depressioncenter.org/datalavista/samples/reports/Project%20Health%20Dashboard.json" target="_blank" rel="noopener" class="btn btn-blue" style="font-size: 0.85rem; padding: 8px 16px;">
+          ↗ Open Demo in New Tab
+        </a>
+      </div>
+    </section>
 
-function sizeCV(){cv.width=stage.offsetWidth;cv.height=stage.offsetHeight;}
-sizeCV();
+  </main>
 
-function initDrops(){
-  drops=[];
-  const n=Math.floor(cv.width*0.18);
-  for(let i=0;i<n;i++) drops.push({x:Math.random()*cv.width,y:Math.random()*cv.height,spd:5+Math.random()*9,len:10+Math.random()*20,op:.1+Math.random()*.32,w:.4+Math.random()*.7});
-}
+  <footer>
+    <div class="footer-links">
+      <a href="https://github.com/DepressionCenter/datalavista" rel="noopener">GitHub Repo</a>
+      <a href="https://teamdynamix.umich.edu/TDClient/210/DepressionCenter/KB/ArticleDet?ID=15179" rel="noopener">Documentation</a>
+      <a href="https://depressioncenter.org/mobiletech" rel="noopener">Contact Mobile Tech Core</a>
+      <a href="https://depressioncenter.org" rel="noopener">Eisenberg Family Depression Center</a>
+    </div>
 
-function renderRain(){
-  if(!rActive)return;
-  cx.clearRect(0,0,cv.width,cv.height);
-  drops.forEach(d=>{
-    cx.beginPath();cx.moveTo(d.x,d.y);cx.lineTo(d.x-d.len*.11,d.y+d.len);
-    cx.strokeStyle=`rgba(125,155,205,${d.op})`;cx.lineWidth=d.w;cx.stroke();
-    d.y+=d.spd;d.x-=d.spd*.11;
-    if(d.y>cv.height+d.len){d.y=-d.len-5;d.x=Math.random()*cv.width;}
-  });
-  rafId=requestAnimationFrame(renderRain);
-}
+    <div style="margin-bottom: 2rem; font-family: 'Share Tech Mono', monospace; font-size: 0.9rem;">
+      <span style="color: var(--text-muted);">CREATED BY THE EISENBERG FAMILY DEPRESSION CENTER,<br />IN COLLABORATION WITH AUTOMATORS ANONYMOUS:</span><br>
+      <div style="margin-top: 8px; display: flex; justify-content: center; gap: 1rem; flex-wrap: wrap;">
+        <a href="https://gabriel.mongefranco.com" target="_blank" rel="noopener" style="color: var(--term-red);">Gabriel Mongefranco</a>
+        <span style="color: #444;">|</span>
+        <a href="https://github.com/jerm-ops" target="_blank" rel="noopener noreferrer" style="color: var(--term-red);">Jeremy Gluskin</a>
+        <span style="color: #444;">|</span>
+        <a href="https://github.com/blondilox-ai" target="_blank" rel="noopener noreferrer" style="color: var(--term-red);">Shelley Boa</a>
+      </div>
+    </div>
 
-let voice=null;
-function pickVoice(){
-  const vs=speechSynthesis.getVoices();if(!vs.length)return;
-  const want=['Google UK English Male','Microsoft George - English (United Kingdom)','Daniel','Alex','Thomas','Google UK English Male'];
-  for(const w of want){const v=vs.find(v=>v.name===w);if(v){voice=v;return;}}
-  voice=vs.find(v=>/male/i.test(v.name)&&/en/i.test(v.lang))||vs.find(v=>/en/i.test(v.lang))||vs[0];
-}
-if(speechSynthesis.onvoiceschanged!==undefined)speechSynthesis.onvoiceschanged=pickVoice;
-pickVoice();
+    <div class="copyright">
+      <p>Copyright &copy; 2026 The Regents of the University of Michigan</p>
+      <p style="margin-top: 8px; font-size: 0.75rem;">
+        DataLaVista™, "Come with me if you want to query"™, and "The BI Tool Terminator"™ are trademarks of The Regents of the University of Michigan.
+      </p>
+    </div>
+  </footer>
 
-function say(text,pitch,rate){
-  try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(text);u.pitch=pitch;u.rate=rate;u.volume=1;if(voice)u.voice=voice;speechSynthesis.speak(u);}catch(e){}
-}
+  <script>
+    (function() {
+      const $ = id => document.getElementById(id);
+      const stage = $('stage');
+      const cv = $('rcv');
+      const cx = cv.getContext('2d');
+      let drops=[], rActive=false, rafId=null;
 
-function flash(op,dur){const f=$('flash');f.style.transition=`opacity ${dur*.08}s`;f.style.opacity=op;setTimeout(()=>{f.style.transition=`opacity ${dur*.5}s`;f.style.opacity=0;},dur*.15);}
-function lightning(){const l=$('lflash');l.style.transition='opacity .04s';l.style.opacity=.65;setTimeout(()=>{l.style.opacity=0;},65);setTimeout(()=>{l.style.opacity=.3;},105);setTimeout(()=>{l.style.opacity=0;},190);}
-function showHp(id,d){setTimeout(()=>$(id).classList.add('vis'),d);}
-function setStatus(line1, line2, amb, d, hold) {
-  setTimeout(() => {
-    const wrap = $('bs');
-    const l1 = $('bs-l1');
-    const l2 = $('bs-l2');
-    l1.textContent = line1;
-    l1.className = 'bst-l1' + (amb ? ' amb' : '');
-    l2.textContent = line2 || '';
-    l2.className = 'bst-l2' + (amb ? ' amb' : '');
-    l2.style.display = line2 ? 'block' : 'none';
-    wrap.style.opacity = 1;
-    if (hold) setTimeout(() => { wrap.style.opacity = 0; }, hold);
-  }, d);
-}
-function glitch(d){setTimeout(()=>{$('s1').classList.add('dogl');setTimeout(()=>$('s1').classList.remove('dogl'),400);flash(.22,180);},d);}
+      function sizeCV(){
+        if(cv && stage) {
+          cv.width=stage.offsetWidth;
+          cv.height=stage.offsetHeight;
+        }
+      }
+      sizeCV();
+      window.addEventListener('resize', sizeCV);
 
-function typeIn(el,text,spd,done){
-  let i=0;
-  const iv=setInterval(()=>{el.innerHTML=text.substring(0,i+1);i++;if(i>=text.length){clearInterval(iv);if(done)setTimeout(done,250);}},spd);
-}
+      function initDrops(){
+        drops=[];
+        const n=Math.floor(cv.width*0.18);
+        for(let i=0;i<n;i++) drops.push({x:Math.random()*cv.width,y:Math.random()*cv.height,spd:5+Math.random()*9,len:10+Math.random()*20,op:.1+Math.random()*.32,w:.4+Math.random()*.7});
+      }
 
-function runS1(){
-  $('s1').classList.add('on');
-  setTimeout(()=>{$('bt').classList.add('open');$('bb').classList.add('open');},100);
-  showHp('h1',380);showHp('h2',580);
-  setTimeout(()=>$('sbeam').classList.add('sw'),480);
-  setStatus('SCANNING... ','BI tools in range',false,650,1020);
-  setTimeout(()=>{showHp('h3',0);showHp('h4',200);},1200);
-  setStatus('THREAT DETECTED','PBI░░TBL░░LKR',false,1500,1620);
-  glitch(2050);
-  setStatus('ACQUIRING TARGET','PBI░░TBL░░LKR',false,2450,1120);
-  glitch(3200);
-  setStatus('TARGET ACQUIRED','OBJECTIVE: TERMINATE.',true,3650,1350);
-  const iv=setInterval(()=>{$('rv').textContent=(Math.random()*4.5).toFixed(1);$('vv').textContent=Math.floor(Math.random()*4);},170);
-  setTimeout(()=>clearInterval(iv),4850);
-  setTimeout(()=>{
-    $('flash').style.transition='opacity .1s';$('flash').style.opacity=1;
-    setTimeout(()=>{$('s1').classList.remove('on');runS2();setTimeout(()=>{$('flash').style.transition='opacity .7s';$('flash').style.opacity=0;},100);},130);
-  },4950);
-}
+      function renderRain(){
+        if(!rActive)return;
+        cx.clearRect(0,0,cv.width,cv.height);
+        drops.forEach(d=>{
+          cx.beginPath();cx.moveTo(d.x,d.y);cx.lineTo(d.x-d.len*.11,d.y+d.len);
+          cx.strokeStyle=`rgba(125,155,205,${d.op})`;cx.lineWidth=d.w;cx.stroke();
+          d.y+=d.spd;d.x-=d.spd*.11;
+          if(d.y>cv.height+d.len){d.y=-d.len-5;d.x=Math.random()*cv.width;}
+        });
+        rafId=requestAnimationFrame(renderRain);
+      }
 
-function runS2(){
-  $('s2').classList.add('on');
-  initDrops();rActive=true;renderRain();
-  setTimeout(()=>{
-    $('sil').style.opacity=1;
-    setTimeout(()=>{$('le').classList.add('eye-on'); $('re').classList.add('eye-on');},1100);
-  },650);
-  setTimeout(lightning,1000);
-  setTimeout(lightning,5100);
-  const dlg=$('dlg');
-  setTimeout(()=>{
-    say('Come with me... if you want to query!',0.51,0.84);
-    typeIn(dlg,'Come with me...',75,()=>{setTimeout(()=>{dlg.innerHTML+='<br>if you want to <span class="hl">QUERY.</span>';},520);});
-  },1650);
-  setTimeout(()=>{
-    rActive=false;
-    $('s2').style.transition='opacity 1.9s';
-    $('s2').style.opacity=0;
-    setTimeout(()=>{$('s2').classList.remove('on');$('s2').style.opacity=1;$('s2').style.transition='';runS3();},2000);
-  },7300);
-}
+      let voice=null;
+      function pickVoice(){
+        const vs=speechSynthesis.getVoices();if(!vs.length)return;
+        const want=['Google UK English Male','Microsoft George - English (United Kingdom)','Daniel','Alex','Thomas'];
+        for(const w of want){const v=vs.find(v=>v.name===w);if(v){voice=v;return;}}
+        voice=vs.find(v=>/male/i.test(v.name)&&/en/i.test(v.lang))||vs.find(v=>/en/i.test(v.lang))||vs[0];
+      }
+      if(speechSynthesis.onvoiceschanged!==undefined)speechSynthesis.onvoiceschanged=pickVoice;
+      pickVoice();
 
-function runS3(){
-  $('s3').classList.add('on');
-  setTimeout(()=>$('bn').classList.add('show'),350);
-  setTimeout(()=>$('bs2').classList.add('show'),1100);
-  setTimeout(()=>say('Daa-taah La Vista, Baby.',0.45,0.94),700);
-  setTimeout(()=>{$('bn').style.animation='gp 3.5s ease-in-out infinite';},3000);
-  setTimeout(()=>$('rep').classList.add('show'),5800);
-  setTimeout(()=>{ $('ghlink').style.opacity=1; }, 1400);
-}
+      function say(text,pitch,rate){
+        try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(text);u.pitch=pitch;u.rate=rate;u.volume=1;if(voice)u.voice=voice;speechSynthesis.speak(u);}catch(e){}
+      }
 
-function resetAll(){
-  speechSynthesis.cancel();rActive=false;if(rafId)cancelAnimationFrame(rafId);
-  ['s1','s2','s3'].forEach(id=>{const el=$(id);el.classList.remove('on');el.style.opacity=1;el.style.transition='';});
-  $('bt').classList.remove('open');$('bb').classList.remove('open');
-  ['h1','h2','h3','h4'].forEach(id=>$(id).classList.remove('vis'));
-  $('bs').style.opacity=0;$('sbeam').classList.remove('sw');$('sbeam').style.transform='';
-  $('sil').style.opacity=0;
-  $('le').classList.remove('eye-on'); $('le').style.opacity=0;
-  $('re').classList.remove('eye-on'); $('re').style.opacity=0;
-  $('bn').classList.remove('show');$('bn').style.animation='';
-  $('bs2').classList.remove('show');
-  $('dlg').innerHTML='';
-  $('rep').classList.remove('show');
-  $('flash').style.opacity=0;$('lflash').style.opacity=0;
-  $('ghlink').style.opacity=0;
-}
+      function flash(op,dur){const f=$('flash');f.style.transition=`opacity ${dur*.08}s`;f.style.opacity=op;setTimeout(()=>{f.style.transition=`opacity ${dur*.5}s`;f.style.opacity=0;},dur*.15);}
+      function lightning(){const l=$('lflash');l.style.transition='opacity .04s';l.style.opacity=.65;setTimeout(()=>{l.style.opacity=0;},65);setTimeout(()=>{l.style.opacity=.3;},105);setTimeout(()=>{l.style.opacity=0;},190);}
+      function showHp(id,d){setTimeout(()=>$(id).classList.add('vis'),d);}
+      function setStatus(line1, line2, amb, d, hold) {
+        setTimeout(() => {
+          const wrap = $('bs');
+          const l1 = $('bs-l1');
+          const l2 = $('bs-l2');
+          l1.textContent = line1;
+          l1.className = 'bst-l1' + (amb ? ' amb' : '');
+          l2.textContent = line2 || '';
+          l2.className = 'bst-l2' + (amb ? ' amb' : '');
+          l2.style.display = line2 ? 'block' : 'none';
+          wrap.style.opacity = 1;
+          if (hold) setTimeout(() => { wrap.style.opacity = 0; }, hold);
+        }, d);
+      }
+      function glitch(d){setTimeout(()=>{$('s1').classList.add('dogl');setTimeout(()=>$('s1').classList.remove('dogl'),400);flash(.22,180);},d);}
 
-$('startBtn').addEventListener('click',()=>{
-  pickVoice();
-  const s=$('start');s.style.opacity=0;
-  window.setTimeout(()=>{s.style.display='none';runS1();},680);
-  window.setTimeout(()=>{ window.location.href="https://github.com/DepressionCenter/datalavista"; }, 30000);
-});
-$('rep').addEventListener('click',()=>{resetAll();setTimeout(runS1,420);});
-</script>
+      function typeIn(el,text,spd,done){
+        let i=0;
+        const iv=setInterval(()=>{el.innerHTML=text.substring(0,i+1);i++;if(i>=text.length){clearInterval(iv);if(done)setTimeout(done,250);}},spd);
+      }
+
+      function runS1(){
+        $('s1').classList.add('on');
+        setTimeout(()=>{$('bt').classList.add('open');$('bb').classList.add('open');},100);
+        showHp('h1',380);showHp('h2',580);
+        setTimeout(()=>$('sbeam').classList.add('sw'),480);
+        setStatus('SCANNING... ','BI tools in range',false,650,1020);
+        setTimeout(()=>{showHp('h3',0);showHp('h4',200);},1200);
+        setStatus('THREAT DETECTED','PBI░░TBL░░LKR',false,1500,1620);
+        glitch(2050);
+        setStatus('ACQUIRING TARGET','PBI░░TBL░░LKR',false,2450,1120);
+        glitch(3200);
+        setStatus('TARGET ACQUIRED','OBJECTIVE: TERMINATE.',true,3650,1350);
+        const iv=setInterval(()=>{$('rv').textContent=(Math.random()*4.5).toFixed(1);$('vv').textContent=Math.floor(Math.random()*4);},170);
+        setTimeout(()=>clearInterval(iv),4850);
+        setTimeout(()=>{
+          $('flash').style.transition='opacity .1s';$('flash').style.opacity=1;
+          setTimeout(()=>{$('s1').classList.remove('on');runS2();setTimeout(()=>{$('flash').style.transition='opacity .7s';$('flash').style.opacity=0;},100);},130);
+        },4950);
+      }
+
+      function runS2(){
+        $('s2').classList.add('on');
+        initDrops();rActive=true;renderRain();
+        setTimeout(()=>{
+          $('sil').style.opacity=1;
+          setTimeout(()=>{$('le').classList.add('eye-on'); $('re').classList.add('eye-on');},1100);
+        },650);
+        setTimeout(lightning,1000);
+        setTimeout(lightning,5100);
+        const dlg=$('dlg');
+        setTimeout(()=>{
+          say('Come with me... if you want to query!',0.51,0.84);
+          typeIn(dlg,'Come with me...',75,()=>{setTimeout(()=>{dlg.innerHTML+='<br>if you want to <span class="hl">QUERY.</span>';},520);});
+        },1650);
+        setTimeout(()=>{
+          rActive=false;
+          $('s2').style.transition='opacity 1.9s';
+          $('s2').style.opacity=0;
+          setTimeout(()=>{$('s2').classList.remove('on');$('s2').style.opacity=1;$('s2').style.transition='';runS3();},2000);
+        },7300);
+      }
+
+      function runS3(){
+        $('s3').classList.add('on');
+        setTimeout(()=>$('bn').classList.add('show'),350);
+        setTimeout(()=>$('bs2').classList.add('show'),1100);
+        setTimeout(()=>say('Daa-taah La Vista, Baby.',0.45,0.94),700);
+        setTimeout(()=>{$('bn').style.animation='gp 3.5s ease-in-out infinite';},3000);
+        setTimeout(()=>$('rep').classList.add('show'),5800);
+      }
+
+      function resetAll(){
+        speechSynthesis.cancel();rActive=false;if(rafId)cancelAnimationFrame(rafId);
+        ['s1','s2','s3'].forEach(id=>{const el=$(id);el.classList.remove('on');el.style.opacity=1;el.style.transition='';});
+        $('bt').classList.remove('open');$('bb').classList.remove('open');
+        ['h1','h2','h3','h4'].forEach(id=>$(id).classList.remove('vis'));
+        $('bs').style.opacity=0;$('sbeam').classList.remove('sw');$('sbeam').style.transform='';
+        $('sil').style.opacity=0;
+        $('le').classList.remove('eye-on'); $('le').style.opacity=0;
+        $('re').classList.remove('eye-on'); $('re').style.opacity=0;
+        $('bn').classList.remove('show');$('bn').style.animation='';
+        $('bs2').classList.remove('show');
+        $('dlg').innerHTML='';
+        $('rep').classList.remove('show');
+        $('flash').style.opacity=0;$('lflash').style.opacity=0;
+      }
+
+      $('startBtn').addEventListener('click',()=>{
+        pickVoice();
+        const s=$('start');s.style.opacity=0;
+        window.setTimeout(()=>{s.style.display='none';runS1();},680);
+      });
+      
+      $('rep').addEventListener('click',()=>{resetAll();setTimeout(runS1,420);});
+    })();
+  </script>
 </body>
 </html>

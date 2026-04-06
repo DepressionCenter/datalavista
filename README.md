@@ -1,9 +1,9 @@
 <!--
 This file is part of DataLaVista™
 README.md
-Author(s): Gabriel Mongefranco.
+Author(s): Gabriel Mongefranco, Jeremy Gluskin, Shelley Boa.
 Created: 2026-03-10
-Last Modified: 2026-03-10
+Last Modified: 2026-04-06
 Summary: DataLaVista is a ightweight, client-side reporting and dashboard toolkit.
 Notes: See README file for documentation and full license information.
 
