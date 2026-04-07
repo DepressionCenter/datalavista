@@ -1,0 +1,101 @@
+Task_ID,Date,Team,Priority,Status,Risk_Level,Planned_Hours,Actual_Hours,Completion_Percentage,Health_Score
+TSK-001,2023-01-01,Frontend,Critical,In Review,Medium,24.0,19.0,99,95
+TSK-002,2023-01-04,Backend,High,In Progress,Low,19.0,19.0,52,100
+TSK-003,2023-01-04,Frontend,Critical,In Review,Medium,25.0,25.0,82,90
+TSK-004,2023-01-04,QA,Critical,In Progress,Medium,32.0,30.0,40,95
+TSK-005,2023-01-05,Design,Low,In Review,High,18.0,19.0,89,75
+TSK-006,2023-01-06,QA,Medium,Done,High,18.0,22.0,100,75
+TSK-007,2023-01-06,Frontend,Medium,In Progress,Medium,33.0,44.0,38,75
+TSK-008,2023-01-09,Backend,Low,In Review,High,26.0,29.0,86,75
+TSK-009,2023-01-10,DevOps,High,Done,High,16.0,19.0,100,75
+TSK-010,2023-01-11,QA,Low,In Review,Medium,24.0,26.0,84,85
+TSK-011,2023-01-11,Backend,Medium,To Do,Low,16.0,8.0,0,100
+TSK-012,2023-01-12,Design,Medium,To Do,Low,16.0,18.0,0,95
+TSK-013,2023-01-12,Design,Low,Done,Medium,22.0,24.0,100,85
+TSK-014,2023-01-12,Design,Low,To Do,Low,5.0,19.0,0,85
+TSK-015,2023-01-13,Backend,Low,To Do,High,6.0,7.0,0,75
+TSK-016,2023-01-13,QA,Medium,In Progress,Medium,16.0,20.0,13,85
+TSK-017,2023-01-14,Backend,Low,In Review,Low,12.0,14.0,81,95
+TSK-018,2023-01-14,Backend,Low,In Progress,Low,23.0,19.0,41,100
+TSK-019,2023-01-15,DevOps,High,In Review,High,13.0,21.0,95,75
+TSK-020,2023-01-16,DevOps,Low,To Do,Medium,9.0,15.0,0,85
+TSK-021,2023-01-18,QA,Medium,In Progress,Medium,32.0,38.0,19,85
+TSK-022,2023-01-20,DevOps,High,In Review,High,18.0,15.0,94,85
+TSK-023,2023-01-21,Design,Critical,In Review,Medium,21.0,30.0,93,85
+TSK-024,2023-01-21,DevOps,Medium,In Progress,Medium,9.0,4.0,34,95
+TSK-025,2023-01-21,Design,Medium,Done,High,16.0,21.0,100,75
+TSK-026,2023-01-22,QA,Critical,In Review,High,21.0,34.0,92,65
+TSK-027,2023-01-25,Backend,Medium,To Do,Low,11.0,8.0,0,100
+TSK-028,2023-01-26,Backend,Critical,In Review,Medium,23.0,22.0,95,95
+TSK-029,2023-01-27,DevOps,Critical,To Do,High,15.0,17.0,0,75
+TSK-030,2023-01-28,Design,Medium,In Progress,Low,18.0,17.0,61,100
+TSK-031,2023-01-28,Frontend,Low,In Review,Medium,15.0,9.0,87,95
+TSK-032,2023-01-29,Frontend,Low,To Do,Low,35.0,37.0,0,95
+TSK-033,2023-01-29,Frontend,Critical,To Do,High,20.0,17.0,0,85
+TSK-034,2023-01-29,Backend,High,In Progress,Medium,12.0,16.0,28,85
+TSK-035,2023-01-30,Backend,Critical,In Review,Low,27.0,24.0,80,100
+TSK-036,2023-01-30,Design,Critical,In Review,High,10.0,20.0,83,75
+TSK-037,2023-01-30,DevOps,Critical,In Progress,High,22.0,20.0,64,85
+TSK-038,2023-02-01,Frontend,Low,In Review,High,4.0,4.0,87,80
+TSK-039,2023-02-01,Design,Low,In Progress,High,9.0,15.0,32,75
+TSK-040,2023-02-03,Design,Low,In Review,High,22.0,18.0,96,85
+TSK-041,2023-02-04,DevOps,Critical,Done,High,26.0,29.0,100,75
+TSK-042,2023-02-04,Design,High,In Review,High,21.0,30.0,94,75
+TSK-043,2023-02-05,DevOps,Low,To Do,Low,19.0,13.0,0,100
+TSK-044,2023-02-05,QA,Medium,To Do,Medium,18.0,21.0,0,85
+TSK-045,2023-02-05,DevOps,Medium,Done,Medium,8.0,11.0,100,85
+TSK-046,2023-02-05,Frontend,Medium,In Review,Low,14.0,20.0,81,95
+TSK-047,2023-02-07,Frontend,Critical,To Do,High,16.0,12.0,0,85
+TSK-048,2023-02-07,DevOps,Medium,To Do,Medium,28.0,23.0,0,95
+TSK-049,2023-02-11,QA,Critical,In Review,High,23.0,28.0,97,75
+TSK-050,2023-02-13,QA,Medium,In Progress,Medium,6.0,9.0,41,85
+TSK-051,2023-02-13,Frontend,High,In Review,High,23.0,26.0,83,75
+TSK-052,2023-02-14,QA,Critical,In Progress,Low,17.0,21.0,68,95
+TSK-053,2023-02-15,Design,Medium,Done,High,15.0,14.0,100,85
+TSK-054,2023-02-15,Backend,Low,Done,Medium,25.0,28.0,100,85
+TSK-055,2023-02-16,Design,Critical,To Do,High,28.0,31.0,0,75
+TSK-056,2023-02-16,Frontend,Low,To Do,Medium,27.0,25.0,0,95
+TSK-057,2023-02-17,QA,Low,To Do,High,13.0,24.0,0,65
+TSK-058,2023-02-18,DevOps,Low,In Progress,Medium,18.0,22.0,27,85
+TSK-059,2023-02-18,Backend,Low,To Do,Medium,23.0,19.0,0,95
+TSK-060,2023-02-18,DevOps,Medium,In Review,Medium,28.0,33.0,94,85
+TSK-061,2023-02-18,Frontend,Medium,In Progress,High,16.0,13.0,77,85
+TSK-062,2023-02-23,QA,Critical,Done,Medium,19.0,25.0,100,85
+TSK-063,2023-02-24,DevOps,Critical,In Progress,High,11.0,19.0,50,75
+TSK-064,2023-02-24,DevOps,Critical,To Do,Low,10.0,8.0,0,100
+TSK-065,2023-02-27,Backend,Medium,In Review,Low,27.0,34.0,94,95
+TSK-066,2023-02-28,Backend,Critical,In Review,Medium,31.0,35.0,99,85
+TSK-067,2023-02-28,QA,Low,To Do,High,19.0,25.0,0,75
+TSK-068,2023-03-01,Backend,Medium,In Review,Medium,28.0,39.0,96,75
+TSK-069,2023-03-06,DevOps,Critical,In Progress,High,23.0,24.0,64,75
+TSK-070,2023-03-10,DevOps,Low,In Progress,High,15.0,13.0,80,85
+TSK-071,2023-03-10,Frontend,Critical,To Do,Low,23.0,21.0,0,100
+TSK-072,2023-03-11,DevOps,High,In Review,High,32.0,30.0,94,85
+TSK-073,2023-03-11,QA,Critical,Done,High,20.0,22.0,100,75
+TSK-074,2023-03-12,Design,High,In Progress,Medium,33.0,37.0,30,85
+TSK-075,2023-03-13,Frontend,Critical,In Progress,Medium,2.0,5.0,70,85
+TSK-076,2023-03-13,Frontend,Critical,In Progress,High,27.0,33.0,67,75
+TSK-077,2023-03-15,QA,Medium,In Progress,Low,21.0,23.0,43,95
+TSK-078,2023-03-17,QA,Medium,Done,Medium,18.0,27.0,100,85
+TSK-079,2023-03-17,Backend,High,To Do,Medium,21.0,22.0,0,85
+TSK-080,2023-03-19,Frontend,Medium,In Progress,Low,4.0,20.0,41,85
+TSK-081,2023-03-19,Backend,Low,In Review,Medium,18.0,23.0,88,85
+TSK-082,2023-03-19,DevOps,Low,Done,High,23.0,21.0,100,85
+TSK-083,2023-03-21,Frontend,High,In Progress,High,32.0,29.0,76,85
+TSK-084,2023-03-22,Frontend,Low,In Review,High,16.0,20.0,95,75
+TSK-085,2023-03-23,Design,Low,In Progress,Medium,14.0,15.0,40,85
+TSK-086,2023-03-23,Frontend,Critical,To Do,Medium,16.0,22.0,0,85
+TSK-087,2023-03-23,DevOps,Medium,Done,Medium,27.0,31.0,100,85
+TSK-088,2023-03-23,Backend,Low,To Do,Medium,23.0,25.0,0,85
+TSK-089,2023-03-24,Backend,Low,Done,High,16.0,14.0,100,85
+TSK-090,2023-03-25,Design,Medium,In Progress,Low,24.0,18.0,45,100
+TSK-091,2023-03-26,DevOps,Low,In Progress,High,21.0,21.0,66,80
+TSK-092,2023-03-27,Backend,Low,Done,Medium,28.0,34.0,100,85
+TSK-093,2023-03-28,QA,Medium,In Review,High,14.0,17.0,82,75
+TSK-094,2023-03-29,DevOps,Critical,In Review,Low,17.0,13.0,89,100
+TSK-095,2023-03-29,DevOps,Low,In Progress,High,17.0,20.0,40,75
+TSK-096,2023-03-30,Design,Medium,In Progress,Low,8.0,12.0,44,95
+TSK-097,2023-03-31,Backend,Low,To Do,Medium,22.0,20.0,0,95
+TSK-098,2023-03-31,DevOps,Low,In Progress,High,22.0,25.0,52,75
+TSK-099,2023-03-31,Backend,Critical,Done,High,20.0,22.0,100,75
+TSK-100,2023-04-01,QA,High,In Review,High,18.0,14.0,90,85
