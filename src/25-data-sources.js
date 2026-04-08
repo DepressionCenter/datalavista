@@ -182,7 +182,7 @@ async function doConnect() {
 
     } else if (activeTab === 'loadconfig') {
   /* Open Dashboard Tab */
-  // Check for FILE UPLOAD FIRST (this was missing!)
+  // Check for FILE UPLOAD FIRST
   const fileInput = document.getElementById('config-file');
   const configUrl = (document.getElementById('config-url')?.value || '').trim();
   const jsonText = (document.getElementById('config-json-input')?.value || '').trim();
