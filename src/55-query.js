@@ -25,71 +25,81 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       // ============================================================
       async function runQuery() {
         const sql = window._cmEditor ? window._cmEditor.getValue() : DataLaVistaState.sql;
-        if (!sql.trim()) { toast('Please enter a SQL query', 'error'); return; }
+        if (!sql.trim() && DataLaVistaState.reportMode !== 'view') { toast('Please enter a SQL query', 'error'); return; }
         DataLaVistaState.sql = sql;
 
-        setStatus('Running query...', 'loading');
+        if (DataLaVistaState.reportMode === 'view') setStatus('Running query...', 'loading');
+
+        // Clear previous results before running
+        const previewWrap = document.getElementById('preview-table-wrap');
+        const previewCount = document.getElementById('preview-row-count');
+        if (previewWrap) previewWrap.innerHTML = '';
+        if (previewCount) previewCount.textContent = '';
+        hideUseInDesign();
 
         try {
-          // Find referenced tables
-          const referencedTables = findReferencedTables(sql);
-
-          // Load data for all referenced tables
-          for (const tname of referencedTables) {
-            await ensureTableData(tname,true);
-          }
-
-          // Register each referenced table in AlaSQL under its raw table name (_raw_<tableKey>)
-          // AND create/update the view that maps aliases to internal names
-          for (const tname of referencedTables) {
-            const t = DataLaVistaState.tables[tname];
-            if (!t || !t.data) continue;
-            
-            // Register the raw table: _raw_SP_PeopleList
-            registerTableInAlaSQL(tname);
-            
-            // Create/update the view: SP_Contacts -> SELECT [alias] AS [internalName] FROM [_raw_SP_PeopleList]
-            // This ensures the view exists and is up-to-date with the latest field mappings
-            const viewName = t.viewName || CyberdynePipeline.getViewForTable(tname);
-            if (viewName) {
-              try {
-                CyberdynePipeline.updateViewSQL(viewName);
-              } catch (e) {
-                console.warn(`[runQuery] Failed to update view ${viewName}:`, e.message);
-                // If view doesn't exist yet, create it
-                if (!CyberdynePipeline.views[viewName]) {
-                  CyberdynePipeline.createView(tname, viewName, t.fields || []);
-                }
-              }
-            }
-          }
-
-          // Execute SQL once, then store results in a named AlaSQL table so
-          // per-widget queries scan a materialized dataset instead of re-running joins.
-          const processedSQL = preprocessSQL(sql);
-          const sampleRows = alasql(processedSQL);
-          if (!Array.isArray(sampleRows)) throw new Error('Query returned no results');
-
-          alasql('DROP TABLE IF EXISTS [dlv_results]');
-          alasql('DROP VIEW  IF EXISTS [dlv_active]');
-          alasql('CREATE TABLE [dlv_results]');
-          alasql.tables['dlv_results'].data = sampleRows;   // O(1) reference assignment
-          alasql('CREATE VIEW [dlv_active] AS SELECT * FROM [dlv_results]');
-          DataLaVistaState.previewFilters = {};
-          DataLaVistaState.design.previewFilteredData = null;
-          DataLaVistaState.queryColumns = sampleRows.length ? Object.keys(sampleRows[0]) : [];
-
-          // Show QB preview table
-          showQueryPreview(sampleRows);
+          const results = await _executeQuery(sql);
+          showQueryPreview(results);
           renderDesignFieldsPanel();
-          setStatus(`Query returned ${sampleRows.length} rows`, 'success');
-          toast(`Query returned ${sampleRows.length} rows`, 'success');
+          if (DataLaVistaState.reportMode !== 'view') showUseInDesign();
+          setStatus(`Query returned ${results.length} rows`, 'success');
+          toast(`Query returned ${results.length} rows`, 'success');
         } catch (err) {
           console.error(err);
           toast('Query error: ' + err.message, 'error');
           setStatus('Query error: ' + err.message, 'error');
           hideUseInDesign();
         }
+      }
+
+      // Shared query execution core used by runQuery() and refreshDashboardPreview().
+      // Loads table data, registers AlaSQL tables/views, runs the SQL, and materializes
+      // results into [dlv_results] / [dlv_active]. Returns the result rows array.
+      async function _executeQuery(sql) {
+        const referencedTables = findReferencedTables(sql);
+
+        for (const tname of referencedTables) {
+          await ensureTableData(tname, true);
+        }
+
+        for (const tname of referencedTables) {
+          const t = DataLaVistaState.tables[tname];
+          if (!t || !t.data || !t.data.length) continue;
+
+          registerTableInAlaSQL(tname);
+
+          const viewName = t.viewName || CyberdynePipeline.getViewForTable(tname);
+          if (viewName) {
+            // Only call updateViewSQL if the AlaSQL view object is missing — avoids errors
+            // after loadConfig() which resets the metadata registry but not AlaSQL view objects.
+            const alasqlViewExists = !!(alasql.tables?.[viewName]?.view);
+            if (!alasqlViewExists) {
+              try { CyberdynePipeline.updateViewSQL(viewName); }
+              catch (e) {
+                console.warn(`[_executeQuery] updateViewSQL failed for ${viewName}:`, e.message);
+                if (!CyberdynePipeline.views[viewName]) {
+                  CyberdynePipeline.createView(tname, viewName, t.fields || []);
+                }
+              }
+            }
+          }
+        }
+
+        const processedSQL = preprocessSQL(sql);
+        const results = alasql(processedSQL);
+        if (!Array.isArray(results)) throw new Error('Query returned no results');
+
+        alasql('DROP TABLE IF EXISTS [dlv_results]');
+        alasql('DROP VIEW  IF EXISTS [dlv_active]');
+        alasql('CREATE TABLE [dlv_results]');
+        alasql.tables['dlv_results'].data = results;   // O(1) reference assignment
+        alasql('CREATE VIEW [dlv_active] AS SELECT * FROM [dlv_results]');
+
+        DataLaVistaState.queryResultsReady = true;
+        DataLaVistaState.design.previewFilteredData = null;
+        DataLaVistaState.queryColumns = results.length ? Object.keys(results[0]) : DataLaVistaState.queryColumns;
+
+        return results;
       }
 
       // Find all tables referenced in the SQL query by matching against both raw table keys and view names

@@ -370,7 +370,7 @@ async function loadConfig(cfg) {
   if (!cfg._license) throw new Error('Invalid report config — missing _license key');
   // Basic validation passed — now clear the existing state and load the config values
   CyberdynePipeline.clearAllViews(); // drop any existing AlaSQL views before reloading
-  DataLaVistaState.activeTab = (DataLaVistaState.reportMode==='view')?'dataPreview':'design';
+  //DataLaVistaState.activeTab = (DataLaVistaState.reportMode==='view')?'dataPreview':'design';
   DataLaVistaState.advancedQB = cfg.advancedQB || {};
   DataLaVistaState.advancedQB.nodeAliases ??= {};
   DataLaVistaState.basicQB = cfg.basicQB || {};
@@ -513,6 +513,7 @@ async function loadConfig(cfg) {
       await ensureTableData(tname, true)
     }
   }
+
   
   if (DataLaVistaState.sql && window._cmEditor) {
     window._cmEditor.setValue(DataLaVistaState.sql);
@@ -523,6 +524,24 @@ async function loadConfig(cfg) {
  
   renderFilterBar();
   updateDashboardTitleTooltipIcon(); // apply info icon if tooltip is set
+
+  try{
+    if(DataLaVistaState.reportMode === 'view' || DataLaVistaState.activeTab === 'dashboardPreview') {
+      setStatus('Refreshing dashboard preview...', 'info');
+      await refreshDashboardPreview();
+    } else {
+      setStatus('Running query...', 'info');
+      await runQuery();
+    }
+    DataLaVistaState.queryResultsReady = true;
+    if(DataLaVistaCore.reportMode!=='view') {
+      showUseInDesign();
+    }
+    
+  } catch(e) {
+    console.warn('Error refreshing dashboard preview after config load:', e);
+  }
+
   if(DataLaVistaState.reportMode !== 'view') {
     const titleInput = document.getElementById('title-input');
     if (titleInput) titleInput.value = DataLaVistaState.design.title || '';
@@ -537,7 +556,7 @@ async function loadConfig(cfg) {
     setStatus('Config loaded', 'success');
     toast('Config loaded successfully', 'success');
   }
-    
+   
 }
 
 // ============================================================

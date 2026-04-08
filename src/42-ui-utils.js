@@ -136,10 +136,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         const btn = document.getElementById('btn-run-query');
         if (!btn) return;
         const tab = DataLaVistaState.qmTab || 'qb';
-        if (tab === 'dataPreview') {
-          btn.disabled = true;
-          return;
-        }
         if (tab === 'sql') {
           const hasSQL = window._cmEditor
             ? !!window._cmEditor.getValue().trim()
