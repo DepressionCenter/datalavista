@@ -81,9 +81,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 
           // Show QB preview table
           showQueryPreview(sampleRows);
-          // Reset design transforms when a new view arrives
-          DataLaVistaState.design.transformedResults = null;
-          applyDesignTransforms();
           renderDesignFieldsPanel();
           setStatus(`Query returned ${sampleRows.length} rows`, 'success');
           toast(`Query returned ${sampleRows.length} rows`, 'success');

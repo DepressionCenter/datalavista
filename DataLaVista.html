@@ -4027,12 +4027,7 @@ const DataLaVistaState = {
     showDashboardTitle: true,   // whether the title bar is visible in preview/report mode
     dashboardTitleTooltip: '',  // optional HTML tooltip (sanitized) shown via info icon next to title
     widgets: [],     // widget objects
-    filters: [],     // { field, label, position }  — preview filter bar chips
-    conditions: [],  // { conj, field, op, value }  — design-level data filter
-    sorts: [],       // { field, dir }              — design-level sort
-    groupBy: [],     // string[]                    — design-level group by
-    fieldAggs: {},   // { [col]: aggVal }           — design-level aggregates
-    transformedResults: null  // cached result of applyDesignTransforms()
+    filters: []      // { field, label, position }  — preview filter bar chips
   },
   currentWidgetId: null,
   previewFilters: {},  // field -> value
@@ -9937,25 +9932,28 @@ function buildConfig() {
     kpiLabelOverride: w.kpiLabelOverride || '',
     stacked: !!w.stacked,
     showTrendLine: !!w.showTrendLine,
-    ySeriesProps: Object.fromEntries(
-      Object.entries(w.ySeriesProps || {}).map(([field, sp]) => [field, {
-        label:      sp.label      || '',
-        color:      sp.color      || '',
-        seriesType: sp.seriesType || '',
-        lineWidth:  sp.lineWidth  != null ? sp.lineWidth  : undefined,
-        opacity:    sp.opacity    != null ? sp.opacity    : undefined,
-        smooth:     sp.smooth     != null ? sp.smooth     : undefined,
-        axisSide:   sp.axisSide   || '',
-        conditions: (sp.conditions || []).map(c => ({
-          conj:       c.conj       || 'AND',
-          field:      c.field      || '',
-          op:         c.op         || '=',
-          value:      c.value      != null ? c.value : '',
-          ...(c.value2     != null ? { value2:     c.value2     } : {}),
-          ...(c.elementKey         ? { elementKey: c.elementKey } : {})
-        }))
-      }])
-    ),
+    seriesProps: (Array.isArray(w.seriesProps) ? w.seriesProps : []).map(sp => ({
+      field:      sp.field      || '',
+      agg:        sp.agg        || '',
+      label:      sp.label      || '',
+      color:      sp.color      || '',
+      seriesType: sp.seriesType || '',
+      ...(sp.lineWidth  != null ? { lineWidth:  sp.lineWidth  } : {}),
+      ...(sp.opacity    != null ? { opacity:    sp.opacity    } : {}),
+      ...(sp.smooth     != null ? { smooth:     sp.smooth     } : {}),
+      axisSide:   sp.axisSide   || '',
+      conditions: (sp.conditions || []).map(c => {
+        const out = {
+          conj:  c.conj  || 'AND',
+          field: c.field || '',
+          op:    c.op    || '=',
+          value: c.value != null ? c.value : ''
+        };
+        if (c.value2     != null) out.value2     = c.value2;
+        if (c.elementKey        ) out.elementKey = c.elementKey;
+        return out;
+      })
+    })),
     bubbleSizeField: w.bubbleSizeField || '',
     bubbleColorField: w.bubbleColorField || '',
     textContent: w.textContent || '',
@@ -9994,17 +9992,6 @@ function buildConfig() {
       label: f.label || f.field || '',
       position: f.position || 'bar'
     })),
-    conditions: (DataLaVistaState.design.conditions || []).map(c => ({
-      conj:       c.conj    || 'AND',
-      field:      c.field   || '',
-      op:         c.op      || '=',
-      value:      c.value   != null ? c.value : '',
-      ...(c.value2     != null ? { value2:     c.value2     } : {}),
-      ...(c.elementKey         ? { elementKey: c.elementKey } : {})
-    })),
-    sorts: (DataLaVistaState.design.sorts || []).map(s => ({ field: s.field || '', dir: s.dir || 'ASC' })),
-    groupBy: (DataLaVistaState.design.groupBy || []).filter(g => g),
-    fieldAggs: Object.assign({}, DataLaVistaState.design.fieldAggs || {})
   };
  
   // ── Smart export: only include tables referenced in the SQL (or uploaded files) ──
@@ -10118,19 +10105,14 @@ async function loadConfig(cfg) {
     showDashboardTitle: loadedDesign.showDashboardTitle !== false,
     dashboardTitleTooltip: loadedDesign.dashboardTitleTooltip || '',
     widgets: loadedDesign.widgets || [],
-    filters: loadedDesign.filters || [],
-    conditions: loadedDesign.conditions || [],
-    sorts: loadedDesign.sorts || [],
-    groupBy: loadedDesign.groupBy || [],
-    fieldAggs: loadedDesign.fieldAggs || {},
-    transformedResults: null
+    filters: loadedDesign.filters || []
   };
   // Migrate legacy single-yField to yFields array + backfill new widget defaults
   for (const w of DataLaVistaState.design.widgets) {
     if (!Array.isArray(w.yFields))        w.yFields = w.yField ? [w.yField] : [];
     if (w.stacked          == null)       w.stacked = false;
     if (w.showTrendLine    == null)       w.showTrendLine = false;
-    // Migrate legacy ySeriesTypes into ySeriesProps
+    // Migrate legacy ySeriesTypes into ySeriesProps (for very old configs)
     if (!w.ySeriesProps) {
       w.ySeriesProps = {};
       if (w.ySeriesTypes && typeof w.ySeriesTypes === 'object') {
@@ -10144,7 +10126,28 @@ async function loadConfig(cfg) {
     // Backfill conditions arrays inside ySeriesProps entries
     if (w.ySeriesProps && typeof w.ySeriesProps === 'object') {
       for (const sp of Object.values(w.ySeriesProps)) {
-        if (!sp.conditions) sp.conditions = [];
+        if (!Array.isArray(sp.conditions)) sp.conditions = [];
+      }
+    }
+
+    // Populate seriesProps (unified source of truth).
+    // New configs have it saved directly; legacy configs need reconstruction.
+    if (!Array.isArray(w.seriesProps) || !w.seriesProps.length) {
+      const _isChartW = ['bar','line','pie','scatter'].includes(w.type);
+      if (_isChartW) {
+        const _yfs = (Array.isArray(w.yFields) && w.yFields.length) ? w.yFields : (w.yField ? [w.yField] : []);
+        w.seriesProps = _yfs.map((yf, yi) => {
+          const leg = (w.ySeriesProps || {})[String(yi)] || (w.ySeriesProps || {})[yf] || {};
+          return { field: yf, agg: leg.agg || (w.fieldAggs || {})[yf] || '', label: leg.label || '', color: leg.color || '', seriesType: leg.seriesType || '', lineWidth: leg.lineWidth ?? null, opacity: leg.opacity ?? null, smooth: leg.smooth ?? null, axisSide: leg.axisSide || '', conditions: (leg.conditions || []).map(c => Object.assign({}, c)) };
+        });
+      } else {
+        const _flds = w.type === 'kpi' ? (w.fields || []).slice(0,1) : (w.fields || []);
+        w.seriesProps = _flds.map(f => ({ field: f, agg: (w.fieldAggs || {})[f] || '', label: '', color: '', seriesType: '', lineWidth: null, opacity: null, smooth: null, axisSide: '', conditions: [] }));
+      }
+    } else {
+      // Backfill conditions arrays in loaded seriesProps entries
+      for (const sp of w.seriesProps) {
+        if (!Array.isArray(sp.conditions)) sp.conditions = [];
       }
     }
 
@@ -10174,13 +10177,6 @@ async function loadConfig(cfg) {
     }));
     if (!w.sorts)                         w.sorts = [];
   }
-  // Normalize design-level conditions
-    if (Array.isArray(DataLaVistaState.design.conditions)) {
-      DataLaVistaState.design.conditions = DataLaVistaState.design.conditions.map(c => ({
-        ...c,
-        value: c.value != null ? c.value : ''
-      }));
-    }
   DataLaVistaState.previewFilters = cfg.previewFilters || {};
   // Normalize legacy tab name ('previewData' was renamed to 'dataPreview')
   DataLaVistaState.qmTab = (cfg.qmTab === 'previewData') ? 'dataPreview' : (cfg.qmTab || 'qb');
@@ -14295,9 +14291,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 
           // Show QB preview table
           showQueryPreview(sampleRows);
-          // Reset design transforms when a new view arrives
-          DataLaVistaState.design.transformedResults = null;
-          applyDesignTransforms();
           renderDesignFieldsPanel();
           setStatus(`Query returned ${sampleRows.length} rows`, 'success');
           toast(`Query returned ${sampleRows.length} rows`, 'success');
@@ -14727,222 +14720,12 @@ function rankSuggestions(rules, cols, meta) {
     body.appendChild(secFields);
   }
 
-  // ============================================================
-  // DESIGN DATA TRANSFORMS (filter / sort / group / aggregate)
-  // Uses the same QB_OPS, DATE_MACRO_OPS, QB_AGGS, and aggsForType()
-  // as the Query Builder so the UI is identical.
-  // ============================================================
-
-  /** Returns the most-specific base dataset available.
-   *  Priority: previewFilteredData → transformedResults → [dlv_active] view → queryResults fallback. */
+  /** Returns the active dataset for widget rendering.
+   *  Priority: previewFilteredData → [dlv_active] view → empty. */
   function getDesignData() {
     if (DataLaVistaState.design.previewFilteredData)  return DataLaVistaState.design.previewFilteredData;
-    if (DataLaVistaState.design.transformedResults)   return DataLaVistaState.design.transformedResults;
     if (alasql.tables && alasql.tables['dlv_active']) return alasql('SELECT * FROM [dlv_active]');
     return [];
-  }
-
-  /** Re-runs the design-level AlaSQL transform against [dlv_results] (or queryResults fallback)
-   *  and stores the result in DataLaVistaState.design.transformedResults, then re-renders widgets. */
-  function applyDesignTransforms() {
-    const hasView = !!(alasql.tables && alasql.tables['dlv_results']);
-    if (!hasView) {
-      DataLaVistaState.design.transformedResults = null;
-      renderDesignCanvas();
-      return;
-    }
-
-    const cols = DataLaVistaState.queryColumns;
-    if (!cols.length) { DataLaVistaState.design.transformedResults = null; renderDesignCanvas(); return; }
-
-    const conditions = (DataLaVistaState.design.conditions || []).filter(c => c.field);
-    const sorts      = (DataLaVistaState.design.sorts      || []).filter(s => s.field);
-    const groups     = DataLaVistaState.design.groupBy || [];
-    const fieldAggs  = DataLaVistaState.design.fieldAggs || {};
-    const anyAgg     = cols.some(c => fieldAggs[c]);
-
-    // No transforms at all → clear cache and use raw data
-    if (!conditions.length && !sorts.length && !groups.length && !anyAgg) {
-      DataLaVistaState.design.transformedResults = null;
-      renderDesignCanvas();
-      renderDesignFieldsPanel();
-      return;
-    }
-
-    // SELECT parts — preserve original column name with AS so widgets keep working
-    const selParts = cols.map(col => {
-      const agg = fieldAggs[col];
-      if (!agg) return `[${col}]`;
-      if (agg === 'COUNT_DISTINCT') return `COUNT(DISTINCT [${col}]) AS [${col}]`;
-      return `${agg}([${col}]) AS [${col}]`;
-    });
-
-    // WHERE parts
-    const whereParts = conditions.map((c, i) => {
-      const conj = i === 0 ? '' : (c.conj || 'AND') + ' ';
-      const col  = `[${c.field}]`;
-      const dt   = sniffType(c.field);
-      return conj + condToSQL(c, col, dt);
-    });
-
-    // GROUP BY parts
-    let groupParts;
-    if (anyAgg) {
-      groupParts = cols.filter(c => !fieldAggs[c]).map(c => `[${c}]`);
-    } else {
-      groupParts = groups.filter(g => g).map(g => `[${g}]`);
-    }
-
-    const orderParts = sorts.map(s => `[${s.field}] ${s.dir || 'ASC'}`);
-
-    const fromSrc = hasView ? '[dlv_results]' : '?';
-    let sql = `SELECT ${selParts.join(', ')} FROM ${fromSrc}`;
-    if (whereParts.length) sql += ` WHERE ${whereParts.join(' ')}`;
-    if (groupParts.length) sql += ` GROUP BY ${groupParts.join(', ')}`;
-    if (orderParts.length) sql += ` ORDER BY ${orderParts.join(', ')}`;
-
-    try {
-      const results = alasql(sql);
-      DataLaVistaState.design.transformedResults = Array.isArray(results) ? results : null;
-      const rowCount = DataLaVistaState.design.transformedResults ? DataLaVistaState.design.transformedResults.length : 0;
-      toast(`Design transform applied — ${rowCount} rows`, 'success');
-    } catch (e) {
-      console.error('Design transform error:', e);
-      DataLaVistaState.design.transformedResults = null;
-      toast('Design transform error: ' + e.message, 'error');
-    }
-
-    renderDesignCanvas();
-    renderDesignFieldsPanel();
-  }
-
-  // ── Design aggregate dropdown ─────────────────────────────────────────────
-  function setDesignFieldAgg(col, agg) {
-    if (!DataLaVistaState.design.fieldAggs) DataLaVistaState.design.fieldAggs = {};
-    if (agg) DataLaVistaState.design.fieldAggs[col] = agg;
-    else delete DataLaVistaState.design.fieldAggs[col];
-    syncDesignGroupBySection();
-    // Update the select's active styling inline without full re-render
-    const sel = document.querySelector('.design-agg-select');
-    // Re-render fields panel to update agg-active class
-    renderDesignFieldsPanel();
-  }
-
-  // ── Design conditions ─────────────────────────────────────────────────────
-  function addDesignCondition() {
-    if (!DataLaVistaState.queryColumns.length) return;
-    if (!DataLaVistaState.design.conditions) DataLaVistaState.design.conditions = [];
-    DataLaVistaState.design.conditions.push({ conj: 'AND', field: DataLaVistaState.queryColumns[0], op: '=', value: '' });
-    renderDesignConditions();
-  }
-
-  function removeDesignCondition(i) {
-    DataLaVistaState.design.conditions.splice(i, 1);
-    renderDesignConditions();
-  }
-
-  function renderDesignConditions() {
-    const area = document.getElementById('design-conditions-area');
-    if (!area) return;
-    const cols = DataLaVistaState.queryColumns.map(alias => {
-      const tk = findTableKeyForAlias(alias);
-      const f  = tk && DataLaVistaState.tables[tk] && DataLaVistaState.tables[tk].fields
-        ? DataLaVistaState.tables[tk].fields.find(x => x.alias === alias)
-        : null;
-      return { alias, displayType: sniffType(alias), tableKey: tk || '', fieldInternalName: f ? f.internalName : '' };
-    });
-    area.innerHTML = renderConditionRows(
-      DataLaVistaState.design.conditions || [], cols,
-      (ci, v) => `DataLaVistaState.design.conditions[${ci}].conj=${v}; applyDesignTransforms()`,
-      (ci, v) => `DataLaVistaState.design.conditions[${ci}].field=${v}; renderDesignConditions()`,
-      (ci, v) => `DataLaVistaState.design.conditions[${ci}].op=${v}; renderDesignConditions()`,
-      (ci, v) => `DataLaVistaState.design.conditions[${ci}].value=${v}; applyDesignTransforms()`,
-      (ci)    => `removeDesignCondition(${ci})`,
-      null,   // rowAttrs
-      (ci, v) => `DataLaVistaState.design.conditions[${ci}].value2=${v}; applyDesignTransforms()`,
-      (ci, v) => `DataLaVistaState.design.conditions[${ci}].elementKey=${v}; renderDesignConditions()`
-    );
-  }
-
-
-  // ── Design sorts ──────────────────────────────────────────────────────────
-  function addDesignSort() {
-    if (!DataLaVistaState.queryColumns.length) return;
-    if (!DataLaVistaState.design.sorts) DataLaVistaState.design.sorts = [];
-    DataLaVistaState.design.sorts.push({ field: DataLaVistaState.queryColumns[0], dir: 'ASC' });
-    renderDesignSorts();
-  }
-
-  function removeDesignSort(i) {
-    DataLaVistaState.design.sorts.splice(i, 1);
-    renderDesignSorts();
-  }
-
-  function renderDesignSorts() {
-    const area = document.getElementById('design-sorts-area');
-    if (!area) return;
-    const cols = DataLaVistaState.queryColumns;
-    area.innerHTML = renderSortRows(
-      DataLaVistaState.design.sorts || [], cols,
-      (si, v) => `DataLaVistaState.design.sorts[${si}].field=${v}`,
-      (si, v) => `DataLaVistaState.design.sorts[${si}].dir=${v}`,
-      (si)    => `removeDesignSort(${si})`
-    );
-  }
-
-  // ── Design group by ───────────────────────────────────────────────────────
-  function addDesignGroupBy() {
-    if (!DataLaVistaState.queryColumns.length) return;
-    if (!DataLaVistaState.design.groupBy) DataLaVistaState.design.groupBy = [];
-    DataLaVistaState.design.groupBy.push(DataLaVistaState.queryColumns[0]);
-    syncDesignGroupBySection();
-  }
-
-  function removeDesignGroupBy(i) {
-    DataLaVistaState.design.groupBy.splice(i, 1);
-    syncDesignGroupBySection();
-  }
-
-  function renderDesignGroupBy() {
-    const area = document.getElementById('design-groupby-area');
-    if (!area) return;
-    const cols = DataLaVistaState.queryColumns;
-    const groups = DataLaVistaState.design.groupBy || [];
-
-    area.innerHTML = '';
-    if (!groups.length) {
-      area.innerHTML = '<div style="font-size:11px;color:var(--text-disabled);padding:2px 0">No grouping — click + Add</div>';
-      return;
-    }
-
-    groups.forEach((g, i) => {
-      const row = document.createElement('div');
-      row.className = 'qb-sort-row';
-      row.innerHTML = `<select class="form-input qb-field-select" onchange="DataLaVistaState.design.groupBy[${i}]=this.value">`;
-	  row.innerHTML += cols.map(f=>`<option value="${f}" ${f===g?'selected':''}>${f}</option>`).join('');
-      row.innerHTML += `</select><button class="btn btn-ghost btn-sm btn-icon qb-remove-btn" onclick="removeDesignGroupBy(${i})">✕</button>`;
-      area.appendChild(row);
-    });
-  }
-
-  /** Shows/hides the manual GROUP BY add-button when aggregates are active (auto-group then). */
-  function syncDesignGroupBySection() {
-    const anyAgg = DataLaVistaState.queryColumns.some(c => (DataLaVistaState.design.fieldAggs || {})[c]);
-    const label  = document.getElementById('design-groupby-label');
-    const addBtn = document.getElementById('design-groupby-add-btn');
-    if (label)  label.textContent = anyAgg ? 'GROUP BY (auto)' : 'GROUP BY';
-    if (addBtn) addBtn.style.display = anyAgg ? 'none' : '';
-    if (anyAgg) {
-      const area = document.getElementById('design-groupby-area');
-      if (area) {
-        const nonAgg = DataLaVistaState.queryColumns.filter(c => !(DataLaVistaState.design.fieldAggs || {})[c]);
-        area.innerHTML = nonAgg.length
-          ? `<div style="font-size:11px;color:var(--text-disabled);padding:2px 0">Auto: ${nonAgg.join(', ')}</div>`
-          : `<div style="font-size:11px;color:var(--text-disabled);padding:2px 0">All fields aggregated — no GROUP BY needed</div>`;
-      }
-    } else {
-      renderDesignGroupBy();
-    }
   }
 
       // ============================================================
@@ -15053,7 +14836,33 @@ function rankSuggestions(rules, cols, meta) {
           const fb = qcols[1] || qcols[0] || '';
           return { yField: fb, yFields: fb ? [fb] : [], yAgg: '' };
         })();
-        const _initFieldAggs = _smartY.yAgg ? { [_smartY.yField]: _smartY.yAgg } : {};
+        // Build initial seriesProps — one entry per Y field for charts, one per column for table/KPI
+        const _isChartWidget = ['bar','line','pie','scatter'].includes(widgetType);
+        const _initFields = fields || (DataLaVistaState.queryColumns.length
+          ? (widgetType === 'kpi' ? [DataLaVistaState.queryColumns[0]] : DataLaVistaState.queryColumns.slice(0, 8))
+          : []);
+        let _initSeriesProps;
+        if (_isChartWidget) {
+          _initSeriesProps = _smartY.yFields.map(yf => ({
+            field: yf, agg: _smartY.yAgg || '', label: '', color: '',
+            seriesType: '', lineWidth: null, opacity: null, smooth: null,
+            axisSide: '', conditions: []
+          }));
+        } else if (widgetType === 'kpi') {
+          _initSeriesProps = _initFields.slice(0,1).map(f => ({
+            field: f, agg: 'SUM', label: '', color: '',
+            seriesType: '', lineWidth: null, opacity: null, smooth: null,
+            axisSide: '', conditions: []
+          }));
+        } else if (widgetType === 'table') {
+          _initSeriesProps = _initFields.map(f => ({
+            field: f, agg: '', label: '', color: '',
+            seriesType: '', lineWidth: null, opacity: null, smooth: null,
+            axisSide: '', conditions: []
+          }));
+        } else {
+          _initSeriesProps = [];
+        }
 
         const widget = {
           id,
@@ -15063,12 +14872,13 @@ function rankSuggestions(rules, cols, meta) {
           showHeaders: true,
           widthPct: 45,
           heightVh: 30,
-          fields: fields || (DataLaVistaState.queryColumns.length ? (widgetType === 'kpi' ? [DataLaVistaState.queryColumns[0]] : DataLaVistaState.queryColumns.slice(0, 8)) : []),
+          fields: _initFields,
           xField: (fields && fields.length > 0) ? fields[0] : DataLaVistaState.queryColumns[0] || '',
           yField: _smartY.yField,  // legacy compat
           yFields: _smartY.yFields,
           aggregation: '',
-          fieldAggs: _initFieldAggs,
+          seriesProps: _initSeriesProps,
+          fieldAggs: {},   // kept for backward compat (not written to by new code)
           conditions: [],
           sorts: [],
           fillColor: '#0078d4',
@@ -15092,7 +14902,7 @@ function rankSuggestions(rules, cols, meta) {
           filters: [],
           stacked: false,
           showTrendLine: false,
-          ySeriesProps: {},
+          ySeriesProps: {},   // kept for backward compat (not written to by new code)
           bubbleSizeField: '',
           bubbleColorField: ''
         };
@@ -15221,6 +15031,51 @@ function rankSuggestions(rules, cols, meta) {
        * Builds the SQL string for a widget. Returns { sql, fromSrc }.
        * fromSrc is null when falling back to in-memory array binding (?).
        */
+      /**
+       * Returns the canonical seriesProps array for a widget, normalizing legacy
+       * fieldAggs + ySeriesProps into the unified format if seriesProps is absent.
+       * For chart widgets: each entry = one Y series.
+       * For table/KPI widgets: each entry = one column.
+       */
+      function _getSeriesProps(w) {
+        if (Array.isArray(w.seriesProps) && w.seriesProps.length) return w.seriesProps;
+        // Legacy migration: reconstruct from ySeriesProps (index-keyed) + fieldAggs (field-keyed)
+        const _isChart = ['bar','line','pie','scatter'].includes(w.type);
+        if (_isChart) {
+          const yfs = (Array.isArray(w.yFields) && w.yFields.length)
+            ? w.yFields : (w.yField ? [w.yField] : []);
+          return yfs.map((yf, yi) => {
+            const legacy = (w.ySeriesProps || {})[String(yi)] || (w.ySeriesProps || {})[yf] || {};
+            return {
+              field:      yf,
+              agg:        legacy.agg || (w.fieldAggs || {})[yf] || '',
+              label:      legacy.label      || '',
+              color:      legacy.color      || '',
+              seriesType: legacy.seriesType || '',
+              lineWidth:  legacy.lineWidth  ?? null,
+              opacity:    legacy.opacity    ?? null,
+              smooth:     legacy.smooth     ?? null,
+              axisSide:   legacy.axisSide   || '',
+              conditions: (legacy.conditions || []).map(c => Object.assign({}, c))
+            };
+          });
+        }
+        // table / kpi
+        const fields = (w.type === 'kpi') ? (w.fields || []).slice(0,1) : (w.fields || []);
+        return fields.map(f => ({
+          field:      f,
+          agg:        (w.fieldAggs || {})[f] || '',
+          label:      '',
+          color:      '',
+          seriesType: '',
+          lineWidth:  null,
+          opacity:    null,
+          smooth:     null,
+          axisSide:   '',
+          conditions: []
+        }));
+      }
+
       function buildWidgetSQL(w) {
         const hasActive  = !!(alasql.tables && alasql.tables['dlv_active']);
         const hasResults = !!(alasql.tables && alasql.tables['dlv_results']);
@@ -15230,45 +15085,52 @@ function rankSuggestions(rules, cols, meta) {
         const base = getDesignData();
 
         const _isChartType = ['bar', 'line', 'pie', 'scatter'].includes(w.type);
-        const fieldAggs    = w.fieldAggs    || {};
-        const ySeriesProps = w.ySeriesProps || {};
+
+        // seriesProps is the unified source of truth (replaces both fieldAggs and ySeriesProps).
+        // Fall back to reconstructing from legacy fieldAggs + ySeriesProps for old configs
+        // that haven't been through loadConfig migration yet (e.g. mid-session).
+        const seriesProps = _getSeriesProps(w);
+
         const conditions   = (w.conditions  || []).filter(c => c.field);
         const sorts        = (w.sorts       || []).filter(s => s.field);
 
-        // For chart types we keep Y fields as-is (no dedup via Set) so duplicate
-        // field names (e.g. two taskId series) each get their own index alias __dlvy_N.
-        // For table/kpi we still deduplicate via the existing logic.
+        // Helper: aggregate for series at index i
+        const _getAgg = (i) => (seriesProps[i] || {}).agg || '';
+
         let xField = '', yFields = [];
         let cols;
         if (w.type === 'table') {
+          // For table, seriesProps[i].field is the column — but respect w.fields order
+          const tableFields = seriesProps.length ? seriesProps.map(s => s.field).filter(Boolean) : (w.fields || []);
           cols = fromSrc
-            ? (w.fields || [])
-            : (w.fields || []).filter(f => base && base.length && Object.prototype.hasOwnProperty.call(base[0], f));
+            ? tableFields
+            : tableFields.filter(f => base && base.length && Object.prototype.hasOwnProperty.call(base[0], f));
         } else if (_isChartType) {
           xField  = w.xField || '';
-          yFields = (Array.isArray(w.yFields) && w.yFields.length) ? w.yFields : (w.yField ? [w.yField] : []);
-          cols    = [xField, ...yFields].filter(Boolean); // no Set dedup
+          yFields = seriesProps.length
+            ? seriesProps.map(s => s.field).filter(Boolean)
+            : ((Array.isArray(w.yFields) && w.yFields.length) ? w.yFields : (w.yField ? [w.yField] : []));
+          cols    = [xField, ...yFields].filter(Boolean);
         } else if (w.type === 'kpi') {
-          cols = (w.fields || []).slice(0, 1);
+          cols = seriesProps.length
+            ? seriesProps.slice(0,1).map(s => s.field).filter(Boolean)
+            : (w.fields || []).slice(0, 1);
         } else {
           return null;
         }
         if (!cols.length) return null;
 
-        // For chart Y fields, agg lives in ySeriesProps[yi].agg (index-keyed).
-        // fieldAggs is still used for table/kpi/scatter/xField.
-        const _getYAgg = (yi) => (ySeriesProps[String(yi)] || {}).agg || '';
-        const anyAgg       = _isChartType ? yFields.some((_, yi) => _getYAgg(yi)) : cols.some(c => fieldAggs[c]);
+        const anyAgg       = _isChartType
+          ? yFields.some((_, i) => _getAgg(i))
+          : cols.some((_, i) => _getAgg(i));
         const needsDistinct = !anyAgg && ['table', 'bar', 'line', 'pie'].includes(w.type);
 
         let selParts;
         if (_isChartType && xField) {
-          // X field — never aggregated
           const xPart = `[${xField}]`;
-          // Y fields — each gets a stable index alias __dlvy_N to handle duplicates
           const yParts = yFields.map((yf, yi) => {
-            const agg     = _getYAgg(yi);
-            const spEntry = ySeriesProps[String(yi)] || {};
+            const agg     = _getAgg(yi);
+            const spEntry = seriesProps[yi] || {};
             const sConds  = (spEntry.conditions || []).filter(c => c.field);
             const alias   = `__dlvy_${yi}`;
 
@@ -15286,9 +15148,9 @@ function rankSuggestions(rules, cols, meta) {
           });
           selParts = [xPart, ...yParts];
         } else {
-          // table / kpi — original logic, no aliases
-          selParts = cols.map(col => {
-            const agg = fieldAggs[col];
+          // table / kpi — use seriesProps for agg; alias stays as field name for table compat
+          selParts = cols.map((col, i) => {
+            const agg = _getAgg(i);
             if (!agg) return `[${col}]`;
             if (agg === 'COUNT_DISTINCT') return `COUNT(DISTINCT [${col}]) AS [${col}]`;
             return `${agg}([${col}]) AS [${col}]`;
@@ -15300,16 +15162,15 @@ function rankSuggestions(rules, cols, meta) {
           return conj + _condToSQLFrag(c);
         });
 
-        // GROUP BY: x field + any non-aggregated y fields
         let groupParts;
         if (_isChartType && anyAgg) {
           groupParts = xField ? [`[${xField}]`] : [];
           yFields.forEach((yf, yi) => {
-            if (!_getYAgg(yi)) groupParts.push(`[${yf}]`);
+            if (!_getAgg(yi)) groupParts.push(`[${yf}]`);
           });
           groupParts = [...new Set(groupParts)];
         } else if (!_isChartType && anyAgg) {
-          groupParts = cols.filter(c => !fieldAggs[c]).map(c => `[${c}]`);
+          groupParts = cols.filter((_, i) => !_getAgg(i)).map(c => `[${c}]`);
         } else {
           groupParts = [];
         }
@@ -15337,11 +15198,9 @@ function rankSuggestions(rules, cols, meta) {
 
         if (!fromSrc && (!base || !base.length)) return [];
 
-        const fieldAggs  = w.fieldAggs  || {};
         const conditions = (w.conditions || []).filter(c => c.field);
         const sorts      = (w.sorts     || []).filter(s => s.field);
 
-        // Fast path: no SQL needed, return base directly
         if (w.type !== 'table' && w.type !== 'kpi' && !['bar','line','pie','scatter'].includes(w.type)) return base;
 
         const built = buildWidgetSQL(w);
@@ -15349,25 +15208,16 @@ function rankSuggestions(rules, cols, meta) {
 
         const { sql } = built;
 
-        // Further fast path: no conditions, sorts, or aggs — just DISTINCT or raw base
-        const _yfs = (Array.isArray(w.yFields) && w.yFields.length) ? w.yFields : (w.yField ? [w.yField] : []);
-        let cols;
-        if (w.type === 'table') {
-          cols = fromSrc ? (w.fields || []) : (w.fields || []).filter(f => base && base.length && Object.prototype.hasOwnProperty.call(base[0], f));
-        } else if (['bar','line','pie','scatter'].includes(w.type)) {
-          cols = [...new Set([w.xField, ..._yfs].filter(Boolean))];
-        } else if (w.type === 'kpi') {
-          cols = (w.fields || []).slice(0,1);
-        } else { cols = []; }
-
-        if (!cols.length) return base;
-
         const _isChart2 = ['bar','line','pie','scatter'].includes(w.type);
-        const _sp2 = w.ySeriesProps || {};
-        const anyAgg = _isChart2
-          ? _yfs.some((_, yi) => (_sp2[String(yi)] || {}).agg)
-          : cols.some(c => fieldAggs[c]);
+        const sp2 = _getSeriesProps(w);
+        const anyAgg = sp2.some(s => s.agg);
         const needsDistinct = !anyAgg && ['table','bar','line','pie'].includes(w.type);
+
+        // Check if we have any relevant fields at all
+        const hasCols = _isChart2
+          ? sp2.some(s => s.field)
+          : (w.type === 'kpi' ? !!(w.fields && w.fields[0]) : !!(w.fields && w.fields.length));
+        if (!hasCols) return base;
 
         if (!conditions.length && !sorts.length && !anyAgg) {
           if (!needsDistinct) return base;
@@ -15394,7 +15244,8 @@ function rankSuggestions(rules, cols, meta) {
         const field = (w.fields && w.fields[0]) || '';
         const kpiData = buildWidgetData(w);
         if (kpiData && kpiData.length && field) {
-          const fieldAgg = (w.fieldAggs || {})[field];
+          const sp = _getSeriesProps(w);
+          const fieldAgg = (sp[0] || {}).agg || '';
           if (fieldAgg) {
             value = kpiData[0][field] ?? '—';
           } else {
@@ -15489,7 +15340,7 @@ function _buildChartOption(w, chartData) {
 
   const stacked       = !!w.stacked;
   const showTrendLine = !!w.showTrendLine;
-  const ySeriesProps  = w.ySeriesProps  || {};
+  const seriesProps   = _getSeriesProps(w);
 
   // ── BAR / LINE ────────────────────────────────────────────────────────────
   if (w.type === 'bar' || w.type === 'line') {
@@ -15498,7 +15349,7 @@ function _buildChartOption(w, chartData) {
     for (var bi = 0; bi < yFields.length; bi++) {
       var byf   = yFields[bi];
       var bkey  = '__dlvy_' + bi;  // alias emitted by buildWidgetSQL
-      var bsp   = ySeriesProps[String(bi)] || {};
+      var bsp   = seriesProps[bi] || {};
       var bst   = bsp.seriesType || w.type;
       var bclr  = bsp.color || colors[bi % colors.length];
       // Read from alias if present (aggregated / filtered series), else raw field
@@ -15850,8 +15701,9 @@ function _buildChartOption(w, chartData) {
       }
 
       function _renderYFieldsHTML(w, wid, cols) {
-        const yfs = (Array.isArray(w.yFields) && w.yFields.length) ? w.yFields : (w.yField ? [w.yField] : []);
-        const ySeriesProps = w.ySeriesProps || {};
+        const sp  = _getSeriesProps(w);
+        const yfs = sp.length ? sp.map(s => s.field).filter(Boolean)
+          : ((Array.isArray(w.yFields) && w.yFields.length) ? w.yFields : (w.yField ? [w.yField] : []));
         let returnVal;
 
         if (!yfs.length) {
@@ -15859,7 +15711,7 @@ function _buildChartOption(w, chartData) {
         } else {
           returnVal = yfs.map((yf, yi) => {
             const ti = DataLaVistaCore.FIELD_TYPE_ICONS[sniffType(yf)] || DataLaVistaCore.FIELD_TYPE_ICONS.default;
-            const spEntry = ySeriesProps[String(yi)] || {};
+            const spEntry = sp[yi] || {};
             const agg = spEntry.agg || '';
             const escapedYf = yf.replace(/'/g, "\\'");
             const colOptions = cols.map(c =>
@@ -15921,8 +15773,8 @@ function _renderBarLineOptionsHTML(w, wid) {
 
       /**
        * Opens an aggregate-picker popup anchored to btn.
-       * yi: Y-field index (chart widgets). When provided, agg is stored in ySeriesProps[yi].agg.
-       *     Pass -1 or omit for non-Y-field uses (table columns, scatter, kpi, xField).
+       * yi: Y-field index (chart/table widgets). When provided, agg is stored in seriesProps[yi].agg.
+       *     Pass -1 or omit for non-Y-field uses (scatter bubble/color fields, xField).
        */
       function showWidgetFieldAggPopup(wid, field, btn, yi) {
         const w = DataLaVistaState.design.widgets.find(x => x.id === wid);
@@ -15930,7 +15782,7 @@ function _renderBarLineOptionsHTML(w, wid) {
         const yIdx = (yi != null && yi >= 0) ? yi : -1;
         const dt = sniffType(field);
         const current = yIdx >= 0
-          ? ((w.ySeriesProps || {})[String(yIdx)] || {}).agg || ''
+          ? (_getSeriesProps(w)[yIdx] || {}).agg || ''
           : (w.fieldAggs || {})[field] || '';
         showAggPopup(btn, dt, current, agg => setWidgetFieldAgg(wid, field, agg, yIdx));
       }
@@ -15941,11 +15793,12 @@ function _renderBarLineOptionsHTML(w, wid) {
         if (!w) return;
         const yIdx = (yi != null && yi >= 0) ? yi : -1;
         if (yIdx >= 0) {
-          if (!w.ySeriesProps) w.ySeriesProps = {};
-          if (!w.ySeriesProps[String(yIdx)]) w.ySeriesProps[String(yIdx)] = {};
-          if (agg) w.ySeriesProps[String(yIdx)].agg = agg;
-          else delete w.ySeriesProps[String(yIdx)].agg;
+          // Ensure seriesProps is populated (may be absent on legacy-loaded widgets)
+          if (!Array.isArray(w.seriesProps) || !w.seriesProps.length) w.seriesProps = _getSeriesProps(w);
+          if (!w.seriesProps[yIdx]) w.seriesProps[yIdx] = { field, agg: '', label: '', color: '', seriesType: '', lineWidth: null, opacity: null, smooth: null, axisSide: '', conditions: [] };
+          w.seriesProps[yIdx].agg = agg || '';
         } else {
+          // fieldAggs used for non-series fields (scatter bubble/color, xField)
           if (!w.fieldAggs) w.fieldAggs = {};
           if (agg) w.fieldAggs[field] = agg;
           else delete w.fieldAggs[field];
@@ -15959,10 +15812,11 @@ function _renderBarLineOptionsHTML(w, wid) {
       function openSeriesAdvancedProps(wid, fieldName, yi) {
         const w = DataLaVistaState.design.widgets.find(x => x.id === wid);
         if (!w) return;
-        if (!w.ySeriesProps) w.ySeriesProps = {};
+        // Ensure seriesProps is populated (may be absent on legacy-loaded widgets)
+        if (!Array.isArray(w.seriesProps) || !w.seriesProps.length) w.seriesProps = _getSeriesProps(w);
 
-        const spKey = String(yi != null ? yi : 0);
-        const existing = w.ySeriesProps[spKey] || {};
+        const spIdx = yi != null ? yi : 0;
+        const existing = w.seriesProps[spIdx] || {};
         const agg = existing.agg || '';
         const cols = DataLaVistaState.queryColumns;
         const enrichedSeriesCols = cols.map(alias => {
@@ -16011,14 +15865,14 @@ function _renderBarLineOptionsHTML(w, wid) {
         };
         _s.clearAll = () => {
           local = { label: '', color: '', seriesType: '', lineWidth: 2, opacity: 1, smooth: true, conditions: [] };
-          // agg is not part of local — lives directly in ySeriesProps[spKey].agg
+          // agg is not part of local — lives directly in seriesProps[spIdx].agg
           _s.rerender();
         };
         _s.apply = () => {
           // Preserve agg (managed by the agg popup, not this modal)
-          const prevAgg = (w.ySeriesProps[spKey] || {}).agg;
-          w.ySeriesProps[spKey] = Object.assign({}, local, { conditions: local.conditions.map(c => Object.assign({}, c)) });
-          if (prevAgg) w.ySeriesProps[spKey].agg = prevAgg;
+          const prevAgg = (w.seriesProps[spIdx] || {}).agg;
+          w.seriesProps[spIdx] = Object.assign({}, local, { field: (w.seriesProps[spIdx] || {}).field || fieldName, conditions: local.conditions.map(c => Object.assign({}, c)) });
+          if (prevAgg) w.seriesProps[spIdx].agg = prevAgg;
           _s.close();
           _widgetRefresh(wid);
         };
@@ -16215,15 +16069,16 @@ function _renderBarLineOptionsHTML(w, wid) {
             : null;
           return { alias, displayType: sniffType(alias), tableKey: tk || '', fieldInternalName: f ? f.internalName : '' };
         });
-        const fieldAggs  = w.fieldAggs  || {};
         const conditions = w.conditions || [];
         const sorts      = w.sorts      || [];
+        const _wsp       = _getSeriesProps(w);
 
         // ── Field row: type-icon + label + field-selector + ∑ agg button ──
+        // Used for singular non-series fields (scatter xField, bubbleSizeField, etc.) — agg via fieldAggs
         const fieldRow = (roleLabel, fieldVal, onChangeExpr) => {
           const dt  = sniffType(fieldVal || '');
           const ti  = DataLaVistaCore.FIELD_TYPE_ICONS[dt] || DataLaVistaCore.FIELD_TYPE_ICONS.default;
-          const agg = fieldAggs[fieldVal] || '';
+          const agg = (w.fieldAggs || {})[fieldVal] || '';
           return `
             <div class="adv-field-row selected">
               <span class="field-type-icon ${ti.cls}">${ti.icon}</span>
@@ -16240,13 +16095,13 @@ function _renderBarLineOptionsHTML(w, wid) {
         const tableFieldRow = (fieldName, idx) => {
           const dt  = sniffType(fieldName);
           const ti  = DataLaVistaCore.FIELD_TYPE_ICONS[dt] || DataLaVistaCore.FIELD_TYPE_ICONS.default;
-          const agg = fieldAggs[fieldName] || '';
+          const agg = (_wsp[idx] || {}).agg || '';
           return `
             <div class="adv-field-row selected">
               <span class="field-type-icon ${ti.cls}">${ti.icon}</span>
               <span class="field-name" style="flex:1">${fieldName}</span>
               <button class="adv-agg-btn${agg ? ' has-agg' : ''}" title="${agg || 'No aggregate'}"
-                onclick="event.stopPropagation();showWidgetFieldAggPopup('${wid}','${fieldName.replace(/'/g,"\\'")}',this)">${agg ? getAggIcon(agg) : '∑'}</button>
+                onclick="event.stopPropagation();showWidgetFieldAggPopup('${wid}','${fieldName.replace(/'/g,"\\'")}',this,${idx})">${agg ? getAggIcon(agg) : '∑'}</button>
               <button class="btn btn-ghost btn-sm btn-icon" style="padding:0 4px" onclick="removeWidgetField('${wid}',${idx})">✕</button>
             </div>`;
         };
@@ -16273,25 +16128,19 @@ function _renderBarLineOptionsHTML(w, wid) {
         );
 
         // ── Group-by (auto-derived, read-only display) ───────────────────
-        const _yfsForGroup = isChart
-          ? ((Array.isArray(w.yFields) && w.yFields.length) ? w.yFields : (w.yField ? [w.yField] : []))
-          : [];
-        const _spForGroup  = w.ySeriesProps || {};
-        const anyAgg = isChart
-          ? _yfsForGroup.some((_, yi) => (_spForGroup[String(yi)] || {}).agg)
-          : (w.fields || []).some(f => fieldAggs[f]);
+        const anyAgg = _wsp.some(sp => sp.agg);
         const renderGroupBy = () => {
           if (!anyAgg) return '<div style="font-size:11px;color:var(--text-disabled);padding:2px 0">Set aggregates on fields above to enable grouping</div>';
           if (isChart) {
-            const nonAggY = _yfsForGroup.filter((_, yi) => !(_spForGroup[String(yi)] || {}).agg);
+            const nonAggY = _wsp.filter(sp => !sp.agg).map(sp => sp.field).filter(Boolean);
             const groupCols = [w.xField, ...nonAggY].filter(Boolean);
             const uniq = [...new Set(groupCols)];
-            if (!uniq.length || (w.xField && uniq.length === 1 && _yfsForGroup.every((_, yi) => (_spForGroup[String(yi)] || {}).agg))) {
+            if (!uniq.length || (w.xField && uniq.length === 1 && _wsp.every(sp => sp.agg))) {
               return '<div style="font-size:11px;color:var(--text-disabled);padding:2px 0">All Y fields aggregated — grouping by X field only</div>';
             }
             return `<div style="font-size:11px;color:var(--text-disabled);padding:2px 0">Auto: ${uniq.join(', ')}</div>`;
           }
-          const nonAggCols = (w.fields || []).filter(f => !fieldAggs[f]);
+          const nonAggCols = _wsp.filter(sp => !sp.agg).map(sp => sp.field).filter(Boolean);
           if (!nonAggCols.length) return '<div style="font-size:11px;color:var(--text-disabled);padding:2px 0">All fields aggregated — no GROUP BY needed</div>';
           return `<div style="font-size:11px;color:var(--text-disabled);padding:2px 0">Auto: ${nonAggCols.join(', ')}</div>`;
         };
@@ -16758,46 +16607,44 @@ function _renderBarLineOptionsHTML(w, wid) {
   const w = DataLaVistaState.design.widgets.find(x => x.id === wid);
   if (!w || !DataLaVistaState.queryColumns.length) return;
   if (!Array.isArray(w.yFields)) w.yFields = w.yField ? [w.yField] : [];
+  if (!Array.isArray(w.seriesProps) || !w.seriesProps.length) w.seriesProps = _getSeriesProps(w);
   // Default to first numeric col not already added
   const next = DataLaVistaState.queryColumns.find(c =>
     sniffType(c) === 'number' && !w.yFields.includes(c)
   ) || DataLaVistaState.queryColumns.find(c => !w.yFields.includes(c))
     || DataLaVistaState.queryColumns[0];
-  if (next) w.yFields.push(next);
+  if (next) {
+    w.yFields.push(next);
+    w.seriesProps.push({ field: next, agg: '', label: '', color: '', seriesType: '', lineWidth: null, opacity: null, smooth: null, axisSide: '', conditions: [] });
+  }
   _widgetRefresh(wid);
 }
 
 function widgetUpdateYField(wid, idx, val) {
   const w = DataLaVistaState.design.widgets.find(x => x.id === wid);
   if (!w || !Array.isArray(w.yFields)) return;
+  if (!Array.isArray(w.seriesProps) || !w.seriesProps.length) w.seriesProps = _getSeriesProps(w);
   w.yFields[idx] = val;
+  if (w.seriesProps[idx]) w.seriesProps[idx].field = val;
+  else w.seriesProps[idx] = { field: val, agg: '', label: '', color: '', seriesType: '', lineWidth: null, opacity: null, smooth: null, axisSide: '', conditions: [] };
   _widgetRefresh(wid);
 }
 
 function widgetRemoveYField(wid, idx) {
   const w = DataLaVistaState.design.widgets.find(x => x.id === wid);
   if (!w || !Array.isArray(w.yFields)) return;
+  if (!Array.isArray(w.seriesProps) || !w.seriesProps.length) w.seriesProps = _getSeriesProps(w);
   w.yFields.splice(idx, 1);
-  // Re-key ySeriesProps: shift entries above removed index down by 1
-  if (w.ySeriesProps) {
-    const rekeyed = {};
-    for (const [k, v] of Object.entries(w.ySeriesProps)) {
-      const n = parseInt(k, 10);
-      if (isNaN(n) || n === idx) continue;
-      rekeyed[String(n > idx ? n - 1 : n)] = v;
-    }
-    w.ySeriesProps = rekeyed;
-  }
+  w.seriesProps.splice(idx, 1);
   _widgetRefresh(wid);
 }
 
-function widgetUpdateYSeriesType(wid, fieldName, seriesType) {
+function widgetUpdateYSeriesType(wid, yi, seriesType) {
   const w = DataLaVistaState.design.widgets.find(x => x.id === wid);
   if (!w) return;
-  if (!w.ySeriesProps) w.ySeriesProps = {};
-  if (!w.ySeriesProps[fieldName]) w.ySeriesProps[fieldName] = {};
-  if (seriesType) w.ySeriesProps[fieldName].seriesType = seriesType;
-  else delete w.ySeriesProps[fieldName].seriesType;
+  if (!Array.isArray(w.seriesProps) || !w.seriesProps.length) w.seriesProps = _getSeriesProps(w);
+  if (!w.seriesProps[yi]) return;
+  w.seriesProps[yi].seriesType = seriesType || '';
   _widgetRefresh(wid);
 }
 /* ============================================================
@@ -17703,18 +17550,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         useResultsInDesign,
         renderDesignFieldsPanel,
         getDesignData,
-        applyDesignTransforms,
-        setDesignFieldAgg,
-        addDesignCondition,
-        removeDesignCondition,
-        renderDesignConditions,
-        addDesignSort,
-        removeDesignSort,
-        renderDesignSorts,
-        addDesignGroupBy,
-        removeDesignGroupBy,
-        renderDesignGroupBy,
-        syncDesignGroupBySection,
         initToolbox,
         onCanvasDragOver,
         onCanvasDragLeave,

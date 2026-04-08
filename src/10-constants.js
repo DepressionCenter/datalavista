@@ -250,12 +250,7 @@ const DataLaVistaState = {
     showDashboardTitle: true,   // whether the title bar is visible in preview/report mode
     dashboardTitleTooltip: '',  // optional HTML tooltip (sanitized) shown via info icon next to title
     widgets: [],     // widget objects
-    filters: [],     // { field, label, position }  — preview filter bar chips
-    conditions: [],  // { conj, field, op, value }  — design-level data filter
-    sorts: [],       // { field, dir }              — design-level sort
-    groupBy: [],     // string[]                    — design-level group by
-    fieldAggs: {},   // { [col]: aggVal }           — design-level aggregates
-    transformedResults: null  // cached result of applyDesignTransforms()
+    filters: []      // { field, label, position }  — preview filter bar chips
   },
   currentWidgetId: null,
   previewFilters: {},  // field -> value
