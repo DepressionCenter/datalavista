@@ -314,7 +314,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
             const parentT = DataLaVistaState.tables[rel.parentTableKey];
             const childFieldAlias  = (childT?.fields || []).find(f => f.internalName === rel.childField)?.alias || rel.childField;
             const parentFieldAlias = (parentT?.fields || []).find(f => f.internalName === rel.parentField)?.alias || rel.parentField;
-            joinType = (rel.source === 'sharepoint-lookup' && rel.isMultiSelect) ? 'INCLUDES' : (rel.joinType || 'LEFT');
+            joinType = (rel.source === 'sharepoint-lookup' && rel.isMultiSelect) ? 'DLV_INCLUDES' : (rel.joinType || 'LEFT');
             fromKey  = childFieldAlias;
             toKey    = parentFieldAlias;
             fromNodeId = existingTableToNodes[rel.childTableKey][0];
@@ -712,28 +712,15 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 
       // ── Show a small aggregate-picker popup near a button ────────────────────
       function showAdvAggPopup(nodeId, field, btn) {
-        document.querySelectorAll('.adv-agg-popup').forEach(p => p.remove());
         const nd = DataLaVistaState.advancedQB.nodes[nodeId];
         if (!nd) return;
         const t = DataLaVistaState.tables[nd.tableName];
         const fm = t ? t.fields.find(f => f.alias === field) : null;
-        const aggs = aggsForType(fm ? fm.displayType : 'text');
+        const displayType = fm ? fm.displayType : 'text';
         const current = (nd.fieldAggs || {})[field] || '';
-        const popup = document.createElement('div');
-        popup.className = 'adv-agg-popup';
-        popup.innerHTML = aggs.map(a =>
-          `<div class="agg-opt${a.val === current ? ' selected' : ''}"
-            onclick="setAdvNodeFieldAgg('${nodeId}','${field}','${a.val}'); document.querySelectorAll('.adv-agg-popup').forEach(p=>p.remove())">${a.label}</div>`
-        ).join('');
-        document.body.appendChild(popup);
-        const rect = btn.getBoundingClientRect();
-        popup.style.top  = (rect.bottom + 2) + 'px';
-        popup.style.left = Math.max(0, rect.left - popup.offsetWidth + rect.width) + 'px';
-        setTimeout(() => {
-          document.addEventListener('click', function close(e) {
-            if (!popup.contains(e.target)) { popup.remove(); document.removeEventListener('click', close); }
-          });
-        }, 10);
+        showAggPopup(btn, displayType, current, agg => {
+          setAdvNodeFieldAgg(nodeId, field, agg);
+        });
       }
 
       // ── Start drawing a join line from a node's join icon ─────────────────────
@@ -953,7 +940,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
             { val: 'CROSS',    label: 'Cross Join',          desc: 'ℹ️ Combine tables, repeating all rows in 2nd table for every row in 1st table' },
             { val: 'UNION',    label: 'Union',               desc: 'ℹ️ Combine tables, removing duplicate rows' },
             { val: 'UNION ALL',label: 'Union All',           desc: 'ℹ️ Combine tables, keeping duplicate rows' },
-            { val: 'INCLUDES', label: 'Lookup Join (SP)',    desc: 'ℹ️ SharePoint lookup join — uses INCLUDES() to match lookup array against parent ID' }
+            { val: 'DLV_INCLUDES', label: 'Lookup Join (SP)',    desc: 'ℹ️ SharePoint lookup join — uses DLV_INCLUDES() to match lookup array against parent ID' }
           ];
 
           const augmentFields = (t, tableKey) => {
@@ -1074,56 +1061,33 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           };
 
           // ── FILTER CONDITIONS section ───────────────────────────
-          const renderNodeConditions = () => {
-            if (!nd.conditions.length)
-              return '<div style="font-size:11px;color:var(--text-disabled);padding:2px 0">No filters — click + Add</div>';
-            return nd.conditions.map((c, ci) => {
-              const fieldMeta = fields.find(f => f.alias === c.field);
-              const isDate = fieldMeta?.displayType === 'date';
-              const ops = getFilterOps(fieldMeta?.displayType);
-              const isMacro = DataLaVistaCore.DATE_MACRO_VALS.has(c.op);
-              const macroMeta = DataLaVistaCore.DATE_MACRO_OPS.find(o => o.val === c.op);
-              const needsValue = c.op !== 'NULL' && c.op !== 'NOTNULL' && !(isMacro && !macroMeta?.hasInput);
-              return `<div class="qb-condition-row" draggable="true"
-                  ondragstart="event.stopPropagation();safeDragSet(event,{type:'adv-node-cond',nodeId:'${id}',idx:${ci}})">
-                ${ci === 0
-                  ? `<span class="qb-where-badge">WHERE</span>`
-                  : `<select class="form-input qb-conj-select" onchange="advNodeCond('${id}',${ci},'conj',this.value)">
-                      <option ${c.conj==='AND'?'selected':''}>AND</option>
-                      <option ${c.conj==='OR'?'selected':''}>OR</option></select>`}
-                <select class="form-input qb-field-select" onchange="advNodeCond('${id}',${ci},'field',this.value)">
-                  ${fields.map(f=>`<option value="${f.alias}" ${f.alias===c.field?'selected':''}>${f.alias}</option>`).join('')}
-                </select>
-                <select class="form-input qb-op-select" style="width:${isDate?'150px':'112px'}!important"
-                  onchange="advNodeCond('${id}',${ci},'op',this.value)">
-                  ${ops.map(o=>`<option value="${o.val}" ${o.val===c.op?'selected':''}>${o.label}</option>`).join('')}
-                </select>
-                ${needsValue
-                  ? buildFilterValueInput(fieldMeta?.displayType, isMacro, macroMeta, c.value,
-                      `advNodeCond('${id}',${ci},'value',this.value)`)
-                  : `<span class="qb-val-blank"></span>`}
-                <button class="btn btn-ghost btn-sm btn-icon qb-remove-btn" onclick="advNodeRemoveCond('${id}',${ci})">✕</button>
-              </div>`;
-            }).join('');
-          };
+          const condCols = fields.map(f => ({
+            alias: f.alias,
+            displayType: f.displayType,
+            tableKey: nd.tableName,
+            fieldInternalName: f.internalName,
+          }));
+          const renderNodeConditions = () => renderConditionRows(
+            nd.conditions, condCols,
+            (ci, v) => `advNodeCond('${id}',${ci},'conj',${v})`,
+            (ci, v) => `advNodeCond('${id}',${ci},'field',${v})`,
+            (ci, v) => `advNodeCond('${id}',${ci},'op',${v})`,
+            (ci, v) => `advNodeCond('${id}',${ci},'value',${v})`,
+            (ci)    => `advNodeRemoveCond('${id}',${ci})`,
+            (ci)    => `draggable="true" ondragstart="event.stopPropagation();safeDragSet(event,{type:'adv-node-cond',nodeId:'${id}',idx:${ci}})"`,
+            (ci, v) => `advNodeCond('${id}',${ci},'value2',${v})`,
+            (ci, v) => `advNodeCond('${id}',${ci},'elementKey',${v})`
+          );
 
           // ── SORT section ────────────────────────────────────────
-          const renderNodeSorts = () => {
-            if (!nd.sorts.length)
-              return '<div style="font-size:11px;color:var(--text-disabled);padding:2px 0">No sorts — click + Add</div>';
-            return nd.sorts.map((s, si) => `
-              <div class="qb-sort-row" draggable="true"
-                  ondragstart="event.stopPropagation();safeDragSet(event,{type:'adv-node-sort',nodeId:'${id}',idx:${si}})">
-                <select class="form-input qb-field-select" onchange="advNodeSort('${id}',${si},'field',this.value)">
-                  ${fields.map(f=>`<option value="${f.alias}" ${f.alias===s.field?'selected':''}>${f.alias}</option>`).join('')}
-                </select>
-                <select class="form-input qb-dir-select" onchange="advNodeSort('${id}',${si},'dir',this.value)">
-                  <option ${s.dir==='ASC'?'selected':''}>ASC</option>
-                  <option ${s.dir==='DESC'?'selected':''}>DESC</option>
-                </select>
-                <button class="btn btn-ghost btn-sm btn-icon" onclick="advNodeRemoveSort('${id}',${si})">✕</button>
-              </div>`).join('');
-          };
+          const sortCols = fields.map(f => f.alias);
+          const renderNodeSorts = () => renderSortRows(
+            nd.sorts, sortCols,
+            (si, v) => `advNodeSort('${id}',${si},'field',${v})`,
+            (si, v) => `advNodeSort('${id}',${si},'dir',${v})`,
+            (si)    => `advNodeRemoveSort('${id}',${si})`,
+            (si)    => `draggable="true" ondragstart="event.stopPropagation();safeDragSet(event,{type:'adv-node-sort',nodeId:'${id}',idx:${si}})"`
+          );
 
           // ── GROUP BY section ────────────────────────────────────
           const renderNodeGroupBy = () => {
@@ -1224,6 +1188,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         const nd = DataLaVistaState.advancedQB.nodes[nodeId];
         if (!nd || !nd.conditions[idx]) return;
         nd.conditions[idx][prop] = val;
+        // Reset op when field or elementKey changes to avoid stale operators
+        if (prop === 'field' || prop === 'elementKey') nd.conditions[idx].op = '=';
         rebuildAdvancedSQL();
         renderAdvOptionsPanel('node', nodeId);
       }
@@ -1712,9 +1678,10 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           normalizeJoinKeys(j);
           if (j.type === 'CROSS') {
             sql += `\nCROSS JOIN ${fromFrag(newNodeId, newNd)}`;
-          } else if (j.type === 'INCLUDES') {
+            //TODO: Remove legacy INCLUDES
+          } else if (j.type === 'DLV_INCLUDES' || j.type === 'INCLUDES') {
             const kp = j.keys[0];
-            sql += `\nLEFT JOIN ${fromFrag(newNodeId, newNd)} ON INCLUDES([${fromAlias}].[${kp.fromKey}], [${toAlias}].[${kp.toKey}])`;
+            sql += `\nLEFT JOIN ${fromFrag(newNodeId, newNd)} ON DLV_INCLUDES([${fromAlias}].[${kp.fromKey}], 'Id', [${toAlias}].[${kp.toKey}])`;
           } else {
             const onClauses = j.keys.map(kp => `[${fromAlias}].[${kp.fromKey}] = [${toAlias}].[${kp.toKey}]`).join(' AND ');
             sql += `\n${j.type} JOIN ${fromFrag(newNodeId, newNd)} ON ${onClauses}`;
@@ -1756,17 +1723,13 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           || CyberdynePipeline.rawTableToView[tableKey]
           || tableKey;
         const prefix = vname ? `[${vname}].` : '';
+        const t = DataLaVistaState.tables[tableKey];
         return nd.conditions.map((c, i) => {
           const conj = i === 0 ? '' : (c.conj + ' ');
-          const col = `${prefix}[${c.field}]`;
-          if (c.op === 'NULL')    return conj + `${col} IS NULL`;
-          if (c.op === 'NOTNULL') return conj + `${col} IS NOT NULL`;
-          if (DataLaVistaCore.DATE_MACRO_VALS.has(c.op)) return conj + dateMacroToSQL(c.op, c.value, col);
-          if (c.op === 'LIKE') return conj + `${col} LIKE '%${c.value}%'`;
-          const raw = c.value || '';
-          const val = (raw === 'true' || raw === 'false') ? raw
-            : ((raw !== '' && !isNaN(raw)) ? raw : `'${raw.replace(/'/g, "''")}'`);
-          return conj + `${col} ${c.op} ${val}`;
+          const col  = `${prefix}[${c.field}]`;
+          const fieldMeta = t && t.fields && t.fields.find(f => f.alias === c.field);
+          const dt = fieldMeta ? (fieldMeta.displayType || 'text') : 'text';
+          return conj + condToSQL(c, col, dt);
         }).join(' ');
       }
       function clearQueryBuilder() {

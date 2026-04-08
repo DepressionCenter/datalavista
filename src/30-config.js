@@ -209,13 +209,43 @@ function buildConfig() {
     kpiLabelOverride: w.kpiLabelOverride || '',
     stacked: !!w.stacked,
     showTrendLine: !!w.showTrendLine,
-    ySeriesTypes: Object.assign({}, w.ySeriesTypes || {}),
+    ySeriesProps: Object.fromEntries(
+      Object.entries(w.ySeriesProps || {}).map(([field, sp]) => [field, {
+        label:      sp.label      || '',
+        color:      sp.color      || '',
+        seriesType: sp.seriesType || '',
+        lineWidth:  sp.lineWidth  != null ? sp.lineWidth  : undefined,
+        opacity:    sp.opacity    != null ? sp.opacity    : undefined,
+        smooth:     sp.smooth     != null ? sp.smooth     : undefined,
+        axisSide:   sp.axisSide   || '',
+        conditions: (sp.conditions || []).map(c => ({
+          conj:       c.conj       || 'AND',
+          field:      c.field      || '',
+          op:         c.op         || '=',
+          value:      c.value      != null ? c.value : '',
+          ...(c.value2     != null ? { value2:     c.value2     } : {}),
+          ...(c.elementKey         ? { elementKey: c.elementKey } : {})
+        }))
+      }])
+    ),
     bubbleSizeField: w.bubbleSizeField || '',
     bubbleColorField: w.bubbleColorField || '',
     textContent: w.textContent || '',
     imageUrl: w.imageUrl || '',
     fieldAggs: Object.assign({}, w.fieldAggs || {}),
-    conditions: (w.conditions || []).map(c => ({ conj: c.conj || 'AND', field: c.field || '', op: c.op || '=', value: c.value || '' })),
+    conditions: (w.conditions || []).map(c => ({
+      conj:       c.conj       || 'AND',
+      field:      c.field      || '',
+      op:         c.op         || '=',
+      value:      c.value      != null ? c.value : '',
+      value2:     c.value2     != null ? c.value2 : undefined,
+      elementKey: c.elementKey || undefined
+    })).map(c => {
+      // Remove undefined keys to keep JSON clean
+      if (c.value2     === undefined) delete c.value2;
+      if (c.elementKey === undefined) delete c.elementKey;
+      return c;
+    }),
     sorts: (w.sorts || []).map(s => ({ field: s.field || '', dir: s.dir || 'ASC' })),
     filters: (w.filters || []).map(f => ({
       field: f.field || '',
@@ -223,7 +253,7 @@ function buildConfig() {
       value: f.value !== undefined ? f.value : '',
       position: f.position || 'widget'
     })),
-    widgetSql: generateWidgetSQL(w, '_results')
+    widgetSql: (() => { try { return buildWidgetSQL(w)?.sql || null; } catch(_) { return null; } })()
   }));
  
   const cleanDesign = {
@@ -236,7 +266,14 @@ function buildConfig() {
       label: f.label || f.field || '',
       position: f.position || 'bar'
     })),
-    conditions: (DataLaVistaState.design.conditions || []).map(c => ({ conj: c.conj || 'AND', field: c.field || '', op: c.op || '=', value: c.value || '' })),
+    conditions: (DataLaVistaState.design.conditions || []).map(c => ({
+      conj:       c.conj    || 'AND',
+      field:      c.field   || '',
+      op:         c.op      || '=',
+      value:      c.value   != null ? c.value : '',
+      ...(c.value2     != null ? { value2:     c.value2     } : {}),
+      ...(c.elementKey         ? { elementKey: c.elementKey } : {})
+    })),
     sorts: (DataLaVistaState.design.sorts || []).map(s => ({ field: s.field || '', dir: s.dir || 'ASC' })),
     groupBy: (DataLaVistaState.design.groupBy || []).filter(g => g),
     fieldAggs: Object.assign({}, DataLaVistaState.design.fieldAggs || {})
@@ -361,33 +398,61 @@ async function loadConfig(cfg) {
     transformedResults: null
   };
   // Migrate legacy single-yField to yFields array + backfill new widget defaults
-for (const w of DataLaVistaState.design.widgets) {
-  if (!Array.isArray(w.yFields))        w.yFields = w.yField ? [w.yField] : [];
-  if (w.stacked          == null)       w.stacked = false;
-  if (w.showTrendLine    == null)       w.showTrendLine = false;
-  if (!w.ySeriesTypes)                  w.ySeriesTypes = {};
-  if (w.bubbleSizeField  == null)       w.bubbleSizeField = '';
-  if (w.bubbleColorField == null)       w.bubbleColorField = '';
-  if (w.showTitle        == null)       w.showTitle = true;
-  if (w.showHeaders      == null)       w.showHeaders = true;
-  if (w.widgetBackgroundColor == null)  w.widgetBackgroundColor = '#fefefe';
-  if (w.chartBackgroundColor  == null)  w.chartBackgroundColor  = '#fefefe';
-  if (w.titleBackgroundColor  == null)  w.titleBackgroundColor  = '#fefefe';
-  if (w.titleFontSize    == null)       w.titleFontSize = 14;
-  if (w.titleFontColor   == null)       w.titleFontColor = '#323130';
-  if (w.headersBackgroundColor == null) w.headersBackgroundColor = '#f3f2f1';
-  if (w.headersFontSize  == null)       w.headersFontSize = 12;
-  if (w.headersFontColor == null)       w.headersFontColor = '#323130';
-  if (w.fontSize         == null)       w.fontSize = 13;
-  if (w.fontColor        == null)       w.fontColor = '#323130';
-  if (w.kpiMetricFontSize == null)      w.kpiMetricFontSize = 36;
-  if (w.kpiLabelFontSize == null)       w.kpiLabelFontSize = 13;
-  if (w.kpiLabelOverride == null)       w.kpiLabelOverride = '';
-  if (w.textContent      == null)       w.textContent = '';
-  if (!w.fieldAggs)                     w.fieldAggs = {};
-  if (!w.conditions)                    w.conditions = [];
-  if (!w.sorts)                         w.sorts = [];
-}
+  for (const w of DataLaVistaState.design.widgets) {
+    if (!Array.isArray(w.yFields))        w.yFields = w.yField ? [w.yField] : [];
+    if (w.stacked          == null)       w.stacked = false;
+    if (w.showTrendLine    == null)       w.showTrendLine = false;
+    // Migrate legacy ySeriesTypes into ySeriesProps
+    if (!w.ySeriesProps) {
+      w.ySeriesProps = {};
+      if (w.ySeriesTypes && typeof w.ySeriesTypes === 'object') {
+        for (const [field, st] of Object.entries(w.ySeriesTypes)) {
+          w.ySeriesProps[field] = Object.assign({ seriesType: st }, w.ySeriesProps[field] || {});
+        }
+      }
+    }
+    delete w.ySeriesTypes; // no longer needed in runtime state
+
+    // Backfill conditions arrays inside ySeriesProps entries
+    if (w.ySeriesProps && typeof w.ySeriesProps === 'object') {
+      for (const sp of Object.values(w.ySeriesProps)) {
+        if (!sp.conditions) sp.conditions = [];
+      }
+    }
+
+    if (w.bubbleSizeField  == null)       w.bubbleSizeField = '';
+    if (w.bubbleColorField == null)       w.bubbleColorField = '';
+    if (w.showTitle        == null)       w.showTitle = true;
+    if (w.showHeaders      == null)       w.showHeaders = true;
+    if (w.widgetBackgroundColor == null)  w.widgetBackgroundColor = '#fefefe';
+    if (w.chartBackgroundColor  == null)  w.chartBackgroundColor  = '#fefefe';
+    if (w.titleBackgroundColor  == null)  w.titleBackgroundColor  = '#fefefe';
+    if (w.titleFontSize    == null)       w.titleFontSize = 14;
+    if (w.titleFontColor   == null)       w.titleFontColor = '#323130';
+    if (w.headersBackgroundColor == null) w.headersBackgroundColor = '#f3f2f1';
+    if (w.headersFontSize  == null)       w.headersFontSize = 12;
+    if (w.headersFontColor == null)       w.headersFontColor = '#323130';
+    if (w.fontSize         == null)       w.fontSize = 13;
+    if (w.fontColor        == null)       w.fontColor = '#323130';
+    if (w.kpiMetricFontSize == null)      w.kpiMetricFontSize = 36;
+    if (w.kpiLabelFontSize == null)       w.kpiLabelFontSize = 13;
+    if (w.kpiLabelOverride == null)       w.kpiLabelOverride = '';
+    if (w.textContent      == null)       w.textContent = '';
+    if (!w.fieldAggs)                     w.fieldAggs = {};
+    if (!w.conditions)                    w.conditions = [];
+    w.conditions = w.conditions.map(c => ({
+      ...c,
+      value: c.value != null ? c.value : ''
+    }));
+    if (!w.sorts)                         w.sorts = [];
+  }
+  // Normalize design-level conditions
+    if (Array.isArray(DataLaVistaState.design.conditions)) {
+      DataLaVistaState.design.conditions = DataLaVistaState.design.conditions.map(c => ({
+        ...c,
+        value: c.value != null ? c.value : ''
+      }));
+    }
   DataLaVistaState.previewFilters = cfg.previewFilters || {};
   // Normalize legacy tab name ('previewData' was renamed to 'dataPreview')
   DataLaVistaState.qmTab = (cfg.qmTab === 'previewData') ? 'dataPreview' : (cfg.qmTab || 'qb');

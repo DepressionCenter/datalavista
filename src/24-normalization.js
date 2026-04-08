@@ -152,7 +152,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       if (t === 'choice') return 'choice';
       if (t === 'multichoice') return 'choice-multi';
       if (t.startsWith('bool') || t === 'yesno' || t === 'yes/no') return 'boolean';
-      if (t === 'number' || t === 'currency' || t === 'integer') return 'number';
+      if (t === 'number' || t === 'currency' || t === 'integer' || t === 'counter' || t === 'autoid' || t === 'float' || t === 'decimal' || t === 'bigint') return 'number';
       if (t === 'datetime' || t === 'date') return 'date';
       if (t === 'url' || t === 'hyperlink' || t === 'link') return 'url';
       if (t === 'calculated') return 'text';
@@ -160,16 +160,16 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       return 'text';
     }
 
-    // Determine display type for UI
     function fieldDisplayType(type) {
-      if (['number'].includes(type)) return 'number';
-      if (['date'].includes(type)) return 'date';
-      if (['bool'].includes(type)) return 'boolean';
-      if (['boolean'].includes(type)) return 'boolean';
-      if (['lookup', 'lookup-multi', 'user', 'user-multi', 'taxkeyword'].includes(type)) return 'lookup';
-      if (['choice', 'choice-multi'].includes(type)) return 'array';
-      return 'text';
-    }
+    const t = (type || '').toLowerCase();
+    if (t === 'number' || t === 'currency' || t === 'integer' || t === 'counter' || t === 'autoid' || t === 'float' || t === 'decimal' || t === 'bigint') return 'number';
+    if (t === 'date' || t === 'datetime') return 'date';
+    if (t === 'bool' || t === 'boolean') return 'boolean';
+    if (['lookup', 'lookup-multi', 'user', 'user-multi', 'taxkeyword'].includes(t)) return 'lookup';
+    if (t === 'choice-multi') return 'array';
+    if (t === 'choice') return 'text';
+    return 'text';
+}
 
     // Camel case conversion
     function toCamelCase(str) {

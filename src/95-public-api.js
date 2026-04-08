@@ -235,6 +235,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         updateWidgetContent,
         getFilterOps,
         buildFilterValueInput,
+        sqlCompare,
         renderFilterBar,
         removeFilterFromBar,
         sniffType,
@@ -279,5 +280,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         renderDashboardTitleProperties,
         updateDashboardTitleProp,
         updateDashboardTitleTooltipIcon,
+        renderConditionRows,
+        renderSortRows,
+        showAggPopup,
         init
       };

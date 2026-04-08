@@ -1,6 +1,6 @@
 ﻿/* ============================================================
 This file is part of DataLaVista™
-80-ui-utils.js: Resizable panels, tab switching, utility functions, and SharePoint file picker.
+42-ui-utils.js: Resizable panels, tab switching, utility functions, and SharePoint file picker.
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 Created: 2026-03-24
 Last Modified: 2026-04-04

@@ -66,21 +66,40 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           if (stage === 2) return v;   // always overwrite with latest value
           return acc;
         };
-      }
-
-      alasql.fn.INCLUDES = function (lookupArray, itemKey) {
-        // Return false if the array is invalid or the itemKey is missing
-        if (!lookupArray || !Array.isArray(lookupArray) || itemKey == null) return false;
-
-        const keyStr = itemKey.toString();
-
-        // Safely check for Id, ID, or id using optional chaining (?.)
-        return lookupArray.some(member =>
-          member?.Id?.toString() === keyStr ||
-          member?.ID?.toString() === keyStr ||
-          member?.id?.toString() === keyStr
-        );
       };
+
+      // Return true if elementValue is included in lookupArray,
+      // checking a specific property if elementName is provided.
+      // If no elementName is given, checks if elementValue matches any Id/ID/id properties.
+      // Useful for querying against SP multi-lookup or multi-user fields (array of objects).
+      alasql.fn.DLV_INCLUDES = function (lookupArray, elementName, elementValue, operator = '=') {
+        if (!lookupArray || !Array.isArray(lookupArray)) return false;
+
+        const op = operator || '=';
+
+        if (elementName != null && elementName !== '') {
+            return lookupArray.some(member =>
+                member && member[elementName] != null &&
+                sqlCompare(member[elementName], op, elementValue)
+            );
+        }
+
+        // Fallback: check Id/ID/id (equality only makes sense here)
+        const valueStr = elementValue != null ? elementValue.toString() : null;
+        return lookupArray.some(member =>
+            member?.Id?.toString() === valueStr ||
+            member?.ID?.toString() === valueStr ||
+            member?.id?.toString() === valueStr
+        );
+    };
+
+    // Legacy wrapper — calls DLV_INCLUDES with no elementName (triggers Id/ID/id fallback)
+    // TODO: Delete this once all code is migrated to DLV_INCLUDES,
+    // and replace INCLUDES() with DLV_INCLUDES() in any SQL loaded through loadConfig().
+    alasql.fn.INCLUDES = function (lookupArray, itemKey) {
+        return alasql.fn.DLV_INCLUDES(lookupArray, null, itemKey);
+    };
+
 
       // ── DLV_PROP: extract a named property from an object ──────────────────
       alasql.fn.DLV_PROP = function(obj, prop) {
@@ -90,6 +109,11 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         return v !== undefined ? v : null;
       };
 
+      // ── DLV_ARRAY_EMPTY: returns true if array is null, not an array, or has no elements ──
+      alasql.fn.DLV_ARRAY_EMPTY = function (arr) {
+          return !arr || !Array.isArray(arr) || arr.length === 0;
+      };
+
       // ── DLV_DISPLAY: human-readable display value from any field value ──────
       alasql.fn.DLV_DISPLAY = function(val) {
         if (val === null || val === undefined) return null;
@@ -97,7 +121,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         if (Array.isArray(val)) {
           const parts = val.map(v => {
             if (typeof v === 'object' && v !== null) {
-              return v.Title || v.Label || v.Name || v.Value || v.lookupValue || JSON.stringify(v);
+              return v.Title || v.Label || v.Name || v.Value || v.lookupValue || v.displayValue || JSON.stringify(v);
             }
             return v != null ? String(v) : null;
           }).filter(s => s != null && s !== '');
@@ -130,8 +154,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         return ids.length > 0 ? ids.join('; ') : null;
       };
 
-      // ── DLV_JOIN: map array elements to a property and join with '; ' ────────
-      alasql.fn.DLV_JOIN = function(arr, prop) {
+      // ── DLV_JOIN: map array elements to a property and join with separator ('; ' by default)
+      alasql.fn.DLV_JOIN = function(arr, prop, separator = '; ') {
         if (!Array.isArray(arr)) return null;
         const parts = arr.map(v => {
           if (typeof v === 'object' && v !== null) {
@@ -143,8 +167,29 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           }
           return v != null ? String(v) : null;
         }).filter(s => s != null && s !== '');
-        return parts.length > 0 ? parts.join('; ') : null;
+        return parts.length > 0 ? parts.join(separator) : null;
       };
+
+      // ── DLV_KEYS: return the keys of an object joined with '; ' ────────────────
+      alasql.fn.DLV_KEYS = function(obj, separator = '; ') {
+          if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return null;
+          const keys = Object.keys(obj);
+          return keys.length > 0 ? keys.join(separator) : null;
+      };
+
+      // ── DLV_ARRAY_MATCH: filter scalar arrays with a comparison operator ──────────
+      // e.g. DLV_ARRAY_MATCH(Tags, '=', 'Urgent')
+      //      DLV_ARRAY_MATCH(Scores, '>=', 90)
+      alasql.fn.DLV_ARRAY_MATCH = function (arr, operator, value, value2) {
+    if (!arr || !Array.isArray(arr)) return false;
+
+    if (operator === 'BETWEEN') {
+        if (value == null || value2 == null) return false;
+        return arr.some(item => sqlCompare(item, '>=', value) && sqlCompare(item, '<=', value2));
+    }
+
+    return arr.some(item => sqlCompare(item, operator, value));
+};
 
       // ── DLV_EMAIL: extract email address from a SharePoint claims string ─────
       alasql.fn.DLV_EMAIL = function(claimsStr) {

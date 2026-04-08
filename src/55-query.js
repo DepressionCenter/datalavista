@@ -202,5 +202,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
     if (typeof v === 'date' || 
       (typeof v === 'string' && ISO_DATE_RE.test(v))
     ) return 'date';
+    if (typeof v === 'string' && v.trim() !== '' && !isNaN(v)) return 'number';
     return 'text';
   }
