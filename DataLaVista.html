@@ -3928,47 +3928,6 @@ DATE_MACRO_OPS: [
 // as they are typically non-informative for visualization and can cause noise in type/relationship
 // inference due to their special formats and values.
 SKIP_FIELDS: new Set([
-  "AccessPolicy",
-  "AppAuthor",
-  "AppEditor",
-  "Author@odata.navigationLinkUrl",
-  "CheckedOutUserId",
-  "ColorTag",
-  "ComplianceAssetId",
-  "ContentType",
-  "ContentVersion",
-  "Created_x0020_Date",
-  "DocIcon",
-  "Edit",
-  "Editor@odata.navigationLinkUrl",
-  "FSObjType",
-  "FolderChildCount",
-  "GUID",
-  "HTML_x0020_File_x0020_Type",
-  "InstanceID",
-  "IsCheckedoutToLocal",
-  "IsCurrentVersion",
-  "ItemChildCount",
-  "Last_x0020_Modified",
-  "MetaInfo",
-  "NoExecute",
-  "OData__SysFlow",
-  "OData__SysProfile",
-  "OData__SysVersion",
-  "Order",
-  "OriginatorId",
-  "ParentLeafName",
-  "ParentUniqueId",
-  "ParentVersionString",
-  "ProgId",
-  "ScopeId",
-  "SortBehavior",
-  "SyncClientId",
-  "TemplateUrl",
-  "UIVersionString",
-  "UniqueId",
-  "WorkflowInstanceID",
-  "WorkflowVersion",
   "_ColorTag",
   "_ComplianceFlags",
   "_ComplianceTag",
@@ -3984,6 +3943,56 @@ SKIP_FIELDS: new Set([
   "_SysProfile",
   "_SysVersion",
   "_UIVersionString",
+  "AccessPolicy",
+  "AppAuthor",
+  "AppEditor",
+  "Author@odata.navigationLinkUrl",
+  "CheckedOutUser",
+  "CheckedOutUserId",
+  "CheckoutUser",
+  "CheckoutUserId",
+  "ColorTag",
+  "ComplianceAssetId",
+  "ContentType",
+  "ContentVersion",
+  "Created_x0020_Date",
+  "DocIcon",
+  "Edit",
+  "Editor@odata.navigationLinkUrl",
+  "FSObjType",
+  "FolderChildCount",
+  "GUID",
+  "HTML_x0020_File_x0020_Type",
+  "ImageTags",
+  "InstanceID",
+  "IsCheckedoutToLocal",
+  "IsCurrentVersion",
+  "ItemChildCount",
+  "Last_x0020_Modified",
+  "MediaServiceImageTags",
+  "MediaServiceLocation",
+  "MetaInfo",
+  "NoExecute",
+  "OData__SysFlow",
+  "OData__SysProfile",
+  "OData__SysVersion",
+  "Order",
+  "OriginatorId",
+  "ParentLeafName",
+  "ParentUniqueId",
+  "ParentVersionString",
+  "ProgId",
+  "ScopeId",
+  "SortBehavior",
+  "SourceNameConvertedDocument",
+  "SourceNameConvertedDocumentId",
+  "Source Version (Converted Document)",
+  "SyncClientId",
+  "TemplateUrl",
+  "UIVersionString",
+  "UniqueId",
+  "WorkflowInstanceID",
+  "WorkflowVersion",
   "odata.editLink",
   "odata.etag",
   "odata.id",
@@ -4356,7 +4365,7 @@ function getObjectKeysForField(tableKey, fieldAlias, displayType) {
     return [{ key: 'Id', type: 'number' }, { key: 'Title', type: 'text' }];
   if (dt === 'person' || dt === 'person-multi')
     return [{ key: 'Id', type: 'number' }, { key: 'Title', type: 'text' }, { key: 'Name', type: 'text' }, { key: 'Email', type: 'text' }];
-  if (dt === 'taxonomy' || dt === 'taxkeyword' || dt === 'taxonomy-multi' || dt === 'taxkeyword-multi')
+  if (dt === 'taxonomyfieldtypemulti' || dt === 'taxonomyfieldtype' || dt === 'taxonomyfield' || dt === 'taxonomy' || dt === 'taxkeyword' || dt === 'taxonomy-multi' || dt === 'taxkeyword-multi')
     return [{ key: 'TermGuid', type: 'text' }, { key: 'Label', type: 'text' }];
 
   if (!tableKey) return [];
@@ -5541,6 +5550,9 @@ function stripODataMetadata(rows, quickCheck = false) {
     let rows = extractRows(json);
     let fields = stripODataMetadata(rows);
 
+    // Snapshot full metadata before filtering so excluded fields can be restored with original data
+    const allFieldsMap = new Map(fields.map(f => [f.InternalName, f]));
+
     // EXCLUDE system/metadata fields AND projected lookups (_x003a_)
     fields = fields.filter(f =>
       !DataLaVistaCore.SKIP_FIELDS.has(f.InternalName) &&
@@ -5581,18 +5593,22 @@ function stripODataMetadata(rows, quickCheck = false) {
     const mandatory = ['ID', 'Title', 'Created', 'Modified', 'Author', 'Editor'];
     mandatory.forEach(mand => {
       if (!fields.some(f => f.InternalName === mand)) {
-        let forcedType = 'Text';
-        if (mand === 'ID') forcedType = 'Counter';
-        if (mand === 'Author' || mand === 'Editor') forcedType = 'User';
-        if (mand === 'Created' || mand === 'Modified') forcedType = 'DateTime';
-        fields.push({ InternalName: mand, Title: mand, TypeAsString: forcedType });
+        if (allFieldsMap.has(mand)) {
+          fields.push(allFieldsMap.get(mand));
+        } else {
+          let forcedType = 'Text';
+          if (mand === 'ID') forcedType = 'Counter';
+          if (mand === 'Author' || mand === 'Editor') forcedType = 'User';
+          if (mand === 'Created' || mand === 'Modified') forcedType = 'DateTime';
+          fields.push({ InternalName: mand, Title: mand, TypeAsString: forcedType });
+        }
       }
     });
-    // For document libraries, always include FileRef and FileLeafRef (not list items)
+    // For document libraries, always include file info (not list items)
     if (isDocLib) {
-      ['FileRef', 'FileLeafRef'].forEach(fn => {
+      ['FileRef', 'FileLeafRef', 'FileDirRef'].forEach(fn => {
         if (!fields.some(f => f.InternalName === fn)) {
-          fields.push({ InternalName: fn, Title: fn, TypeAsString: 'Text' });
+          fields.push(allFieldsMap.get(fn) ?? { InternalName: fn, Title: fn, TypeAsString: 'Text' });
         }
       });
     }
@@ -9021,6 +9037,25 @@ Object.assign(CyberdynePipeline, {
   ============================================================ */
 
   /**
+ * Verify that no two fields in an alias array share the same alias.
+ * Returns an array of { alias, conflictingInternalNames[] } for any duplicates found.
+ */
+validateAliasUniqueness(fields) {
+    const seen = {};  // alias → first internalName
+    const conflicts = [];
+    for (const f of fields) {
+        const a = f.alias;
+        if (!a) continue;
+        if (seen[a] !== undefined) {
+            conflicts.push({ alias: a, fields: [seen[a], f.internalName] });
+        } else {
+            seen[a] = f.internalName;
+        }
+    }
+    return conflicts;
+},
+
+  /**
    * Create (or replace) an AlaSQL view for a raw table.
    * Returns the final viewName (may differ if there was a collision).
    */
@@ -9056,74 +9091,88 @@ Object.assign(CyberdynePipeline, {
     return viewName;
   },
 
+
   /** Build and execute the AlaSQL CREATE VIEW statement for a view */
-_applyViewSQL(viewName) {
-    const view = this.views[viewName];
-    if (!view) return;
- 
-    const rawTable = view.rawTable;
-    const rawTableRef = `[_raw_${rawTable}]`;
-    const t = DataLaVistaState.tables[rawTable];
- 
-    // ── FieldExpander path: activated when baseFields are present ──────────
-    // Filter out any already-synthetic fields that may have leaked in from old configs
-    const baseFields = (view.baseFields || []).filter(f => !f.isSynthetic && !f.isAutoId);
-    if (baseFields.length > 0) {
-      const sourceType = (t && t.sourceType) ? t.sourceType : 'unknown';
-      const siteUrl   = (t && t.siteUrl)    ? t.siteUrl    : (DataLaVistaState.spSiteUrl || '');
-       
-      const virtualCols = [];
-      const seenAliases = new Set();
-      for (const field of baseFields) {
-        const expanded = this.FieldExpander.expand(field, rawTableRef, { sourceType, siteUrl });
-        for (const vc of expanded) {
-          if (!seenAliases.has(vc.alias)) {
-            seenAliases.add(vc.alias);
-            virtualCols.push(vc);
+  _applyViewSQL(viewName) {
+      const view = this.views[viewName];
+      if (!view) return;
+
+      const rawTable = view.rawTable;
+      const rawTableRef = `[_raw_${rawTable}]`;
+      const t = DataLaVistaState.tables[rawTable];
+
+      // ── FieldExpander path: activated when baseFields are present ──────────
+      // Filter out any already-synthetic fields that may have leaked in from old configs
+      const baseFields = (view.baseFields || []).filter(f => !f.isSynthetic && !f.isAutoId);
+      if (baseFields.length > 0) {
+        const sourceType = (t && t.sourceType) ? t.sourceType : 'unknown';
+        const siteUrl   = (t && t.siteUrl)    ? t.siteUrl    : (DataLaVistaState.spSiteUrl || '');
+
+        const virtualCols = [];
+        const seenAliases = new Set();
+        for (const field of baseFields) {
+          const expanded = this.FieldExpander.expand(field, rawTableRef, { sourceType, siteUrl });
+          for (const vc of expanded) {
+            // ── Fix 1: warn and rename instead of silently dropping ──────────
+            let alias = vc.alias;
+            if (seenAliases.has(alias)) {
+              console.warn(
+                `[CyberdynePipeline] _applyViewSQL: Duplicate alias "${alias}" in view "${viewName}"` +
+                ` (internalName: "${vc.internalName}", parentField: "${vc.parentField}").` +
+                ` Suffixing to avoid silent data loss.`
+              );
+              let counter = 2;
+              while (seenAliases.has(alias + '_' + counter)) counter++;
+              alias = alias + '_' + counter;
+            }
+            seenAliases.add(alias);
+            // Shallow-clone vc only if the alias actually changed, to avoid
+            // mutating the FieldExpander's output object in place.
+            virtualCols.push(alias !== vc.alias ? { ...vc, alias } : vc);
+            // ── End Fix 1 ────────────────────────────────────────────────────
           }
         }
+        if (virtualCols.length === 0) return;
+        const selectParts = virtualCols.map(vc => `${vc.sqlExpr} AS [${vc.alias}]`);
+        try { alasql(`DROP VIEW IF EXISTS [${viewName}]`); } catch (_) {}
+        try {
+          alasql(`CREATE VIEW [${viewName}] AS SELECT ${selectParts.join(', ')} FROM ${rawTableRef}`);
+        } catch (e) { console.warn(`[CyberdynePipeline] Failed to create view ${viewName}:`, e.message); }
+
+        // Rebuild view metadata from expanded virtual columns
+        view.columnMappings = {};
+        view.fields = [];
+        for (const vc of virtualCols) {
+          view.columnMappings[vc.alias] = vc.internalName;
+          view.fields.push({
+            internalName: vc.internalName,
+            displayName: vc.alias,
+            alias: vc.alias,
+            type: vc.type,
+            displayType: vc.displayType,
+            isSynthetic: vc.isSynthetic,
+            parentField: vc.parentField,
+            isAutoId: vc.isSynthetic  // hide synthetics from basic QB
+          });
+        }
+
+        // Sync t.fields so renderFieldsPanel and QB show the expanded field list
+        if (t && t.data && t.data.length > 0) t.fields = view.fields;
+        return;
+      } else { }
+
+      // ── Fallback: legacy columnMappings (old configs without baseFields) ───
+      const cols = [];
+      for (const [alias, internalName] of Object.entries(view.columnMappings)) {
+        cols.push(`[${internalName}] AS [${alias}]`);
       }
-      if (virtualCols.length === 0) return; 
-      const selectParts = virtualCols.map(vc => `${vc.sqlExpr} AS [${vc.alias}]`);
+      if (cols.length === 0) return; // Nothing to select yet (lazy SP list)
       try { alasql(`DROP VIEW IF EXISTS [${viewName}]`); } catch (_) {}
-      try{
-        alasql(`CREATE VIEW [${viewName}] AS SELECT ${selectParts.join(', ')} FROM ${rawTableRef}`);
-    } catch (e) { console.warn(`[CyberdynePipeline] Failed to create view ${viewName}:`, e.message); }
-
-      // Rebuild view metadata from expanded virtual columns
-      view.columnMappings = {};
-      view.fields = [];
-      for (const vc of virtualCols) {
-        view.columnMappings[vc.alias] = vc.internalName;
-        view.fields.push({
-          internalName: vc.internalName,
-          displayName: vc.alias,
-          alias: vc.alias,
-          type: vc.type,
-          displayType: vc.displayType,
-          isSynthetic: vc.isSynthetic,
-          parentField: vc.parentField,
-          isAutoId: vc.isSynthetic  // hide synthetics from basic QB
-        });
-      }
- 
-      // Sync t.fields so renderFieldsPanel and QB show the expanded field list
-      if (t && t.data && t.data.length > 0) t.fields = view.fields;
-      return;
-    } else { }
-
-    // ── Fallback: legacy columnMappings (old configs without baseFields) ───
-    const cols = [];
-    for (const [alias, internalName] of Object.entries(view.columnMappings)) {
-      cols.push(`[${internalName}] AS [${alias}]`);
-    }
-    if (cols.length === 0) return; // Nothing to select yet (lazy SP list)
-    try { alasql(`DROP VIEW IF EXISTS [${viewName}]`); } catch (_) {}
-    try{
-      console.log(`[CyberdynePipeline] Creating view cyberdyne-views.js Line 142 ${viewName} with columns:`, cols);
-       alasql(`CREATE VIEW [${viewName}] AS SELECT ${cols.join(', ')} FROM ${rawTableRef}`);
-    } catch (e) { console.warn(`[CyberdynePipeline] Failed to create view ${viewName}:`, e.message); }
-  },
+      try {
+        console.log(`[CyberdynePipeline] Creating view cyberdyne-views.js Line 142 ${viewName} with columns:`, cols);
+        alasql(`CREATE VIEW [${viewName}] AS SELECT ${cols.join(', ')} FROM ${rawTableRef}`);
+      } catch (e) { console.warn(`[CyberdynePipeline] Failed to create view ${viewName}:`, e.message); }
+    },
 
   /** Recreate the AlaSQL view with current column mappings (call after alias changes) */
   updateViewSQL(viewName) {
@@ -9161,34 +9210,52 @@ _applyViewSQL(viewName) {
   updateColumnAlias(viewName, internalName, newAlias) {
     const view = this.views[viewName];
     if (!view) throw new Error(`View "${viewName}" not found`);
-    // Update alias in baseFields (source of truth for FieldExpander)
+
+    // ── Guard: reject if newAlias is already taken by a DIFFERENT field ──
+    const existingOwner = view.columnMappings[newAlias];
+    if (existingOwner && existingOwner !== internalName) {
+        throw new Error(
+            `Alias "${newAlias}" is already used by field "${existingOwner}" in view "${viewName}".`
+        );
+    }
+
     const baseField = (view.baseFields || []).find(f => f.internalName === internalName);
     if (baseField) baseField.alias = newAlias;
-    // Remove old alias for this internal name
+
     for (const [alias, iName] of Object.entries(view.columnMappings)) {
-      if (iName === internalName) { delete view.columnMappings[alias]; break; }
+        if (iName === internalName) { delete view.columnMappings[alias]; break; }
     }
     view.columnMappings[newAlias] = internalName;
-    // Update the field's alias in the view's fields array
+
     const field = view.fields.find(f => f.internalName === internalName);
     if (field) field.alias = newAlias;
+
     this.updateViewSQL(viewName);
-  },
+},
 
   /** Add a new field's column mapping to an existing view */
   addColumnToView(viewName, field) {
     const view = this.views[viewName];
     if (!view) return;
-    view.columnMappings[field.alias] = field.internalName;
-    if (!view.fields.find(f => f.internalName === field.internalName)) {
-      view.fields.push(field);
+
+    // ── Guard: reject alias collision ──
+    const existingOwner = view.columnMappings[field.alias];
+    if (existingOwner && existingOwner !== field.internalName) {
+        throw new Error(
+            `Alias "${field.alias}" is already used by field "${existingOwner}" in view "${viewName}".`
+        );
     }
-    // Keep baseFields in sync so FieldExpander picks up the new field
+
+    view.columnMappings[field.alias] = field.internalName;
+
+    if (!view.fields.find(f => f.internalName === field.internalName)) {
+        view.fields.push(field);
+    }
     if (view.baseFields && !view.baseFields.find(f => f.internalName === field.internalName)) {
-      view.baseFields.push(field);
+        view.baseFields.push(field);
     }
     this.updateViewSQL(viewName);
-  },
+},
 
   /* ============================================================
      VIEW DELETION
@@ -10691,10 +10758,22 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           inp.maxLength = 50;
           labelEl.replaceWith(inp);
           inp.focus(); inp.select();
+
           const commit = () => {
             const newAlias = inp.value.trim() || currentVal;
-            renameTable(tableKey, newAlias);
+            try {
+              renameTable(tableKey, newAlias);
+            } catch (err) {
+              // Restore the original label text and show a brief error tooltip
+              toast('Unable to rename table. It may conflict with an existing table, or it may contain special characters.', 'error');
+              inp.style.outline = '2px solid red';
+              inp.title = err.message;
+              inp.focus();
+              // Prevent the blur→commit loop from re-firing immediately
+            }
           };
+
+
           inp.addEventListener('blur', commit);
           inp.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') { inp.blur(); }
@@ -10714,9 +10793,19 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           inp.maxLength = 50;
           labelEl.replaceWith(inp);
           inp.focus(); inp.select();
+
           const commit = () => {
             const newAlias = inp.value.trim() || currentVal;
-            renameField(tableKey, fieldAlias, newAlias);
+            try {
+              renameField(tableKey, fieldAlias, newAlias);
+            } catch (err) {
+              // Restore the original label text and show a brief error tooltip
+              toast('Unable to rename field. It may conflict with an existing field, or it may contain special characters.', 'error');
+              inp.style.outline = '2px solid red';
+              inp.title = err.message;
+              inp.focus();
+              // Prevent the blur→commit loop from re-firing immediately
+            }
           };
           inp.addEventListener('blur', commit);
           inp.addEventListener('keydown', (e) => {
@@ -10770,43 +10859,51 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         const oldDsAlias = ds.alias;
         if (newAlias === oldDsAlias) { renderFieldsPanel(); return; }
 
-        // For each table: rename views whose name carries the old DS alias as a prefix,
-        // and update SQL for non-view tables
-        (ds.tables || []).forEach(tableKey => {
+        // ── Phase 1: validate all renames before committing any ──────────────────
+        // Build the full rename plan and catch conflicts early, before touching any state.
+        const renamePlan = []; // { tableKey, oldViewName, newViewName }
+        for (const tableKey of (ds.tables || [])) {
           const t = DataLaVistaState.tables[tableKey];
-          if (!t) return;
+          if (!t) continue;
           const viewName = CyberdynePipeline.rawTableToView[tableKey];
-          if (viewName) {
-            // If the view name starts with the old DS alias, rename it to use the new alias
-            if (viewName.startsWith(oldDsAlias)) {
-              const suffix = viewName.slice(oldDsAlias.length);
-              const newViewName = newAlias + suffix;
-              try {
-                updateSQLEditorName(viewName, newViewName);
-                CyberdynePipeline.renameView(viewName, newViewName);
-                t.viewName = newViewName;
-                // t.alias is the table's own alias — it doesn't include the DS prefix, so leave it unchanged
-              } catch (err) {
-                console.warn('[renameDatasource] Could not rename view', viewName, '->', newViewName, err.message);
-              }
+          if (viewName && viewName.startsWith(oldDsAlias)) {
+            const suffix = viewName.slice(oldDsAlias.length);
+            const newViewName = newAlias + suffix;
+            // Reject if newViewName is already taken by a view belonging to a DIFFERENT raw table
+            const existingView = CyberdynePipeline.views[newViewName];
+            if (existingView && existingView.rawTable !== tableKey) {
+              toast(`Rename failed: view name "${newViewName}" is already in use.`, 'error');
+              renderFieldsPanel();
+              return;
             }
-            // (Views without DS prefix are independent — no rename needed)
-          } else {
-            // Non-view table: update SQL using DSAlias_TableAlias pattern
-            const oldQName = oldDsAlias + '_' + t.alias;
-            const newQName = newAlias + '_' + t.alias;
-            updateSQLEditorName(oldQName, newQName);
+            renamePlan.push({ tableKey, oldViewName: viewName, newViewName });
           }
-        });
+        }
 
-        // Commit alias change and propagate to child tables
+        // ── Phase 2: commit all renames ───────────────────────────────────────────
+        for (const { tableKey, oldViewName, newViewName } of renamePlan) {
+          const t = DataLaVistaState.tables[tableKey];
+          try {
+            CyberdynePipeline.renameView(oldViewName, newViewName);
+            updateSQLEditorName(oldViewName, newViewName);  // after renameView succeeds
+            t.viewName = newViewName;
+          } catch (err) {
+            // Should not reach here after phase 1 validation, but guard anyway
+            console.error('[renameDatasource] Unexpected failure renaming view', oldViewName, '->', newViewName, err.message);
+            toast(`Rename failed: ${err.message}`, 'error');
+            renderFieldsPanel();
+            return;
+          }
+        }
+
+        // ── Phase 3: commit DS-level alias and propagate ──────────────────────────
         ds.alias = newAlias;
-        (ds.tables || []).forEach(tableKey => {
+        for (const tableKey of (ds.tables || [])) {
           const t = DataLaVistaState.tables[tableKey];
           if (t) t.dsAlias = newAlias;
-        });
+        }
 
-        // Rebuild QB SQL (FROM clauses use view names; regenerating picks up any renamed views)
+        // Rebuild QB SQL
         if (DataLaVistaState.basicQB.tableName) {
           const t = DataLaVistaState.tables[DataLaVistaState.basicQB.tableName];
           if (t && t.dataSource === dsName) rebuildBasicSQL();
@@ -10840,9 +10937,9 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           const newViewName = (dsPrefix && existingView.startsWith(dsPrefix))
             ? dsPrefix + newAlias
             : newAlias;
-          try {
-            updateSQLEditorName(existingView, newViewName);
+          try {            
             CyberdynePipeline.renameView(existingView, newViewName);
+            updateSQLEditorName(existingView, newViewName);
             t.alias = newAlias;
             t.viewName = newViewName;
           } catch (err) {
@@ -10880,14 +10977,12 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         const f = t.fields.find(x => x.alias === oldAlias);
         if (!f) return;
 
-        // For view-backed tables, update the view's column mapping so AlaSQL view stays in sync
+        // For view-backed tables, update the view's column mapping so AlaSQL view stays in sync.
+        // Allow the error to propagate — if the view cannot be updated (e.g. duplicate alias),
+        // we must not proceed with updating state, or the UI and view will diverge.
         const viewName = CyberdynePipeline.rawTableToView[tableKey];
         if (viewName) {
-          try {
-            CyberdynePipeline.updateColumnAlias(viewName, f.internalName, newAlias);
-          } catch (err) {
-            console.warn('[renameField] updateColumnAlias:', err.message);
-          }
+          CyberdynePipeline.updateColumnAlias(viewName, f.internalName, newAlias); // throws on duplicate
         }
 
         f.alias = newAlias;

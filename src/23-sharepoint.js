@@ -305,6 +305,9 @@ function stripODataMetadata(rows, quickCheck = false) {
     let rows = extractRows(json);
     let fields = stripODataMetadata(rows);
 
+    // Snapshot full metadata before filtering so excluded fields can be restored with original data
+    const allFieldsMap = new Map(fields.map(f => [f.InternalName, f]));
+
     // EXCLUDE system/metadata fields AND projected lookups (_x003a_)
     fields = fields.filter(f =>
       !DataLaVistaCore.SKIP_FIELDS.has(f.InternalName) &&
@@ -345,18 +348,22 @@ function stripODataMetadata(rows, quickCheck = false) {
     const mandatory = ['ID', 'Title', 'Created', 'Modified', 'Author', 'Editor'];
     mandatory.forEach(mand => {
       if (!fields.some(f => f.InternalName === mand)) {
-        let forcedType = 'Text';
-        if (mand === 'ID') forcedType = 'Counter';
-        if (mand === 'Author' || mand === 'Editor') forcedType = 'User';
-        if (mand === 'Created' || mand === 'Modified') forcedType = 'DateTime';
-        fields.push({ InternalName: mand, Title: mand, TypeAsString: forcedType });
+        if (allFieldsMap.has(mand)) {
+          fields.push(allFieldsMap.get(mand));
+        } else {
+          let forcedType = 'Text';
+          if (mand === 'ID') forcedType = 'Counter';
+          if (mand === 'Author' || mand === 'Editor') forcedType = 'User';
+          if (mand === 'Created' || mand === 'Modified') forcedType = 'DateTime';
+          fields.push({ InternalName: mand, Title: mand, TypeAsString: forcedType });
+        }
       }
     });
-    // For document libraries, always include FileRef and FileLeafRef (not list items)
+    // For document libraries, always include file info (not list items)
     if (isDocLib) {
-      ['FileRef', 'FileLeafRef'].forEach(fn => {
+      ['FileRef', 'FileLeafRef', 'FileDirRef'].forEach(fn => {
         if (!fields.some(f => f.InternalName === fn)) {
-          fields.push({ InternalName: fn, Title: fn, TypeAsString: 'Text' });
+          fields.push(allFieldsMap.get(fn) ?? { InternalName: fn, Title: fn, TypeAsString: 'Text' });
         }
       });
     }
