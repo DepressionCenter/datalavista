@@ -344,18 +344,9 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         const whereParts = conds.map((c, i) => {
           const conj = i === 0 ? '' : (c.conj || 'AND') + ' ';
           const col  = `[${alias}].[${c.field}]`;
-          if (c.op === 'NULL')    return conj + `${col} IS NULL`;
-          if (c.op === 'NOTNULL') return conj + `${col} IS NOT NULL`;
-          if (DataLaVistaCore.DATE_MACRO_VALS.has(c.op)) {
-            const expr = dateMacroToSQL(c.op, c.value, col);
-            return expr ? conj + expr : conj + `${col} IS NOT NULL`;
-          }
-          const raw = c.value || '';
-          const val = c.op === 'LIKE'
-            ? `'%${raw}%'`
-            : (raw === 'true' || raw === 'false' ? raw
-              : (raw !== '' && !isNaN(raw) ? raw : `'${raw.replace(/'/g, "''")}'`));
-          return conj + `${col} ${c.op} ${val}`;
+          const fieldMeta = t.fields.find(f => f.alias === c.field);
+          const dt = fieldMeta ? (fieldMeta.displayType || 'text') : 'text';
+          return conj + condToSQL(c, col, dt);
         });
 
         const orderParts = sorts.map(s => `[${alias}].[${s.field}] ${s.dir || 'ASC'}`);
@@ -553,52 +544,27 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       function renderBasicConditions() {
         const area = document.getElementById('basic-conditions-area');
         if (!area) return;
-        const t = DataLaVistaState.tables[DataLaVistaState.basicQB.tableName];
+        const tname = DataLaVistaState.basicQB.tableName;
+        const t = DataLaVistaState.tables[tname];
         if (!t) return;
         const fields = t.fields.filter(f => !f.isAutoId);
-        const fieldOpts = fields.map(f => `<option value="${f.alias}">${f.alias}</option>`).join('');
-
-        area.innerHTML = '';
-        if (!DataLaVistaState.basicQB.conditions.length) {
-          area.innerHTML = '<div style="font-size:11px;color:var(--text-disabled);padding:2px 0">No filters — click + Add</div>';
-          return;
-        }
-
-        DataLaVistaState.basicQB.conditions.forEach((c, i) => {
-          // Determine if the selected field is a date type
-          const fieldMeta  = fields.find(f => f.alias === c.field);
-          const isDate     = fieldMeta?.displayType === 'date';
-          const ops        = getFilterOps(fieldMeta?.displayType);
-          // A date macro has no free-text value; only NULL/NOTNULL/macros hide the input
-          const isMacro    = DataLaVistaCore.DATE_MACRO_VALS.has(c.op);
-          const macroMeta  = DataLaVistaCore.DATE_MACRO_OPS.find(o => o.val === c.op);
-          const needsValue = c.op !== 'NULL' && c.op !== 'NOTNULL' && !(isMacro && !macroMeta?.hasInput);
-
-          const row = document.createElement('div');
-          row.className = 'qb-condition-row';
-          row.innerHTML = `
-      ${i === 0
-              ? `<span class="qb-where-badge">WHERE</span>`
-              : `<select class="form-input qb-conj-select" onchange="DataLaVistaState.basicQB.conditions[${i}].conj=this.value; rebuildBasicSQL()">
-            <option ${c.conj === 'AND' ? 'selected' : ''}>AND</option>
-            <option ${c.conj === 'OR' ? 'selected' : ''}>OR</option>
-           </select>`
-            }
-      <select class="form-input qb-field-select" onchange="DataLaVistaState.basicQB.conditions[${i}].field=this.value; renderBasicConditions(); rebuildBasicSQL()">
-        ${fields.map(f => `<option value="${f.alias}" ${f.alias === c.field ? 'selected' : ''}>${f.alias}</option>`).join('')}
-      </select>
-      <select class="form-input qb-op-select" style="width:${isDate ? '150px' : '112px'} !important" onchange="DataLaVistaState.basicQB.conditions[${i}].op=this.value; renderBasicConditions(); rebuildBasicSQL()">
-        ${ops.map(o => `<option value="${o.val}" ${o.val === c.op ? 'selected' : ''}>${o.label}</option>`).join('')}
-      </select>
-      ${needsValue
-              ? buildFilterValueInput(fieldMeta?.displayType, isMacro, macroMeta, c.value,
-                  `DataLaVistaState.basicQB.conditions[${i}].value=this.value; rebuildBasicSQL()`)
-              : `<span class="qb-val-blank"></span>`
-            }
-      <button class="btn btn-ghost btn-sm btn-icon qb-remove-btn" onclick="removeBasicCondition(${i})">✕</button>
-    `;
-          area.appendChild(row);
-        });
+        const cols = fields.map(f => ({
+          alias: f.alias,
+          displayType: f.displayType,
+          tableKey: tname,
+          fieldInternalName: f.internalName,
+        }));
+        area.innerHTML = renderConditionRows(
+          DataLaVistaState.basicQB.conditions, cols,
+          (ci, v) => `DataLaVistaState.basicQB.conditions[${ci}].conj=${v}; rebuildBasicSQL()`,
+          (ci, v) => `DataLaVistaState.basicQB.conditions[${ci}].field=${v}; renderBasicConditions(); rebuildBasicSQL()`,
+          (ci, v) => `DataLaVistaState.basicQB.conditions[${ci}].op=${v}; renderBasicConditions(); rebuildBasicSQL()`,
+          (ci, v) => `DataLaVistaState.basicQB.conditions[${ci}].value=${v}; rebuildBasicSQL()`,
+          (ci)    => `removeBasicCondition(${ci})`,
+          null,   // rowAttrs
+          (ci, v) => `DataLaVistaState.basicQB.conditions[${ci}].value2=${v}; rebuildBasicSQL()`,
+          (ci, v) => `DataLaVistaState.basicQB.conditions[${ci}].elementKey=${v}; renderBasicConditions(); rebuildBasicSQL()`
+        );
       }
 
       // ── Sorts ─────────────────────────────────────────────────────────────────────
@@ -622,28 +588,13 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         const t = DataLaVistaState.tables[DataLaVistaState.basicQB.tableName];
         if (!t) return;
         const fields = t.fields.filter(f => !f.isAutoId);
-
-        area.innerHTML = '';
-        if (!DataLaVistaState.basicQB.sorts.length) {
-          area.innerHTML = '<div style="font-size:11px;color:var(--text-disabled);padding:2px 0">No sorts — click + Add</div>';
-          return;
-        }
-
-        DataLaVistaState.basicQB.sorts.forEach((s, i) => {
-          const row = document.createElement('div');
-          row.className = 'qb-sort-row';
-          row.innerHTML = `
-      <select class="form-input qb-field-select" onchange="DataLaVistaState.basicQB.sorts[${i}].field=this.value; rebuildBasicSQL()">
-        ${fields.map(f => `<option value="${f.alias}" ${f.alias === s.field ? 'selected' : ''}>${f.alias}</option>`).join('')}
-      </select>
-      <select class="form-input qb-dir-select" onchange="DataLaVistaState.basicQB.sorts[${i}].dir=this.value; rebuildBasicSQL()">
-        <option ${s.dir === 'ASC' ? 'selected' : ''}>ASC</option>
-        <option ${s.dir === 'DESC' ? 'selected' : ''}>DESC</option>
-      </select>
-      <button class="btn btn-ghost btn-sm btn-icon qb-remove-btn" onclick="removeBasicSort(${i})">✕</button>
-    `;
-          area.appendChild(row);
-        });
+        const cols = fields.map(f => f.alias);
+        area.innerHTML = renderSortRows(
+          DataLaVistaState.basicQB.sorts, cols,
+          (si, v) => `DataLaVistaState.basicQB.sorts[${si}].field=${v}; rebuildBasicSQL()`,
+          (si, v) => `DataLaVistaState.basicQB.sorts[${si}].dir=${v}; rebuildBasicSQL()`,
+          (si)    => `removeBasicSort(${si})`
+        );
       }
 
       // ── Rebuild SQL and push to editor ────────────────────────────────────────────

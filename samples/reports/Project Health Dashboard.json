@@ -51,7 +51,7 @@
     "groupBy": [],
     "rowLimit": 500
   },
-  "currentWidgetId": null,
+  "currentWidgetId": "w_1775520711005",
   "dataSources": {
     "projec": {
       "alias": "projec",
@@ -116,7 +116,80 @@
         "kpiLabelOverride": "",
         "stacked": false,
         "showTrendLine": false,
-        "ySeriesProps": {},
+        "seriesProps": [
+          {
+            "field": "TaskID",
+            "agg": "",
+            "label": "",
+            "color": "",
+            "seriesType": "",
+            "axisSide": "",
+            "conditions": []
+          },
+          {
+            "field": "Date",
+            "agg": "",
+            "label": "",
+            "color": "",
+            "seriesType": "",
+            "axisSide": "",
+            "conditions": []
+          },
+          {
+            "field": "Team",
+            "agg": "",
+            "label": "",
+            "color": "",
+            "seriesType": "",
+            "axisSide": "",
+            "conditions": []
+          },
+          {
+            "field": "Priority",
+            "agg": "",
+            "label": "",
+            "color": "",
+            "seriesType": "",
+            "axisSide": "",
+            "conditions": []
+          },
+          {
+            "field": "Status",
+            "agg": "",
+            "label": "",
+            "color": "",
+            "seriesType": "",
+            "axisSide": "",
+            "conditions": []
+          },
+          {
+            "field": "RiskLevel",
+            "agg": "",
+            "label": "",
+            "color": "",
+            "seriesType": "",
+            "axisSide": "",
+            "conditions": []
+          },
+          {
+            "field": "PlannedHours",
+            "agg": "SUM",
+            "label": "",
+            "color": "",
+            "seriesType": "",
+            "axisSide": "",
+            "conditions": []
+          },
+          {
+            "field": "ActualHours",
+            "agg": "",
+            "label": "",
+            "color": "",
+            "seriesType": "",
+            "axisSide": "",
+            "conditions": []
+          }
+        ],
         "bubbleSizeField": "",
         "bubbleColorField": "",
         "textContent": "<h4>Welcome to the Project Health Dashboard</h4>\n<p>This executive view provides comprehensive insights into cross-functional team performance, schedule variances, and overall project stability over our recent three-month cycle.</p><br />\n</p>Use the visualizations below to track resource allocation (Planned vs. Actual hours), identify potential bottlenecks within departmental workflows, and monitor the trajectory of our overall Project Health Score. High-risk outliers and critical-priority tasks are highlighted to facilitate quick, data-driven decision-making. Scroll to the bottom data table for granular, task-level details.</p>",
@@ -171,7 +244,17 @@
         "kpiLabelOverride": "",
         "stacked": false,
         "showTrendLine": false,
-        "ySeriesProps": {},
+        "seriesProps": [
+          {
+            "field": "TaskID",
+            "agg": "COUNT",
+            "label": "",
+            "color": "",
+            "seriesType": "",
+            "axisSide": "",
+            "conditions": []
+          }
+        ],
         "bubbleSizeField": "",
         "bubbleColorField": "",
         "textContent": "Enter text or HTML here...",
@@ -183,12 +266,12 @@
         "conditions": [],
         "sorts": [],
         "filters": [],
-        "widgetSql": "SELECT [RiskLevel], [TaskID] FROM [_results]"
+        "widgetSql": "SELECT [RiskLevel], COUNT([TaskID]) AS [__dlvy_0] FROM [dlv_active] GROUP BY [RiskLevel]"
       },
       {
         "id": "w_1775520295362",
         "type": "line",
-        "title": "Actual Hours Over Time",
+        "title": "Planned vs. Actual Hours Over Time",
         "showTitle": true,
         "showHeaders": true,
         "widthPct": 59,
@@ -206,6 +289,7 @@
         "xField": "Date",
         "yField": "PlannedHours",
         "yFields": [
+          "PlannedHours",
           "ActualHours"
         ],
         "aggregation": "",
@@ -227,17 +311,26 @@
         "kpiLabelOverride": "",
         "stacked": false,
         "showTrendLine": true,
-        "ySeriesProps": {
-          "ActualHours": {
+        "seriesProps": [
+          {
+            "field": "PlannedHours",
+            "agg": "SUM",
             "label": "",
             "color": "",
             "seriesType": "",
-            "lineWidth": 2,
-            "opacity": 1,
-            "smooth": true,
+            "axisSide": "",
+            "conditions": []
+          },
+          {
+            "field": "ActualHours",
+            "agg": "SUM",
+            "label": "",
+            "color": "",
+            "seriesType": "",
+            "axisSide": "",
             "conditions": []
           }
-        },
+        ],
         "bubbleSizeField": "",
         "bubbleColorField": "",
         "textContent": "Enter text or HTML here...",
@@ -254,7 +347,7 @@
           }
         ],
         "filters": [],
-        "widgetSql": "SELECT [Date], [ActualHours] FROM [_results]"
+        "widgetSql": "SELECT [Date], SUM([PlannedHours]) AS [__dlvy_0], SUM([ActualHours]) AS [__dlvy_1] FROM [dlv_active] GROUP BY [Date] ORDER BY [Date] ASC"
       },
       {
         "id": "w_1775520711005",
@@ -277,6 +370,8 @@
         "xField": "Team",
         "yField": "PlannedHours",
         "yFields": [
+          "TaskID",
+          "TaskID",
           "TaskID"
         ],
         "aggregation": "",
@@ -296,35 +391,67 @@
         "kpiMetricFontSize": 36,
         "kpiLabelFontSize": 13,
         "kpiLabelOverride": "",
-        "stacked": false,
+        "stacked": true,
         "showTrendLine": false,
-        "ySeriesProps": {
-          "TaskID": {
-            "label": "",
-            "color": "",
+        "seriesProps": [
+          {
+            "field": "TaskID",
+            "agg": "COUNT_DISTINCT",
+            "label": "In Progress",
+            "color": "#4bd01b",
             "seriesType": "",
             "lineWidth": 2,
             "opacity": 1,
             "smooth": true,
+            "axisSide": "",
             "conditions": [
               {
                 "conj": "AND",
-                "field": "Priority",
+                "field": "Status",
                 "op": "=",
-                "value": "Low"
+                "value": "In Progress"
               }
             ]
           },
-          "PlannedHours": {
-            "label": "",
-            "color": "",
+          {
+            "field": "TaskID",
+            "agg": "COUNT_DISTINCT",
+            "label": "In Review",
+            "color": "#ead810",
             "seriesType": "",
             "lineWidth": 2,
             "opacity": 1,
             "smooth": true,
-            "conditions": []
+            "axisSide": "",
+            "conditions": [
+              {
+                "conj": "AND",
+                "field": "Status",
+                "op": "=",
+                "value": "In Review"
+              }
+            ]
+          },
+          {
+            "field": "TaskID",
+            "agg": "COUNT_DISTINCT",
+            "label": "To Do",
+            "color": "#347fc5",
+            "seriesType": "",
+            "lineWidth": 2,
+            "opacity": 1,
+            "smooth": true,
+            "axisSide": "",
+            "conditions": [
+              {
+                "conj": "AND",
+                "field": "Status",
+                "op": "=",
+                "value": "To Do"
+              }
+            ]
           }
-        },
+        ],
         "bubbleSizeField": "",
         "bubbleColorField": "",
         "textContent": "Enter text or HTML here...",
@@ -347,9 +474,14 @@
             "value": "Done"
           }
         ],
-        "sorts": [],
+        "sorts": [
+          {
+            "field": "Team",
+            "dir": "ASC"
+          }
+        ],
         "filters": [],
-        "widgetSql": "SELECT [Team], [TaskID] FROM [_results]"
+        "widgetSql": "SELECT [Team], COUNT(DISTINCT CASE WHEN [Status] = 'In Progress' THEN [TaskID] ELSE NULL END) AS [__dlvy_0], COUNT(DISTINCT CASE WHEN [Status] = 'In Review' THEN [TaskID] ELSE NULL END) AS [__dlvy_1], COUNT(DISTINCT CASE WHEN [Status] = 'To Do' THEN [TaskID] ELSE NULL END) AS [__dlvy_2] FROM [dlv_active] WHERE [Status] != 'Done' GROUP BY [Team] ORDER BY [Team] ASC"
       },
       {
         "id": "w_1775521350016",
@@ -392,7 +524,71 @@
         "kpiLabelOverride": "",
         "stacked": false,
         "showTrendLine": false,
-        "ySeriesProps": {},
+        "seriesProps": [
+          {
+            "field": "TaskID",
+            "agg": "",
+            "label": "",
+            "color": "",
+            "seriesType": "",
+            "axisSide": "",
+            "conditions": []
+          },
+          {
+            "field": "Team",
+            "agg": "",
+            "label": "",
+            "color": "",
+            "seriesType": "",
+            "axisSide": "",
+            "conditions": []
+          },
+          {
+            "field": "Priority",
+            "agg": "",
+            "label": "",
+            "color": "",
+            "seriesType": "",
+            "axisSide": "",
+            "conditions": []
+          },
+          {
+            "field": "Status",
+            "agg": "",
+            "label": "",
+            "color": "",
+            "seriesType": "",
+            "axisSide": "",
+            "conditions": []
+          },
+          {
+            "field": "RiskLevel",
+            "agg": "",
+            "label": "",
+            "color": "",
+            "seriesType": "",
+            "axisSide": "",
+            "conditions": []
+          },
+          {
+            "field": "PlannedHours",
+            "agg": "SUM",
+            "label": "",
+            "color": "",
+            "seriesType": "",
+            "axisSide": "",
+            "conditions": []
+          },
+          {
+            "field": "ActualHours",
+            "agg": "SUM",
+            "label": "",
+            "color": "",
+            "seriesType": "",
+            "axisSide": "",
+            "conditions": []
+          }
+        ],
         "bubbleSizeField": "",
         "bubbleColorField": "",
         "textContent": "Enter text or HTML here...",
@@ -413,7 +609,7 @@
           }
         ],
         "filters": [],
-        "widgetSql": "SELECT [TaskID], [Team], [Priority], [Status], [RiskLevel], [PlannedHours], [ActualHours] FROM [_results]"
+        "widgetSql": "SELECT [TaskID], [Team], [Priority], [Status], [RiskLevel], SUM([PlannedHours]) AS [PlannedHours], SUM([ActualHours]) AS [ActualHours] FROM [dlv_active] GROUP BY [TaskID], [Team], [Priority], [Status], [RiskLevel] ORDER BY [TaskID] ASC, [Team] ASC"
       }
     ],
     "filters": [
@@ -432,11 +628,7 @@
         "label": "RiskLevel",
         "position": "bar"
       }
-    ],
-    "conditions": [],
-    "sorts": [],
-    "groupBy": [],
-    "fieldAggs": {}
+    ]
   },
   "previewFilters": {},
   "qbCollapsed": false,

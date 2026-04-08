@@ -306,269 +306,12 @@ function rankSuggestions(rules, cols, meta) {
     body.appendChild(secFields);
   }
 
-  // ============================================================
-  // DESIGN DATA TRANSFORMS (filter / sort / group / aggregate)
-  // Uses the same QB_OPS, DATE_MACRO_OPS, QB_AGGS, and aggsForType()
-  // as the Query Builder so the UI is identical.
-  // ============================================================
-
-  /** Returns the most-specific base dataset available.
-   *  Priority: previewFilteredData → transformedResults → [dlv_active] view → queryResults fallback. */
+  /** Returns the active dataset for widget rendering.
+   *  Priority: previewFilteredData → [dlv_active] view → empty. */
   function getDesignData() {
     if (DataLaVistaState.design.previewFilteredData)  return DataLaVistaState.design.previewFilteredData;
-    if (DataLaVistaState.design.transformedResults)   return DataLaVistaState.design.transformedResults;
     if (alasql.tables && alasql.tables['dlv_active']) return alasql('SELECT * FROM [dlv_active]');
     return [];
-  }
-
-  /** Re-runs the design-level AlaSQL transform against [dlv_results] (or queryResults fallback)
-   *  and stores the result in DataLaVistaState.design.transformedResults, then re-renders widgets. */
-  function applyDesignTransforms() {
-    const hasView = !!(alasql.tables && alasql.tables['dlv_results']);
-    if (!hasView) {
-      DataLaVistaState.design.transformedResults = null;
-      renderDesignCanvas();
-      return;
-    }
-
-    const cols = DataLaVistaState.queryColumns;
-    if (!cols.length) { DataLaVistaState.design.transformedResults = null; renderDesignCanvas(); return; }
-
-    const conditions = (DataLaVistaState.design.conditions || []).filter(c => c.field);
-    const sorts      = (DataLaVistaState.design.sorts      || []).filter(s => s.field);
-    const groups     = DataLaVistaState.design.groupBy || [];
-    const fieldAggs  = DataLaVistaState.design.fieldAggs || {};
-    const anyAgg     = cols.some(c => fieldAggs[c]);
-
-    // No transforms at all → clear cache and use raw data
-    if (!conditions.length && !sorts.length && !groups.length && !anyAgg) {
-      DataLaVistaState.design.transformedResults = null;
-      renderDesignCanvas();
-      renderDesignFieldsPanel();
-      return;
-    }
-
-    // SELECT parts — preserve original column name with AS so widgets keep working
-    const selParts = cols.map(col => {
-      const agg = fieldAggs[col];
-      if (!agg) return `[${col}]`;
-      if (agg === 'COUNT_DISTINCT') return `COUNT(DISTINCT [${col}]) AS [${col}]`;
-      return `${agg}([${col}]) AS [${col}]`;
-    });
-
-    // WHERE parts — identical logic to buildBasicSQL / renderNodeConditions
-    const whereParts = conditions.map((c, i) => {
-      const conj = i === 0 ? '' : (c.conj || 'AND') + ' ';
-      const col  = `[${c.field}]`;
-      if (c.op === 'NULL')    return conj + `${col} IS NULL`;
-      if (c.op === 'NOTNULL') return conj + `${col} IS NOT NULL`;
-      if (DataLaVistaCore.DATE_MACRO_VALS.has(c.op)) {
-        const expr = dateMacroToSQL(c.op, c.value, col);
-        return expr ? conj + expr : conj + `${col} IS NOT NULL`;
-      }
-      const raw = c.value || '';
-      const val = c.op === 'LIKE'
-        ? `'%${raw}%'`
-        : (raw === 'true' || raw === 'false' ? raw : (raw !== '' && !isNaN(raw) ? raw : `'${raw.replace(/'/g, "''")}'`));
-      return conj + `${col} ${c.op} ${val}`;
-    });
-
-    // GROUP BY parts
-    let groupParts;
-    if (anyAgg) {
-      groupParts = cols.filter(c => !fieldAggs[c]).map(c => `[${c}]`);
-    } else {
-      groupParts = groups.filter(g => g).map(g => `[${g}]`);
-    }
-
-    const orderParts = sorts.map(s => `[${s.field}] ${s.dir || 'ASC'}`);
-
-    const fromSrc = hasView ? '[dlv_results]' : '?';
-    let sql = `SELECT ${selParts.join(', ')} FROM ${fromSrc}`;
-    if (whereParts.length) sql += ` WHERE ${whereParts.join(' ')}`;
-    if (groupParts.length) sql += ` GROUP BY ${groupParts.join(', ')}`;
-    if (orderParts.length) sql += ` ORDER BY ${orderParts.join(', ')}`;
-
-    try {
-      const results = alasql(sql);
-      DataLaVistaState.design.transformedResults = Array.isArray(results) ? results : null;
-      const rowCount = DataLaVistaState.design.transformedResults ? DataLaVistaState.design.transformedResults.length : 0;
-      toast(`Design transform applied — ${rowCount} rows`, 'success');
-    } catch (e) {
-      console.error('Design transform error:', e);
-      DataLaVistaState.design.transformedResults = null;
-      toast('Design transform error: ' + e.message, 'error');
-    }
-
-    renderDesignCanvas();
-    renderDesignFieldsPanel();
-  }
-
-  // ── Design aggregate dropdown ─────────────────────────────────────────────
-  function setDesignFieldAgg(col, agg) {
-    if (!DataLaVistaState.design.fieldAggs) DataLaVistaState.design.fieldAggs = {};
-    if (agg) DataLaVistaState.design.fieldAggs[col] = agg;
-    else delete DataLaVistaState.design.fieldAggs[col];
-    syncDesignGroupBySection();
-    // Update the select's active styling inline without full re-render
-    const sel = document.querySelector('.design-agg-select');
-    // Re-render fields panel to update agg-active class
-    renderDesignFieldsPanel();
-  }
-
-  // ── Design conditions ─────────────────────────────────────────────────────
-  function addDesignCondition() {
-    if (!DataLaVistaState.queryColumns.length) return;
-    if (!DataLaVistaState.design.conditions) DataLaVistaState.design.conditions = [];
-    DataLaVistaState.design.conditions.push({ conj: 'AND', field: DataLaVistaState.queryColumns[0], op: '=', value: '' });
-    renderDesignConditions();
-  }
-
-  function removeDesignCondition(i) {
-    DataLaVistaState.design.conditions.splice(i, 1);
-    renderDesignConditions();
-  }
-
-  function renderDesignConditions() {
-    const area = document.getElementById('design-conditions-area');
-    if (!area) return;
-    const cols = DataLaVistaState.queryColumns;
-    const conds = DataLaVistaState.design.conditions || [];
-
-    area.innerHTML = '';
-    if (!conds.length) {
-      area.innerHTML = '<div style="font-size:11px;color:var(--text-disabled);padding:2px 0">No filters — click + Add</div>';
-      return;
-    }
-
-    const fieldOpts = cols.map(c => `<option value="${c}">${c}</option>`).join('');
-
-    conds.forEach((c, i) => {
-      const dt = sniffType(c.field);
-      const ops = getFilterOps(dt);
-      const isMacro = DataLaVistaCore.DATE_MACRO_VALS.has(c.op);
-      const macroMeta = DataLaVistaCore.DATE_MACRO_OPS.find(o => o.val === c.op);
-      const needsValue = c.op !== 'NULL' && c.op !== 'NOTNULL' && !(isMacro && !macroMeta?.hasInput);
-
-      const row = document.createElement('div');
-      row.className = 'qb-condition-row';
-	  row.innerHTML = (i === 0 ? `<span class="qb-where-badge">WHERE</span>`
-          : `<select class="form-input qb-conj-select" onchange="DataLaVistaState.design.conditions[${i}].conj=this.value">
-               <option ${c.conj==='AND'?'selected':''}>AND</option>
-               <option ${c.conj==='OR'?'selected':''}>OR</option>
-             </select>` );
-	  row.innerHTML += `<select class="form-input qb-field-select"
-          onchange="DataLaVistaState.design.conditions[${i}].field=this.value; renderDesignConditions()">`;
-	  row.innerHTML += cols.map(f=>`<option value="${f}" ${f===c.field?'selected':''}>${f}</option>`).join('');
-	  row.innerHTML == `</select>`;
-	  row.innerHTML += `<select class="form-input qb-op-select" style="width:${dt==='date'?'150px':'112px'}!important"
-          onchange="DataLaVistaState.design.conditions[${i}].op=this.value; renderDesignConditions()">`;
-	  row.innerHTML += ops.map(o=>`<option value="${o.val}" ${o.val===c.op?'selected':''}>${o.label}</option>`).join('');
-	  row.innerHTML += `</select>`;
-	  row.innerHTML += (needsValue
-          ? buildFilterValueInput(dt, isMacro, macroMeta, c.value,
-              `DataLaVistaState.design.conditions[${i}].value=this.value`)
-          : `<span class="qb-val-blank"></span>`);
-	  row.innerHTML += `<button class="btn btn-ghost btn-sm btn-icon qb-remove-btn" onclick="removeDesignCondition(${i})">✕</button>`;
-	  row.innerHTML += ``;
-	  area.appendChild(row);
-    });
-  }
-
-
-  // ── Design sorts ──────────────────────────────────────────────────────────
-  function addDesignSort() {
-    if (!DataLaVistaState.queryColumns.length) return;
-    if (!DataLaVistaState.design.sorts) DataLaVistaState.design.sorts = [];
-    DataLaVistaState.design.sorts.push({ field: DataLaVistaState.queryColumns[0], dir: 'ASC' });
-    renderDesignSorts();
-  }
-
-  function removeDesignSort(i) {
-    DataLaVistaState.design.sorts.splice(i, 1);
-    renderDesignSorts();
-  }
-
-  function renderDesignSorts() {
-    const area = document.getElementById('design-sorts-area');
-    if (!area) return;
-    const cols = DataLaVistaState.queryColumns;
-    const sorts = DataLaVistaState.design.sorts || [];
-
-    area.innerHTML = '';
-    if (!sorts.length) {
-      area.innerHTML = '<div style="font-size:11px;color:var(--text-disabled);padding:2px 0">No sorts — click + Add</div>';
-      return;
-    }
-
-    sorts.forEach((s, i) => {
-      const row = document.createElement('div');
-      row.className = 'qb-sort-row';
-      row.innerHTML = `<select class="form-input qb-field-select" onchange="DataLaVistaState.design.sorts[${i}].field=this.value">`;
-	  row.innerHTML += cols.map(f=>`<option value="${f}" ${f===s.field?'selected':''}>${f}</option>`).join('');
-      row.innerHTML += `</select>
-        <select class="form-input qb-dir-select" onchange="DataLaVistaState.design.sorts[${i}].dir=this.value">
-          <option ${s.dir==='ASC'?'selected':''}>ASC</option>
-          <option ${s.dir==='DESC'?'selected':''}>DESC</option>
-        </select>
-        <button class="btn btn-ghost btn-sm btn-icon qb-remove-btn" onclick="removeDesignSort(${i})">✕</button>`;
-      area.appendChild(row);
-    });
-  }
-
-  // ── Design group by ───────────────────────────────────────────────────────
-  function addDesignGroupBy() {
-    if (!DataLaVistaState.queryColumns.length) return;
-    if (!DataLaVistaState.design.groupBy) DataLaVistaState.design.groupBy = [];
-    DataLaVistaState.design.groupBy.push(DataLaVistaState.queryColumns[0]);
-    syncDesignGroupBySection();
-  }
-
-  function removeDesignGroupBy(i) {
-    DataLaVistaState.design.groupBy.splice(i, 1);
-    syncDesignGroupBySection();
-  }
-
-  function renderDesignGroupBy() {
-    const area = document.getElementById('design-groupby-area');
-    if (!area) return;
-    const cols = DataLaVistaState.queryColumns;
-    const groups = DataLaVistaState.design.groupBy || [];
-
-    area.innerHTML = '';
-    if (!groups.length) {
-      area.innerHTML = '<div style="font-size:11px;color:var(--text-disabled);padding:2px 0">No grouping — click + Add</div>';
-      return;
-    }
-
-    groups.forEach((g, i) => {
-      const row = document.createElement('div');
-      row.className = 'qb-sort-row';
-      row.innerHTML = `<select class="form-input qb-field-select" onchange="DataLaVistaState.design.groupBy[${i}]=this.value">`;
-	  row.innerHTML += cols.map(f=>`<option value="${f}" ${f===g?'selected':''}>${f}</option>`).join('');
-      row.innerHTML += `</select><button class="btn btn-ghost btn-sm btn-icon qb-remove-btn" onclick="removeDesignGroupBy(${i})">✕</button>`;
-      area.appendChild(row);
-    });
-  }
-
-  /** Shows/hides the manual GROUP BY add-button when aggregates are active (auto-group then). */
-  function syncDesignGroupBySection() {
-    const anyAgg = DataLaVistaState.queryColumns.some(c => (DataLaVistaState.design.fieldAggs || {})[c]);
-    const label  = document.getElementById('design-groupby-label');
-    const addBtn = document.getElementById('design-groupby-add-btn');
-    if (label)  label.textContent = anyAgg ? 'GROUP BY (auto)' : 'GROUP BY';
-    if (addBtn) addBtn.style.display = anyAgg ? 'none' : '';
-    if (anyAgg) {
-      const area = document.getElementById('design-groupby-area');
-      if (area) {
-        const nonAgg = DataLaVistaState.queryColumns.filter(c => !(DataLaVistaState.design.fieldAggs || {})[c]);
-        area.innerHTML = nonAgg.length
-          ? `<div style="font-size:11px;color:var(--text-disabled);padding:2px 0">Auto: ${nonAgg.join(', ')}</div>`
-          : `<div style="font-size:11px;color:var(--text-disabled);padding:2px 0">All fields aggregated — no GROUP BY needed</div>`;
-      }
-    } else {
-      renderDesignGroupBy();
-    }
   }
 
       // ============================================================
@@ -614,12 +357,6 @@ function rankSuggestions(rules, cols, meta) {
         if (event.currentTarget === event.target) event.currentTarget.classList.remove('drag-over');
       }
 
-      // TODO: Use new heuristic functions scoreRule() and rankSuggestions()
-      // to auto-suggest best widget type and fields based on the dropped item
-      // (e.g. date → line chart with date on x-axis, number → bar chart, etc.).
-      // The CHART_TYPE_RULES const needs revision as some heuristics that use
-      // field names changed to just data types during de-duplication.
-      // See AI prompt #4 in the archive folder.
       function onDropToCanvas(event) {
         event.preventDefault();
         event.currentTarget.classList.remove('drag-over');
@@ -685,7 +422,33 @@ function rankSuggestions(rules, cols, meta) {
           const fb = qcols[1] || qcols[0] || '';
           return { yField: fb, yFields: fb ? [fb] : [], yAgg: '' };
         })();
-        const _initFieldAggs = _smartY.yAgg ? { [_smartY.yField]: _smartY.yAgg } : {};
+        // Build initial seriesProps — one entry per Y field for charts, one per column for table/KPI
+        const _isChartWidget = ['bar','line','pie','scatter'].includes(widgetType);
+        const _initFields = fields || (DataLaVistaState.queryColumns.length
+          ? (widgetType === 'kpi' ? [DataLaVistaState.queryColumns[0]] : DataLaVistaState.queryColumns.slice(0, 8))
+          : []);
+        let _initSeriesProps;
+        if (_isChartWidget) {
+          _initSeriesProps = _smartY.yFields.map(yf => ({
+            field: yf, agg: _smartY.yAgg || '', label: '', color: '',
+            seriesType: '', lineWidth: null, opacity: null, smooth: null,
+            axisSide: '', conditions: []
+          }));
+        } else if (widgetType === 'kpi') {
+          _initSeriesProps = _initFields.slice(0,1).map(f => ({
+            field: f, agg: 'SUM', label: '', color: '',
+            seriesType: '', lineWidth: null, opacity: null, smooth: null,
+            axisSide: '', conditions: []
+          }));
+        } else if (widgetType === 'table') {
+          _initSeriesProps = _initFields.map(f => ({
+            field: f, agg: '', label: '', color: '',
+            seriesType: '', lineWidth: null, opacity: null, smooth: null,
+            axisSide: '', conditions: []
+          }));
+        } else {
+          _initSeriesProps = [];
+        }
 
         const widget = {
           id,
@@ -695,12 +458,13 @@ function rankSuggestions(rules, cols, meta) {
           showHeaders: true,
           widthPct: 45,
           heightVh: 30,
-          fields: fields || (DataLaVistaState.queryColumns.length ? (widgetType === 'kpi' ? [DataLaVistaState.queryColumns[0]] : DataLaVistaState.queryColumns.slice(0, 8)) : []),
+          fields: _initFields,
           xField: (fields && fields.length > 0) ? fields[0] : DataLaVistaState.queryColumns[0] || '',
           yField: _smartY.yField,  // legacy compat
           yFields: _smartY.yFields,
           aggregation: '',
-          fieldAggs: _initFieldAggs,
+          seriesProps: _initSeriesProps,
+          fieldAggs: {},   // kept for backward compat (not written to by new code)
           conditions: [],
           sorts: [],
           fillColor: '#0078d4',
@@ -724,7 +488,7 @@ function rankSuggestions(rules, cols, meta) {
           filters: [],
           stacked: false,
           showTrendLine: false,
-          ySeriesTypes: {},
+          ySeriesProps: {},   // kept for backward compat (not written to by new code)
           bubbleSizeField: '',
           bubbleColorField: ''
         };
@@ -833,103 +597,224 @@ function rankSuggestions(rules, cols, meta) {
       // ============================================================
 
       // ============================================================
-      // PER-WIDGET DATA BUILDER
-      // Applies widget-level fieldAggs, conditions, and sorts via AlaSQL
-      // on top of the (possibly globally-transformed) base dataset.
+      // PER-WIDGET SQL BUILDER & DATA EXECUTOR
       // ============================================================
+
+      /** Converts a single condition object to a SQL fragment (no leading conjunction). */
+      function _condToSQLFrag(c) {
+        return condToSQL(c, `[${c.field}]`, sniffType(c.field));
+      }
+
+      /** Converts conditions array to a WHERE-clause body string (no WHERE keyword). */
+      function _condsToWhereBody(conditions) {
+        return conditions.map((c, i) => {
+          const conj = i === 0 ? '' : (c.conj || 'AND') + ' ';
+          return conj + _condToSQLFrag(c);
+        }).join(' ');
+      }
+
+      /**
+       * Builds the SQL string for a widget. Returns { sql, fromSrc }.
+       * fromSrc is null when falling back to in-memory array binding (?).
+       */
+      /**
+       * Returns the canonical seriesProps array for a widget, normalizing legacy
+       * fieldAggs + ySeriesProps into the unified format if seriesProps is absent.
+       * For chart widgets: each entry = one Y series.
+       * For table/KPI widgets: each entry = one column.
+       */
+      function _getSeriesProps(w) {
+        if (Array.isArray(w.seriesProps) && w.seriesProps.length) return w.seriesProps;
+        // Legacy migration: reconstruct from ySeriesProps (index-keyed) + fieldAggs (field-keyed)
+        const _isChart = ['bar','line','pie','scatter'].includes(w.type);
+        if (_isChart) {
+          const yfs = (Array.isArray(w.yFields) && w.yFields.length)
+            ? w.yFields : (w.yField ? [w.yField] : []);
+          return yfs.map((yf, yi) => {
+            const legacy = (w.ySeriesProps || {})[String(yi)] || (w.ySeriesProps || {})[yf] || {};
+            return {
+              field:      yf,
+              agg:        legacy.agg || (w.fieldAggs || {})[yf] || '',
+              label:      legacy.label      || '',
+              color:      legacy.color      || '',
+              seriesType: legacy.seriesType || '',
+              lineWidth:  legacy.lineWidth  ?? null,
+              opacity:    legacy.opacity    ?? null,
+              smooth:     legacy.smooth     ?? null,
+              axisSide:   legacy.axisSide   || '',
+              conditions: (legacy.conditions || []).map(c => Object.assign({}, c))
+            };
+          });
+        }
+        // table / kpi
+        const fields = (w.type === 'kpi') ? (w.fields || []).slice(0,1) : (w.fields || []);
+        return fields.map(f => ({
+          field:      f,
+          agg:        (w.fieldAggs || {})[f] || '',
+          label:      '',
+          color:      '',
+          seriesType: '',
+          lineWidth:  null,
+          opacity:    null,
+          smooth:     null,
+          axisSide:   '',
+          conditions: []
+        }));
+      }
+
+      function buildWidgetSQL(w) {
+        const hasActive  = !!(alasql.tables && alasql.tables['dlv_active']);
+        const hasResults = !!(alasql.tables && alasql.tables['dlv_results']);
+        const fromSrc    = hasActive ? '[dlv_active]' : hasResults ? '[dlv_results]' : null;
+        const from       = fromSrc || '?';
+
+        const base = getDesignData();
+
+        const _isChartType = ['bar', 'line', 'pie', 'scatter'].includes(w.type);
+
+        // seriesProps is the unified source of truth (replaces both fieldAggs and ySeriesProps).
+        // Fall back to reconstructing from legacy fieldAggs + ySeriesProps for old configs
+        // that haven't been through loadConfig migration yet (e.g. mid-session).
+        const seriesProps = _getSeriesProps(w);
+
+        const conditions   = (w.conditions  || []).filter(c => c.field);
+        const sorts        = (w.sorts       || []).filter(s => s.field);
+
+        // Helper: aggregate for series at index i
+        const _getAgg = (i) => (seriesProps[i] || {}).agg || '';
+
+        let xField = '', yFields = [];
+        let cols;
+        if (w.type === 'table') {
+          // For table, seriesProps[i].field is the column — but respect w.fields order
+          const tableFields = seriesProps.length ? seriesProps.map(s => s.field).filter(Boolean) : (w.fields || []);
+          cols = fromSrc
+            ? tableFields
+            : tableFields.filter(f => base && base.length && Object.prototype.hasOwnProperty.call(base[0], f));
+        } else if (_isChartType) {
+          xField  = w.xField || '';
+          yFields = seriesProps.length
+            ? seriesProps.map(s => s.field).filter(Boolean)
+            : ((Array.isArray(w.yFields) && w.yFields.length) ? w.yFields : (w.yField ? [w.yField] : []));
+          cols    = [xField, ...yFields].filter(Boolean);
+        } else if (w.type === 'kpi') {
+          cols = seriesProps.length
+            ? seriesProps.slice(0,1).map(s => s.field).filter(Boolean)
+            : (w.fields || []).slice(0, 1);
+        } else {
+          return null;
+        }
+        if (!cols.length) return null;
+
+        const anyAgg       = _isChartType
+          ? yFields.some((_, i) => _getAgg(i))
+          : cols.some((_, i) => _getAgg(i));
+        const needsDistinct = !anyAgg && ['table', 'bar', 'line', 'pie'].includes(w.type);
+
+        let selParts;
+        if (_isChartType && xField) {
+          const xPart = `[${xField}]`;
+          const yParts = yFields.map((yf, yi) => {
+            const agg     = _getAgg(yi);
+            const spEntry = seriesProps[yi] || {};
+            const sConds  = (spEntry.conditions || []).filter(c => c.field);
+            const alias   = `__dlvy_${yi}`;
+
+            if (!agg) return `[${yf}] AS [${alias}]`;
+
+            if (!sConds.length) {
+              if (agg === 'COUNT_DISTINCT') return `COUNT(DISTINCT [${yf}]) AS [${alias}]`;
+              return `${agg}([${yf}]) AS [${alias}]`;
+            }
+            const caseWhen = _condsToWhereBody(sConds);
+            if (agg === 'SUM')            return `SUM(CASE WHEN ${caseWhen} THEN 1 ELSE 0 END) AS [${alias}]`;
+            if (agg === 'COUNT')          return `COUNT(CASE WHEN ${caseWhen} THEN 1 ELSE NULL END) AS [${alias}]`;
+            if (agg === 'COUNT_DISTINCT') return `COUNT(DISTINCT CASE WHEN ${caseWhen} THEN [${yf}] ELSE NULL END) AS [${alias}]`;
+            return `${agg}(CASE WHEN ${caseWhen} THEN [${yf}] ELSE NULL END) AS [${alias}]`;
+          });
+          selParts = [xPart, ...yParts];
+        } else {
+          // table / kpi — use seriesProps for agg; alias stays as field name for table compat
+          selParts = cols.map((col, i) => {
+            const agg = _getAgg(i);
+            if (!agg) return `[${col}]`;
+            if (agg === 'COUNT_DISTINCT') return `COUNT(DISTINCT [${col}]) AS [${col}]`;
+            return `${agg}([${col}]) AS [${col}]`;
+          });
+        }
+
+        const whereParts = conditions.map((c, i) => {
+          const conj = i === 0 ? '' : (c.conj || 'AND') + ' ';
+          return conj + _condToSQLFrag(c);
+        });
+
+        let groupParts;
+        if (_isChartType && anyAgg) {
+          groupParts = xField ? [`[${xField}]`] : [];
+          yFields.forEach((yf, yi) => {
+            if (!_getAgg(yi)) groupParts.push(`[${yf}]`);
+          });
+          groupParts = [...new Set(groupParts)];
+        } else if (!_isChartType && anyAgg) {
+          groupParts = cols.filter((_, i) => !_getAgg(i)).map(c => `[${c}]`);
+        } else {
+          groupParts = [];
+        }
+
+        const orderParts = sorts.map(s => `[${s.field}] ${s.dir || 'ASC'}`);
+
+        const selectKw = (needsDistinct && !anyAgg) ? 'SELECT DISTINCT' : 'SELECT';
+        let sql = `${selectKw} ${selParts.join(', ')} FROM ${from}`;
+        if (whereParts.length) sql += ` WHERE ${whereParts.join(' ')}`;
+        if (groupParts.length) sql += ` GROUP BY ${groupParts.join(', ')}`;
+        if (orderParts.length) sql += ` ORDER BY ${orderParts.join(', ')}`;
+
+        return { sql, fromSrc };
+      }
+
+      /**
+       * Executes buildWidgetSQL and returns the result rows.
+       * Falls back to getDesignData() on error or when no SQL can be built.
+       */
       function buildWidgetData(w) {
-        // Prefer a named AlaSQL view if one was registered by the preview runner.
-        // [dlv_active] exists when a global filter bar filter is active (sits on top
-        // of [dlv_results]); [dlv_results] is the base view wrapping the user's SQL.
-        // Falling back to the in-memory array keeps the Design tab working before any
-        // preview run has been executed.
+        const base = getDesignData();
         const hasActive  = !!(alasql.tables && alasql.tables['dlv_active']);
         const hasResults = !!(alasql.tables && alasql.tables['dlv_results']);
         const fromSrc    = hasActive ? '[dlv_active]' : hasResults ? '[dlv_results]' : null;
 
-        const base = getDesignData();
         if (!fromSrc && (!base || !base.length)) return [];
 
-        // Determine the set of columns this widget cares about.
-        // When using a named view we don't have a base[0] to introspect, so we
-        // rely on the widget's own field config (cols will be validated by SQL).
-        let cols;
-        if (w.type === 'table') {
-          cols = fromSrc
-            ? (w.fields || [])
-            : (w.fields || []).filter(f => Object.prototype.hasOwnProperty.call(base[0], f));
-        } else if (['bar', 'line', 'pie', 'scatter'].includes(w.type)) {
-          const _yfs = (Array.isArray(w.yFields) && w.yFields.length) ? w.yFields : (w.yField ? [w.yField] : []);
-          cols = [...new Set([w.xField, ..._yfs].filter(Boolean))];
-        } else if (w.type === 'kpi') {
-          cols = (w.fields || []).slice(0, 1);
-        } else {
-          return base;
-        }
-        if (!cols.length) return base;
-
-        // Ensure state arrays exist (handles widgets created before this version)
-        const fieldAggs  = w.fieldAggs  || {};
         const conditions = (w.conditions || []).filter(c => c.field);
         const sorts      = (w.sorts     || []).filter(s => s.field);
-        const anyAgg     = cols.some(c => fieldAggs[c]);
 
-        // DISTINCT applies for non-aggregated table/bar/line/pie
-        const needsDistinct = !anyAgg && ['table', 'bar', 'line', 'pie'].includes(w.type);
+        if (w.type !== 'table' && w.type !== 'kpi' && !['bar','line','pie','scatter'].includes(w.type)) return base;
+
+        const built = buildWidgetSQL(w);
+        if (!built) return base;
+
+        const { sql } = built;
+
+        const _isChart2 = ['bar','line','pie','scatter'].includes(w.type);
+        const sp2 = _getSeriesProps(w);
+        const anyAgg = sp2.some(s => s.agg);
+        const needsDistinct = !anyAgg && ['table','bar','line','pie'].includes(w.type);
+
+        // Check if we have any relevant fields at all
+        const hasCols = _isChart2
+          ? sp2.some(s => s.field)
+          : (w.type === 'kpi' ? !!(w.fields && w.fields[0]) : !!(w.fields && w.fields.length));
+        if (!hasCols) return base;
 
         if (!conditions.length && !sorts.length && !anyAgg) {
           if (!needsDistinct) return base;
-          // Only DISTINCT needed — build minimal query
-          const from2 = fromSrc || '?';
-          const selD = cols.map(col => `[${col}]`);
-          const sqlD = `SELECT DISTINCT ${selD.join(', ')} FROM ${from2}`;
           try {
-            const rd = fromSrc ? alasql(sqlD) : alasql(sqlD, [base]);
+            const rd = fromSrc ? alasql(sql) : alasql(sql, [base]);
             return Array.isArray(rd) ? rd : base;
           } catch (e) {
             console.warn('buildWidgetData DISTINCT error:', e.message);
             return base;
           }
         }
-
-        // SELECT — preserve column name via AS so downstream code keeps working
-        const selParts = cols.map(col => {
-          const agg = fieldAggs[col];
-          if (!agg) return `[${col}]`;
-          if (agg === 'COUNT_DISTINCT') return `COUNT(DISTINCT [${col}]) AS [${col}]`;
-          return `${agg}([${col}]) AS [${col}]`;
-        });
-
-        // WHERE — same logic as applyDesignTransforms / AQB node conditions
-        const whereParts = conditions.map((c, i) => {
-          const conj = i === 0 ? '' : (c.conj || 'AND') + ' ';
-          const col  = `[${c.field}]`;
-          if (c.op === 'NULL')    return conj + `${col} IS NULL`;
-          if (c.op === 'NOTNULL') return conj + `${col} IS NOT NULL`;
-          if (DataLaVistaCore.DATE_MACRO_VALS.has(c.op)) {
-            const expr = dateMacroToSQL(c.op, c.value, col);
-            return expr ? conj + expr : conj + `${col} IS NOT NULL`;
-          }
-          const raw = c.value || '';
-          const val = c.op === 'LIKE'
-            ? `'%${raw}%'`
-            : (raw === 'true' || raw === 'false' ? raw : (raw !== '' && !isNaN(raw) ? raw : `'${raw.replace(/'/g, "''")}'`));
-          return conj + `${col} ${c.op} ${val}`;
-        });
-
-        // GROUP BY — auto-derived from non-aggregated columns when any agg is active
-        const groupParts = anyAgg ? cols.filter(c => !fieldAggs[c]).map(c => `[${c}]`) : [];
-
-        // ORDER BY
-        const orderParts = sorts.map(s => `[${s.field}] ${s.dir || 'ASC'}`);
-
-        // Use named view when available (no array binding needed); fall back to ?
-        const from = fromSrc || '?';
-        const selectKw = (needsDistinct && !anyAgg) ? 'SELECT DISTINCT' : 'SELECT';
-        let sql = `${selectKw} ${selParts.join(', ')} FROM ${from}`;
-        if (whereParts.length) sql += ` WHERE ${whereParts.join(' ')}`;
-        if (groupParts.length) sql += ` GROUP BY ${groupParts.join(', ')}`;
-        if (orderParts.length) sql += ` ORDER BY ${orderParts.join(', ')}`;
 
         try {
           const result = fromSrc ? alasql(sql) : alasql(sql, [base]);
@@ -945,7 +830,8 @@ function rankSuggestions(rules, cols, meta) {
         const field = (w.fields && w.fields[0]) || '';
         const kpiData = buildWidgetData(w);
         if (kpiData && kpiData.length && field) {
-          const fieldAgg = (w.fieldAggs || {})[field];
+          const sp = _getSeriesProps(w);
+          const fieldAgg = (sp[0] || {}).agg || '';
           if (fieldAgg) {
             value = kpiData[0][field] ?? '—';
           } else {
@@ -1040,27 +926,35 @@ function _buildChartOption(w, chartData) {
 
   const stacked       = !!w.stacked;
   const showTrendLine = !!w.showTrendLine;
-  const ySeriesTypes  = w.ySeriesTypes || {};
+  const seriesProps   = _getSeriesProps(w);
 
   // ── BAR / LINE ────────────────────────────────────────────────────────────
   if (w.type === 'bar' || w.type === 'line') {
     var barSeries = [];
 
     for (var bi = 0; bi < yFields.length; bi++) {
-      var byf = yFields[bi];
-      var bst = ySeriesTypes[byf] || w.type;
+      var byf   = yFields[bi];
+      var bkey  = '__dlvy_' + bi;  // alias emitted by buildWidgetSQL
+      var bsp   = seriesProps[bi] || {};
+      var bst   = bsp.seriesType || w.type;
+      var bclr  = bsp.color || colors[bi % colors.length];
+      // Read from alias if present (aggregated / filtered series), else raw field
+      var bget  = function(r, key, field) { return r[key] !== undefined ? r[key] : r[field]; };
       var bs  = {
-        name      : byf,
+        name      : bsp.label || byf,
         type      : bst,
-        data      : chartData.map(function(r) { return parseFloat(r[byf]) || 0; }),
-        itemStyle : { color: colors[bi % colors.length] }
+        data      : chartData.map(function(r) { return parseFloat(bget(r, bkey, byf)) || 0; }),
+        itemStyle : { color: bclr, opacity: bsp.opacity != null ? bsp.opacity : 1 }
       };
-      if (bst === 'line') bs.smooth = true;
+      if (bst === 'line') {
+        bs.smooth = bsp.smooth != null ? !!bsp.smooth : true;
+        if (bsp.lineWidth != null) bs.lineStyle = { width: bsp.lineWidth };
+      }
       if (stacked) bs.stack = 'total';
       barSeries.push(bs);
 
       if (showTrendLine) {
-        var bvals  = chartData.map(function(r) { return parseFloat(r[byf]) || 0; });
+        var bvals  = chartData.map(function(r) { return parseFloat(bget(r, bkey, byf)) || 0; });
         var bn     = bvals.length;
         var bsumX  = (bn * (bn - 1)) / 2;
         var bsumY  = 0;
@@ -1109,13 +1003,14 @@ function _buildChartOption(w, chartData) {
 
   // ── PIE ───────────────────────────────────────────────────────────────────
   if (w.type === 'pie') {
+    var pieGet = function(r, i, field) { var k = '__dlvy_' + i; return r[k] !== undefined ? r[k] : r[field]; };
     if (yFields.length === 1) {
       return {
         tooltip : { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
         series  : [{
           type   : 'pie',
           data   : chartData.map(function(r) {
-            return { name: String(r[xField] != null ? r[xField] : ''), value: parseFloat(r[yFields[0]]) || 0 };
+            return { name: String(r[xField] != null ? r[xField] : ''), value: parseFloat(pieGet(r, 0, yFields[0])) || 0 };
           }),
           radius : ['30%', '65%'],
           label  : { fontSize: 11 }
@@ -1132,7 +1027,7 @@ function _buildChartOption(w, chartData) {
           radius : ['20%', '40%'],
           center : [Math.round(pieStep * pi + pieStep / 2) + '%', '50%'],
           data   : chartData.map(function(r) {
-            return { name: String(r[xField] != null ? r[xField] : ''), value: parseFloat(r[pyf]) || 0 };
+            return { name: String(r[xField] != null ? r[xField] : ''), value: parseFloat(pieGet(r, pi, pyf)) || 0 };
           }),
           label  : { fontSize: 10, formatter: '{b}' }
         };
@@ -1392,45 +1287,33 @@ function _buildChartOption(w, chartData) {
       }
 
       function _renderYFieldsHTML(w, wid, cols) {
-        const yfs = (Array.isArray(w.yFields) && w.yFields.length) ? w.yFields : (w.yField ? [w.yField] : []);
-				
-								   
-        const isMixed = w.type === 'bar' || w.type === 'line';
-        const yst = w.ySeriesTypes || {};
+        const sp  = _getSeriesProps(w);
+        const yfs = sp.length ? sp.map(s => s.field).filter(Boolean)
+          : ((Array.isArray(w.yFields) && w.yFields.length) ? w.yFields : (w.yField ? [w.yField] : []));
         let returnVal;
 
         if (!yfs.length) {
           returnVal = '<div style="font-size:11px;color:var(--text-disabled);padding:4px 0">No Y fields — click + Add</div>';
         } else {
-
-            returnVal = yfs.map((yf, yi) => {
+          returnVal = yfs.map((yf, yi) => {
             const ti = DataLaVistaCore.FIELD_TYPE_ICONS[sniffType(yf)] || DataLaVistaCore.FIELD_TYPE_ICONS.default;
-												  
-            const agg = (w.fieldAggs || {})[yf] || '';
+            const spEntry = sp[yi] || {};
+            const agg = spEntry.agg || '';
             const escapedYf = yf.replace(/'/g, "\\'");
-
-            const colOptions = cols.map(c => 
+            const colOptions = cols.map(c =>
               '<option value="' + c + '"' + (c === yf ? ' selected' : '') + '>' + c + '</option>'
             ).join('');
-
-            let mixedSelect = '';
-            if (isMixed) {
-              mixedSelect = '<select class="form-input" style="width:52px;height:22px;font-size:10px" title="Series type"'
-                + ' onchange="widgetUpdateYSeriesType(\'' + wid + '\',\'' + escapedYf + '\',this.value)">'
-                + '<option value=""' + (!yst[yf] ? ' selected' : '') + '>auto</option>'
-                + '<option value="bar"' + (yst[yf] === 'bar' ? ' selected' : '') + '>bar</option>'
-                + '<option value="line"' + (yst[yf] === 'line' ? ' selected' : '') + '>line</option>'
-                + '</select>';
-            }
+            const hasSeriesConds = !!(spEntry.conditions && spEntry.conditions.length);
 
             return '<div class="adv-field-row selected">'
               + '<span class="field-type-icon ' + ti.cls + '">' + ti.icon + '</span>'
               + '<select class="form-input" style="flex:1;height:22px;font-size:11px"'
               + ' onchange="widgetUpdateYField(\'' + wid + '\',' + yi + ',this.value)">'
               + colOptions + '</select>'
-              + mixedSelect
+              + '<button class="btn btn-ghost btn-sm btn-icon' + (hasSeriesConds ? ' has-agg' : '') + '" title="Series properties" style="padding:0 4px"'
+              + ' onclick="event.stopPropagation();openSeriesAdvancedProps(\'' + wid + '\',\'' + escapedYf + '\',' + yi + ')">⚙️</button>'
               + '<button class="adv-agg-btn' + (agg ? ' has-agg' : '') + '" title="' + (agg || 'No aggregate') + '"'
-              + ' onclick="event.stopPropagation();showWidgetFieldAggPopup(\'' + wid + '\',\'' + escapedYf + '\',this)">'
+              + ' onclick="event.stopPropagation();showWidgetFieldAggPopup(\'' + wid + '\',\'' + escapedYf + '\',this,' + yi + ')">'
               + (agg ? getAggIcon(agg) : '∑') + '</button>'
               + '<button class="btn btn-ghost btn-sm btn-icon" style="padding:0 4px"'
               + ' onclick="widgetRemoveYField(\'' + wid + '\',' + yi + ')">✕</button>'
@@ -1474,38 +1357,229 @@ function _renderBarLineOptionsHTML(w, wid) {
     + '<input type="checkbox"' + (w.showTrendLine ? ' checked' : '') + ' onchange="updateWidgetProp(\'' + wid + '\',\'showTrendLine\',this.checked)"/></div>';
 }
 
-      /** Opens an aggregate-picker popup anchored to btn, for a specific widget field. */
-      function showWidgetFieldAggPopup(wid, field, btn) {
-        document.querySelectorAll('.adv-agg-popup').forEach(p => p.remove());
-        const dt = sniffType(field);
-        const aggs = aggsForType(dt);
+      /**
+       * Opens an aggregate-picker popup anchored to btn.
+       * yi: Y-field index (chart/table widgets). When provided, agg is stored in seriesProps[yi].agg.
+       *     Pass -1 or omit for non-Y-field uses (scatter bubble/color fields, xField).
+       */
+      function showWidgetFieldAggPopup(wid, field, btn, yi) {
         const w = DataLaVistaState.design.widgets.find(x => x.id === wid);
-        const current = w ? ((w.fieldAggs || {})[field] || '') : '';
-        const popup = document.createElement('div');
-        popup.className = 'adv-agg-popup';
-        popup.innerHTML = aggs.map(a =>
-          `<div class="agg-opt${a.val === current ? ' selected' : ''}"
-            onclick="setWidgetFieldAgg('${wid}','${field.replace(/'/g,"\\'")}','${a.val}');document.querySelectorAll('.adv-agg-popup').forEach(p=>p.remove())">${a.label}</div>`
-        ).join('');
-        document.body.appendChild(popup);
-        const rect = btn.getBoundingClientRect();
-        popup.style.top  = (rect.bottom + 2) + 'px';
-        popup.style.left = Math.max(0, rect.left - popup.offsetWidth + rect.width) + 'px';
-        setTimeout(() => {
-          document.addEventListener('click', function close(e) {
-            if (!popup.contains(e.target)) { popup.remove(); document.removeEventListener('click', close); }
-          });
-        }, 10);
+        if (!w) return;
+        const yIdx = (yi != null && yi >= 0) ? yi : -1;
+        const dt = sniffType(field);
+        const current = yIdx >= 0
+          ? (_getSeriesProps(w)[yIdx] || {}).agg || ''
+          : (w.fieldAggs || {})[field] || '';
+        showAggPopup(btn, dt, current, agg => setWidgetFieldAgg(wid, field, agg, yIdx));
       }
 
       /** Sets (or clears) a per-field aggregate on a widget, then refreshes. */
-      function setWidgetFieldAgg(wid, field, agg) {
+      function setWidgetFieldAgg(wid, field, agg, yi) {
+        const w    = DataLaVistaState.design.widgets.find(x => x.id === wid);
+        if (!w) return;
+        const yIdx = (yi != null && yi >= 0) ? yi : -1;
+        if (yIdx >= 0) {
+          // Ensure seriesProps is populated (may be absent on legacy-loaded widgets)
+          if (!Array.isArray(w.seriesProps) || !w.seriesProps.length) w.seriesProps = _getSeriesProps(w);
+          if (!w.seriesProps[yIdx]) w.seriesProps[yIdx] = { field, agg: '', label: '', color: '', seriesType: '', lineWidth: null, opacity: null, smooth: null, axisSide: '', conditions: [] };
+          w.seriesProps[yIdx].agg = agg || '';
+        } else {
+          // fieldAggs used for non-series fields (scatter bubble/color, xField)
+          if (!w.fieldAggs) w.fieldAggs = {};
+          if (agg) w.fieldAggs[field] = agg;
+          else delete w.fieldAggs[field];
+        }
+        _widgetRefresh(wid);
+      }
+
+
+      // ── Series advanced properties modal ────────────────────────────────
+
+      function openSeriesAdvancedProps(wid, fieldName, yi) {
         const w = DataLaVistaState.design.widgets.find(x => x.id === wid);
         if (!w) return;
-        if (!w.fieldAggs) w.fieldAggs = {};
-        if (agg) w.fieldAggs[field] = agg;
-        else delete w.fieldAggs[field];
-        _widgetRefresh(wid);
+        // Ensure seriesProps is populated (may be absent on legacy-loaded widgets)
+        if (!Array.isArray(w.seriesProps) || !w.seriesProps.length) w.seriesProps = _getSeriesProps(w);
+
+        const spIdx = yi != null ? yi : 0;
+        const existing = w.seriesProps[spIdx] || {};
+        const agg = existing.agg || '';
+        const cols = DataLaVistaState.queryColumns;
+        const enrichedSeriesCols = cols.map(alias => {
+          const tk = findTableKeyForAlias(alias);
+          const f  = tk && DataLaVistaState.tables[tk] && DataLaVistaState.tables[tk].fields
+            ? DataLaVistaState.tables[tk].fields.find(x => x.alias === alias)
+            : null;
+          return { alias, displayType: sniffType(alias), tableKey: tk || '', fieldInternalName: f ? f.internalName : '' };
+        });
+
+        // Work on a local copy until Apply
+        let local = {
+          label:      existing.label      || '',
+          color:      existing.color      || '',
+          seriesType: existing.seriesType || '',
+          lineWidth:  existing.lineWidth  != null ? existing.lineWidth : 2,
+          opacity:    existing.opacity    != null ? existing.opacity   : 1,
+          smooth:     existing.smooth     != null ? !!existing.smooth  : true,
+          conditions: (existing.conditions || []).map(c => Object.assign({}, c))
+        };
+
+        // All handlers live on a single namespace object to avoid TS window-property errors
+        /** @type {any} */
+        const _s = {};
+
+        _s.prop = (k, v) => { local[k] = v; };
+
+        _s.rerender = () => {
+          const dlg = document.getElementById('series-adv-dialog');
+          if (dlg) dlg.innerHTML = _s.renderHeader() + _s.renderBody();
+        };
+
+        _s.condAdd = () => {
+          if (!cols.length) return;
+          local.conditions.push({ conj: 'AND', field: cols[0], op: '=', value: '' });
+          _s.rerender();
+        };
+        _s.condRemove = (ci) => { local.conditions.splice(ci, 1); _s.rerender(); };
+        _s.condUpdate = (ci, prop, val) => {
+          if (!local.conditions[ci]) return;
+          local.conditions[ci][prop] = val;
+          if (prop === 'op' || prop === 'field' || prop === 'elementKey') _s.rerender();
+          // Reset op to '=' when switching fields or element keys to avoid stale ops
+          if (prop === 'field') local.conditions[ci].op = '=';
+          if (prop === 'elementKey') local.conditions[ci].op = '=';
+        };
+        _s.clearAll = () => {
+          local = { label: '', color: '', seriesType: '', lineWidth: 2, opacity: 1, smooth: true, conditions: [] };
+          // agg is not part of local — lives directly in seriesProps[spIdx].agg
+          _s.rerender();
+        };
+        _s.apply = () => {
+          // Preserve agg (managed by the agg popup, not this modal)
+          const prevAgg = (w.seriesProps[spIdx] || {}).agg;
+          w.seriesProps[spIdx] = Object.assign({}, local, { field: (w.seriesProps[spIdx] || {}).field || fieldName, conditions: local.conditions.map(c => Object.assign({}, c)) });
+          if (prevAgg) w.seriesProps[spIdx].agg = prevAgg;
+          _s.close();
+          _widgetRefresh(wid);
+        };
+        _s.close = () => {
+          const ov = document.getElementById('series-adv-overlay');
+          if (ov) ov.remove();
+          delete window['_dlvSeries'];
+        };
+
+        // Expose single handle on window for inline HTML handlers
+        window['_dlvSeries'] = _s;
+
+        const isLineType = () => !local.seriesType || local.seriesType === 'line' || (local.seriesType === '' && w.type === 'line');
+
+        _s.renderHeader = () => {
+          const aggLabel = agg ? (agg === 'COUNT_DISTINCT' ? 'COUNT DISTINCT' : agg) : 'RAW';
+          return `<div class="popup-header panel-header">
+            <h3 style="font-size:15px;font-weight:600;margin:0">Advanced Properties</h3>
+            <button class="btn btn-ghost btn-icon" onclick="_dlvSeries.close()">✕</button>
+          </div>
+          <span class="toolbox-section-label" style="display:block;padding:8px 20px 4px">
+            Series: ${aggLabel} of ${fieldName}
+          </span>`;
+        };
+
+        _s.renderBody = () => {
+          const lineOpts = isLineType();
+          const condRows = renderConditionRows(
+            local.conditions, enrichedSeriesCols,
+            (ci, v) => `_dlvSeries.condUpdate(${ci},'conj',${v})`,
+            (ci, v) => `_dlvSeries.condUpdate(${ci},'field',${v})`,
+            (ci, v) => `_dlvSeries.condUpdate(${ci},'op',${v})`,
+            (ci, v) => `_dlvSeries.condUpdate(${ci},'value',${v})`,
+            (ci)    => `_dlvSeries.condRemove(${ci})`,
+            null,   // rowAttrs
+            (ci, v) => `_dlvSeries.condUpdate(${ci},'value2',${v})`,
+            (ci, v) => `_dlvSeries.condUpdate(${ci},'elementKey',${v})`
+          );
+
+          return `<div class="popup-body" style="padding-top:0;gap:10px">
+            <div class="adv-node-section">
+              <div class="adv-node-section-hdr">GENERAL</div>
+              <div class="props-row"><label>Display label</label>
+                <input type="text" class="form-input" value="${local.label.replace(/"/g,'&quot;')}"
+                  oninput="_dlvSeries.prop('label',this.value)" placeholder="${fieldName}"/></div>
+            </div>
+            <div class="adv-node-section">
+              <div class="adv-node-section-hdr">APPEARANCE</div>
+              <div class="props-row"><label>Color</label>
+                <div class="color-input-wrap">
+                  <input type="color" value="${local.color||'#0078d4'}"
+                    oninput="_dlvSeries.prop('color',this.value);this.nextElementSibling.value=this.value"/>
+                  <input type="text" class="form-input" value="${local.color||''}"
+                    oninput="_dlvSeries.prop('color',this.value);this.previousElementSibling.value=this.value||'#000000'" placeholder="(palette)"/>
+                </div></div>
+              ${lineOpts ? `<div class="props-row"><label>Line width</label>
+                <input type="number" class="form-input" min="1" max="10" style="width:60px"
+                  value="${local.lineWidth}" oninput="_dlvSeries.prop('lineWidth',+this.value)"/></div>` : ''}
+              <div class="props-row"><label>Opacity</label>
+                <input type="number" class="form-input" min="0" max="1" step="0.05" style="width:60px"
+                  value="${local.opacity}" oninput="_dlvSeries.prop('opacity',+this.value)"/></div>
+              ${lineOpts ? `<div class="props-row"><label>Smooth</label>
+                <input type="checkbox" ${local.smooth?'checked':''}
+                  onchange="_dlvSeries.prop('smooth',this.checked)"/></div>` : ''}
+            </div>
+            <div class="adv-node-section">
+              <div class="adv-node-section-hdr">
+                <span>FILTER CONDITIONS</span>
+                <button class="btn btn-ghost btn-sm" onclick="_dlvSeries.condAdd()">+ Add</button>
+              </div>
+              <div id="series-cond-rows">${condRows}</div>
+            </div>
+            <div class="adv-node-section">
+              <div class="adv-node-section-hdr">SERIES TYPE</div>
+              <div class="props-row"><label>Type</label>
+                <select class="form-input" onchange="_dlvSeries.prop('seriesType',this.value);_dlvSeries.rerender()">
+                  <option value="" ${!local.seriesType?'selected':''}>auto</option>
+                  <option value="bar" ${local.seriesType==='bar'?'selected':''}>bar</option>
+                  <option value="line" ${local.seriesType==='line'?'selected':''}>line</option>
+                </select></div>
+            </div>
+          </div>
+          <div class="popup-footer" style="justify-content:space-between">
+            <button class="btn btn-ghost btn-sm" onclick="_dlvSeries.clearAll()">Clear All</button>
+            <button class="btn btn-primary btn-sm" onclick="_dlvSeries.apply()">Apply</button>
+          </div>`;
+        };
+
+        // Build overlay
+        const overlay = document.createElement('div');
+        overlay.id = 'series-adv-overlay';
+        overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:9999;display:flex;align-items:flex-start;justify-content:center;padding-top:60px';
+        overlay.addEventListener('click', e => { if (e.target === overlay) _s.close(); });
+
+        const dialog = document.createElement('div');
+        dialog.id = 'series-adv-dialog';
+        dialog.style.cssText = 'background:var(--surface);border-radius:var(--radius-lg);box-shadow:var(--shadow-lg);width:560px;max-width:calc(100vw - 40px);max-height:calc(100vh - 120px);overflow-y:auto;animation:popIn 200ms ease';
+        dialog.innerHTML = _s.renderHeader() + _s.renderBody();
+
+        overlay.appendChild(dialog);
+        document.body.appendChild(overlay);
+      }
+
+      /** Formats and peeks at the SQL for a widget via a tooltip. */
+      function peekWidgetSQL(wid, btn) {
+        const w = DataLaVistaState.design.widgets.find(x => x.id === wid);
+        if (!w) return;
+        const built = buildWidgetSQL(w);
+        if (!built) {
+          dlvTooltip.attach(btn, '<pre style="font-size:11px;margin:0">N/A for this widget type</pre>', { html: true, maxWidth: '500px', placement: 'top' });
+          dlvTooltip.update(btn, '<pre style="font-size:11px;margin:0">N/A for this widget type</pre>', { html: true, maxWidth: '500px', placement: 'top' });
+          return;
+        }
+        const formatted = built.sql
+          .replace(/\b(SELECT DISTINCT|SELECT|FROM|WHERE|GROUP BY|ORDER BY)\b/g, '\n$1')
+          .trim();
+        const html = `<pre style="font-size:11px;margin:0;white-space:pre-wrap">${formatted.replace(/</g,'&lt;')}</pre>`;
+        dlvTooltip.attach(btn, html, { html: true, maxWidth: '500px', placement: 'top', delay: 0 });
+        dlvTooltip.update(btn, html, { html: true, maxWidth: '500px', placement: 'top', delay: 0 });
+        // Force immediate show
+        btn.dispatchEvent(new MouseEvent('mouseenter'));
       }
 
       // ── Per-widget conditions ────────────────────────────────────────────
@@ -1529,8 +1603,13 @@ function _renderBarLineOptionsHTML(w, wid) {
         const w = DataLaVistaState.design.widgets.find(x => x.id === wid);
         if (!w || !w.conditions[idx]) return;
         w.conditions[idx][prop] = val;
-        if (prop === 'op') renderWidgetProperties(wid); // re-render to toggle value input
-        else updateWidgetContent(wid);
+        // re-render to update ops / value input when field, op, or elementKey changes
+        if (prop === 'op' || prop === 'field' || prop === 'elementKey') {
+          if (prop === 'field' || prop === 'elementKey') w.conditions[idx].op = '=';
+          renderWidgetProperties(wid);
+        } else {
+          updateWidgetContent(wid);
+        }
       }
 
       // ── Per-widget sorts ─────────────────────────────────────────────────
@@ -1569,15 +1648,23 @@ function _renderBarLineOptionsHTML(w, wid) {
         const isData  = isChart || isKPI || isTable;
 
         const cols       = DataLaVistaState.queryColumns;
-        const fieldAggs  = w.fieldAggs  || {};
+        const enrichedCols = cols.map(alias => {
+          const tk = findTableKeyForAlias(alias);
+          const f  = tk && DataLaVistaState.tables[tk] && DataLaVistaState.tables[tk].fields
+            ? DataLaVistaState.tables[tk].fields.find(x => x.alias === alias)
+            : null;
+          return { alias, displayType: sniffType(alias), tableKey: tk || '', fieldInternalName: f ? f.internalName : '' };
+        });
         const conditions = w.conditions || [];
         const sorts      = w.sorts      || [];
+        const _wsp       = _getSeriesProps(w);
 
         // ── Field row: type-icon + label + field-selector + ∑ agg button ──
+        // Used for singular non-series fields (scatter xField, bubbleSizeField, etc.) — agg via fieldAggs
         const fieldRow = (roleLabel, fieldVal, onChangeExpr) => {
           const dt  = sniffType(fieldVal || '');
           const ti  = DataLaVistaCore.FIELD_TYPE_ICONS[dt] || DataLaVistaCore.FIELD_TYPE_ICONS.default;
-          const agg = fieldAggs[fieldVal] || '';
+          const agg = (w.fieldAggs || {})[fieldVal] || '';
           return `
             <div class="adv-field-row selected">
               <span class="field-type-icon ${ti.cls}">${ti.icon}</span>
@@ -1594,72 +1681,52 @@ function _renderBarLineOptionsHTML(w, wid) {
         const tableFieldRow = (fieldName, idx) => {
           const dt  = sniffType(fieldName);
           const ti  = DataLaVistaCore.FIELD_TYPE_ICONS[dt] || DataLaVistaCore.FIELD_TYPE_ICONS.default;
-          const agg = fieldAggs[fieldName] || '';
+          const agg = (_wsp[idx] || {}).agg || '';
           return `
             <div class="adv-field-row selected">
               <span class="field-type-icon ${ti.cls}">${ti.icon}</span>
               <span class="field-name" style="flex:1">${fieldName}</span>
               <button class="adv-agg-btn${agg ? ' has-agg' : ''}" title="${agg || 'No aggregate'}"
-                onclick="event.stopPropagation();showWidgetFieldAggPopup('${wid}','${fieldName.replace(/'/g,"\\'")}',this)">${agg ? getAggIcon(agg) : '∑'}</button>
+                onclick="event.stopPropagation();showWidgetFieldAggPopup('${wid}','${fieldName.replace(/'/g,"\\'")}',this,${idx})">${agg ? getAggIcon(agg) : '∑'}</button>
               <button class="btn btn-ghost btn-sm btn-icon" style="padding:0 4px" onclick="removeWidgetField('${wid}',${idx})">✕</button>
             </div>`;
         };
 
         // ── Filter conditions ────────────────────────────────────────────
-        const renderConditions = () => {
-          if (!conditions.length)
-            return '<div style="font-size:11px;color:var(--text-disabled);padding:2px 0">No filters — click + Add</div>';
-          return conditions.map((c, ci) => {
-            const fieldType  = sniffType(c.field);
-            const ops        = getFilterOps(fieldType);
-            const isMacro    = DataLaVistaCore.DATE_MACRO_VALS.has(c.op);
-            const macroMeta  = DataLaVistaCore.DATE_MACRO_OPS.find(o => o.val === c.op);
-            const needsValue = c.op !== 'NULL' && c.op !== 'NOTNULL' && !(isMacro && !macroMeta?.hasInput);
-            return `<div class="qb-condition-row">
-              ${ci === 0
-                ? `<span class="qb-where-badge">WHERE</span>`
-                : `<select class="form-input qb-conj-select" onchange="widgetUpdateCond('${wid}',${ci},'conj',this.value)">
-                    <option ${c.conj==='AND'?'selected':''}>AND</option>
-                    <option ${c.conj==='OR'?'selected':''}>OR</option></select>`}
-              <select class="form-input qb-field-select" onchange="widgetUpdateCond('${wid}',${ci},'field',this.value)">
-                ${cols.map(col=>`<option value="${col}" ${col===c.field?'selected':''}>${col}</option>`).join('')}
-              </select>
-              <select class="form-input qb-op-select" style="width:${fieldType === 'date' ? '150px' : '112px'}!important"
-                onchange="widgetUpdateCond('${wid}',${ci},'op',this.value)">
-                ${ops.map(o=>`<option value="${o.val}" ${o.val===c.op?'selected':''}>${o.label}</option>`).join('')}
-              </select>
-              ${needsValue
-                ? buildFilterValueInput(fieldType, isMacro, macroMeta, c.value,
-                    `widgetUpdateCond('${wid}',${ci},'value',this.value)`)
-                : `<span class="qb-val-blank"></span>`}
-              <button class="btn btn-ghost btn-sm btn-icon qb-remove-btn" onclick="widgetRemoveCond('${wid}',${ci})">✕</button>
-            </div>`;
-          }).join('');
-        };
+        const renderConditions = () => renderConditionRows(
+          conditions, enrichedCols,
+          (ci, v) => `widgetUpdateCond('${wid}',${ci},'conj',${v})`,
+          (ci, v) => `widgetUpdateCond('${wid}',${ci},'field',${v})`,
+          (ci, v) => `widgetUpdateCond('${wid}',${ci},'op',${v})`,
+          (ci, v) => `widgetUpdateCond('${wid}',${ci},'value',${v})`,
+          (ci)    => `widgetRemoveCond('${wid}',${ci})`,
+          null,   // rowAttrs
+          (ci, v) => `widgetUpdateCond('${wid}',${ci},'value2',${v})`,
+          (ci, v) => `widgetUpdateCond('${wid}',${ci},'elementKey',${v})`
+        );
 
         // ── Sort rows ────────────────────────────────────────────────────
-        const renderSorts = () => {
-          if (!sorts.length)
-            return '<div style="font-size:11px;color:var(--text-disabled);padding:2px 0">No sorts — click + Add</div>';
-          return sorts.map((s, si) => `
-            <div class="qb-sort-row">
-              <select class="form-input qb-field-select" onchange="widgetUpdateSort('${wid}',${si},'field',this.value)">
-                ${cols.map(col=>`<option value="${col}" ${col===s.field?'selected':''}>${col}</option>`).join('')}
-              </select>
-              <select class="form-input qb-dir-select" onchange="widgetUpdateSort('${wid}',${si},'dir',this.value)">
-                <option ${s.dir==='ASC'?'selected':''}>ASC</option>
-                <option ${s.dir==='DESC'?'selected':''}>DESC</option>
-              </select>
-              <button class="btn btn-ghost btn-sm btn-icon" onclick="widgetRemoveSort('${wid}',${si})">✕</button>
-            </div>`).join('');
-        };
+        const renderSorts = () => renderSortRows(
+          sorts, cols,
+          (si, v) => `widgetUpdateSort('${wid}',${si},'field',${v})`,
+          (si, v) => `widgetUpdateSort('${wid}',${si},'dir',${v})`,
+          (si)    => `widgetRemoveSort('${wid}',${si})`
+        );
 
         // ── Group-by (auto-derived, read-only display) ───────────────────
-        const activeCols  = isChart ? [w.xField, w.yField].filter(Boolean) : (w.fields || []);
-        const anyAgg      = activeCols.some(f => fieldAggs[f]);
-        const nonAggCols  = activeCols.filter(f => !fieldAggs[f]);
+        const anyAgg = _wsp.some(sp => sp.agg);
         const renderGroupBy = () => {
           if (!anyAgg) return '<div style="font-size:11px;color:var(--text-disabled);padding:2px 0">Set aggregates on fields above to enable grouping</div>';
+          if (isChart) {
+            const nonAggY = _wsp.filter(sp => !sp.agg).map(sp => sp.field).filter(Boolean);
+            const groupCols = [w.xField, ...nonAggY].filter(Boolean);
+            const uniq = [...new Set(groupCols)];
+            if (!uniq.length || (w.xField && uniq.length === 1 && _wsp.every(sp => sp.agg))) {
+              return '<div style="font-size:11px;color:var(--text-disabled);padding:2px 0">All Y fields aggregated — grouping by X field only</div>';
+            }
+            return `<div style="font-size:11px;color:var(--text-disabled);padding:2px 0">Auto: ${uniq.join(', ')}</div>`;
+          }
+          const nonAggCols = _wsp.filter(sp => !sp.agg).map(sp => sp.field).filter(Boolean);
           if (!nonAggCols.length) return '<div style="font-size:11px;color:var(--text-disabled);padding:2px 0">All fields aggregated — no GROUP BY needed</div>';
           return `<div style="font-size:11px;color:var(--text-disabled);padding:2px 0">Auto: ${nonAggCols.join(', ')}</div>`;
         };
@@ -1811,6 +1878,11 @@ function _renderBarLineOptionsHTML(w, wid) {
             <div class="adv-node-section-hdr"><span>GROUP BY</span></div>
             <div>${renderGroupBy()}</div>
           </div>
+
+          <div style="display:flex;justify-content:flex-end;padding:4px 0 8px">
+            <button class="btn btn-ghost btn-sm" aria-label="Peek at SQL Code"
+              onclick="peekWidgetSQL('${wid}',this)">📜</button>
+          </div>
           ` : ''}
         `;
       }
@@ -1843,7 +1915,7 @@ function _renderBarLineOptionsHTML(w, wid) {
         if (['showHeaders','headersBackgroundColor','headersFontSize','headersFontColor','fields'].includes(prop) && w.type === 'table')
           el.querySelector('.widget-content').innerHTML = renderTableContent(w);
         if (['xField', 'yField', 'yFields', 'aggregation', 'fieldAggs', 'fillColor', 'fields',
-             'stacked', 'showTrendLine', 'ySeriesTypes', 'bubbleSizeField', 'bubbleColorField',
+             'stacked', 'showTrendLine', 'ySeriesProps', 'bubbleSizeField', 'bubbleColorField',
              'chartBackgroundColor'].includes(prop) && ['bar', 'line', 'pie', 'scatter'].includes(w.type)) renderChart(w);
         if (['xField', 'yField', 'aggregation', 'fieldAggs', 'fillColor', 'fields',
              'kpiMetricFontSize', 'kpiLabelFontSize', 'kpiLabelOverride'].includes(prop) && w.type === 'kpi')
@@ -2121,34 +2193,43 @@ function _renderBarLineOptionsHTML(w, wid) {
   const w = DataLaVistaState.design.widgets.find(x => x.id === wid);
   if (!w || !DataLaVistaState.queryColumns.length) return;
   if (!Array.isArray(w.yFields)) w.yFields = w.yField ? [w.yField] : [];
+  if (!Array.isArray(w.seriesProps) || !w.seriesProps.length) w.seriesProps = _getSeriesProps(w);
   // Default to first numeric col not already added
   const next = DataLaVistaState.queryColumns.find(c =>
     sniffType(c) === 'number' && !w.yFields.includes(c)
   ) || DataLaVistaState.queryColumns.find(c => !w.yFields.includes(c))
     || DataLaVistaState.queryColumns[0];
-  if (next) w.yFields.push(next);
+  if (next) {
+    w.yFields.push(next);
+    w.seriesProps.push({ field: next, agg: '', label: '', color: '', seriesType: '', lineWidth: null, opacity: null, smooth: null, axisSide: '', conditions: [] });
+  }
   _widgetRefresh(wid);
 }
 
 function widgetUpdateYField(wid, idx, val) {
   const w = DataLaVistaState.design.widgets.find(x => x.id === wid);
   if (!w || !Array.isArray(w.yFields)) return;
+  if (!Array.isArray(w.seriesProps) || !w.seriesProps.length) w.seriesProps = _getSeriesProps(w);
   w.yFields[idx] = val;
+  if (w.seriesProps[idx]) w.seriesProps[idx].field = val;
+  else w.seriesProps[idx] = { field: val, agg: '', label: '', color: '', seriesType: '', lineWidth: null, opacity: null, smooth: null, axisSide: '', conditions: [] };
   _widgetRefresh(wid);
 }
 
 function widgetRemoveYField(wid, idx) {
   const w = DataLaVistaState.design.widgets.find(x => x.id === wid);
   if (!w || !Array.isArray(w.yFields)) return;
+  if (!Array.isArray(w.seriesProps) || !w.seriesProps.length) w.seriesProps = _getSeriesProps(w);
   w.yFields.splice(idx, 1);
+  w.seriesProps.splice(idx, 1);
   _widgetRefresh(wid);
 }
 
-function widgetUpdateYSeriesType(wid, fieldName, seriesType) {
+function widgetUpdateYSeriesType(wid, yi, seriesType) {
   const w = DataLaVistaState.design.widgets.find(x => x.id === wid);
   if (!w) return;
-  if (!w.ySeriesTypes) w.ySeriesTypes = {};
-  if (seriesType) w.ySeriesTypes[fieldName] = seriesType;
-  else delete w.ySeriesTypes[fieldName];
+  if (!Array.isArray(w.seriesProps) || !w.seriesProps.length) w.seriesProps = _getSeriesProps(w);
+  if (!w.seriesProps[yi]) return;
+  w.seriesProps[yi].seriesType = seriesType || '';
   _widgetRefresh(wid);
 }

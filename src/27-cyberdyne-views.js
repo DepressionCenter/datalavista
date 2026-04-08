@@ -38,6 +38,25 @@ Object.assign(CyberdynePipeline, {
   ============================================================ */
 
   /**
+ * Verify that no two fields in an alias array share the same alias.
+ * Returns an array of { alias, conflictingInternalNames[] } for any duplicates found.
+ */
+validateAliasUniqueness(fields) {
+    const seen = {};  // alias → first internalName
+    const conflicts = [];
+    for (const f of fields) {
+        const a = f.alias;
+        if (!a) continue;
+        if (seen[a] !== undefined) {
+            conflicts.push({ alias: a, fields: [seen[a], f.internalName] });
+        } else {
+            seen[a] = f.internalName;
+        }
+    }
+    return conflicts;
+},
+
+  /**
    * Create (or replace) an AlaSQL view for a raw table.
    * Returns the final viewName (may differ if there was a collision).
    */
@@ -73,74 +92,88 @@ Object.assign(CyberdynePipeline, {
     return viewName;
   },
 
+
   /** Build and execute the AlaSQL CREATE VIEW statement for a view */
-_applyViewSQL(viewName) {
-    const view = this.views[viewName];
-    if (!view) return;
- 
-    const rawTable = view.rawTable;
-    const rawTableRef = `[_raw_${rawTable}]`;
-    const t = DataLaVistaState.tables[rawTable];
- 
-    // ── FieldExpander path: activated when baseFields are present ──────────
-    // Filter out any already-synthetic fields that may have leaked in from old configs
-    const baseFields = (view.baseFields || []).filter(f => !f.isSynthetic && !f.isAutoId);
-    if (baseFields.length > 0) {
-      const sourceType = (t && t.sourceType) ? t.sourceType : 'unknown';
-      const siteUrl   = (t && t.siteUrl)    ? t.siteUrl    : (DataLaVistaState.spSiteUrl || '');
-       
-      const virtualCols = [];
-      const seenAliases = new Set();
-      for (const field of baseFields) {
-        const expanded = this.FieldExpander.expand(field, rawTableRef, { sourceType, siteUrl });
-        for (const vc of expanded) {
-          if (!seenAliases.has(vc.alias)) {
-            seenAliases.add(vc.alias);
-            virtualCols.push(vc);
+  _applyViewSQL(viewName) {
+      const view = this.views[viewName];
+      if (!view) return;
+
+      const rawTable = view.rawTable;
+      const rawTableRef = `[_raw_${rawTable}]`;
+      const t = DataLaVistaState.tables[rawTable];
+
+      // ── FieldExpander path: activated when baseFields are present ──────────
+      // Filter out any already-synthetic fields that may have leaked in from old configs
+      const baseFields = (view.baseFields || []).filter(f => !f.isSynthetic && !f.isAutoId);
+      if (baseFields.length > 0) {
+        const sourceType = (t && t.sourceType) ? t.sourceType : 'unknown';
+        const siteUrl   = (t && t.siteUrl)    ? t.siteUrl    : (DataLaVistaState.spSiteUrl || '');
+
+        const virtualCols = [];
+        const seenAliases = new Set();
+        for (const field of baseFields) {
+          const expanded = this.FieldExpander.expand(field, rawTableRef, { sourceType, siteUrl });
+          for (const vc of expanded) {
+            // ── Fix 1: warn and rename instead of silently dropping ──────────
+            let alias = vc.alias;
+            if (seenAliases.has(alias)) {
+              console.warn(
+                `[CyberdynePipeline] _applyViewSQL: Duplicate alias "${alias}" in view "${viewName}"` +
+                ` (internalName: "${vc.internalName}", parentField: "${vc.parentField}").` +
+                ` Suffixing to avoid silent data loss.`
+              );
+              let counter = 2;
+              while (seenAliases.has(alias + '_' + counter)) counter++;
+              alias = alias + '_' + counter;
+            }
+            seenAliases.add(alias);
+            // Shallow-clone vc only if the alias actually changed, to avoid
+            // mutating the FieldExpander's output object in place.
+            virtualCols.push(alias !== vc.alias ? { ...vc, alias } : vc);
+            // ── End Fix 1 ────────────────────────────────────────────────────
           }
         }
+        if (virtualCols.length === 0) return;
+        const selectParts = virtualCols.map(vc => `${vc.sqlExpr} AS [${vc.alias}]`);
+        try { alasql(`DROP VIEW IF EXISTS [${viewName}]`); } catch (_) {}
+        try {
+          alasql(`CREATE VIEW [${viewName}] AS SELECT ${selectParts.join(', ')} FROM ${rawTableRef}`);
+        } catch (e) { console.warn(`[CyberdynePipeline] Failed to create view ${viewName}:`, e.message); }
+
+        // Rebuild view metadata from expanded virtual columns
+        view.columnMappings = {};
+        view.fields = [];
+        for (const vc of virtualCols) {
+          view.columnMappings[vc.alias] = vc.internalName;
+          view.fields.push({
+            internalName: vc.internalName,
+            displayName: vc.alias,
+            alias: vc.alias,
+            type: vc.type,
+            displayType: vc.displayType,
+            isSynthetic: vc.isSynthetic,
+            parentField: vc.parentField,
+            isAutoId: vc.isSynthetic  // hide synthetics from basic QB
+          });
+        }
+
+        // Sync t.fields so renderFieldsPanel and QB show the expanded field list
+        if (t && t.data && t.data.length > 0) t.fields = view.fields;
+        return;
+      } else { }
+
+      // ── Fallback: legacy columnMappings (old configs without baseFields) ───
+      const cols = [];
+      for (const [alias, internalName] of Object.entries(view.columnMappings)) {
+        cols.push(`[${internalName}] AS [${alias}]`);
       }
-      if (virtualCols.length === 0) return; 
-      const selectParts = virtualCols.map(vc => `${vc.sqlExpr} AS [${vc.alias}]`);
+      if (cols.length === 0) return; // Nothing to select yet (lazy SP list)
       try { alasql(`DROP VIEW IF EXISTS [${viewName}]`); } catch (_) {}
-      try{
-        alasql(`CREATE VIEW [${viewName}] AS SELECT ${selectParts.join(', ')} FROM ${rawTableRef}`);
-    } catch (e) { console.warn(`[CyberdynePipeline] Failed to create view ${viewName}:`, e.message); }
-
-      // Rebuild view metadata from expanded virtual columns
-      view.columnMappings = {};
-      view.fields = [];
-      for (const vc of virtualCols) {
-        view.columnMappings[vc.alias] = vc.internalName;
-        view.fields.push({
-          internalName: vc.internalName,
-          displayName: vc.alias,
-          alias: vc.alias,
-          type: vc.type,
-          displayType: vc.displayType,
-          isSynthetic: vc.isSynthetic,
-          parentField: vc.parentField,
-          isAutoId: vc.isSynthetic  // hide synthetics from basic QB
-        });
-      }
- 
-      // Sync t.fields so renderFieldsPanel and QB show the expanded field list
-      if (t && t.data && t.data.length > 0) t.fields = view.fields;
-      return;
-    } else { }
-
-    // ── Fallback: legacy columnMappings (old configs without baseFields) ───
-    const cols = [];
-    for (const [alias, internalName] of Object.entries(view.columnMappings)) {
-      cols.push(`[${internalName}] AS [${alias}]`);
-    }
-    if (cols.length === 0) return; // Nothing to select yet (lazy SP list)
-    try { alasql(`DROP VIEW IF EXISTS [${viewName}]`); } catch (_) {}
-    try{
-      console.log(`[CyberdynePipeline] Creating view cyberdyne-views.js Line 142 ${viewName} with columns:`, cols);
-       alasql(`CREATE VIEW [${viewName}] AS SELECT ${cols.join(', ')} FROM ${rawTableRef}`);
-    } catch (e) { console.warn(`[CyberdynePipeline] Failed to create view ${viewName}:`, e.message); }
-  },
+      try {
+        console.log(`[CyberdynePipeline] Creating view cyberdyne-views.js Line 142 ${viewName} with columns:`, cols);
+        alasql(`CREATE VIEW [${viewName}] AS SELECT ${cols.join(', ')} FROM ${rawTableRef}`);
+      } catch (e) { console.warn(`[CyberdynePipeline] Failed to create view ${viewName}:`, e.message); }
+    },
 
   /** Recreate the AlaSQL view with current column mappings (call after alias changes) */
   updateViewSQL(viewName) {
@@ -178,34 +211,52 @@ _applyViewSQL(viewName) {
   updateColumnAlias(viewName, internalName, newAlias) {
     const view = this.views[viewName];
     if (!view) throw new Error(`View "${viewName}" not found`);
-    // Update alias in baseFields (source of truth for FieldExpander)
+
+    // ── Guard: reject if newAlias is already taken by a DIFFERENT field ──
+    const existingOwner = view.columnMappings[newAlias];
+    if (existingOwner && existingOwner !== internalName) {
+        throw new Error(
+            `Alias "${newAlias}" is already used by field "${existingOwner}" in view "${viewName}".`
+        );
+    }
+
     const baseField = (view.baseFields || []).find(f => f.internalName === internalName);
     if (baseField) baseField.alias = newAlias;
-    // Remove old alias for this internal name
+
     for (const [alias, iName] of Object.entries(view.columnMappings)) {
-      if (iName === internalName) { delete view.columnMappings[alias]; break; }
+        if (iName === internalName) { delete view.columnMappings[alias]; break; }
     }
     view.columnMappings[newAlias] = internalName;
-    // Update the field's alias in the view's fields array
+
     const field = view.fields.find(f => f.internalName === internalName);
     if (field) field.alias = newAlias;
+
     this.updateViewSQL(viewName);
-  },
+},
 
   /** Add a new field's column mapping to an existing view */
   addColumnToView(viewName, field) {
     const view = this.views[viewName];
     if (!view) return;
-    view.columnMappings[field.alias] = field.internalName;
-    if (!view.fields.find(f => f.internalName === field.internalName)) {
-      view.fields.push(field);
+
+    // ── Guard: reject alias collision ──
+    const existingOwner = view.columnMappings[field.alias];
+    if (existingOwner && existingOwner !== field.internalName) {
+        throw new Error(
+            `Alias "${field.alias}" is already used by field "${existingOwner}" in view "${viewName}".`
+        );
     }
-    // Keep baseFields in sync so FieldExpander picks up the new field
+
+    view.columnMappings[field.alias] = field.internalName;
+
+    if (!view.fields.find(f => f.internalName === field.internalName)) {
+        view.fields.push(field);
+    }
     if (view.baseFields && !view.baseFields.find(f => f.internalName === field.internalName)) {
-      view.baseFields.push(field);
+        view.baseFields.push(field);
     }
     this.updateViewSQL(viewName);
-  },
+},
 
   /* ============================================================
      VIEW DELETION
@@ -494,7 +545,7 @@ _applyViewSQL(viewName) {
         const typeStr = (field.TypeAsString || field.type || '').toLowerCase();
         const isMultiSelect = typeStr.includes('multi') || typeStr.includes('multichoice');
         const childJoinField = isMultiSelect
-          ? field.alias + 'Data'   // array field → INCLUDES join
+          ? field.alias + 'Data'   // array field → DLV_INCLUDES join
           : field.alias + 'Id';    // scalar FK  → regular LEFT JOIN
 
         const exists = DataLaVistaState.relationships.some(r =>

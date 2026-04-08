@@ -209,13 +209,46 @@ function buildConfig() {
     kpiLabelOverride: w.kpiLabelOverride || '',
     stacked: !!w.stacked,
     showTrendLine: !!w.showTrendLine,
-    ySeriesTypes: Object.assign({}, w.ySeriesTypes || {}),
+    seriesProps: (Array.isArray(w.seriesProps) ? w.seriesProps : []).map(sp => ({
+      field:      sp.field      || '',
+      agg:        sp.agg        || '',
+      label:      sp.label      || '',
+      color:      sp.color      || '',
+      seriesType: sp.seriesType || '',
+      ...(sp.lineWidth  != null ? { lineWidth:  sp.lineWidth  } : {}),
+      ...(sp.opacity    != null ? { opacity:    sp.opacity    } : {}),
+      ...(sp.smooth     != null ? { smooth:     sp.smooth     } : {}),
+      axisSide:   sp.axisSide   || '',
+      conditions: (sp.conditions || []).map(c => {
+        const out = {
+          conj:  c.conj  || 'AND',
+          field: c.field || '',
+          op:    c.op    || '=',
+          value: c.value != null ? c.value : ''
+        };
+        if (c.value2     != null) out.value2     = c.value2;
+        if (c.elementKey        ) out.elementKey = c.elementKey;
+        return out;
+      })
+    })),
     bubbleSizeField: w.bubbleSizeField || '',
     bubbleColorField: w.bubbleColorField || '',
     textContent: w.textContent || '',
     imageUrl: w.imageUrl || '',
     fieldAggs: Object.assign({}, w.fieldAggs || {}),
-    conditions: (w.conditions || []).map(c => ({ conj: c.conj || 'AND', field: c.field || '', op: c.op || '=', value: c.value || '' })),
+    conditions: (w.conditions || []).map(c => ({
+      conj:       c.conj       || 'AND',
+      field:      c.field      || '',
+      op:         c.op         || '=',
+      value:      c.value      != null ? c.value : '',
+      value2:     c.value2     != null ? c.value2 : undefined,
+      elementKey: c.elementKey || undefined
+    })).map(c => {
+      // Remove undefined keys to keep JSON clean
+      if (c.value2     === undefined) delete c.value2;
+      if (c.elementKey === undefined) delete c.elementKey;
+      return c;
+    }),
     sorts: (w.sorts || []).map(s => ({ field: s.field || '', dir: s.dir || 'ASC' })),
     filters: (w.filters || []).map(f => ({
       field: f.field || '',
@@ -223,7 +256,7 @@ function buildConfig() {
       value: f.value !== undefined ? f.value : '',
       position: f.position || 'widget'
     })),
-    widgetSql: generateWidgetSQL(w, '_results')
+    widgetSql: (() => { try { return buildWidgetSQL(w)?.sql || null; } catch(_) { return null; } })()
   }));
  
   const cleanDesign = {
@@ -236,10 +269,6 @@ function buildConfig() {
       label: f.label || f.field || '',
       position: f.position || 'bar'
     })),
-    conditions: (DataLaVistaState.design.conditions || []).map(c => ({ conj: c.conj || 'AND', field: c.field || '', op: c.op || '=', value: c.value || '' })),
-    sorts: (DataLaVistaState.design.sorts || []).map(s => ({ field: s.field || '', dir: s.dir || 'ASC' })),
-    groupBy: (DataLaVistaState.design.groupBy || []).filter(g => g),
-    fieldAggs: Object.assign({}, DataLaVistaState.design.fieldAggs || {})
   };
  
   // ── Smart export: only include tables referenced in the SQL (or uploaded files) ──
@@ -341,7 +370,7 @@ async function loadConfig(cfg) {
   if (!cfg._license) throw new Error('Invalid report config — missing _license key');
   // Basic validation passed — now clear the existing state and load the config values
   CyberdynePipeline.clearAllViews(); // drop any existing AlaSQL views before reloading
-  DataLaVistaState.activeTab = (DataLaVistaState.reportMode==='view')?'dataPreview':'design';
+  //DataLaVistaState.activeTab = (DataLaVistaState.reportMode==='view')?'dataPreview':'design';
   DataLaVistaState.advancedQB = cfg.advancedQB || {};
   DataLaVistaState.advancedQB.nodeAliases ??= {};
   DataLaVistaState.basicQB = cfg.basicQB || {};
@@ -353,41 +382,78 @@ async function loadConfig(cfg) {
     showDashboardTitle: loadedDesign.showDashboardTitle !== false,
     dashboardTitleTooltip: loadedDesign.dashboardTitleTooltip || '',
     widgets: loadedDesign.widgets || [],
-    filters: loadedDesign.filters || [],
-    conditions: loadedDesign.conditions || [],
-    sorts: loadedDesign.sorts || [],
-    groupBy: loadedDesign.groupBy || [],
-    fieldAggs: loadedDesign.fieldAggs || {},
-    transformedResults: null
+    filters: loadedDesign.filters || []
   };
   // Migrate legacy single-yField to yFields array + backfill new widget defaults
-for (const w of DataLaVistaState.design.widgets) {
-  if (!Array.isArray(w.yFields))        w.yFields = w.yField ? [w.yField] : [];
-  if (w.stacked          == null)       w.stacked = false;
-  if (w.showTrendLine    == null)       w.showTrendLine = false;
-  if (!w.ySeriesTypes)                  w.ySeriesTypes = {};
-  if (w.bubbleSizeField  == null)       w.bubbleSizeField = '';
-  if (w.bubbleColorField == null)       w.bubbleColorField = '';
-  if (w.showTitle        == null)       w.showTitle = true;
-  if (w.showHeaders      == null)       w.showHeaders = true;
-  if (w.widgetBackgroundColor == null)  w.widgetBackgroundColor = '#fefefe';
-  if (w.chartBackgroundColor  == null)  w.chartBackgroundColor  = '#fefefe';
-  if (w.titleBackgroundColor  == null)  w.titleBackgroundColor  = '#fefefe';
-  if (w.titleFontSize    == null)       w.titleFontSize = 14;
-  if (w.titleFontColor   == null)       w.titleFontColor = '#323130';
-  if (w.headersBackgroundColor == null) w.headersBackgroundColor = '#f3f2f1';
-  if (w.headersFontSize  == null)       w.headersFontSize = 12;
-  if (w.headersFontColor == null)       w.headersFontColor = '#323130';
-  if (w.fontSize         == null)       w.fontSize = 13;
-  if (w.fontColor        == null)       w.fontColor = '#323130';
-  if (w.kpiMetricFontSize == null)      w.kpiMetricFontSize = 36;
-  if (w.kpiLabelFontSize == null)       w.kpiLabelFontSize = 13;
-  if (w.kpiLabelOverride == null)       w.kpiLabelOverride = '';
-  if (w.textContent      == null)       w.textContent = '';
-  if (!w.fieldAggs)                     w.fieldAggs = {};
-  if (!w.conditions)                    w.conditions = [];
-  if (!w.sorts)                         w.sorts = [];
-}
+  for (const w of DataLaVistaState.design.widgets) {
+    if (!Array.isArray(w.yFields))        w.yFields = w.yField ? [w.yField] : [];
+    if (w.stacked          == null)       w.stacked = false;
+    if (w.showTrendLine    == null)       w.showTrendLine = false;
+    // Migrate legacy ySeriesTypes into ySeriesProps (for very old configs)
+    if (!w.ySeriesProps) {
+      w.ySeriesProps = {};
+      if (w.ySeriesTypes && typeof w.ySeriesTypes === 'object') {
+        for (const [field, st] of Object.entries(w.ySeriesTypes)) {
+          w.ySeriesProps[field] = Object.assign({ seriesType: st }, w.ySeriesProps[field] || {});
+        }
+      }
+    }
+    delete w.ySeriesTypes; // no longer needed in runtime state
+
+    // Backfill conditions arrays inside ySeriesProps entries
+    if (w.ySeriesProps && typeof w.ySeriesProps === 'object') {
+      for (const sp of Object.values(w.ySeriesProps)) {
+        if (!Array.isArray(sp.conditions)) sp.conditions = [];
+      }
+    }
+
+    // Populate seriesProps (unified source of truth).
+    // New configs have it saved directly; legacy configs need reconstruction.
+    if (!Array.isArray(w.seriesProps) || !w.seriesProps.length) {
+      const _isChartW = ['bar','line','pie','scatter'].includes(w.type);
+      if (_isChartW) {
+        const _yfs = (Array.isArray(w.yFields) && w.yFields.length) ? w.yFields : (w.yField ? [w.yField] : []);
+        w.seriesProps = _yfs.map((yf, yi) => {
+          const leg = (w.ySeriesProps || {})[String(yi)] || (w.ySeriesProps || {})[yf] || {};
+          return { field: yf, agg: leg.agg || (w.fieldAggs || {})[yf] || '', label: leg.label || '', color: leg.color || '', seriesType: leg.seriesType || '', lineWidth: leg.lineWidth ?? null, opacity: leg.opacity ?? null, smooth: leg.smooth ?? null, axisSide: leg.axisSide || '', conditions: (leg.conditions || []).map(c => Object.assign({}, c)) };
+        });
+      } else {
+        const _flds = w.type === 'kpi' ? (w.fields || []).slice(0,1) : (w.fields || []);
+        w.seriesProps = _flds.map(f => ({ field: f, agg: (w.fieldAggs || {})[f] || '', label: '', color: '', seriesType: '', lineWidth: null, opacity: null, smooth: null, axisSide: '', conditions: [] }));
+      }
+    } else {
+      // Backfill conditions arrays in loaded seriesProps entries
+      for (const sp of w.seriesProps) {
+        if (!Array.isArray(sp.conditions)) sp.conditions = [];
+      }
+    }
+
+    if (w.bubbleSizeField  == null)       w.bubbleSizeField = '';
+    if (w.bubbleColorField == null)       w.bubbleColorField = '';
+    if (w.showTitle        == null)       w.showTitle = true;
+    if (w.showHeaders      == null)       w.showHeaders = true;
+    if (w.widgetBackgroundColor == null)  w.widgetBackgroundColor = '#fefefe';
+    if (w.chartBackgroundColor  == null)  w.chartBackgroundColor  = '#fefefe';
+    if (w.titleBackgroundColor  == null)  w.titleBackgroundColor  = '#fefefe';
+    if (w.titleFontSize    == null)       w.titleFontSize = 14;
+    if (w.titleFontColor   == null)       w.titleFontColor = '#323130';
+    if (w.headersBackgroundColor == null) w.headersBackgroundColor = '#f3f2f1';
+    if (w.headersFontSize  == null)       w.headersFontSize = 12;
+    if (w.headersFontColor == null)       w.headersFontColor = '#323130';
+    if (w.fontSize         == null)       w.fontSize = 13;
+    if (w.fontColor        == null)       w.fontColor = '#323130';
+    if (w.kpiMetricFontSize == null)      w.kpiMetricFontSize = 36;
+    if (w.kpiLabelFontSize == null)       w.kpiLabelFontSize = 13;
+    if (w.kpiLabelOverride == null)       w.kpiLabelOverride = '';
+    if (w.textContent      == null)       w.textContent = '';
+    if (!w.fieldAggs)                     w.fieldAggs = {};
+    if (!w.conditions)                    w.conditions = [];
+    w.conditions = w.conditions.map(c => ({
+      ...c,
+      value: c.value != null ? c.value : ''
+    }));
+    if (!w.sorts)                         w.sorts = [];
+  }
   DataLaVistaState.previewFilters = cfg.previewFilters || {};
   // Normalize legacy tab name ('previewData' was renamed to 'dataPreview')
   DataLaVistaState.qmTab = (cfg.qmTab === 'previewData') ? 'dataPreview' : (cfg.qmTab || 'qb');
@@ -447,6 +513,7 @@ for (const w of DataLaVistaState.design.widgets) {
       await ensureTableData(tname, true)
     }
   }
+
   
   if (DataLaVistaState.sql && window._cmEditor) {
     window._cmEditor.setValue(DataLaVistaState.sql);
@@ -457,6 +524,24 @@ for (const w of DataLaVistaState.design.widgets) {
  
   renderFilterBar();
   updateDashboardTitleTooltipIcon(); // apply info icon if tooltip is set
+
+  try{
+    if(DataLaVistaState.reportMode === 'view' || DataLaVistaState.activeTab === 'dashboardPreview') {
+      setStatus('Refreshing dashboard preview...', 'info');
+      await refreshDashboardPreview();
+    } else {
+      setStatus('Running query...', 'info');
+      await runQuery();
+    }
+    DataLaVistaState.queryResultsReady = true;
+    if(DataLaVistaCore.reportMode!=='view') {
+      showUseInDesign();
+    }
+    
+  } catch(e) {
+    console.warn('Error refreshing dashboard preview after config load:', e);
+  }
+
   if(DataLaVistaState.reportMode !== 'view') {
     const titleInput = document.getElementById('title-input');
     if (titleInput) titleInput.value = DataLaVistaState.design.title || '';
@@ -471,7 +556,7 @@ for (const w of DataLaVistaState.design.widgets) {
     setStatus('Config loaded', 'success');
     toast('Config loaded successfully', 'success');
   }
-    
+   
 }
 
 // ============================================================

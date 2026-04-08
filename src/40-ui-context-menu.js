@@ -131,10 +131,22 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           inp.maxLength = 50;
           labelEl.replaceWith(inp);
           inp.focus(); inp.select();
+
           const commit = () => {
             const newAlias = inp.value.trim() || currentVal;
-            renameTable(tableKey, newAlias);
+            try {
+              renameTable(tableKey, newAlias);
+            } catch (err) {
+              // Restore the original label text and show a brief error tooltip
+              toast('Unable to rename table. It may conflict with an existing table, or it may contain special characters.', 'error');
+              inp.style.outline = '2px solid red';
+              inp.title = err.message;
+              inp.focus();
+              // Prevent the blur→commit loop from re-firing immediately
+            }
           };
+
+
           inp.addEventListener('blur', commit);
           inp.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') { inp.blur(); }
@@ -154,9 +166,19 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           inp.maxLength = 50;
           labelEl.replaceWith(inp);
           inp.focus(); inp.select();
+
           const commit = () => {
             const newAlias = inp.value.trim() || currentVal;
-            renameField(tableKey, fieldAlias, newAlias);
+            try {
+              renameField(tableKey, fieldAlias, newAlias);
+            } catch (err) {
+              // Restore the original label text and show a brief error tooltip
+              toast('Unable to rename field. It may conflict with an existing field, or it may contain special characters.', 'error');
+              inp.style.outline = '2px solid red';
+              inp.title = err.message;
+              inp.focus();
+              // Prevent the blur→commit loop from re-firing immediately
+            }
           };
           inp.addEventListener('blur', commit);
           inp.addEventListener('keydown', (e) => {
@@ -210,43 +232,51 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         const oldDsAlias = ds.alias;
         if (newAlias === oldDsAlias) { renderFieldsPanel(); return; }
 
-        // For each table: rename views whose name carries the old DS alias as a prefix,
-        // and update SQL for non-view tables
-        (ds.tables || []).forEach(tableKey => {
+        // ── Phase 1: validate all renames before committing any ──────────────────
+        // Build the full rename plan and catch conflicts early, before touching any state.
+        const renamePlan = []; // { tableKey, oldViewName, newViewName }
+        for (const tableKey of (ds.tables || [])) {
           const t = DataLaVistaState.tables[tableKey];
-          if (!t) return;
+          if (!t) continue;
           const viewName = CyberdynePipeline.rawTableToView[tableKey];
-          if (viewName) {
-            // If the view name starts with the old DS alias, rename it to use the new alias
-            if (viewName.startsWith(oldDsAlias)) {
-              const suffix = viewName.slice(oldDsAlias.length);
-              const newViewName = newAlias + suffix;
-              try {
-                updateSQLEditorName(viewName, newViewName);
-                CyberdynePipeline.renameView(viewName, newViewName);
-                t.viewName = newViewName;
-                // t.alias is the table's own alias — it doesn't include the DS prefix, so leave it unchanged
-              } catch (err) {
-                console.warn('[renameDatasource] Could not rename view', viewName, '->', newViewName, err.message);
-              }
+          if (viewName && viewName.startsWith(oldDsAlias)) {
+            const suffix = viewName.slice(oldDsAlias.length);
+            const newViewName = newAlias + suffix;
+            // Reject if newViewName is already taken by a view belonging to a DIFFERENT raw table
+            const existingView = CyberdynePipeline.views[newViewName];
+            if (existingView && existingView.rawTable !== tableKey) {
+              toast(`Rename failed: view name "${newViewName}" is already in use.`, 'error');
+              renderFieldsPanel();
+              return;
             }
-            // (Views without DS prefix are independent — no rename needed)
-          } else {
-            // Non-view table: update SQL using DSAlias_TableAlias pattern
-            const oldQName = oldDsAlias + '_' + t.alias;
-            const newQName = newAlias + '_' + t.alias;
-            updateSQLEditorName(oldQName, newQName);
+            renamePlan.push({ tableKey, oldViewName: viewName, newViewName });
           }
-        });
+        }
 
-        // Commit alias change and propagate to child tables
+        // ── Phase 2: commit all renames ───────────────────────────────────────────
+        for (const { tableKey, oldViewName, newViewName } of renamePlan) {
+          const t = DataLaVistaState.tables[tableKey];
+          try {
+            CyberdynePipeline.renameView(oldViewName, newViewName);
+            updateSQLEditorName(oldViewName, newViewName);  // after renameView succeeds
+            t.viewName = newViewName;
+          } catch (err) {
+            // Should not reach here after phase 1 validation, but guard anyway
+            console.error('[renameDatasource] Unexpected failure renaming view', oldViewName, '->', newViewName, err.message);
+            toast(`Rename failed: ${err.message}`, 'error');
+            renderFieldsPanel();
+            return;
+          }
+        }
+
+        // ── Phase 3: commit DS-level alias and propagate ──────────────────────────
         ds.alias = newAlias;
-        (ds.tables || []).forEach(tableKey => {
+        for (const tableKey of (ds.tables || [])) {
           const t = DataLaVistaState.tables[tableKey];
           if (t) t.dsAlias = newAlias;
-        });
+        }
 
-        // Rebuild QB SQL (FROM clauses use view names; regenerating picks up any renamed views)
+        // Rebuild QB SQL
         if (DataLaVistaState.basicQB.tableName) {
           const t = DataLaVistaState.tables[DataLaVistaState.basicQB.tableName];
           if (t && t.dataSource === dsName) rebuildBasicSQL();
@@ -280,9 +310,9 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           const newViewName = (dsPrefix && existingView.startsWith(dsPrefix))
             ? dsPrefix + newAlias
             : newAlias;
-          try {
-            updateSQLEditorName(existingView, newViewName);
+          try {            
             CyberdynePipeline.renameView(existingView, newViewName);
+            updateSQLEditorName(existingView, newViewName);
             t.alias = newAlias;
             t.viewName = newViewName;
           } catch (err) {
@@ -320,14 +350,12 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         const f = t.fields.find(x => x.alias === oldAlias);
         if (!f) return;
 
-        // For view-backed tables, update the view's column mapping so AlaSQL view stays in sync
+        // For view-backed tables, update the view's column mapping so AlaSQL view stays in sync.
+        // Allow the error to propagate — if the view cannot be updated (e.g. duplicate alias),
+        // we must not proceed with updating state, or the UI and view will diverge.
         const viewName = CyberdynePipeline.rawTableToView[tableKey];
         if (viewName) {
-          try {
-            CyberdynePipeline.updateColumnAlias(viewName, f.internalName, newAlias);
-          } catch (err) {
-            console.warn('[renameField] updateColumnAlias:', err.message);
-          }
+          CyberdynePipeline.updateColumnAlias(viewName, f.internalName, newAlias); // throws on duplicate
         }
 
         f.alias = newAlias;

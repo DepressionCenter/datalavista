@@ -181,39 +181,38 @@ async function doConnect() {
       await processConnectQueue('remote');
 
     } else if (activeTab === 'loadconfig') {
-  /* Open Dashboard Tab */
-  // Check for FILE UPLOAD FIRST (this was missing!)
-  const fileInput = document.getElementById('config-file');
-  const configUrl = (document.getElementById('config-url')?.value || '').trim();
-  const jsonText = (document.getElementById('config-json-input')?.value || '').trim();
+      /* Open Dashboard Tab */
+      // Check for FILE UPLOAD FIRST
+      const fileInput = document.getElementById('config-file');
+      const configUrl = (document.getElementById('config-url')?.value || '').trim();
+      const jsonText = (document.getElementById('config-json-input')?.value || '').trim();
+      
+      let parsed;
+      
+      // Priority: file upload > URL > textarea
+      if (fileInput && fileInput.files && fileInput.files.length > 0) {
+        progText.textContent = 'Reading uploaded config file...';
+        const file = fileInput.files[0];
+        const text = await file.text();
+        parsed = safeJSONParse(text, 'Config');
+        if (!parsed) throw new Error('Invalid JSON in uploaded file');
+        fileInput.value = ''; // Clear the input
+        
+      } else if (configUrl) {
+        progText.textContent = 'Fetching config from URL...';
+        const json = await fetchJSONWithFallbacks(configUrl);
+        parsed = json;
+        
+      } else if (jsonText) {
+        progText.textContent = 'Parsing config JSON...';
+        parsed = safeJSONParse(jsonText, 'Config');
+        if (!parsed) throw new Error('Invalid JSON in textarea'); 
+    } else {
+      throw new Error('Please provide a dashboard URL, upload a file, or paste a JSON configuration.');
+    }
   
-  let parsed;
-  
-  // Priority: file upload > URL > textarea
-  if (fileInput && fileInput.files && fileInput.files.length > 0) {
-    progText.textContent = 'Reading uploaded config file...';
-    const file = fileInput.files[0];
-    const text = await file.text();
-    parsed = safeJSONParse(text, 'Config');
-    if (!parsed) throw new Error('Invalid JSON in uploaded file');
-    fileInput.value = ''; // Clear the input
-    
-  } else if (configUrl) {
-    progText.textContent = 'Fetching config from URL...';
-    const json = await fetchJSONWithFallbacks(configUrl);
-    parsed = json;
-    
-  } else if (jsonText) {
-    progText.textContent = 'Parsing config JSON...';
-    parsed = safeJSONParse(jsonText, 'Config');
-    if (!parsed) throw new Error('Invalid JSON in textarea');
-    
-  } else {
-    throw new Error('Please provide a dashboard URL, upload a file, or paste a JSON configuration.');
-  }
-  
-  progText.textContent = 'Loading dashboard...';
-  await loadConfig(parsed);
+    progText.textContent = 'Loading dashboard...';
+    await loadConfig(parsed);
 }
 
     // Post successful connection popup cleanup and UI updates
@@ -842,16 +841,13 @@ async function fetchJSONWithFallbacks(url) {
   for (const s of strategies) {
     try {
       const result = await s.fn();
-      console.info(`[fetchJSONWithFallbacks] ✅ succeeded via: ${s.name} (${isSameOrigin ? 'same-origin' : 'cross-origin'})`);
       return result;
     } catch (err) {
       errors[s.name] = err.message;
-      console.warn(`[fetchJSONWithFallbacks] ${s.name} failed:`, err.message);
     }
   }
 
   const summary = Object.entries(errors).map(([k, v]) => `  [${k}] ${v}`).join('\n');
-  console.error('[fetchJSONWithFallbacks] All strategies failed:', summary);
   throw new Error('Unable to fetch file. Check the URL and try again.');
 }
 

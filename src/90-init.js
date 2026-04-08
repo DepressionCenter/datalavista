@@ -75,9 +75,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         throw new Error('Report config contains no SQL query.');
       }
 
-      
-      await refreshDashboardPreview();
-
       if(DataLaVistaState.reportLoaded) {
         setStatus('Report ready', 'success');
         toast('Report loaded', 'success');

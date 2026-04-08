@@ -25,61 +25,23 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       // ============================================================
       async function refreshDashboardPreview() {
         DataLaVistaState.reportLoaded = false;
-        if (!DataLaVistaState.sql.trim()) { toast('Please build a query first', 'error'); return; }
-        if(DataLaVistaState.reportMode != 'view') setStatus('Loading preview data...', 'loading');
+        if (!DataLaVistaState.sql.trim() && DataLaVistaState.reportMode !== 'view') { toast('Please build a query first', 'error'); return; }
+        if (DataLaVistaState.reportMode !== 'view') setStatus('Loading preview data...', 'loading');
 
         try {
-          const referencedTables = findReferencedTables(DataLaVistaState.sql);
-          for (const tname of referencedTables) {
-            await ensureTableData(tname, true); // Load all rows
-          }
-          for (const tname of referencedTables) {
-            const t = DataLaVistaState.tables[tname];
-            if (!t || !t.data.length) {
-              continue;
-            }
-            // Register the raw _raw_tname TABLE (safe regardless of VIEW state)
-            registerTableInAlaSQL(tname);
-            // Rebuild the FieldExpander VIEW only if the AlaSQL view object is absent or stale.
-            // ensureTableData already creates it for SP lists; fetchTableData does it for
-            // remote files. Skip redundant _applyViewSQL calls for views already active.
-            const viewName = t.viewName || CyberdynePipeline.getViewForTable(tname);
-            if (viewName) {
-              const alasqlViewExists = !!(alasql.tables && alasql.tables[viewName] && alasql.tables[viewName].view);
-              if (!alasqlViewExists) {
-                try { CyberdynePipeline.updateViewSQL(viewName); }
-                catch (e) { console.warn('[DLV] [refreshDashboardPreview] updateViewSQL:', viewName, e.message); }
-              }
-            }
-          }
-
-          // Execute SQL once with full data, then materialize into a named table.
-          // Per-widget SQL scans [dlv_active] (a view on the materialized table) — fast.
-          const processedSQL = preprocessSQL(DataLaVistaState.sql);
-          const results = alasql(processedSQL);
-
-          alasql('DROP TABLE IF EXISTS [dlv_results]');													  
-          alasql('DROP VIEW  IF EXISTS [dlv_active]');
-          alasql('CREATE TABLE [dlv_results]');
-          alasql.tables['dlv_results'].data = results;
-          alasql('CREATE VIEW [dlv_active] AS SELECT * FROM [dlv_results]');
-																				   
-          DataLaVistaState.previewFilters = {};
-          DataLaVistaState.design.previewFilteredData = null;
-          DataLaVistaState.queryColumns = results.length ? Object.keys(results[0]) : DataLaVistaState.queryColumns;
-
+          const results = await _executeQuery(DataLaVistaState.sql);
+          DataLaVistaState.queryResultsReady = true;
           renderPreviewTab();
-          
-          if(DataLaVistaState.reportMode !== 'view') setStatus(`Preview: ${results.length} rows`, 'success');
+          if (DataLaVistaState.reportMode !== 'view') setStatus(`Preview: ${results.length} rows`, 'success');
           DataLaVistaState.reportLoaded = true;
         } catch (err) {
           console.error('[DLV] refreshDashboardPreview failed:', err);
-          if(DataLaVistaState.reportMode !== 'view') {
-          toast('Preview error: ' + err.message, 'error');
-          setStatus('Preview error', 'error');
+          if (DataLaVistaState.reportMode !== 'view') {
+            toast('Preview error: ' + err.message, 'error');
+            setStatus('Preview error', 'error');
           } else {
             toast('Unable to load report data.', 'error');
-           setStatus('Report error', 'error');
+            setStatus('Report error', 'error');
           }
         }
       }

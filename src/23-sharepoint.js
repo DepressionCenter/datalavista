@@ -40,23 +40,129 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 
     // ── Data Source Name Helpers ─────────────────────────────────────────────────
 
-    /** Normalize a user-supplied data source name: alphanumeric only, max 6 chars. */
+    /**
+     * Split a PascalCase/camelCase/separated string into words.
+     * e.g. "DepressionCenter" → ["Depression", "Center"]
+     *      "PHIRecords"       → ["PHI", "Records"]
+     *      "DepressionCenter-TrackMaster" → ["Depression", "Center", "Track", "Master"]
+     */
+    function splitSourceNameWords(name) {
+      return name
+        .replace(/([a-z])([A-Z])/g, '$1 $2')       // camelCase split
+        .replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2') // ACRONYMWord split
+        .replace(/[\s_\-]+/g, ' ')                  // normalize separators
+        .trim()
+        .split(' ')
+        .filter(w => w.length > 0);
+    }
+
+    /**
+     * Find syllable start positions in a word.
+     * e.g. "depression" → [0, 3, 6]  (dep|res|sion)
+     *      "center"     → [0, 3]      (cen|ter)
+     *      "clinical"   → [0, 4, 6]  (clin|i|cal)
+     *      "dashboard"  → [0, 4]     (dash|board)
+     */
+    function syllableBreaks(word) {
+      const w = word.toLowerCase();
+      const isVowel = c => /[aeiou]/.test(c);
+      const breaks = [0];
+
+      let i = 0;
+      while (i < w.length) {
+        // Skip consonants to reach the vowel nucleus
+        while (i < w.length && !isVowel(w[i])) i++;
+        if (i >= w.length) break;
+
+        // Skip the vowel cluster
+        while (i < w.length && isVowel(w[i])) i++;
+
+        // Skip one coda consonant
+        if (i < w.length && !isVowel(w[i])) i++;
+
+        // Only mark a new syllable if there is at least one vowel remaining
+        if (i < w.length && /[aeiou]/.test(w.slice(i))) {
+          breaks.push(i);
+        }
+      }
+
+      return breaks;
+    }
+
+    /**
+     * Extract as many complete syllables from a word as will fit within maxChars.
+     * Always returns at least the first syllable even if it exceeds maxChars.
+     */
+    function syllableFit(word, maxChars) {
+      if (word.length <= maxChars) return word;
+
+      const breaks = syllableBreaks(word);
+      let result = word.slice(0, breaks[1] ?? word.length); // at minimum, syllable 1
+
+      for (let i = 2; i < breaks.length; i++) {
+        const candidate = word.slice(0, breaks[i + 1] ?? word.length);
+        if (candidate.length <= maxChars) {
+          result = candidate;
+        } else {
+          const upToHere = word.slice(0, breaks[i]);
+          if (upToHere.length <= maxChars) result = upToHere;
+          break;
+        }
+      }
+
+      return result;
+    }
+
+    /**
+     * Normalize a user-supplied data source name.
+     * - 1 word:  as many syllables as fit in 8 chars (min 4 if word is long enough)
+     * - 2+ words: up to 6 chars of syllables from word 1, then syllables from
+     *             word 2 filling the remainder up to 8 chars total.
+     * Output is PascalCase. Non-alphanumeric characters are stripped first.
+     *
+     * e.g. "DepressionCenter"              → "DepresCen"
+     *      "SharePoint"                    → "SharePoint"
+     *      "ClinicalTrials"                → "ClinicTrials"
+     *      "PatientData"                   → "PatData"
+     *      "Dashboard"                     → "Dash"
+     *      "DepressionCenter-TrackMaster"  → "DepresCen"
+     */
     function normalizeDataSourceName(raw) {
-      return (raw || '').replace(/[^A-Za-z0-9]/g, '').slice(0, 6);
+      const cleaned = (raw || '').replace(/[^A-Za-z0-9]/g, '');
+      if (!cleaned) return '';
+
+      const words = splitSourceNameWords(cleaned);
+
+      const pascal = s => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
+
+      if (words.length === 1) {
+        const part = syllableFit(words[0], 8);
+        const result = part.length < 4 && words[0].length >= 4
+          ? words[0].slice(0, 4)
+          : part;
+        return pascal(result);
+      }
+
+      // Give word 1 up to 6 chars of syllables, then fill remainder to 8 with word 2
+      const part1 = syllableFit(words[0], 6);
+      const remaining = 8 - part1.length;
+      const part2 = remaining > 0 ? syllableFit(words[1], remaining) : '';
+
+      return pascal(part1) + (part2 ? pascal(part2) : '');
     }
 
     /**
      * Generate a unique data source name for a given type.
-     * Defaults: sharepoint→SP, json→JSON, csv→CSV, others→Table.
+     * Defaults: sharepoint→SP, json→JSON, csv→CSV, sqlite→DB, db→DB, others→Table.
      * If the base name is taken, appends 1, 2, 3... until unique.
      */
     function generateDataSourceName(type, preferredBase) {
-      const bases = { sharepoint: 'SP', json: 'JSON', csv: 'CSV' };
+      const bases = { sharepoint: 'SP', json: 'JSON', csv: 'CSV', sqlite: 'DB', db: 'DB' };
       const base = normalizeDataSourceName(preferredBase) || bases[type] || 'Table';
       const existing = Object.keys(DataLaVistaState.dataSources);
       if (!existing.includes(base)) return base;
       for (let i = 1; i < 100; i++) {
-        const candidate = (base + i).slice(0, 6);
+        const candidate = (base + i).slice(0, 8);
         if (!existing.includes(candidate)) return candidate;
       }
       return base + Date.now().toString().slice(-4);
@@ -199,6 +305,9 @@ function stripODataMetadata(rows, quickCheck = false) {
     let rows = extractRows(json);
     let fields = stripODataMetadata(rows);
 
+    // Snapshot full metadata before filtering so excluded fields can be restored with original data
+    const allFieldsMap = new Map(fields.map(f => [f.InternalName, f]));
+
     // EXCLUDE system/metadata fields AND projected lookups (_x003a_)
     fields = fields.filter(f =>
       !DataLaVistaCore.SKIP_FIELDS.has(f.InternalName) &&
@@ -239,18 +348,22 @@ function stripODataMetadata(rows, quickCheck = false) {
     const mandatory = ['ID', 'Title', 'Created', 'Modified', 'Author', 'Editor'];
     mandatory.forEach(mand => {
       if (!fields.some(f => f.InternalName === mand)) {
-        let forcedType = 'Text';
-        if (mand === 'ID') forcedType = 'Counter';
-        if (mand === 'Author' || mand === 'Editor') forcedType = 'User';
-        if (mand === 'Created' || mand === 'Modified') forcedType = 'DateTime';
-        fields.push({ InternalName: mand, Title: mand, TypeAsString: forcedType });
+        if (allFieldsMap.has(mand)) {
+          fields.push(allFieldsMap.get(mand));
+        } else {
+          let forcedType = 'Text';
+          if (mand === 'ID') forcedType = 'Counter';
+          if (mand === 'Author' || mand === 'Editor') forcedType = 'User';
+          if (mand === 'Created' || mand === 'Modified') forcedType = 'DateTime';
+          fields.push({ InternalName: mand, Title: mand, TypeAsString: forcedType });
+        }
       }
     });
-    // For document libraries, always include FileRef and FileLeafRef (not list items)
+    // For document libraries, always include file info (not list items)
     if (isDocLib) {
-      ['FileRef', 'FileLeafRef'].forEach(fn => {
+      ['FileRef', 'FileLeafRef', 'FileDirRef'].forEach(fn => {
         if (!fields.some(f => f.InternalName === fn)) {
-          fields.push({ InternalName: fn, Title: fn, TypeAsString: 'Text' });
+          fields.push(allFieldsMap.get(fn) ?? { InternalName: fn, Title: fn, TypeAsString: 'Text' });
         }
       });
     }
