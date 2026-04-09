@@ -1,0 +1,281 @@
+{
+  "$license": "This file is part of DataLaVista™. Copyright (c) 2026 The Regents of the University of Michigan. Licensed under GPL-3.0 or later. See https://github.com/DepressionCenter/datalavista",
+  "$schema": "https://developer.microsoft.com/json-schemas/sp/v2/row-formatting.schema.json",
+  "hideColumnHeader": true,
+  "hideSelection": false,
+  "rowFormatter": {
+    "elmType": "div",
+    "style": {
+      "display": "flex",
+      "align-items": "center",
+      "padding": "12px 16px",
+      "border-bottom": "1px solid #e0e6ef",
+      "background-color": "=if(@rowIndex % 2 == 0, '#ffffff', '#fcfcfc')",
+      "box-sizing": "border-box",
+      "width": "100%"
+    },
+    "children": [
+      {
+        "elmType": "a",
+        "style": {
+          "display": "=if(endsWith([$FileLeafRef], '.json'), 'flex', 'none')",
+          "align-items": "center",
+          "justify-content": "center",
+          "width": "42px",
+          "height": "42px",
+          "border-radius": "8px",
+          "margin-right": "16px",
+          "flex-shrink": "0",
+          "background-color": "#00274C",
+          "color": "#FFCB05",
+          "font-size": "22px",
+          "text-decoration": "none",
+          "cursor": "pointer"
+        },
+        "attributes": {
+          "iconName": "BIDashboard",
+          "href": "=@currentWeb + '/SitePages/DataLaVista.aspx?report=' + [$FileRef] + '&env=Embedded'",
+          "target": "_blank",
+          "title": "Launch Dashboard"
+        }
+      },
+      {
+        "elmType": "div",
+        "style": {
+          "display": "=if(endsWith([$FileLeafRef], '.json'), 'none', 'flex')",
+          "align-items": "center",
+          "justify-content": "center",
+          "width": "42px",
+          "height": "42px",
+          "border-radius": "8px",
+          "margin-right": "16px",
+          "flex-shrink": "0",
+          "background-color": "=if(endsWith([$FileLeafRef], '.pbix'), '#FFCB05', if(endsWith([$FileLeafRef], '.pbit'), '#FFCB05', '#f0f4f8'))",
+          "color": "=if(endsWith([$FileLeafRef], '.pbix'), '#00274C', if(endsWith([$FileLeafRef], '.pbit'), '#00274C', '#4a6278'))",
+          "font-size": "22px",
+          "cursor": "pointer"
+        },
+        "attributes": {
+          "iconName": "=if(endsWith([$FileLeafRef], '.pbix'), 'PowerBILogo', if(endsWith([$FileLeafRef], '.pbit'), 'PowerBILogo', 'Document'))",
+          "title": "Open file"
+        },
+        "customRowAction": {
+          "action": "defaultClick"
+        }
+      },
+      {
+        "elmType": "div",
+        "style": {
+          "display": "flex",
+          "align-items": "center",
+          "justify-content": "space-between",
+          "width": "340px",
+          "padding-right": "24px",
+          "flex-shrink": "1"
+        },
+        "children": [
+          {
+            "elmType": "a",
+            "style": {
+              "display": "=if(endsWith([$FileLeafRef], '.json'), 'flex', 'none')",
+              "flex-direction": "column",
+              "flex-grow": "1",
+              "text-decoration": "none",
+              "cursor": "pointer",
+              "overflow": "hidden",
+              "padding-right": "8px"
+            },
+            "attributes": {
+              "href": "=@currentWeb + '/SitePages/DataLaVista.aspx?report=' + [$FileRef] + '&env=Embedded'",
+              "target": "_blank",
+              "title": "Launch Dashboard"
+            },
+            "children": [
+              {
+                "elmType": "div",
+                "txtContent": "[$FileLeafRef]",
+                "style": {
+                  "font-weight": "600",
+                  "font-size": "14px",
+                  "color": "#00274C",
+                  "white-space": "nowrap",
+                  "overflow": "hidden",
+                  "text-overflow": "ellipsis"
+                }
+              },
+              {
+                "elmType": "div",
+                "txtContent": "DataLaVista™ Dashboard",
+                "style": {
+                  "font-size": "12px",
+                  "color": "#4a6278",
+                  "margin-top": "2px"
+                }
+              }
+            ]
+          },
+          {
+            "elmType": "div",
+            "style": {
+              "display": "=if(endsWith([$FileLeafRef], '.json'), 'none', 'flex')",
+              "flex-direction": "column",
+              "flex-grow": "1",
+              "cursor": "pointer",
+              "overflow": "hidden",
+              "padding-right": "8px"
+            },
+            "customRowAction": {
+              "action": "defaultClick"
+            },
+            "children": [
+              {
+                "elmType": "div",
+                "txtContent": "[$FileLeafRef]",
+                "style": {
+                  "font-weight": "600",
+                  "font-size": "14px",
+                  "color": "#00274C",
+                  "white-space": "nowrap",
+                  "overflow": "hidden",
+                  "text-overflow": "ellipsis"
+                }
+              },
+              {
+                "elmType": "div",
+                "txtContent": "=if(endsWith([$FileLeafRef], '.pbix'), 'Power BI Report', if(endsWith([$FileLeafRef], '.pbit'), 'Power BI Template', 'Standard Document'))",
+                "style": {
+                  "font-size": "12px",
+                  "color": "#4a6278",
+                  "margin-top": "2px"
+                }
+              }
+            ]
+          },
+          {
+            "elmType": "div",
+            "attributes": {
+              "iconName": "MoreVertical",
+              "title": "More options"
+            },
+            "customRowAction": {
+              "action": "openContextMenu"
+            },
+            "style": {
+              "cursor": "pointer",
+              "padding": "4px",
+              "font-size": "16px",
+              "color": "#00274C",
+              "display": "flex",
+              "align-items": "center",
+              "justify-content": "center",
+              "flex-shrink": "0"
+            }
+          }
+        ]
+      },
+      {
+        "elmType": "div",
+        "style": {
+          "display": "flex",
+          "flex-direction": "column",
+          "width": "180px",
+          "flex-shrink": "0",
+          "padding-right": "16px"
+        },
+        "children": [
+          {
+            "elmType": "div",
+            "txtContent": "[$Editor.title]",
+            "style": {
+              "font-size": "12px",
+              "color": "#00274C",
+              "white-space": "nowrap",
+              "overflow": "hidden",
+              "text-overflow": "ellipsis"
+            }
+          },
+          {
+            "elmType": "div",
+            "txtContent": "[$Modified]",
+            "style": {
+              "font-size": "11px",
+              "color": "#7a8fa0",
+              "margin-top": "2px"
+            }
+          }
+        ]
+      },
+      {
+        "elmType": "div",
+        "style": {
+          "display": "flex",
+          "align-items": "center",
+          "gap": "10px",
+          "flex-shrink": "0"
+        },
+        "children": [
+          {
+            "elmType": "a",
+            "txtContent": "✏️ Edit",
+            "attributes": {
+              "href": "=@currentWeb + '/SitePages/DataLaVista.aspx?report=' + [$FileRef] + '&reportMode=edit'",
+              "target": "_blank",
+              "title": "Edit Dashboard"
+            },
+            "style": {
+              "display": "=if(endsWith([$FileLeafRef], '.json'), 'inline-block', 'none')",
+              "padding": "6px 14px",
+              "border": "1px solid rgba(0, 39, 76, 0.25)",
+              "color": "rgba(0, 39, 76, 0.6)",
+              "border-radius": "20px",
+              "font-size": "12px",
+              "font-weight": "500",
+              "text-decoration": "none",
+              "white-space": "nowrap",
+              "cursor": "pointer"
+            }
+          },
+          {
+            "elmType": "a",
+            "txtContent": "▶ Launch",
+            "style": {
+              "display": "=if(endsWith([$FileLeafRef], '.json'), 'inline-block', 'none')",
+              "padding": "6px 18px",
+              "background-color": "#00274C",
+              "color": "#FFCB05",
+              "border-radius": "20px",
+              "font-size": "12px",
+              "font-weight": "600",
+              "text-decoration": "none",
+              "white-space": "nowrap",
+              "cursor": "pointer"
+            },
+            "attributes": {
+              "href": "=@currentWeb + '/SitePages/DataLaVista.aspx?report=' + [$FileRef] + '&env=Embedded'",
+              "target": "_blank"
+            }
+          },
+          {
+            "elmType": "div",
+            "txtContent": "⚡ Open",
+            "style": {
+              "display": "=if(endsWith([$FileLeafRef], '.json'), 'none', if(endsWith([$FileLeafRef], '.pbix'), 'inline-block', if(endsWith([$FileLeafRef], '.pbit'), 'inline-block', 'none')))",
+              "padding": "6px 18px",
+              "background-color": "#FFCB05",
+              "color": "#00274C",
+              "border-radius": "20px",
+              "font-size": "12px",
+              "font-weight": "600",
+              "text-decoration": "none",
+              "white-space": "nowrap",
+              "cursor": "pointer"
+            },
+            "customRowAction": {
+              "action": "defaultClick"
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

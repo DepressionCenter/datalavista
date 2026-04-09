@@ -79,7 +79,7 @@ with this program. If not, see https://www.gnu.org/licenses/.
       --tab-h: 36px;
       --toolbar-h: 42px;
       --panel-fields-w: 220px;
-      --panel-tools-w: 240px;
+      --panel-tools-w: 290px;
       --transition: 150ms ease;
     }
 
@@ -1883,9 +1883,16 @@ with this program. If not, see https://www.gnu.org/licenses/.
 
     .widget-actions {
       display: flex;
-      gap: 4px;
+      gap: 2px;
       opacity: 0;
       transition: opacity var(--transition);
+    }
+    .widget-actions .btn {
+      font-size: 11px;
+      padding: 1px 5px;
+      min-width: 0;
+      height: 20px;
+      line-height: 1;
     }
 
     .widget:hover .widget-actions {
@@ -2004,8 +2011,8 @@ with this program. If not, see https://www.gnu.org/licenses/.
    ============================================================ */
     #toolbox-panel {
       width: var(--panel-tools-w);
-      min-width: 200px;
-      max-width: 360px;
+      min-width: 220px;
+      max-width: 420px;
     }
 
     .toolbox-section {

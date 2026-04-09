@@ -107,10 +107,11 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         for (const w of DataLaVistaState.design.widgets) {
           const el = document.createElement('div');
           el.className = 'widget';
-          const titleStyle = `background:${w.titleBackgroundColor||'#fefefe'};font-size:${w.titleFontSize||14}px;color:${w.titleFontColor||'#323130'}`;
+          const titleHdrStyle  = `background:${w.titleBackgroundColor||'#fefefe'}`;
+          const titleSpanStyle = `font-size:${w.titleFontSize||14}px;color:${w.titleFontColor||'#323130'}`;
           el.style.cssText = `width:${w.widthPct}%;height:${w.heightVh}vh;min-height:120px;border-color:${w.borderColor};border-width:${w.borderSize}px;background:${w.widgetBackgroundColor||'#fefefe'}`;
           el.innerHTML = `
-            <div class="widget-header${w.showTitle === false ? ' hidden' : ''}" style="${titleStyle}"><span class="widget-title">${w.title}</span></div>
+            <div class="widget-header${w.showTitle === false ? ' hidden' : ''}" style="${titleHdrStyle}"><span class="widget-title" style="${titleSpanStyle}">${w.title}</span></div>
             <div class="widget-content" id="prev-wcontent-${w.id}">
               ${getPrevWidgetContent(w)}
             </div>

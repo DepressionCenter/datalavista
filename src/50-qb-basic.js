@@ -317,7 +317,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         const alias = t.alias || vname;
         const fromClause = alias !== vname ? `[${vname}] AS [${alias}]` : `[${vname}]`;
 
-        const selectedAliases = DataLaVistaState.basicQB.selectedFields;
+        const selectedAliases = [...new Set(DataLaVistaState.basicQB.selectedFields)];
         const aggs   = DataLaVistaState.basicQB.fieldAggs || {};
         const conds  = DataLaVistaState.basicQB.conditions.filter(c => c.field);
         const sorts  = DataLaVistaState.basicQB.sorts.filter(s => s.field);
@@ -531,7 +531,9 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         const t = DataLaVistaState.tables[DataLaVistaState.basicQB.tableName];
         if (!t) return;
         const fields = t.fields.filter(f => !f.isAutoId);
-        DataLaVistaState.basicQB.conditions.push({ conj: 'AND', field: fields[0]?.alias || '', op: '=', value: '' });
+        const firstField = fields[0];
+        const defaultValue = firstField?.displayType === 'boolean' ? 'true' : '';
+        DataLaVistaState.basicQB.conditions.push({ conj: 'AND', field: firstField?.alias || '', op: '=', value: defaultValue });
         renderBasicConditions();
       }
 
