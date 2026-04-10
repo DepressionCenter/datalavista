@@ -144,15 +144,14 @@ with this program. If not, see https://www.gnu.org/licenses/.
    LAYOUT
    ============================================================ */
     #app {
-      /* Shrink to fit comfortably under SharePoint's header without double-scrollbars */
-      height: calc(100vh - 220px);
-      min-height: 500px;
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-    }
+    height: calc(100vh - var(--app-top-offset, 200px));
+    min-height: 420px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
 
     /* Top Toolbar */
     #toolbar {
@@ -815,6 +814,29 @@ with this program. If not, see https://www.gnu.org/licenses/.
       cursor: grabbing;
     }
 
+    .field-item-synthetic-list {
+      padding-left: 18px;
+      border-left: 2px solid var(--border);
+      margin-left: 8px;
+    }
+
+    .field-item-synthetic {
+      opacity: 0.75;
+      font-style: italic;
+    }
+
+    .field-item-parent-toggle {
+      cursor: pointer;
+      font-size: 9px;
+      color: var(--text-disabled);
+      flex-shrink: 0;
+      width: 10px;
+      display: inline-block;
+      transition: transform var(--transition);
+    }
+
+    .field-item-parent-toggle.open { transform: rotate(90deg); }
+
     .field-type-icon {
       width: 16px;
       text-align: center;
@@ -1027,6 +1049,21 @@ with this program. If not, see https://www.gnu.org/licenses/.
       display: grid;
       grid-template-columns: 1fr 1fr 1fr;
       gap: 4px 8px;
+    }
+
+    .basic-field-synthetic-group {
+      grid-column: 1 / -1;
+      border-left: 2px solid var(--border);
+      margin-left: 8px;
+      padding-left: 8px;
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 4px 8px;
+    }
+
+    .basic-field-row.basic-field-synthetic {
+      opacity: 0.75;
+      font-style: italic;
     }
 
     .basic-field-row {
@@ -9487,7 +9524,7 @@ validateAliasUniqueness(fields) {
             displayType: vc.displayType,
             isSynthetic: vc.isSynthetic,
             parentField: vc.parentField,
-            isAutoId: vc.isSynthetic  // hide synthetics from basic QB
+            isAutoId: false
           });
         }
 
@@ -10881,16 +10918,23 @@ function renderFieldsPanel() {
         showCtxMenu(e, { level: 'table', tableKey: tkey, dsName, isFileUpload: ds.isFileUpload || false });
       });
 
-      // Build fields list, sorted alphabetically
+      // Build fields list: base fields sorted alphabetically, synthetic children nested under parent
       const flist = node.querySelector('.fields-list');
-      const sortedFields = [...t.fields]
+      const baseFields = [...t.fields]
+        .filter(f => !f.isSynthetic)
         .sort((a, b) => (a.alias || a.displayName || '').localeCompare(b.alias || b.displayName || ''));
-        //TODO: removed this from above .sort:  .filter(f => !f.isAutoId)
+      const syntheticByParent = {};
+      for (const f of t.fields) {
+        if (f.isSynthetic && f.parentField) {
+          if (!syntheticByParent[f.parentField]) syntheticByParent[f.parentField] = [];
+          syntheticByParent[f.parentField].push(f);
+        }
+      }
 
-      for (const f of sortedFields) {
+      const makeFieldItem = (f, extraClass) => {
         const ti = DataLaVistaCore.FIELD_TYPE_ICONS[f.displayType] || DataLaVistaCore.FIELD_TYPE_ICONS.default;
         const fitem = document.createElement('div');
-        fitem.className = 'field-item';
+        fitem.className = 'field-item' + (extraClass ? ' ' + extraClass : '');
         fitem.draggable = true;
         fitem.style.paddingLeft = '14px';
         fitem.innerHTML = `
@@ -10901,12 +10945,55 @@ function renderFieldsPanel() {
           safeDragSet(e, { type: 'field', table: tkey, field: f.alias, internalName: f.internalName });
           e.stopPropagation();
         });
-        // Right-click on field: only "Rename"
         fitem.addEventListener('contextmenu', (e) => {
           e.preventDefault();
           showCtxMenu(e, { level: 'field', tableKey: tkey, fieldAlias: f.alias });
         });
-        flist.appendChild(fitem);
+        return fitem;
+      };
+
+      for (const f of baseFields) {
+        const children = syntheticByParent[f.alias] || [];
+        if (!children.length) {
+          flist.appendChild(makeFieldItem(f, ''));
+        } else {
+          // Parent item with expand toggle
+          const ti = DataLaVistaCore.FIELD_TYPE_ICONS[f.displayType] || DataLaVistaCore.FIELD_TYPE_ICONS.default;
+          const fitem = document.createElement('div');
+          fitem.className = 'field-item';
+          fitem.draggable = true;
+          fitem.style.paddingLeft = '14px';
+          fitem.innerHTML = `
+            <span class="field-item-parent-toggle" title="Show/hide sub-fields">▶</span>
+            <span class="field-type-icon ${ti.cls}" title="${f.displayName || f.alias}">${ti.icon}</span>
+            <span class="field-label" id="flabel-${CSS.escape(tkey)}-${CSS.escape(f.alias)}" title="${f.displayName || f.alias}">${f.alias}</span>
+          `;
+          fitem.addEventListener('dragstart', e => {
+            safeDragSet(e, { type: 'field', table: tkey, field: f.alias, internalName: f.internalName });
+            e.stopPropagation();
+          });
+          fitem.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            showCtxMenu(e, { level: 'field', tableKey: tkey, fieldAlias: f.alias });
+          });
+          flist.appendChild(fitem);
+
+          // Synthetic children container, collapsed by default
+          const childList = document.createElement('div');
+          childList.className = 'field-item-synthetic-list hidden';
+          for (const sf of children) {
+            childList.appendChild(makeFieldItem(sf, 'field-item-synthetic'));
+          }
+          flist.appendChild(childList);
+
+          // Wire toggle
+          const toggleArrow = fitem.querySelector('.field-item-parent-toggle');
+          toggleArrow.addEventListener('click', e => {
+            e.stopPropagation();
+            const open = childList.classList.toggle('hidden');
+            toggleArrow.classList.toggle('open', !open);
+          });
+        }
       }
 
       // Tables start collapsed by default
@@ -12959,26 +13046,45 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
     </div>
   `;
 
-        // Render field checkboxes with aggregate dropdown
+        // Render field checkboxes with aggregate dropdown; group synthetic children under parent
         const grid = document.getElementById('basic-fields-grid');
         const aggs = DataLaVistaState.basicQB.fieldAggs || {};
+        const baseRows = rows.filter(f => !f.isSynthetic);
+        const synByParent = {};
         for (const f of rows) {
+          if (f.isSynthetic && f.parentField) {
+            if (!synByParent[f.parentField]) synByParent[f.parentField] = [];
+            synByParent[f.parentField].push(f);
+          }
+        }
+
+        const makeFieldRow = (f, extraClass) => {
           const checked = DataLaVistaState.basicQB.selectedFields.includes(f.alias);
           const currentAgg = aggs[f.alias] || '';
           const ti = DataLaVistaCore.FIELD_TYPE_ICONS[f.displayType] || DataLaVistaCore.FIELD_TYPE_ICONS.default;
           const availableAggs = aggsForType(f.displayType);
           const aggOpts = availableAggs.map(a => `<option value="${a.val}" ${a.val === currentAgg ? 'selected' : ''}>${a.label}</option>`).join('');
           const div = document.createElement('div');
-          div.className = 'basic-field-row' + (checked ? '' : ' field-row-unchecked');
+          div.className = 'basic-field-row' + (checked ? '' : ' field-row-unchecked') + (extraClass ? ' ' + extraClass : '');
           div.innerHTML = `
       <input type="checkbox" id="bfchk-${f.alias}" ${checked ? 'checked' : ''}
         onchange="toggleBasicField('${f.alias}', this.checked)"/>
       <span class="field-type-icon ${ti.cls}" style="font-size:10px">${ti.icon}</span>
       <label for="bfchk-${f.alias}" title="${f.displayName}" style="flex:1">${f.alias}</label>
-      ${checked ? `<select class="form-input field-agg-select" title="Aggregate function"
-        onchange="setFieldAgg('${f.alias}', this.value)">${aggOpts}</select>` : ''}
+      ${checked ? '<select class="form-input field-agg-select" title="Aggregate function" onchange="setFieldAgg(\'' + f.alias + '\', this.value)">' + aggOpts + '</select>' : ''}
     `;
-          grid.appendChild(div);
+          return div;
+        };
+
+        for (const f of baseRows) {
+          grid.appendChild(makeFieldRow(f, ''));
+          const children = synByParent[f.alias] || [];
+          if (children.length) {
+            const group = document.createElement('div');
+            group.className = 'basic-field-synthetic-group';
+            for (const sf of children) group.appendChild(makeFieldRow(sf, 'basic-field-synthetic'));
+            grid.appendChild(group);
+          }
         }
 
         renderBasicConditions();
@@ -14045,6 +14151,26 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         document.getElementById('node-props-title').textContent = nd.alias || nd.tableName;
 
         const body = document.getElementById('node-props-body');
+        const _baseFields = t.fields.filter(f => !f.isSynthetic);
+        const _synByParent = {};
+        for (const f of t.fields) {
+          if (f.isSynthetic && f.parentField) {
+            if (!_synByParent[f.parentField]) _synByParent[f.parentField] = [];
+            _synByParent[f.parentField].push(f);
+          }
+        }
+        const _fieldRowHTML = (f, indent) => {
+          const sel = nd.selectedFields.includes(f.alias);
+          return '<div class="basic-field-row' + (indent ? ' basic-field-synthetic' : '') + '" style="' + (indent ? 'padding-left:18px;border-left:2px solid var(--border);margin-left:8px' : '') + '" onclick="toggleAdvFieldInProps(\'' + nodeId + '\',\'' + f.alias + '\',this)">'
+            + '<input type="checkbox" ' + (sel ? 'checked' : '') + ' onclick="event.stopPropagation();" onchange="toggleAdvFieldInProps(\'' + nodeId + '\',\'' + f.alias + '\',this.closest(\'.basic-field-row\'))"/>'
+            + '<label>' + f.alias + '</label>'
+            + '</div>';
+        };
+        const _fieldsHTML = _baseFields.map(f => {
+          const children = _synByParent[f.alias] || [];
+          return _fieldRowHTML(f, false) + children.map(sf => _fieldRowHTML(sf, true)).join('');
+        }).join('');
+
         body.innerHTML = `
     <div class="form-group">
       <label>Alias</label>
@@ -14052,13 +14178,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
     </div>
     <div>
       <div style="font-size:11px;font-weight:700;color:var(--text-disabled);text-transform:uppercase;margin-bottom:4px">Fields — click to toggle</div>
-      ${t.fields.map(f => {
-          const sel = nd.selectedFields.includes(f.alias);
-          return `<div class="basic-field-row${f.isAutoId ? ' adv-field-synthetic' : ''}" onclick="toggleAdvFieldInProps('${nodeId}','${f.alias}',this)" title="${f.isAutoId ? 'Synthetic/auto-generated field' : ''}">
-          <input type="checkbox" ${sel ? 'checked' : ''} onclick="event.stopPropagation();" onchange="toggleAdvFieldInProps('${nodeId}','${f.alias}',this.closest('.basic-field-row'))"/>
-          <label>${f.alias}${f.isAutoId ? ' <span style="opacity:.5;font-size:10px">[auto]</span>' : ''}</label>
-        </div>`;
-        }).join('')}
+      ${_fieldsHTML}
     </div>
   `;
         props.classList.add('visible');
@@ -16249,19 +16369,21 @@ function _buildChartOption(w, chartData) {
         }]
       };
     }
-    var pieStep = Math.floor(100 / yFields.length);
+    // Multiple Y fields: polar rose (stacked polar bar) — far more readable than side-by-side pies
+    var categories = chartData.map(function(r) { return String(r[xField] != null ? r[xField] : ''); });
     return {
-      tooltip : { trigger: 'item', formatter: '{a}<br/>{b}: {c} ({d}%)' },
-      series  : yFields.map(function(pyf, pi) {
+      tooltip  : { trigger: 'axis', axisPointer: { type: 'cross' } },
+      legend   : { show: true, bottom: 0 },
+      polar    : { radius: ['15%', '75%'] },
+      angleAxis: { type: 'category', data: categories, startAngle: 90 },
+      radiusAxis: { type: 'value' },
+      series   : yFields.map(function(pyf, pi) {
         return {
-          name   : pyf,
-          type   : 'pie',
-          radius : ['20%', '40%'],
-          center : [Math.round(pieStep * pi + pieStep / 2) + '%', '50%'],
-          data   : chartData.map(function(r) {
-            return { name: String(r[xField] != null ? r[xField] : ''), value: parseFloat(pieGet(r, pi, pyf)) || 0 };
-          }),
-          label  : { fontSize: 10, formatter: '{b}' }
+          name             : pyf,
+          type             : 'bar',
+          coordinateSystem : 'polar',
+          stack            : 'total',
+          data             : chartData.map(function(r) { return parseFloat(pieGet(r, pi, pyf)) || 0; })
         };
       })
     };
@@ -17190,7 +17312,7 @@ function _renderBarLineOptionsHTML(w, wid) {
               </div></div>
             <div class="props-row"><label>Title font</label>
               <div class="color-input-wrap">
-                <input type="number" class="form-input" min="8" max="48" value="${w.titleFontSize||14}" oninput="updateWidgetProp('${wid}','titleFontSize',+this.value)" style="width:50px" title="Title font size"/>
+                <input type="number" class="form-input" min="8" max="48" value="${w.titleFontSize||12}" oninput="updateWidgetProp('${wid}','titleFontSize',+this.value)" style="width:50px" title="Title font size"/>
                 <input type="color" value="${w.titleFontColor||'#323130'}" oninput="updateWidgetProp('${wid}','titleFontColor',this.value)" title="Title font color"/>
                 <input type="text" class="form-input" value="${w.titleFontColor||'#323130'}" oninput="updateWidgetProp('${wid}','titleFontColor',this.value)"/>
               </div></div>
@@ -17835,7 +17957,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           el.style.cssText = `width:${w.widthPct}%;height:${w.heightVh}vh;min-height:120px;border-color:${w.borderColor};border-width:${w.borderSize}px;background:${w.widgetBackgroundColor||'#fefefe'}`;
           el.innerHTML = `
             <div class="widget-header${w.showTitle === false ? ' hidden' : ''}" style="${titleHdrStyle}"><span class="widget-title" style="${titleSpanStyle}">${w.title}</span></div>
-            <div class="widget-content" id="prev-wcontent-${w.id}">
+            <div class="widget-content${['bar','line','pie','scatter'].includes(w.type) ? ' widget-content-chart' : ''}" id="prev-wcontent-${w.id}">
               ${getPrevWidgetContent(w)}
             </div>
           `;
@@ -17877,8 +17999,17 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
   if (!chartEl) return;
   const id = 'prev_' + w.id;
   if (DataLaVistaState.charts[id]) { try { DataLaVistaState.charts[id].dispose(); } catch(e){} }
+  if (DataLaVistaState._chartROs && DataLaVistaState._chartROs[id]) {
+    try { DataLaVistaState._chartROs[id].disconnect(); } catch(e) {}
+  }
   const chart = echarts.init(chartEl);
   DataLaVistaState.charts[id] = chart;
+  if (typeof ResizeObserver !== 'undefined') {
+    if (!DataLaVistaState._chartROs) DataLaVistaState._chartROs = {};
+    const ro = new ResizeObserver(() => { try { chart.resize(); } catch(e) {} });
+    ro.observe(chartEl);
+    DataLaVistaState._chartROs[id] = ro;
+  }
   const chartData = buildWidgetData(w);
   const option = _buildChartOption(w, chartData);
   if (!option) {
@@ -18112,6 +18243,82 @@ You should have received a copy of the GNU General Public License along
 with this program. If not, see <https://www.gnu.org/licenses/>.
 ================================================================ */
 
+// ─────────────────────────────────────────────────────────────────────────────
+// APP HEIGHT MANAGEMENT
+// Dynamically calculates and sets --app-top-offset so #app fills the remaining
+// viewport height below whatever chrome sits above it (standalone, SharePoint,
+// or embedded iframe). Called once at init and wired to resize/mutation events.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const DLV_HEIGHT_CONFIG = {
+    bottomPadding: 12,   // px of breathing room at the bottom of the viewport
+    minHeight:     480,  // px — #app never shrinks below this
+    // SharePoint re-renders its chrome in waves; retry at these delays (ms)
+    spRetryDelays: [200, 600, 1200, 2500]
+};
+
+// Stored references so we can disconnect observers if ever needed
+let _dlvResizeObserver   = null;
+let _dlvMutationObserver = null;
+let _dlvResizeListener   = null;
+
+function dlvSetAppHeight() {
+    const app = document.getElementById('app');
+    if (!app) return;
+
+    const offsetFromTop = app.getBoundingClientRect().top;
+
+    // Clamp: ignore negative values (e.g. page scrolled) or values so large
+    // the app would be shorter than minHeight.
+    const safeOffset = Math.max(
+        0,
+        Math.min(offsetFromTop, window.innerHeight - DLV_HEIGHT_CONFIG.minHeight)
+    );
+
+    const finalOffset = Math.round(safeOffset) + DLV_HEIGHT_CONFIG.bottomPadding;
+    document.documentElement.style.setProperty('--app-top-offset', finalOffset + 'px');
+}
+
+function dlvIsInIframe() {
+    try { return window.self !== window.top; } catch (e) { return true; }
+}
+
+function dlvInitHeightManagement() {
+    // Calculate immediately
+    dlvSetAppHeight();
+
+    // Always watch for window/orientation resize
+    _dlvResizeListener = () => dlvSetAppHeight();
+    window.addEventListener('resize', _dlvResizeListener, { passive: true });
+
+    if (DataLaVistaState.isSpSite) {
+        // SharePoint modern renders chrome in multiple async waves.
+        // Fire recalculations at each expected wave.
+        DLV_HEIGHT_CONFIG.spRetryDelays.forEach(ms => setTimeout(dlvSetAppHeight, ms));
+
+        // Also watch for SP banners, command bars, or messaging appearing
+        // after load and pushing #app down.
+        if (window.MutationObserver) {
+            _dlvMutationObserver = new MutationObserver(dlvSetAppHeight);
+            _dlvMutationObserver.observe(document.body, {
+                childList:       true,
+                subtree:         false,  // body-level only — cheap
+                attributes:      true,
+                attributeFilter: ['style', 'class']
+            });
+        }
+    }
+
+    if (dlvIsInIframe()) {
+        // Parent app may resize the iframe; ResizeObserver on body catches this
+        // without polling.
+        if (window.ResizeObserver) {
+            _dlvResizeObserver = new ResizeObserver(dlvSetAppHeight);
+            _dlvResizeObserver.observe(document.body);
+        }
+    }
+}
+
   function initAdvOptsResizer() {
     const resizer = document.getElementById('adv-opts-resizer');
     const panel   = document.getElementById('adv-options-panel');
@@ -18263,6 +18470,9 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       DataLaVistaState.isSpSite = true;
       console.log('Detected SharePoint environment. Site URL: ' + DataLaVistaState.spSiteUrl);
     }
+
+    // ── Set dynamic app height now that we know the environment ──────
+    dlvInitHeightManagement();
 
     // If running inside SharePoint, check if the page is in edit mode
     if (DataLaVistaState.isSpSite) {

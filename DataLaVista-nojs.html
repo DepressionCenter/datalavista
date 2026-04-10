@@ -144,15 +144,14 @@ with this program. If not, see https://www.gnu.org/licenses/.
    LAYOUT
    ============================================================ */
     #app {
-      /* Shrink to fit comfortably under SharePoint's header without double-scrollbars */
-      height: calc(100vh - 220px);
-      min-height: 500px;
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-    }
+    height: calc(100vh - var(--app-top-offset, 200px));
+    min-height: 420px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
 
     /* Top Toolbar */
     #toolbar {
@@ -815,6 +814,29 @@ with this program. If not, see https://www.gnu.org/licenses/.
       cursor: grabbing;
     }
 
+    .field-item-synthetic-list {
+      padding-left: 18px;
+      border-left: 2px solid var(--border);
+      margin-left: 8px;
+    }
+
+    .field-item-synthetic {
+      opacity: 0.75;
+      font-style: italic;
+    }
+
+    .field-item-parent-toggle {
+      cursor: pointer;
+      font-size: 9px;
+      color: var(--text-disabled);
+      flex-shrink: 0;
+      width: 10px;
+      display: inline-block;
+      transition: transform var(--transition);
+    }
+
+    .field-item-parent-toggle.open { transform: rotate(90deg); }
+
     .field-type-icon {
       width: 16px;
       text-align: center;
@@ -1027,6 +1049,21 @@ with this program. If not, see https://www.gnu.org/licenses/.
       display: grid;
       grid-template-columns: 1fr 1fr 1fr;
       gap: 4px 8px;
+    }
+
+    .basic-field-synthetic-group {
+      grid-column: 1 / -1;
+      border-left: 2px solid var(--border);
+      margin-left: 8px;
+      padding-left: 8px;
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 4px 8px;
+    }
+
+    .basic-field-row.basic-field-synthetic {
+      opacity: 0.75;
+      font-style: italic;
     }
 
     .basic-field-row {

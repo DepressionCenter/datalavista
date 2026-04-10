@@ -871,6 +871,26 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         document.getElementById('node-props-title').textContent = nd.alias || nd.tableName;
 
         const body = document.getElementById('node-props-body');
+        const _baseFields = t.fields.filter(f => !f.isSynthetic);
+        const _synByParent = {};
+        for (const f of t.fields) {
+          if (f.isSynthetic && f.parentField) {
+            if (!_synByParent[f.parentField]) _synByParent[f.parentField] = [];
+            _synByParent[f.parentField].push(f);
+          }
+        }
+        const _fieldRowHTML = (f, indent) => {
+          const sel = nd.selectedFields.includes(f.alias);
+          return '<div class="basic-field-row' + (indent ? ' basic-field-synthetic' : '') + '" style="' + (indent ? 'padding-left:18px;border-left:2px solid var(--border);margin-left:8px' : '') + '" onclick="toggleAdvFieldInProps(\'' + nodeId + '\',\'' + f.alias + '\',this)">'
+            + '<input type="checkbox" ' + (sel ? 'checked' : '') + ' onclick="event.stopPropagation();" onchange="toggleAdvFieldInProps(\'' + nodeId + '\',\'' + f.alias + '\',this.closest(\'.basic-field-row\'))"/>'
+            + '<label>' + f.alias + '</label>'
+            + '</div>';
+        };
+        const _fieldsHTML = _baseFields.map(f => {
+          const children = _synByParent[f.alias] || [];
+          return _fieldRowHTML(f, false) + children.map(sf => _fieldRowHTML(sf, true)).join('');
+        }).join('');
+
         body.innerHTML = `
     <div class="form-group">
       <label>Alias</label>
@@ -878,13 +898,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
     </div>
     <div>
       <div style="font-size:11px;font-weight:700;color:var(--text-disabled);text-transform:uppercase;margin-bottom:4px">Fields — click to toggle</div>
-      ${t.fields.map(f => {
-          const sel = nd.selectedFields.includes(f.alias);
-          return `<div class="basic-field-row${f.isAutoId ? ' adv-field-synthetic' : ''}" onclick="toggleAdvFieldInProps('${nodeId}','${f.alias}',this)" title="${f.isAutoId ? 'Synthetic/auto-generated field' : ''}">
-          <input type="checkbox" ${sel ? 'checked' : ''} onclick="event.stopPropagation();" onchange="toggleAdvFieldInProps('${nodeId}','${f.alias}',this.closest('.basic-field-row'))"/>
-          <label>${f.alias}${f.isAutoId ? ' <span style="opacity:.5;font-size:10px">[auto]</span>' : ''}</label>
-        </div>`;
-        }).join('')}
+      ${_fieldsHTML}
     </div>
   `;
         props.classList.add('visible');

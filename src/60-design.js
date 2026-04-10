@@ -1091,19 +1091,21 @@ function _buildChartOption(w, chartData) {
         }]
       };
     }
-    var pieStep = Math.floor(100 / yFields.length);
+    // Multiple Y fields: polar rose (stacked polar bar) — far more readable than side-by-side pies
+    var categories = chartData.map(function(r) { return String(r[xField] != null ? r[xField] : ''); });
     return {
-      tooltip : { trigger: 'item', formatter: '{a}<br/>{b}: {c} ({d}%)' },
-      series  : yFields.map(function(pyf, pi) {
+      tooltip  : { trigger: 'axis', axisPointer: { type: 'cross' } },
+      legend   : { show: true, bottom: 0 },
+      polar    : { radius: ['15%', '75%'] },
+      angleAxis: { type: 'category', data: categories, startAngle: 90 },
+      radiusAxis: { type: 'value' },
+      series   : yFields.map(function(pyf, pi) {
         return {
-          name   : pyf,
-          type   : 'pie',
-          radius : ['20%', '40%'],
-          center : [Math.round(pieStep * pi + pieStep / 2) + '%', '50%'],
-          data   : chartData.map(function(r) {
-            return { name: String(r[xField] != null ? r[xField] : ''), value: parseFloat(pieGet(r, pi, pyf)) || 0 };
-          }),
-          label  : { fontSize: 10, formatter: '{b}' }
+          name             : pyf,
+          type             : 'bar',
+          coordinateSystem : 'polar',
+          stack            : 'total',
+          data             : chartData.map(function(r) { return parseFloat(pieGet(r, pi, pyf)) || 0; })
         };
       })
     };
@@ -2032,7 +2034,7 @@ function _renderBarLineOptionsHTML(w, wid) {
               </div></div>
             <div class="props-row"><label>Title font</label>
               <div class="color-input-wrap">
-                <input type="number" class="form-input" min="8" max="48" value="${w.titleFontSize||14}" oninput="updateWidgetProp('${wid}','titleFontSize',+this.value)" style="width:50px" title="Title font size"/>
+                <input type="number" class="form-input" min="8" max="48" value="${w.titleFontSize||12}" oninput="updateWidgetProp('${wid}','titleFontSize',+this.value)" style="width:50px" title="Title font size"/>
                 <input type="color" value="${w.titleFontColor||'#323130'}" oninput="updateWidgetProp('${wid}','titleFontColor',this.value)" title="Title font color"/>
                 <input type="text" class="form-input" value="${w.titleFontColor||'#323130'}" oninput="updateWidgetProp('${wid}','titleFontColor',this.value)"/>
               </div></div>
