@@ -62,7 +62,7 @@ Most enterprise data is trapped behind bloated frameworks or expensive BI tools.
 ## Quick Start Guide
 ### Live Demo:
 + ***Dashboard View-Mode Demo: [Project Health Dashboard](https://code.depressioncenter.org/datalavista/DataLaVista.html?reportMode=view&report=https://code.depressioncenter.org/datalavista/samples/reports/Project%20Health%20Dashboard.json)***
-+ ***Dashboard Designer Demo: [DataLaVista.html](https://code.depressioncenter.org/datalavista/DataLaVista.html)***
++ ***Dashboard Designer Demo: [DataLaVista.html](https://code.depressioncenter.org/datalavista/DataLaVista.html?reportMode=view&report=https://code.depressioncenter.org/datalavista/samples/reports/Project%20Health%20Dashboard.json&reportMode=edit)***
   - Use the "Remote Files" tab in the Connect popup and use one of these links to load sample data: [studies.csv](https://code.depressioncenter.org/datalavista/samples/data/studies.csv), [researchers.xml](https://code.depressioncenter.org/datalavista/samples/data/researchers.xml), [participants.json](https://code.depressioncenter.org/datalavista/samples/data/participants.json)
 ### To use inside a SharePoint Online page:
 + First ensure you have the "Modern Script Editor" app installed. If not available, contact your site administrator to [install it](https://github.com/pnp/sp-dev-fx-webparts/tree/main/samples/react-script-editor)
