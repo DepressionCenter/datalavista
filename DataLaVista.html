@@ -619,10 +619,24 @@ with this program. If not, see https://www.gnu.org/licenses/.
     .btn-ghost {
       background: transparent;
       color: var(--text);
+      transition: all 0.3s ease;
     }
 
     .btn-ghost:hover {
       background: var(--surface2);
+    }
+
+    .btn-help {
+      font-weight: 700;
+      color: whitesmoke;
+      font-size: 13px;
+    }
+
+    .btn-help:hover {
+      background: var(--surface2);
+      font-weight: 800;
+      color: #b52c30;
+      font-size: 13px;
     }
 
     .btn-danger {
@@ -3283,7 +3297,7 @@ with this program. If not, see https://www.gnu.org/licenses/.
         <button id="toolbar-reportMode-button-4" class="btn btn-primary btn-sm" onclick="shareLiveReport()" title="Copy live report link to clipboard">📨 Share</button>
       </div>
       <div class="toolbar-sep"></div>
-      <button id="toolbar-button-help" class="btn btn-ghost btn-sm" onclick="showHelp()" title="Help">❓</button>
+      <a href="https://teamdynamix.umich.edu/TDClient/210/DepressionCenter/KB/ArticleDet?ID=15179" target="_blank" title="Help and Documentation"><button id="toolbar-button-help" class="btn btn-ghost btn-sm btn-help" title="Help">?</button></a>
     </div>
 
     
@@ -12312,13 +12326,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         a.download = filename;
         a.click();
       }
-
-      // TODO: actually show help! Also credits, like the ones in the generate config tab
-      function showHelp() {
-        toast('DataLaVista — Connect a SharePoint site, CSVs, or JSON, and create beautiful dashboards.', 'info');
-      }
-
-
       
       /** Detect if running inside a SharePoint site and return the site URL, or null. */
       function getSpSiteUrl() {
@@ -18807,7 +18814,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         setStatus,
         toast,
         downloadText,
-        showHelp,
         loadReportFromUrl,
         widgetUpdateYSeriesType,
         applyDrillFilter,

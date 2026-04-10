@@ -193,13 +193,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         a.download = filename;
         a.click();
       }
-
-      // TODO: actually show help! Also credits, like the ones in the generate config tab
-      function showHelp() {
-        toast('DataLaVista — Connect a SharePoint site, CSVs, or JSON, and create beautiful dashboards.', 'info');
-      }
-
-
       
       /** Detect if running inside a SharePoint site and return the site URL, or null. */
       function getSpSiteUrl() {
