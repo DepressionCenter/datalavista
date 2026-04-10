@@ -144,14 +144,15 @@ with this program. If not, see https://www.gnu.org/licenses/.
    LAYOUT
    ============================================================ */
     #app {
-    height: calc(100vh - var(--app-top-offset, 200px));
-    min-height: 420px;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-  }
+      /* Shrink to fit comfortably under SharePoint's header without double-scrollbars */
+      height: calc(100vh - 200px);
+      min-height: 500px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+    }
 
     /* Top Toolbar */
     #toolbar {

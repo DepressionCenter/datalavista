@@ -144,14 +144,15 @@ with this program. If not, see https://www.gnu.org/licenses/.
    LAYOUT
    ============================================================ */
     #app {
-    height: calc(100vh - var(--app-top-offset, 200px));
-    min-height: 420px;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-  }
+      /* Shrink to fit comfortably under SharePoint's header without double-scrollbars */
+      height: calc(100vh - 200px);
+      min-height: 500px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+    }
 
     /* Top Toolbar */
     #toolbar {
@@ -18250,74 +18251,9 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 // or embedded iframe). Called once at init and wired to resize/mutation events.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const DLV_HEIGHT_CONFIG = {
-    bottomPadding: 12,   // px of breathing room at the bottom of the viewport
-    minHeight:     480,  // px — #app never shrinks below this
-    // SharePoint re-renders its chrome in waves; retry at these delays (ms)
-    spRetryDelays: [200, 600, 1200, 2500]
-};
-
-// Stored references so we can disconnect observers if ever needed
-let _dlvResizeObserver   = null;
-let _dlvMutationObserver = null;
-let _dlvResizeListener   = null;
-
-function dlvSetAppHeight() {
-    const app = document.getElementById('app');
-    if (!app) return;
-
-    const offsetFromTop = app.getBoundingClientRect().top;
-
-    // Clamp: ignore negative values (e.g. page scrolled) or values so large
-    // the app would be shorter than minHeight.
-    const safeOffset = Math.max(
-        0,
-        Math.min(offsetFromTop, window.innerHeight - DLV_HEIGHT_CONFIG.minHeight)
-    );
-
-    const finalOffset = Math.round(safeOffset) + DLV_HEIGHT_CONFIG.bottomPadding;
-    document.documentElement.style.setProperty('--app-top-offset', finalOffset + 'px');
-}
-
-function dlvIsInIframe() {
-    try { return window.self !== window.top; } catch (e) { return true; }
-}
-
-function dlvInitHeightManagement() {
-    // Calculate immediately
-    dlvSetAppHeight();
-
-    // Always watch for window/orientation resize
-    _dlvResizeListener = () => dlvSetAppHeight();
-    window.addEventListener('resize', _dlvResizeListener, { passive: true });
-
-    if (DataLaVistaState.isSpSite) {
-        // SharePoint modern renders chrome in multiple async waves.
-        // Fire recalculations at each expected wave.
-        DLV_HEIGHT_CONFIG.spRetryDelays.forEach(ms => setTimeout(dlvSetAppHeight, ms));
-
-        // Also watch for SP banners, command bars, or messaging appearing
-        // after load and pushing #app down.
-        if (window.MutationObserver) {
-            _dlvMutationObserver = new MutationObserver(dlvSetAppHeight);
-            _dlvMutationObserver.observe(document.body, {
-                childList:       true,
-                subtree:         false,  // body-level only — cheap
-                attributes:      true,
-                attributeFilter: ['style', 'class']
-            });
-        }
-    }
-
-    if (dlvIsInIframe()) {
-        // Parent app may resize the iframe; ResizeObserver on body catches this
-        // without polling.
-        if (window.ResizeObserver) {
-            _dlvResizeObserver = new ResizeObserver(dlvSetAppHeight);
-            _dlvResizeObserver.observe(document.body);
-        }
-    }
-}
+  function dlvIsInIframe() {
+      try { return window.self !== window.top; } catch (e) { return true; }
+  }
 
   function initAdvOptsResizer() {
     const resizer = document.getElementById('adv-opts-resizer');
@@ -18470,9 +18406,6 @@ function dlvInitHeightManagement() {
       DataLaVistaState.isSpSite = true;
       console.log('Detected SharePoint environment. Site URL: ' + DataLaVistaState.spSiteUrl);
     }
-
-    // ── Set dynamic app height now that we know the environment ──────
-    dlvInitHeightManagement();
 
     // If running inside SharePoint, check if the page is in edit mode
     if (DataLaVistaState.isSpSite) {
