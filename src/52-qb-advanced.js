@@ -996,12 +996,13 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
             <button class="btn btn-sm" style="width:100%;margin-bottom:10px;font-size:12px" onclick="addActiveJoinKey()">+ Add Key Pair</button>
             <div class="form-group" style="margin-top:4px">
               <label>Join Type</label>
-              <select class="form-input" style="height:28px" id="adv-join-type-sel"
-                onchange="setActiveJoinProp('type',this.value); renderAdvOptionsPanel('join',${id})">
-                ${JOIN_TYPES.map(jt => `<option value="${jt.val}" ${jt.val === j.type ? 'selected' : ''}>${jt.label}</option>`).join('')}
-              </select>
-              <div style="font-size:11px;color:var(--text-disabled);margin-top:2px">
-                ${JOIN_TYPES.find(jt => jt.val === j.type)?.desc || ''}
+              <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+                <span class="qb-badge" style="font-size:11px;padding:3px 10px"
+                  data-opts="${_attrEnc(JSON.stringify(JOIN_TYPES.map(jt => ({ val: jt.val, label: jt.label }))))}"
+                  data-cur="${_attrEnc(j.type)}"
+                  data-js="${_attrEnc("setActiveJoinProp('type',__V__); renderAdvOptionsPanel('join'," + id + ")")}"
+                  onclick="showPropPopup(this)">${_attrEnc(JOIN_TYPES.find(jt => jt.val === j.type)?.label || j.type)}</span>
+                <span style="font-size:11px;color:var(--text-disabled)">${JOIN_TYPES.find(jt => jt.val === j.type)?.desc || ''}</span>
               </div>
             </div>
             <div style="display:flex;flex-direction:column;align-items:center;margin-top:10px;gap:4px">
@@ -1072,10 +1073,10 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
             (ci, v) => `advNodeCond('${id}',${ci},'conj',${v})`,
             (ci, v) => `advNodeCond('${id}',${ci},'field',${v})`,
             (ci, v) => `advNodeCond('${id}',${ci},'op',${v})`,
-            (ci, v) => `advNodeCond('${id}',${ci},'value',${v})`,
+            (ci, v) => `advNodeCondValOnly('${id}',${ci},${v})`,
             (ci)    => `advNodeRemoveCond('${id}',${ci})`,
             (ci)    => `draggable="true" ondragstart="event.stopPropagation();safeDragSet(event,{type:'adv-node-cond',nodeId:'${id}',idx:${ci}})"`,
-            (ci, v) => `advNodeCond('${id}',${ci},'value2',${v})`,
+            (ci, v) => `advNodeCondVal2Only('${id}',${ci},${v})`,
             (ci, v) => `advNodeCond('${id}',${ci},'elementKey',${v})`
           );
 
@@ -1188,10 +1189,29 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         const nd = DataLaVistaState.advancedQB.nodes[nodeId];
         if (!nd || !nd.conditions[idx]) return;
         nd.conditions[idx][prop] = val;
-        // Reset op when field or elementKey changes to avoid stale operators
-        if (prop === 'field' || prop === 'elementKey') nd.conditions[idx].op = '=';
+        // Reset op/value when field or elementKey changes to avoid stale operators/values
+        if (prop === 'field' || prop === 'elementKey') {
+          nd.conditions[idx].op = '=';
+          nd.conditions[idx].value = '';
+          nd.conditions[idx].value2 = '';
+          if (prop === 'field') nd.conditions[idx].elementKey = '';
+        }
         rebuildAdvancedSQL();
         renderAdvOptionsPanel('node', nodeId);
+      }
+      // Value-only updates: update state + SQL without re-rendering the panel
+      // (prevents focus loss in autosuggest text inputs)
+      function advNodeCondValOnly(nodeId, idx, val) {
+        const nd = DataLaVistaState.advancedQB.nodes[nodeId];
+        if (!nd || !nd.conditions[idx]) return;
+        nd.conditions[idx].value = val;
+        rebuildAdvancedSQL();
+      }
+      function advNodeCondVal2Only(nodeId, idx, val) {
+        const nd = DataLaVistaState.advancedQB.nodes[nodeId];
+        if (!nd || !nd.conditions[idx]) return;
+        nd.conditions[idx].value2 = val;
+        rebuildAdvancedSQL();
       }
       function advNodeAddCond(nodeId) {
         const nd = DataLaVistaState.advancedQB.nodes[nodeId];

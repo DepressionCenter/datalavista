@@ -358,6 +358,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           CyberdynePipeline.updateColumnAlias(viewName, f.internalName, newAlias); // throws on duplicate
         }
 
+        _dlvAcEvict(tableKey + '|' + oldAlias + '|');
         f.alias = newAlias;
         // NOTE: data rows are keyed by internalName, not alias — no row migration needed.
         // The AS alias in generated SQL is what produces the output column name.
@@ -408,6 +409,9 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
     triggerFileReupload(dsName);
     return;
   }
+
+  // Evict autosuggest cache for all tables in this data source so fresh data shows up
+  (ds.tables || []).forEach(tk => _dlvAcEvict(tk + '|'));
 
   showLoadingPopup('Refreshing data source...');
   try {
@@ -481,6 +485,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         DataLaVistaState.design.filters = (DataLaVistaState.design.filters || []);
 
         delete DataLaVistaState.tables[tableKey];
+        _dlvAcEvict(tableKey + '|');
 
         if (!silent) {
           renderFieldsPanel();

@@ -1081,7 +1081,7 @@ with this program. If not, see https://www.gnu.org/licenses/.
       margin-bottom: 4px;
     }
 
-    .qb-where-badge {
+    .qb-badge {
       font-size: 10px;
       font-weight: 700;
       color: var(--primary);
@@ -1089,13 +1089,13 @@ with this program. If not, see https://www.gnu.org/licenses/.
       border-radius: 2px;
       padding: 2px 6px;
       flex-shrink: 0;
-      min-width: 48px;
       text-align: center;
+      cursor: pointer;
+      user-select: none;
+      white-space: nowrap;
     }
-
-    .qb-conj-select {
-      width: 58px !important;
-      flex-shrink: 0;
+    .qb-badge:hover {
+      background: var(--primary-light);
     }
 
     .qb-field-select {
@@ -1103,10 +1103,58 @@ with this program. If not, see https://www.gnu.org/licenses/.
       min-width: 0;
     }
 
-    .qb-op-select {
-      width: 112px !important;
-      flex-shrink: 0;
+    /* (qb-conj-select / qb-op-select removed — replaced by floating badge popups) */
+    /* Property picker popup (AND/OR, operators, ASC/DESC, join types) */
+    .dlv-prop-popup {
+      position: fixed;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      z-index: 11000;
+      min-width: 70px;
+      padding: 3px 0;
+      display: flex;
+      flex-direction: row;
+      align-items: flex-start;
     }
+    .dlv-prop-popup-col {
+      display: flex;
+      flex-direction: column;
+    }
+    .dlv-prop-popup-col + .dlv-prop-popup-col {
+      border-left: 1px solid var(--border);
+    }
+    .dlv-prop-opt {
+      padding: 5px 12px;
+      font-size: 11px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .dlv-prop-opt:hover  { background: var(--primary-ultralight); color: var(--primary); }
+    .dlv-prop-opt.selected { font-weight: 700; color: var(--primary); }
+
+    /* Autosuggest dropdown */
+    .dlv-ac-popup {
+      position: fixed;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      z-index: 11000;
+      max-height: 200px;
+      min-width: 280px;
+      overflow-y: auto;
+      padding: 3px 0;
+    }
+    .dlv-ac-item {
+      padding: 4px 10px;
+      font-size: 12px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .dlv-ac-item:hover,
+    .dlv-ac-item.focused { background: var(--primary-ultralight); color: var(--primary); }
 
     .qb-val-input {
       flex: 1;
@@ -1128,9 +1176,8 @@ with this program. If not, see https://www.gnu.org/licenses/.
       margin-bottom: 4px;
     }
 
-    .qb-dir-select {
-      width: 64px !important;
-      flex-shrink: 0;
+    .qb-dir-badge {
+      min-width: 44px;
     }
 
     .field-agg-select {
@@ -1909,6 +1956,10 @@ with this program. If not, see https://www.gnu.org/licenses/.
       overflow: auto;
       min-height: 0;
       position: relative;
+    }
+
+    .widget-content-chart {
+      overflow: hidden;
     }
 
     .widget-resize-handle {
@@ -4287,17 +4338,13 @@ function buildFilterValueInput(displayType, isMacro, macroMeta, value, handlerJS
     }
   }
 
-  // Text — with optional autosuggestions via <datalist>
+  // Text — with optional custom autosuggest dropdown
   if (tableKey && fieldAlias) {
-    const safeId = (tableKey + '__' + fieldAlias + (elementKey ? '__' + elementKey : '')).replace(/[^a-zA-Z0-9_-]/g, '_');
-    const listId = 'dlv-sug-' + safeId;
     const tkSafe = tableKey.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
     const faSafe = fieldAlias.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
     const ekSafe = elementKey.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-    const onFocus = `loadFilterSuggestions(this,'${tkSafe}','${faSafe}','${ekSafe}',1000)`;
     return `<input type="text" class="form-input qb-val-input" placeholder="value" value="${safeVal}"`
-         + ` list="${listId}" onfocus="${onFocus}" oninput="${handlerJS}"/>`
-         + `<datalist id="${listId}"></datalist>`;
+         + ` onfocus="dlvAcShow(this,'${tkSafe}','${faSafe}','${ekSafe}')" oninput="dlvAcFilter(this);${handlerJS}" onblur="dlvAcBlur(this)" onkeydown="dlvAcKeydown(this,event)"/>`;
   }
 
   return `<input type="text" class="form-input qb-val-input" placeholder="value" value="${safeVal}" oninput="${handlerJS}"/>`;
@@ -4591,56 +4638,198 @@ function condToSQL(c, colExpr, displayType) {
   return `${colExpr} ${op} ${val}`;
 }
 
-/**
- * Populate a <datalist> with distinct field values for filter autosuggestions.
- * Called onfocus on text filter inputs. Runs once per datalist (idempotent).
- * @param {HTMLInputElement} inputEl
- * @param {string} tableKey        Raw table key (or empty string for dlv_results)
- * @param {string} fieldAlias      Field alias / column name
- * @param {string} [elementKey]    For array-of-objects: query col->elementKey
- * @param {number} [limit]         Max distinct values (default 1000)
- */
-function loadFilterSuggestions(inputEl, tableKey, fieldAlias, elementKey, limit) {
-  const listId = inputEl && inputEl.getAttribute('list');
-  if (!listId) return;
-  const dl = document.getElementById(listId);
-  if (!dl || dl.dataset.loaded) return;
-  dl.dataset.loaded = '1'; // mark before query to prevent double-fire
+// ============================================================
+// CUSTOM AUTOSUGGEST DROPDOWN
+// ============================================================
+// Replaces the <datalist> approach with a floating dropdown that:
+//   - Shows immediately on focus (no typing required)
+//   - Filters as you type
+//   - Tracks scroll so the popup follows the input
+//   - Caches suggestions per (tableKey|fieldAlias|elementKey)
+// ──────────────────────────────────────────────────────────────
+var _dlvAcCache = {}; // suggestion cache: cacheKey (tableKey|fieldAlias|elementKey) → string[]
 
-  const lim = limit || 1000;
-  const fa  = fieldAlias || '';
-  const ek  = elementKey || '';
+/** Evict all cached suggestions whose key starts with `prefix`. */
+function _dlvAcEvict(prefix) {
+  for (const k of Object.keys(_dlvAcCache)) {
+    if (k.startsWith(prefix)) delete _dlvAcCache[k];
+  }
+}
 
+function _dlvAcLoad(tableKey, fieldAlias, elementKey) {
+  const key = (tableKey || '') + '|' + (fieldAlias || '') + '|' + (elementKey || '');
+  if (_dlvAcCache[key]) return _dlvAcCache[key]; // only populated entries are cached
+  const values = [];
   try {
-    // Determine FROM source
-    let fromSrc = null;
-    if (tableKey) {
+    const fa = fieldAlias || '';
+    const ek = elementKey || '';
+
+    if (ek) {
+      // ── Array-of-objects element key: use DLV_ARRAY_EXTRACT_ELEMENT ─────────
+      // Resolve the view name; DLV_ARRAY_EXTRACT_ELEMENT queries it directly
       const vname = (typeof CyberdynePipeline !== 'undefined' && CyberdynePipeline.rawTableToView && CyberdynePipeline.rawTableToView[tableKey])
         || tableKey;
-      if (alasql.tables && alasql.tables[vname]) fromSrc = `[${vname}]`;
-    }
-    if (!fromSrc) {
-      if (alasql.tables && alasql.tables['dlv_active'])   fromSrc = '[dlv_active]';
-      else if (alasql.tables && alasql.tables['dlv_results']) fromSrc = '[dlv_results]';
-    }
-    if (!fromSrc) return;
-
-    const col    = ek ? `[${fa}]->${ek}` : `[${fa}]`;
-    const lenFn  = `LENGTH('' + ${col})`;
-    const sql    = `SELECT DISTINCT ${col} AS col FROM ${fromSrc} WHERE ${col} IS NOT NULL AND ${lenFn} < 50 ORDER BY col LIMIT ${lim}`;
-    const rows   = alasql(sql);
-    const frag   = document.createDocumentFragment();
-    for (const r of rows) {
-      if (r.col != null && r.col !== '') {
-        const opt = document.createElement('option');
-        opt.value = String(r.col);
-        frag.appendChild(opt);
+      // Embed as SQL literals — FROM table-functions don't support ? parameters
+      const vnameEsc = vname.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+      const opts = JSON.stringify({ columnToExpand: fa, element: ek }).replace(/'/g, "\\'");
+      const rows = alasql('SELECT * FROM DLV_ARRAY_EXTRACT_ELEMENT("' + vnameEsc + '", \'' + opts + '\')');
+      for (var ei = 0; ei < rows.length; ei++) {
+        const v = rows[ei][ek];
+        if (v != null && v !== '') values.push(String(v));
+      }
+      // Results are already distinct and sorted by DLV_ARRAY_EXTRACT_ELEMENT
+    } else {
+      // ── Scalar / text field: query via AlaSQL ─────────────────────────────
+      let fromSrc = null;
+      if (tableKey) {
+        const vname = (typeof CyberdynePipeline !== 'undefined' && CyberdynePipeline.rawTableToView && CyberdynePipeline.rawTableToView[tableKey])
+          || tableKey;
+        fromSrc = '[' + vname + ']';
+      }
+      if (!fromSrc) {
+        if (alasql.tables && alasql.tables['dlv_results']) fromSrc = '[dlv_results]';
+      }
+      if (fromSrc) {
+        const col = '[' + fa + ']';
+        const sql = 'SELECT DISTINCT ' + col + ' AS col FROM ' + fromSrc
+          + ' WHERE ' + col + ' IS NOT NULL ORDER BY ' + col + ' LIMIT 1000';
+        const rows = alasql(sql);
+        for (var i = 0; i < rows.length; i++) {
+          const r = rows[i];
+          if (r.col != null && r.col !== '') values.push(String(r.col));
+        }
       }
     }
-    dl.appendChild(frag);
-  } catch (_) {
-    // Silently fail — data may not be loaded yet
+  } catch (_) { /* silently fail — data may not be loaded yet */ }
+
+  // Only cache non-empty results; empty means data wasn't ready — retry on next focus
+  if (values.length) _dlvAcCache[key] = values;
+  return values;
+}
+
+function _dlvAcSelect(inputEl, v) {
+  const savedAll = inputEl['_dlvAcAll'];
+  inputEl['_dlvAcAll'] = null; // suppress re-open from the dispatched input event
+  inputEl.value = v;
+  inputEl.dispatchEvent(new Event('input', { bubbles: true }));
+  inputEl['_dlvAcAll'] = savedAll;
+  const popup = document.querySelector('.dlv-ac-popup');
+  if (popup) { popup['_dlvCleanup'] && popup['_dlvCleanup'](); popup.remove(); }
+}
+
+function _dlvAcRender(inputEl) {
+  // Remove any existing popup
+  const old = document.querySelector('.dlv-ac-popup');
+  if (old) { old['_dlvCleanup'] && old['_dlvCleanup'](); old.remove(); }
+
+  const all = inputEl['_dlvAcAll'];
+  if (!all || !all.length) return;
+
+  const query    = (inputEl.value || '').toLowerCase();
+  const filtered = query ? all.filter(function(v) { return v.toLowerCase().includes(query); }) : all;
+  if (!filtered.length) return;
+
+  const popup = document.createElement('div');
+  popup.className = 'dlv-ac-popup';
+  popup['_dlvFocusIdx'] = -1;
+
+  filtered.slice(0, 100).forEach(function(v, idx) {
+    const item = document.createElement('div');
+    item.className = 'dlv-ac-item';
+    item.textContent = v;
+    item.dataset.idx = String(idx);
+    item.addEventListener('mousedown', function(e) { e.preventDefault(); }); // keep input focused
+    item.addEventListener('click', function() { _dlvAcSelect(inputEl, v); });
+    popup.appendChild(item);
+  });
+
+  document.body.appendChild(popup);
+
+  function reposition() {
+    const r   = inputEl.getBoundingClientRect();
+    const minW = Math.max(r.width, 280); // at least 280px (~40 chars)
+    popup.style.top      = (r.bottom + 1) + 'px';
+    popup.style.left     = r.left + 'px';
+    popup.style.minWidth = minW + 'px';
+    popup.style.width    = 'auto';
   }
+  reposition();
+
+  let rafId;
+  const onScroll = function() { cancelAnimationFrame(rafId); rafId = requestAnimationFrame(reposition); };
+  window.addEventListener('scroll', onScroll, { capture: true, passive: true });
+
+  function cleanup() {
+    window.removeEventListener('scroll', onScroll, { capture: true });
+    cancelAnimationFrame(rafId);
+  }
+  popup['_dlvCleanup'] = cleanup;
+}
+
+function _dlvAcMoveFocus(popup, delta) {
+  const items = popup.querySelectorAll('.dlv-ac-item');
+  if (!items.length) return;
+  let idx = popup['_dlvFocusIdx'] + delta;
+  if (idx < 0) idx = items.length - 1;
+  if (idx >= items.length) idx = 0;
+  popup['_dlvFocusIdx'] = idx;
+  items.forEach(function(el) { el.classList.remove('focused'); });
+  const target = items[idx];
+  target.classList.add('focused');
+  target.scrollIntoView({ block: 'nearest' });
+}
+
+/** Show autosuggest dropdown — called onfocus on text filter inputs. */
+function dlvAcShow(inputEl, tableKey, fieldAlias, elementKey) {
+  // Always (re)load if not yet cached with results; empty _dlvAcAll means previous load got no data
+  if (!inputEl['_dlvAcAll'] || !inputEl['_dlvAcAll'].length) {
+    inputEl['_dlvAcAll'] = _dlvAcLoad(tableKey, fieldAlias, elementKey);
+  }
+  _dlvAcRender(inputEl);
+}
+
+/** Re-filter the autosuggest dropdown — called oninput on text filter inputs. */
+function dlvAcFilter(inputEl) {
+  if (inputEl['_dlvAcAll'] && inputEl['_dlvAcAll'].length) _dlvAcRender(inputEl);
+}
+
+/**
+ * Keyboard navigation — called onkeydown on text filter inputs.
+ * ArrowDown/Up: navigate items. Enter: select focused item. Escape: close.
+ */
+function dlvAcKeydown(inputEl, e) {
+  const popup = document.querySelector('.dlv-ac-popup');
+  if (!popup) {
+    // No popup open — ArrowDown opens it
+    if (e.key === 'ArrowDown') { e.preventDefault(); _dlvAcRender(inputEl); }
+    return;
+  }
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    _dlvAcMoveFocus(popup, 1);
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    _dlvAcMoveFocus(popup, -1);
+  } else if (e.key === 'Enter') {
+    const focused = popup.querySelector('.dlv-ac-item.focused');
+    if (focused) {
+      e.preventDefault();
+      _dlvAcSelect(inputEl, focused.textContent);
+    }
+    // If nothing focused, let Enter bubble normally (submit/apply)
+  } else if (e.key === 'Escape') {
+    e.preventDefault();
+    popup['_dlvCleanup'] && popup['_dlvCleanup']();
+    popup.remove();
+  }
+}
+
+/** Hide dropdown with a small delay so item clicks can register — called onblur. */
+function dlvAcBlur(inputEl) {
+  setTimeout(function() {
+    const popup = document.querySelector('.dlv-ac-popup');
+    if (popup) { popup['_dlvCleanup'] && popup['_dlvCleanup'](); popup.remove(); }
+  }, 150);
 }
 
 
@@ -4827,6 +5016,149 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       alasql.fn.DLV_ARRAY_EMPTY = function (arr) {
           return !arr || !Array.isArray(arr) || arr.length === 0;
       };
+
+      // ── DLV_VIEW: forces execution of a view for keywords like SEARCH that only operate on raw tables ─────────
+      alasql.from.DLV_VIEW = function(viewName, opts, cb, idx, query) {
+        let cols = '*';
+        if (typeof opts === 'string') {
+            try {
+                const parsed = JSON.parse(opts);
+                if (Array.isArray(parsed.columns) && parsed.columns.length > 0) {
+                    cols = parsed.columns.join(', ');
+                }
+            } catch(e) {}
+        }
+
+        const results = alasql('SELECT ' + cols + ' FROM ' + viewName);
+        if (cb) return cb(results, idx, query);
+        return results;
+    };
+
+
+      /**
+ * DLV_ARRAY_EXPAND
+ * Expands an array-of-objects column into a flat result set.
+ *
+ * @param {string} tableName  - Table or view name
+ * @param {string} opts       - JSON string with options:
+ *   @param {string}   opts.columnToExpand  - (required) Column containing array of objects
+ *   @param {string}   [opts.parentId]      - Field to use as ParentId; falls back to Id, ID, or row number
+ *   @param {string[]} [opts.elements]      - Child fields to include; omit for all fields
+ *   @param {boolean}  [opts.skipEmptyArrays=false] - Skip rows with null/empty arrays
+ *
+ * Output columns: ParentId, ParentRowNumber, ChildRowNumber, ...(child fields)
+ *
+ * Minimum usage:
+ *   SELECT * FROM DLV_ARRAY_EXPAND("MyTable", '{"columnToExpand":"MyArrayCol"}')
+ *
+ * Full usage:
+ *   SELECT * FROM DLV_ARRAY_EXPAND("MyTable", '{"columnToExpand":"RecipientData","parentId":"ID","elements":["Title","Id"],"skipEmptyArrays":true}')
+ */
+alasql.from.DLV_ARRAY_EXPAND = function(tableName, opts, cb, idx, query) {
+    let parentIdField = null, columnToExpand = null, elements = null, skipEmptyArrays = false;
+
+    if (typeof opts === 'string') {
+        try {
+            const parsed = JSON.parse(opts);
+            parentIdField   = parsed.parentId       || null;
+            columnToExpand  = parsed.columnToExpand || null;
+            elements        = Array.isArray(parsed.elements) && parsed.elements.length > 0 ? parsed.elements : null;
+            skipEmptyArrays = parsed.skipEmptyArrays === true;
+        } catch(e) {}
+    }
+
+    if (!columnToExpand) {
+        if (cb) return cb([], idx, query);
+        return [];
+    }
+
+    const whereClause = skipEmptyArrays
+        ? ' WHERE ' + columnToExpand + ' IS NOT NULL AND ' + columnToExpand + '->length > 0'
+        : '';
+
+    const sqlQuery = 'SELECT COALESCE(' + (parentIdField ? parentIdField + ',' : '') + 'Id,ID) AS ParentId, ROWNUM() AS RowNumber, ' + columnToExpand + ' FROM ' + tableName + whereClause;
+    const data = alasql(sqlQuery);
+    const results = [];
+
+    data.forEach(row => {
+        const arr = row[columnToExpand];
+        const parentId = row['ParentId'];
+        const parentRowNumber = row['RowNumber'];
+
+        if (arr && Array.isArray(arr) && arr.length > 0) {
+            Array.prototype.push.apply(results, arr.map((child, i) => {
+                const childData = elements
+                    ? elements.reduce((acc, key) => { acc[key] = child[key]; return acc; }, {})
+                    : { ...child };
+                return { ParentId: parentId, ParentRowNumber: parentRowNumber, ChildRowNumber: i + 1, ...childData };
+            }));
+        } else if (!skipEmptyArrays) {
+            results.push({ ParentId: parentId, ParentRowNumber: parentRowNumber });
+        }
+    });
+
+    if (cb) return cb(results, idx, query);
+    return results;
+};
+
+/**
+ * DLV_ARRAY_EXTRACT_ELEMENT
+ * Extracts a single field from all objects in an array column — flat, distinct, sorted.
+ *
+ * @param {string} tableName - Table or view name
+ * @param {string} opts      - JSON string with options (all required):
+ *   @param {string} opts.columnToExpand - Column containing array of objects
+ *   @param {string} opts.element        - Field name to extract from each child object
+ *
+ * Output columns: one column named after opts.element, distinct values, sorted ascending
+ *
+ * Usage:
+ *   SELECT * FROM DLV_ARRAY_EXTRACT_ELEMENT("MyTable", '{"columnToExpand":"RecipientData","element":"Title"}')
+ */
+alasql.from.DLV_ARRAY_EXTRACT_ELEMENT = function(tableName, opts, cb, idx, query) {
+    let columnToExpand = null, elementName = null;
+
+    if (typeof opts === 'string') {
+        try {
+            const parsed = JSON.parse(opts);
+            columnToExpand = parsed.columnToExpand || null;
+            elementName    = parsed.element        || null;
+        } catch(e) {}
+    }
+
+    if (!tableName || !columnToExpand || !elementName) {
+        if (cb) return cb([], idx, query);
+        return [];
+    }
+
+    const data = alasql(
+        'SELECT ' + columnToExpand + ' FROM ' + tableName +
+        ' WHERE ' + columnToExpand + ' IS NOT NULL AND ' + columnToExpand + '->length > 0'
+    );
+    const seen = new Set();
+    const results = [];
+
+    data.forEach(row => {
+        const arr = row[columnToExpand];
+        if (Array.isArray(arr) && arr.length > 0) {
+            arr.forEach(child => {
+                const val = child[elementName];
+                if (val !== undefined && val !== null && !seen.has(val)) {
+                    seen.add(val);
+                    results.push({ [elementName]: val });
+                }
+            });
+        }
+    });
+
+    results.sort((a, b) => {
+        const av = a[elementName], bv = b[elementName];
+        return av < bv ? -1 : av > bv ? 1 : 0;
+    });
+
+    if (cb) return cb(results, idx, query);
+    return results;
+};
 
       // ── DLV_DISPLAY: human-readable display value from any field value ──────
       alasql.fn.DLV_DISPLAY = function(val) {
@@ -11007,6 +11339,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           CyberdynePipeline.updateColumnAlias(viewName, f.internalName, newAlias); // throws on duplicate
         }
 
+        _dlvAcEvict(tableKey + '|' + oldAlias + '|');
         f.alias = newAlias;
         // NOTE: data rows are keyed by internalName, not alias — no row migration needed.
         // The AS alias in generated SQL is what produces the output column name.
@@ -11057,6 +11390,9 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
     triggerFileReupload(dsName);
     return;
   }
+
+  // Evict autosuggest cache for all tables in this data source so fresh data shows up
+  (ds.tables || []).forEach(tk => _dlvAcEvict(tk + '|'));
 
   showLoadingPopup('Refreshing data source...');
   try {
@@ -11130,6 +11466,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         DataLaVistaState.design.filters = (DataLaVistaState.design.filters || []);
 
         delete DataLaVistaState.tables[tableKey];
+        _dlvAcEvict(tableKey + '|');
 
         if (!silent) {
           renderFieldsPanel();
@@ -11311,7 +11648,7 @@ This file is part of DataLaVista™
 42-ui-shared.js: Shared UI rendering helpers for condition rows, sort rows, and aggregate popups.
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 Created: 2026-04-07
-Last Modified: 2026-04-07
+Last Modified: 2026-04-09
 Summary: Centralizes renderConditionRows, renderSortRows, and showAggPopup so that all callers
          (basic QB, advanced QB, widget properties panel, series advanced properties modal)
          use identical rendering logic and pick up the same operators / date macros.
@@ -11330,6 +11667,116 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License along
 with this program. If not, see <https://www.gnu.org/licenses/>.
 ================================================================ */
+
+// ============================================================
+// ATTRIBUTE ENCODING HELPER
+// ============================================================
+function _attrEnc(s) {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+// ============================================================
+// OP SYMBOL HELPER
+// ============================================================
+function getOpSymbol(label) {
+  if (!label) return '';
+  const tokens = label.split(' ');
+  const result = [];
+  for (let i = 0; i < tokens.length; i++) {
+    if (/^[a-zA-Z]+$/.test(tokens[i])) break;
+    result.push(tokens[i]);
+  }
+  return result.length ? result.join(' ') : tokens[0];
+}
+
+// ============================================================
+// PROPERTY POPUP  (AND/OR, operators, ASC/DESC, join types)
+// ============================================================
+// Generic floating picker popup. The trigger element stores its config in data-* attributes:
+//   data-opts  JSON array of {val, label} objects
+//   data-cur   current selected value (string)
+//   data-js    JS handler template — __V__ is replaced with JSON.stringify(selectedVal)
+//   data-fmt   optional "symbol" → badge text is set via getOpSymbol(label)
+function showPropPopup(btn) {
+  document.querySelectorAll('.dlv-prop-popup').forEach(p => { p['_dlvCleanup'] && p['_dlvCleanup'](); p.remove(); });
+
+  let opts, cur, tpl;
+  try {
+    opts = JSON.parse(btn.dataset.opts || '[]');
+    cur  = btn.dataset.cur || '';
+    tpl  = btn.dataset.js  || '';
+  } catch (e) { return; }
+  if (!opts.length || !tpl) return;
+
+  const isSym = btn.dataset.fmt === 'symbol';
+
+  const popup = document.createElement('div');
+  popup.className = 'dlv-prop-popup';
+
+  const MAX_ROWS = 9;
+  const colCount = Math.ceil(opts.length / MAX_ROWS);
+  for (let ci = 0; ci < colCount; ci++) {
+    const colDiv = document.createElement('div');
+    colDiv.className = 'dlv-prop-popup-col';
+    opts.slice(ci * MAX_ROWS, (ci + 1) * MAX_ROWS).forEach(o => {
+      const item = document.createElement('div');
+      item.className = 'dlv-prop-opt' + (String(o.val) === String(cur) ? ' selected' : '');
+      item.textContent = o.label || o.val;
+      item.addEventListener('mousedown', e => e.preventDefault());
+      item.addEventListener('click', () => {
+        popup['_dlvCleanup'] && popup['_dlvCleanup']();
+        popup.remove();
+        btn.textContent = isSym ? getOpSymbol(o.label || String(o.val)) : (o.label || String(o.val));
+        btn.dataset.cur = String(o.val);
+        const js = tpl.replace(/__V__/g, JSON.stringify(o.val));
+        try { new Function(js)(); } catch (ex) { console.error('[DLV] prop popup handler error:', ex, js); }
+      });
+      colDiv.appendChild(item);
+    });
+    popup.appendChild(colDiv);
+  }
+
+  document.body.appendChild(popup);
+
+  function reposition() {
+    const r = btn.getBoundingClientRect();
+    popup.style.top  = (r.bottom + 2) + 'px';
+    popup.style.left = Math.max(0, r.left) + 'px';
+    // Clamp so popup doesn't overflow the right edge of the viewport
+    const pr = popup.getBoundingClientRect();
+    if (pr.right > window.innerWidth - 4) {
+      popup.style.left = Math.max(0, window.innerWidth - pr.width - 4) + 'px';
+    }
+  }
+  reposition();
+
+  let rafId;
+  const onScroll = () => { cancelAnimationFrame(rafId); rafId = requestAnimationFrame(reposition); };
+  window.addEventListener('scroll', onScroll, { capture: true, passive: true });
+
+  function cleanup() {
+    window.removeEventListener('scroll', onScroll, { capture: true });
+    cancelAnimationFrame(rafId);
+  }
+  popup['_dlvCleanup'] = cleanup;
+
+  setTimeout(() => {
+    function closeOnClick(e) {
+      const t = e.target instanceof Node ? e.target : null;
+      if (!t || (!popup.contains(t) && e.target !== btn)) {
+        cleanup();
+        popup.remove();
+        document.removeEventListener('click', closeOnClick);
+      }
+    }
+    document.addEventListener('click', closeOnClick);
+  }, 10);
+}
 
 // ============================================================
 // SHARED CONDITION-ROW RENDERER
@@ -11397,7 +11844,6 @@ function renderConditionRows(conditions, cols, conjJS, fieldJS, opJS, valJS, rem
     const isMacro   = DataLaVistaCore.DATE_MACRO_VALS.has(c.op);
     const macroMeta = DataLaVistaCore.DATE_MACRO_OPS.find(o => o.val === c.op);
     const noValOps  = new Set(['NULL', 'NOTNULL', 'ARR_EMPTY', 'ARR_NOT_EMPTY']);
-    // Also mark noInput ops from getArrayScalarOps
     const currentOp = ops.find(o => o.val === c.op);
     const needsVal  = !noValOps.has(c.op) && !(currentOp && currentOp.noInput) && !(isMacro && !macroMeta?.hasInput);
 
@@ -11419,12 +11865,18 @@ function renderConditionRows(conditions, cols, conjJS, fieldJS, opJS, valJS, rem
         </select>`
       : '';
 
-    // ── op select ─────────────────────────────────────────────────────────────
-    const opWidth = (baseType === 'date' || (needsElementKey && elemType === 'date')) ? '152px'
-      : (baseType === 'text' && !needsElementKey) ? '172px'
-      : '132px';
-    const opSelectHTML = `<select class="form-input qb-op-select" style="width:${opWidth}!important"
-      onchange="${opJS(ci, 'this.value')}">${renderOpsOptions(ops, c.op)}</select>`;
+    // ── op badge (floating popup) ─────────────────────────────────────────────
+    const selectedOp = ops.find(o => o.val === c.op) || ops[0];
+    const opSymbol   = getOpSymbol(selectedOp ? selectedOp.label : c.op);
+    const opTitle    = selectedOp ? selectedOp.label : '';
+    const opTpl      = opJS(ci, '__V__');
+    const opOpts     = JSON.stringify(ops.map(o => ({ val: o.val, label: o.label })));
+    const opSelectHTML =
+      '<span class="qb-badge qb-op-badge" title="' + _attrEnc(opTitle) + '" data-fmt="symbol"'
+      + ' data-opts="' + _attrEnc(opOpts) + '"'
+      + ' data-cur="' + _attrEnc(selectedOp ? selectedOp.val : c.op) + '"'
+      + ' data-js="' + _attrEnc(opTpl) + '"'
+      + ' onclick="showPropPopup(this)">' + _attrEnc(opSymbol) + '</span>';
 
     // ── value input ───────────────────────────────────────────────────────────
     const valInputOptions = {
@@ -11439,19 +11891,29 @@ function renderConditionRows(conditions, cols, conjJS, fieldJS, opJS, valJS, rem
       ? buildFilterValueInput(valDisplayType, isMacro, macroMeta, c.value, valJS(ci, 'this.value'), valInputOptions)
       : `<span class="qb-val-blank"></span>`;
 
-    return `<div class="qb-condition-row" ${extraAttrs}>
-      ${ci === 0
-        ? `<span class="qb-where-badge">WHERE</span>`
-        : `<select class="form-input qb-conj-select" onchange="${conjJS(ci, 'this.value')}">
-            <option ${c.conj === 'AND' ? 'selected' : ''}>AND</option>
-            <option ${c.conj === 'OR'  ? 'selected' : ''}>OR</option>
-           </select>`}
-      <select class="form-input qb-field-select" onchange="${fieldJS(ci, 'this.value')}">${colOptions}</select>
-      ${elemKeyDropdown}
-      ${opSelectHTML}
-      ${valueHTML}
-      <button class="btn btn-ghost btn-sm btn-icon qb-remove-btn" onclick="${removeJS(ci)}">✕</button>
-    </div>`;
+    // ── conj badge (floating popup) ───────────────────────────────────────────
+    let rowPrefix;
+    if (ci === 0) {
+      rowPrefix = '';
+    } else {
+      const conjTpl  = conjJS(ci, '__V__');
+      const conjOpts = JSON.stringify([{ val: 'AND', label: 'AND' }, { val: 'OR', label: 'OR' }]);
+      rowPrefix =
+        '<span class="qb-badge qb-conj-badge"'
+        + ' data-opts="' + _attrEnc(conjOpts) + '"'
+        + ' data-cur="' + _attrEnc(c.conj || 'AND') + '"'
+        + ' data-js="' + _attrEnc(conjTpl) + '"'
+        + ' onclick="showPropPopup(this)">' + _attrEnc(c.conj || 'AND') + '</span>';
+    }
+
+    return '<div class="qb-condition-row"' + (extraAttrs ? ' ' + extraAttrs : '') + '>'
+      + rowPrefix
+      + '<select class="form-input qb-field-select" onchange="' + fieldJS(ci, 'this.value') + '">' + colOptions + '</select>'
+      + elemKeyDropdown
+      + opSelectHTML
+      + valueHTML
+      + '<button class="btn btn-ghost btn-sm btn-icon qb-remove-btn" onclick="' + removeJS(ci) + '">\u2715</button>'
+      + '</div>';
   }).join('');
 }
 
@@ -11478,7 +11940,7 @@ function renderSortRows(sorts, cols, fieldJS, dirJS, removeJS, rowAttrs) {
     const aliasB = (typeof b === 'string' ? b : b.alias).toLowerCase();
     return aliasA.localeCompare(aliasB);
   });
-  
+
   return sorts.map((s, si) => {
     const extraAttrs = rowAttrs ? rowAttrs(si) : '';
     const colOptions = cols.map(col => {
@@ -11486,14 +11948,20 @@ function renderSortRows(sorts, cols, fieldJS, dirJS, removeJS, rowAttrs) {
       return `<option value="${alias}" ${alias === s.field ? 'selected' : ''}>${alias}</option>`;
     }).join('');
 
+    const dirTpl  = dirJS(si, '__V__');
+    const dirOpts = JSON.stringify([{ val: 'ASC', label: 'ASC' }, { val: 'DESC', label: 'DESC' }]);
+    const dirBadge =
+      '<span class="qb-badge qb-dir-badge"'
+      + ' data-opts="' + _attrEnc(dirOpts) + '"'
+      + ' data-cur="' + _attrEnc(s.dir || 'ASC') + '"'
+      + ' data-js="' + _attrEnc(dirTpl) + '"'
+      + ' onclick="showPropPopup(this)">' + _attrEnc(s.dir || 'ASC') + '</span>';
+
     return `<div class="qb-sort-row" ${extraAttrs}>
       <select class="form-input qb-field-select" onchange="${fieldJS(si, 'this.value')}">
         ${colOptions}
       </select>
-      <select class="form-input qb-dir-select" onchange="${dirJS(si, 'this.value')}">
-        <option ${s.dir === 'ASC'  ? 'selected' : ''}>ASC</option>
-        <option ${s.dir === 'DESC' ? 'selected' : ''}>DESC</option>
-      </select>
+      ${dirBadge}
       <button class="btn btn-ghost btn-sm btn-icon qb-remove-btn" onclick="${removeJS(si)}">✕</button>
     </div>`;
   }).join('');
@@ -11505,6 +11973,7 @@ function renderSortRows(sorts, cols, fieldJS, dirJS, removeJS, rowAttrs) {
 // ============================================================
 /**
  * Opens a floating aggregate-picker popup anchored below btn.
+ * Tracks scroll so the popup follows the button.
  *
  * @param {HTMLElement} btn       Anchor button element
  * @param {string}      displayType  Field displayType for aggsForType()
@@ -11512,7 +11981,7 @@ function renderSortRows(sorts, cols, fieldJS, dirJS, removeJS, rowAttrs) {
  * @param {Function}    onSelect  (aggVal) => void   called when user picks an agg
  */
 function showAggPopup(btn, displayType, current, onSelect) {
-  document.querySelectorAll('.adv-agg-popup').forEach(p => p.remove());
+  document.querySelectorAll('.adv-agg-popup').forEach(p => { p['_dlvCleanup'] && p['_dlvCleanup'](); p.remove(); });
   const aggs  = aggsForType(displayType || 'text');
   const popup = document.createElement('div');
   popup.className = 'adv-agg-popup';
@@ -11520,19 +11989,41 @@ function showAggPopup(btn, displayType, current, onSelect) {
     const opt = document.createElement('div');
     opt.className = 'agg-opt' + (a.val === current ? ' selected' : '');
     opt.textContent = a.label;
+    opt.addEventListener('mousedown', e => e.preventDefault());
     opt.addEventListener('click', () => {
+      popup['_dlvCleanup'] && popup['_dlvCleanup']();
       document.querySelectorAll('.adv-agg-popup').forEach(p => p.remove());
       onSelect(a.val);
     });
     popup.appendChild(opt);
   });
   document.body.appendChild(popup);
-  const rect = btn.getBoundingClientRect();
-  popup.style.top  = (rect.bottom + 2) + 'px';
-  popup.style.left = Math.max(0, rect.left - popup.offsetWidth + rect.width) + 'px';
+
+  function reposition() {
+    const rect = btn.getBoundingClientRect();
+    popup.style.top  = (rect.bottom + 2) + 'px';
+    popup.style.left = Math.max(0, rect.left - popup.offsetWidth + rect.width) + 'px';
+  }
+  reposition();
+
+  let rafId;
+  const onScroll = () => { cancelAnimationFrame(rafId); rafId = requestAnimationFrame(reposition); };
+  window.addEventListener('scroll', onScroll, { capture: true, passive: true });
+
+  function cleanup() {
+    window.removeEventListener('scroll', onScroll, { capture: true });
+    cancelAnimationFrame(rafId);
+  }
+  popup['_dlvCleanup'] = cleanup;
+
   setTimeout(() => {
     document.addEventListener('click', function close(e) {
-      if (!popup.contains(e.target)) { popup.remove(); document.removeEventListener('click', close); }
+      const t = e.target instanceof Node ? e.target : null;
+      if (!t || !popup.contains(t)) {
+        cleanup();
+        popup.remove();
+        document.removeEventListener('click', close);
+      }
     });
   }, 10);
 }
@@ -12581,7 +13072,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         area.innerHTML = renderConditionRows(
           DataLaVistaState.basicQB.conditions, cols,
           (ci, v) => `DataLaVistaState.basicQB.conditions[${ci}].conj=${v}; rebuildBasicSQL()`,
-          (ci, v) => `DataLaVistaState.basicQB.conditions[${ci}].field=${v}; renderBasicConditions(); rebuildBasicSQL()`,
+          (ci, v) => `DataLaVistaState.basicQB.conditions[${ci}].field=${v}; DataLaVistaState.basicQB.conditions[${ci}].value=''; DataLaVistaState.basicQB.conditions[${ci}].value2=''; DataLaVistaState.basicQB.conditions[${ci}].elementKey=''; renderBasicConditions(); rebuildBasicSQL()`,
           (ci, v) => `DataLaVistaState.basicQB.conditions[${ci}].op=${v}; renderBasicConditions(); rebuildBasicSQL()`,
           (ci, v) => `DataLaVistaState.basicQB.conditions[${ci}].value=${v}; rebuildBasicSQL()`,
           (ci)    => `removeBasicCondition(${ci})`,
@@ -13679,12 +14170,13 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
             <button class="btn btn-sm" style="width:100%;margin-bottom:10px;font-size:12px" onclick="addActiveJoinKey()">+ Add Key Pair</button>
             <div class="form-group" style="margin-top:4px">
               <label>Join Type</label>
-              <select class="form-input" style="height:28px" id="adv-join-type-sel"
-                onchange="setActiveJoinProp('type',this.value); renderAdvOptionsPanel('join',${id})">
-                ${JOIN_TYPES.map(jt => `<option value="${jt.val}" ${jt.val === j.type ? 'selected' : ''}>${jt.label}</option>`).join('')}
-              </select>
-              <div style="font-size:11px;color:var(--text-disabled);margin-top:2px">
-                ${JOIN_TYPES.find(jt => jt.val === j.type)?.desc || ''}
+              <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+                <span class="qb-badge" style="font-size:11px;padding:3px 10px"
+                  data-opts="${_attrEnc(JSON.stringify(JOIN_TYPES.map(jt => ({ val: jt.val, label: jt.label }))))}"
+                  data-cur="${_attrEnc(j.type)}"
+                  data-js="${_attrEnc("setActiveJoinProp('type',__V__); renderAdvOptionsPanel('join'," + id + ")")}"
+                  onclick="showPropPopup(this)">${_attrEnc(JOIN_TYPES.find(jt => jt.val === j.type)?.label || j.type)}</span>
+                <span style="font-size:11px;color:var(--text-disabled)">${JOIN_TYPES.find(jt => jt.val === j.type)?.desc || ''}</span>
               </div>
             </div>
             <div style="display:flex;flex-direction:column;align-items:center;margin-top:10px;gap:4px">
@@ -13755,10 +14247,10 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
             (ci, v) => `advNodeCond('${id}',${ci},'conj',${v})`,
             (ci, v) => `advNodeCond('${id}',${ci},'field',${v})`,
             (ci, v) => `advNodeCond('${id}',${ci},'op',${v})`,
-            (ci, v) => `advNodeCond('${id}',${ci},'value',${v})`,
+            (ci, v) => `advNodeCondValOnly('${id}',${ci},${v})`,
             (ci)    => `advNodeRemoveCond('${id}',${ci})`,
             (ci)    => `draggable="true" ondragstart="event.stopPropagation();safeDragSet(event,{type:'adv-node-cond',nodeId:'${id}',idx:${ci}})"`,
-            (ci, v) => `advNodeCond('${id}',${ci},'value2',${v})`,
+            (ci, v) => `advNodeCondVal2Only('${id}',${ci},${v})`,
             (ci, v) => `advNodeCond('${id}',${ci},'elementKey',${v})`
           );
 
@@ -13871,10 +14363,29 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         const nd = DataLaVistaState.advancedQB.nodes[nodeId];
         if (!nd || !nd.conditions[idx]) return;
         nd.conditions[idx][prop] = val;
-        // Reset op when field or elementKey changes to avoid stale operators
-        if (prop === 'field' || prop === 'elementKey') nd.conditions[idx].op = '=';
+        // Reset op/value when field or elementKey changes to avoid stale operators/values
+        if (prop === 'field' || prop === 'elementKey') {
+          nd.conditions[idx].op = '=';
+          nd.conditions[idx].value = '';
+          nd.conditions[idx].value2 = '';
+          if (prop === 'field') nd.conditions[idx].elementKey = '';
+        }
         rebuildAdvancedSQL();
         renderAdvOptionsPanel('node', nodeId);
+      }
+      // Value-only updates: update state + SQL without re-rendering the panel
+      // (prevents focus loss in autosuggest text inputs)
+      function advNodeCondValOnly(nodeId, idx, val) {
+        const nd = DataLaVistaState.advancedQB.nodes[nodeId];
+        if (!nd || !nd.conditions[idx]) return;
+        nd.conditions[idx].value = val;
+        rebuildAdvancedSQL();
+      }
+      function advNodeCondVal2Only(nodeId, idx, val) {
+        const nd = DataLaVistaState.advancedQB.nodes[nodeId];
+        if (!nd || !nd.conditions[idx]) return;
+        nd.conditions[idx].value2 = val;
+        rebuildAdvancedSQL();
       }
       function advNodeAddCond(nodeId) {
         const nd = DataLaVistaState.advancedQB.nodes[nodeId];
@@ -14470,6 +14981,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 
         try {
           const results = await _executeQuery(sql);
+          // Evict autosuggest cache for dlv_results/dlv_active — columns may have changed
+          _dlvAcEvict('|');
           showQueryPreview(results);
           renderDesignFieldsPanel();
           if (DataLaVistaState.reportMode !== 'view') showUseInDesign();
@@ -15250,8 +15763,9 @@ function rankSuggestions(rules, cols, meta) {
 
         const titleHdrStyle   = `background:${w.titleBackgroundColor||'#fefefe'}`;
         const titleSpanStyle  = `font-size:${w.titleFontSize||14}px;color:${w.titleFontColor||'#323130'}`;
+        const isChartWidget = ['bar', 'line', 'pie', 'scatter'].includes(w.type);
 		el.innerHTML = `<div class="widget-header" style="${titleHdrStyle}"><span class="widget-title" style="${titleSpanStyle}">${w.title || ''}</span>${actions}</div>
-  <div class="widget-content" id="wcontent-${w.id}">${getWidgetContentHTML(w)}</div><div class="widget-resize-handle"></div>`;
+  <div class="widget-content${isChartWidget ? ' widget-content-chart' : ''}" id="wcontent-${w.id}">${getWidgetContentHTML(w)}</div><div class="widget-resize-handle"></div>`;
 		// Set hidden via DOM property — safe from SharePoint HTML sanitizer
 		if (w.showTitle === false) {
 		  el.querySelector('.widget-header').hidden = true;
@@ -15913,8 +16427,19 @@ function _buildChartOption(w, chartData) {
   const chartEl = document.getElementById('chart-' + w.id);
   if (!chartEl) return;
   if (DataLaVistaState.charts[w.id]) { try { DataLaVistaState.charts[w.id].dispose(); } catch(e){} }
+  // Disconnect any prior ResizeObserver for this widget
+  if (DataLaVistaState._chartROs && DataLaVistaState._chartROs[w.id]) {
+    try { DataLaVistaState._chartROs[w.id].disconnect(); } catch(e) {}
+  }
   const chart = echarts.init(chartEl, null, { renderer: 'canvas' });
   DataLaVistaState.charts[w.id] = chart;
+  // Resize chart whenever its container changes size (window, drag-handle, iframe, panel, etc.)
+  if (typeof ResizeObserver !== 'undefined') {
+    if (!DataLaVistaState._chartROs) DataLaVistaState._chartROs = {};
+    const ro = new ResizeObserver(() => { try { chart.resize(); } catch(e) {} });
+    ro.observe(chartEl);
+    DataLaVistaState._chartROs[w.id] = ro;
+  }
   const chartData = buildWidgetData(w);
   const option = _buildChartOption(w, chartData);
   if (!option) {
@@ -15972,6 +16497,7 @@ function _buildChartOption(w, chartData) {
       function deleteWidget(wid) {
         DataLaVistaState.design.widgets = DataLaVistaState.design.widgets.filter(w => w.id !== wid);
         if (DataLaVistaState.charts[wid]) { try { DataLaVistaState.charts[wid].dispose(); } catch (e) { } delete DataLaVistaState.charts[wid]; }
+        if (DataLaVistaState._chartROs && DataLaVistaState._chartROs[wid]) { try { DataLaVistaState._chartROs[wid].disconnect(); } catch(e) {} delete DataLaVistaState._chartROs[wid]; }
         document.getElementById('widget-' + wid)?.remove();
         if (DataLaVistaState.currentWidgetId === wid) {
           DataLaVistaState.currentWidgetId = null;
@@ -16281,7 +16807,7 @@ function _renderBarLineOptionsHTML(w, wid) {
           const f  = tk && DataLaVistaState.tables[tk] && DataLaVistaState.tables[tk].fields
             ? DataLaVistaState.tables[tk].fields.find(x => x.alias === alias)
             : null;
-          return { alias, displayType: sniffType(alias), tableKey: tk || '', fieldInternalName: f ? f.internalName : '' };
+          return { alias, displayType: sniffType(alias), tableKey: 'dlv_results', fieldInternalName: f ? f.internalName : '' };
         });
 
         // Work on a local copy until Apply
@@ -16315,10 +16841,10 @@ function _renderBarLineOptionsHTML(w, wid) {
         _s.condUpdate = (ci, prop, val) => {
           if (!local.conditions[ci]) return;
           local.conditions[ci][prop] = val;
+          // Reset op/value when switching fields or element keys to avoid stale ops/values
+          if (prop === 'field') { local.conditions[ci].op = '='; local.conditions[ci].value = ''; local.conditions[ci].value2 = ''; local.conditions[ci].elementKey = ''; }
+          if (prop === 'elementKey') { local.conditions[ci].op = '='; local.conditions[ci].value = ''; local.conditions[ci].value2 = ''; }
           if (prop === 'op' || prop === 'field' || prop === 'elementKey') _s.rerender();
-          // Reset op to '=' when switching fields or element keys to avoid stale ops
-          if (prop === 'field') local.conditions[ci].op = '=';
-          if (prop === 'elementKey') local.conditions[ci].op = '=';
         };
         _s.clearAll = () => {
           local = { label: '', color: '', seriesType: '', lineWidth: 2, opacity: 1, smooth: true, conditions: [] };
@@ -16482,7 +17008,12 @@ function _renderBarLineOptionsHTML(w, wid) {
         w.conditions[idx][prop] = val;
         // re-render to update ops / value input when field, op, or elementKey changes
         if (prop === 'op' || prop === 'field' || prop === 'elementKey') {
-          if (prop === 'field' || prop === 'elementKey') w.conditions[idx].op = '=';
+          if (prop === 'field' || prop === 'elementKey') {
+            w.conditions[idx].op = '=';
+            w.conditions[idx].value = '';
+            w.conditions[idx].value2 = '';
+            if (prop === 'field') w.conditions[idx].elementKey = '';
+          }
           renderWidgetProperties(wid);
         } else {
           updateWidgetContent(wid);
@@ -16526,12 +17057,12 @@ function _renderBarLineOptionsHTML(w, wid) {
 
         const cols       = DataLaVistaState.queryColumns;
         const enrichedCols = cols.map(alias => {
-          if (alias === '__dlv_count__') return { alias, displayType: 'number', tableKey: '', fieldInternalName: '' };
+          if (alias === '__dlv_count__') return { alias, displayType: 'number', tableKey: 'dlv_results', fieldInternalName: '' };
           const tk = findTableKeyForAlias(alias);
           const f  = tk && DataLaVistaState.tables[tk] && DataLaVistaState.tables[tk].fields
             ? DataLaVistaState.tables[tk].fields.find(x => x.alias === alias)
             : null;
-          return { alias, displayType: sniffType(alias), tableKey: tk || '', fieldInternalName: f ? f.internalName : '' };
+          return { alias, displayType: sniffType(alias), tableKey: 'dlv_results', fieldInternalName: f ? f.internalName : '' };
         });
         const conditions = w.conditions || [];
         const sorts      = w.sorts      || [];
@@ -16857,6 +17388,7 @@ function _renderBarLineOptionsHTML(w, wid) {
         const content = el.querySelector('.widget-content');
         content.innerHTML = getWidgetContentHTML(w);
         if (DataLaVistaState.charts[wid]) { try { DataLaVistaState.charts[wid].dispose(); } catch (e) { } delete DataLaVistaState.charts[wid]; }
+        if (DataLaVistaState._chartROs && DataLaVistaState._chartROs[wid]) { try { DataLaVistaState._chartROs[wid].disconnect(); } catch(e) {} delete DataLaVistaState._chartROs[wid]; }
         if (newIsChart) {
           requestAnimationFrame(() => renderChart(w));
         }

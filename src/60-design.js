@@ -605,8 +605,9 @@ function rankSuggestions(rules, cols, meta) {
 
         const titleHdrStyle   = `background:${w.titleBackgroundColor||'#fefefe'}`;
         const titleSpanStyle  = `font-size:${w.titleFontSize||14}px;color:${w.titleFontColor||'#323130'}`;
+        const isChartWidget = ['bar', 'line', 'pie', 'scatter'].includes(w.type);
 		el.innerHTML = `<div class="widget-header" style="${titleHdrStyle}"><span class="widget-title" style="${titleSpanStyle}">${w.title || ''}</span>${actions}</div>
-  <div class="widget-content" id="wcontent-${w.id}">${getWidgetContentHTML(w)}</div><div class="widget-resize-handle"></div>`;
+  <div class="widget-content${isChartWidget ? ' widget-content-chart' : ''}" id="wcontent-${w.id}">${getWidgetContentHTML(w)}</div><div class="widget-resize-handle"></div>`;
 		// Set hidden via DOM property — safe from SharePoint HTML sanitizer
 		if (w.showTitle === false) {
 		  el.querySelector('.widget-header').hidden = true;
@@ -1268,8 +1269,19 @@ function _buildChartOption(w, chartData) {
   const chartEl = document.getElementById('chart-' + w.id);
   if (!chartEl) return;
   if (DataLaVistaState.charts[w.id]) { try { DataLaVistaState.charts[w.id].dispose(); } catch(e){} }
+  // Disconnect any prior ResizeObserver for this widget
+  if (DataLaVistaState._chartROs && DataLaVistaState._chartROs[w.id]) {
+    try { DataLaVistaState._chartROs[w.id].disconnect(); } catch(e) {}
+  }
   const chart = echarts.init(chartEl, null, { renderer: 'canvas' });
   DataLaVistaState.charts[w.id] = chart;
+  // Resize chart whenever its container changes size (window, drag-handle, iframe, panel, etc.)
+  if (typeof ResizeObserver !== 'undefined') {
+    if (!DataLaVistaState._chartROs) DataLaVistaState._chartROs = {};
+    const ro = new ResizeObserver(() => { try { chart.resize(); } catch(e) {} });
+    ro.observe(chartEl);
+    DataLaVistaState._chartROs[w.id] = ro;
+  }
   const chartData = buildWidgetData(w);
   const option = _buildChartOption(w, chartData);
   if (!option) {
@@ -1327,6 +1339,7 @@ function _buildChartOption(w, chartData) {
       function deleteWidget(wid) {
         DataLaVistaState.design.widgets = DataLaVistaState.design.widgets.filter(w => w.id !== wid);
         if (DataLaVistaState.charts[wid]) { try { DataLaVistaState.charts[wid].dispose(); } catch (e) { } delete DataLaVistaState.charts[wid]; }
+        if (DataLaVistaState._chartROs && DataLaVistaState._chartROs[wid]) { try { DataLaVistaState._chartROs[wid].disconnect(); } catch(e) {} delete DataLaVistaState._chartROs[wid]; }
         document.getElementById('widget-' + wid)?.remove();
         if (DataLaVistaState.currentWidgetId === wid) {
           DataLaVistaState.currentWidgetId = null;
@@ -1636,7 +1649,7 @@ function _renderBarLineOptionsHTML(w, wid) {
           const f  = tk && DataLaVistaState.tables[tk] && DataLaVistaState.tables[tk].fields
             ? DataLaVistaState.tables[tk].fields.find(x => x.alias === alias)
             : null;
-          return { alias, displayType: sniffType(alias), tableKey: tk || '', fieldInternalName: f ? f.internalName : '' };
+          return { alias, displayType: sniffType(alias), tableKey: 'dlv_results', fieldInternalName: f ? f.internalName : '' };
         });
 
         // Work on a local copy until Apply
@@ -1670,10 +1683,10 @@ function _renderBarLineOptionsHTML(w, wid) {
         _s.condUpdate = (ci, prop, val) => {
           if (!local.conditions[ci]) return;
           local.conditions[ci][prop] = val;
+          // Reset op/value when switching fields or element keys to avoid stale ops/values
+          if (prop === 'field') { local.conditions[ci].op = '='; local.conditions[ci].value = ''; local.conditions[ci].value2 = ''; local.conditions[ci].elementKey = ''; }
+          if (prop === 'elementKey') { local.conditions[ci].op = '='; local.conditions[ci].value = ''; local.conditions[ci].value2 = ''; }
           if (prop === 'op' || prop === 'field' || prop === 'elementKey') _s.rerender();
-          // Reset op to '=' when switching fields or element keys to avoid stale ops
-          if (prop === 'field') local.conditions[ci].op = '=';
-          if (prop === 'elementKey') local.conditions[ci].op = '=';
         };
         _s.clearAll = () => {
           local = { label: '', color: '', seriesType: '', lineWidth: 2, opacity: 1, smooth: true, conditions: [] };
@@ -1837,7 +1850,12 @@ function _renderBarLineOptionsHTML(w, wid) {
         w.conditions[idx][prop] = val;
         // re-render to update ops / value input when field, op, or elementKey changes
         if (prop === 'op' || prop === 'field' || prop === 'elementKey') {
-          if (prop === 'field' || prop === 'elementKey') w.conditions[idx].op = '=';
+          if (prop === 'field' || prop === 'elementKey') {
+            w.conditions[idx].op = '=';
+            w.conditions[idx].value = '';
+            w.conditions[idx].value2 = '';
+            if (prop === 'field') w.conditions[idx].elementKey = '';
+          }
           renderWidgetProperties(wid);
         } else {
           updateWidgetContent(wid);
@@ -1881,12 +1899,12 @@ function _renderBarLineOptionsHTML(w, wid) {
 
         const cols       = DataLaVistaState.queryColumns;
         const enrichedCols = cols.map(alias => {
-          if (alias === '__dlv_count__') return { alias, displayType: 'number', tableKey: '', fieldInternalName: '' };
+          if (alias === '__dlv_count__') return { alias, displayType: 'number', tableKey: 'dlv_results', fieldInternalName: '' };
           const tk = findTableKeyForAlias(alias);
           const f  = tk && DataLaVistaState.tables[tk] && DataLaVistaState.tables[tk].fields
             ? DataLaVistaState.tables[tk].fields.find(x => x.alias === alias)
             : null;
-          return { alias, displayType: sniffType(alias), tableKey: tk || '', fieldInternalName: f ? f.internalName : '' };
+          return { alias, displayType: sniffType(alias), tableKey: 'dlv_results', fieldInternalName: f ? f.internalName : '' };
         });
         const conditions = w.conditions || [];
         const sorts      = w.sorts      || [];
@@ -2212,6 +2230,7 @@ function _renderBarLineOptionsHTML(w, wid) {
         const content = el.querySelector('.widget-content');
         content.innerHTML = getWidgetContentHTML(w);
         if (DataLaVistaState.charts[wid]) { try { DataLaVistaState.charts[wid].dispose(); } catch (e) { } delete DataLaVistaState.charts[wid]; }
+        if (DataLaVistaState._chartROs && DataLaVistaState._chartROs[wid]) { try { DataLaVistaState._chartROs[wid].disconnect(); } catch(e) {} delete DataLaVistaState._chartROs[wid]; }
         if (newIsChart) {
           requestAnimationFrame(() => renderChart(w));
         }
