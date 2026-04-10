@@ -503,17 +503,13 @@ function buildFilterValueInput(displayType, isMacro, macroMeta, value, handlerJS
     }
   }
 
-  // Text — with optional autosuggestions via <datalist>
+  // Text — with optional custom autosuggest dropdown
   if (tableKey && fieldAlias) {
-    const safeId = (tableKey + '__' + fieldAlias + (elementKey ? '__' + elementKey : '')).replace(/[^a-zA-Z0-9_-]/g, '_');
-    const listId = 'dlv-sug-' + safeId;
     const tkSafe = tableKey.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
     const faSafe = fieldAlias.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
     const ekSafe = elementKey.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-    const onFocus = `loadFilterSuggestions(this,'${tkSafe}','${faSafe}','${ekSafe}',1000)`;
     return `<input type="text" class="form-input qb-val-input" placeholder="value" value="${safeVal}"`
-         + ` list="${listId}" onfocus="${onFocus}" oninput="${handlerJS}"/>`
-         + `<datalist id="${listId}"></datalist>`;
+         + ` onfocus="dlvAcShow(this,'${tkSafe}','${faSafe}','${ekSafe}')" oninput="dlvAcFilter(this);${handlerJS}" onblur="dlvAcBlur(this)" onkeydown="dlvAcKeydown(this,event)"/>`;
   }
 
   return `<input type="text" class="form-input qb-val-input" placeholder="value" value="${safeVal}" oninput="${handlerJS}"/>`;
@@ -807,56 +803,198 @@ function condToSQL(c, colExpr, displayType) {
   return `${colExpr} ${op} ${val}`;
 }
 
-/**
- * Populate a <datalist> with distinct field values for filter autosuggestions.
- * Called onfocus on text filter inputs. Runs once per datalist (idempotent).
- * @param {HTMLInputElement} inputEl
- * @param {string} tableKey        Raw table key (or empty string for dlv_results)
- * @param {string} fieldAlias      Field alias / column name
- * @param {string} [elementKey]    For array-of-objects: query col->elementKey
- * @param {number} [limit]         Max distinct values (default 1000)
- */
-function loadFilterSuggestions(inputEl, tableKey, fieldAlias, elementKey, limit) {
-  const listId = inputEl && inputEl.getAttribute('list');
-  if (!listId) return;
-  const dl = document.getElementById(listId);
-  if (!dl || dl.dataset.loaded) return;
-  dl.dataset.loaded = '1'; // mark before query to prevent double-fire
+// ============================================================
+// CUSTOM AUTOSUGGEST DROPDOWN
+// ============================================================
+// Replaces the <datalist> approach with a floating dropdown that:
+//   - Shows immediately on focus (no typing required)
+//   - Filters as you type
+//   - Tracks scroll so the popup follows the input
+//   - Caches suggestions per (tableKey|fieldAlias|elementKey)
+// ──────────────────────────────────────────────────────────────
+var _dlvAcCache = {}; // suggestion cache: cacheKey (tableKey|fieldAlias|elementKey) → string[]
 
-  const lim = limit || 1000;
-  const fa  = fieldAlias || '';
-  const ek  = elementKey || '';
+/** Evict all cached suggestions whose key starts with `prefix`. */
+function _dlvAcEvict(prefix) {
+  for (const k of Object.keys(_dlvAcCache)) {
+    if (k.startsWith(prefix)) delete _dlvAcCache[k];
+  }
+}
 
+function _dlvAcLoad(tableKey, fieldAlias, elementKey) {
+  const key = (tableKey || '') + '|' + (fieldAlias || '') + '|' + (elementKey || '');
+  if (_dlvAcCache[key]) return _dlvAcCache[key]; // only populated entries are cached
+  const values = [];
   try {
-    // Determine FROM source
-    let fromSrc = null;
-    if (tableKey) {
+    const fa = fieldAlias || '';
+    const ek = elementKey || '';
+
+    if (ek) {
+      // ── Array-of-objects element key: use DLV_ARRAY_EXTRACT_ELEMENT ─────────
+      // Resolve the view name; DLV_ARRAY_EXTRACT_ELEMENT queries it directly
       const vname = (typeof CyberdynePipeline !== 'undefined' && CyberdynePipeline.rawTableToView && CyberdynePipeline.rawTableToView[tableKey])
         || tableKey;
-      if (alasql.tables && alasql.tables[vname]) fromSrc = `[${vname}]`;
-    }
-    if (!fromSrc) {
-      if (alasql.tables && alasql.tables['dlv_active'])   fromSrc = '[dlv_active]';
-      else if (alasql.tables && alasql.tables['dlv_results']) fromSrc = '[dlv_results]';
-    }
-    if (!fromSrc) return;
-
-    const col    = ek ? `[${fa}]->${ek}` : `[${fa}]`;
-    const lenFn  = `LENGTH('' + ${col})`;
-    const sql    = `SELECT DISTINCT ${col} AS col FROM ${fromSrc} WHERE ${col} IS NOT NULL AND ${lenFn} < 50 ORDER BY col LIMIT ${lim}`;
-    const rows   = alasql(sql);
-    const frag   = document.createDocumentFragment();
-    for (const r of rows) {
-      if (r.col != null && r.col !== '') {
-        const opt = document.createElement('option');
-        opt.value = String(r.col);
-        frag.appendChild(opt);
+      // Embed as SQL literals — FROM table-functions don't support ? parameters
+      const vnameEsc = vname.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+      const opts = JSON.stringify({ columnToExpand: fa, element: ek }).replace(/'/g, "\\'");
+      const rows = alasql('SELECT * FROM DLV_ARRAY_EXTRACT_ELEMENT("' + vnameEsc + '", \'' + opts + '\')');
+      for (var ei = 0; ei < rows.length; ei++) {
+        const v = rows[ei][ek];
+        if (v != null && v !== '') values.push(String(v));
+      }
+      // Results are already distinct and sorted by DLV_ARRAY_EXTRACT_ELEMENT
+    } else {
+      // ── Scalar / text field: query via AlaSQL ─────────────────────────────
+      let fromSrc = null;
+      if (tableKey) {
+        const vname = (typeof CyberdynePipeline !== 'undefined' && CyberdynePipeline.rawTableToView && CyberdynePipeline.rawTableToView[tableKey])
+          || tableKey;
+        fromSrc = '[' + vname + ']';
+      }
+      if (!fromSrc) {
+        if (alasql.tables && alasql.tables['dlv_results']) fromSrc = '[dlv_results]';
+      }
+      if (fromSrc) {
+        const col = '[' + fa + ']';
+        const sql = 'SELECT DISTINCT ' + col + ' AS col FROM ' + fromSrc
+          + ' WHERE ' + col + ' IS NOT NULL ORDER BY ' + col + ' LIMIT 1000';
+        const rows = alasql(sql);
+        for (var i = 0; i < rows.length; i++) {
+          const r = rows[i];
+          if (r.col != null && r.col !== '') values.push(String(r.col));
+        }
       }
     }
-    dl.appendChild(frag);
-  } catch (_) {
-    // Silently fail — data may not be loaded yet
+  } catch (_) { /* silently fail — data may not be loaded yet */ }
+
+  // Only cache non-empty results; empty means data wasn't ready — retry on next focus
+  if (values.length) _dlvAcCache[key] = values;
+  return values;
+}
+
+function _dlvAcSelect(inputEl, v) {
+  const savedAll = inputEl['_dlvAcAll'];
+  inputEl['_dlvAcAll'] = null; // suppress re-open from the dispatched input event
+  inputEl.value = v;
+  inputEl.dispatchEvent(new Event('input', { bubbles: true }));
+  inputEl['_dlvAcAll'] = savedAll;
+  const popup = document.querySelector('.dlv-ac-popup');
+  if (popup) { popup['_dlvCleanup'] && popup['_dlvCleanup'](); popup.remove(); }
+}
+
+function _dlvAcRender(inputEl) {
+  // Remove any existing popup
+  const old = document.querySelector('.dlv-ac-popup');
+  if (old) { old['_dlvCleanup'] && old['_dlvCleanup'](); old.remove(); }
+
+  const all = inputEl['_dlvAcAll'];
+  if (!all || !all.length) return;
+
+  const query    = (inputEl.value || '').toLowerCase();
+  const filtered = query ? all.filter(function(v) { return v.toLowerCase().includes(query); }) : all;
+  if (!filtered.length) return;
+
+  const popup = document.createElement('div');
+  popup.className = 'dlv-ac-popup';
+  popup['_dlvFocusIdx'] = -1;
+
+  filtered.slice(0, 100).forEach(function(v, idx) {
+    const item = document.createElement('div');
+    item.className = 'dlv-ac-item';
+    item.textContent = v;
+    item.dataset.idx = String(idx);
+    item.addEventListener('mousedown', function(e) { e.preventDefault(); }); // keep input focused
+    item.addEventListener('click', function() { _dlvAcSelect(inputEl, v); });
+    popup.appendChild(item);
+  });
+
+  document.body.appendChild(popup);
+
+  function reposition() {
+    const r   = inputEl.getBoundingClientRect();
+    const minW = Math.max(r.width, 280); // at least 280px (~40 chars)
+    popup.style.top      = (r.bottom + 1) + 'px';
+    popup.style.left     = r.left + 'px';
+    popup.style.minWidth = minW + 'px';
+    popup.style.width    = 'auto';
   }
+  reposition();
+
+  let rafId;
+  const onScroll = function() { cancelAnimationFrame(rafId); rafId = requestAnimationFrame(reposition); };
+  window.addEventListener('scroll', onScroll, { capture: true, passive: true });
+
+  function cleanup() {
+    window.removeEventListener('scroll', onScroll, { capture: true });
+    cancelAnimationFrame(rafId);
+  }
+  popup['_dlvCleanup'] = cleanup;
+}
+
+function _dlvAcMoveFocus(popup, delta) {
+  const items = popup.querySelectorAll('.dlv-ac-item');
+  if (!items.length) return;
+  let idx = popup['_dlvFocusIdx'] + delta;
+  if (idx < 0) idx = items.length - 1;
+  if (idx >= items.length) idx = 0;
+  popup['_dlvFocusIdx'] = idx;
+  items.forEach(function(el) { el.classList.remove('focused'); });
+  const target = items[idx];
+  target.classList.add('focused');
+  target.scrollIntoView({ block: 'nearest' });
+}
+
+/** Show autosuggest dropdown — called onfocus on text filter inputs. */
+function dlvAcShow(inputEl, tableKey, fieldAlias, elementKey) {
+  // Always (re)load if not yet cached with results; empty _dlvAcAll means previous load got no data
+  if (!inputEl['_dlvAcAll'] || !inputEl['_dlvAcAll'].length) {
+    inputEl['_dlvAcAll'] = _dlvAcLoad(tableKey, fieldAlias, elementKey);
+  }
+  _dlvAcRender(inputEl);
+}
+
+/** Re-filter the autosuggest dropdown — called oninput on text filter inputs. */
+function dlvAcFilter(inputEl) {
+  if (inputEl['_dlvAcAll'] && inputEl['_dlvAcAll'].length) _dlvAcRender(inputEl);
+}
+
+/**
+ * Keyboard navigation — called onkeydown on text filter inputs.
+ * ArrowDown/Up: navigate items. Enter: select focused item. Escape: close.
+ */
+function dlvAcKeydown(inputEl, e) {
+  const popup = document.querySelector('.dlv-ac-popup');
+  if (!popup) {
+    // No popup open — ArrowDown opens it
+    if (e.key === 'ArrowDown') { e.preventDefault(); _dlvAcRender(inputEl); }
+    return;
+  }
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    _dlvAcMoveFocus(popup, 1);
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    _dlvAcMoveFocus(popup, -1);
+  } else if (e.key === 'Enter') {
+    const focused = popup.querySelector('.dlv-ac-item.focused');
+    if (focused) {
+      e.preventDefault();
+      _dlvAcSelect(inputEl, focused.textContent);
+    }
+    // If nothing focused, let Enter bubble normally (submit/apply)
+  } else if (e.key === 'Escape') {
+    e.preventDefault();
+    popup['_dlvCleanup'] && popup['_dlvCleanup']();
+    popup.remove();
+  }
+}
+
+/** Hide dropdown with a small delay so item clicks can register — called onblur. */
+function dlvAcBlur(inputEl) {
+  setTimeout(function() {
+    const popup = document.querySelector('.dlv-ac-popup');
+    if (popup) { popup['_dlvCleanup'] && popup['_dlvCleanup'](); popup.remove(); }
+  }, 150);
 }
 
 

@@ -21,6 +21,17 @@ You should have received a copy of the GNU General Public License along
 with this program. If not, see <https://www.gnu.org/licenses/>.
 ================================================================ */
 
+// ─────────────────────────────────────────────────────────────────────────────
+// APP HEIGHT MANAGEMENT
+// Dynamically calculates and sets --app-top-offset so #app fills the remaining
+// viewport height below whatever chrome sits above it (standalone, SharePoint,
+// or embedded iframe). Called once at init and wired to resize/mutation events.
+// ─────────────────────────────────────────────────────────────────────────────
+
+  function dlvIsInIframe() {
+      try { return window.self !== window.top; } catch (e) { return true; }
+  }
+
   function initAdvOptsResizer() {
     const resizer = document.getElementById('adv-opts-resizer');
     const panel   = document.getElementById('adv-options-panel');

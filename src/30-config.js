@@ -650,16 +650,23 @@ function renderFieldsPanel() {
         showCtxMenu(e, { level: 'table', tableKey: tkey, dsName, isFileUpload: ds.isFileUpload || false });
       });
 
-      // Build fields list, sorted alphabetically
+      // Build fields list: base fields sorted alphabetically, synthetic children nested under parent
       const flist = node.querySelector('.fields-list');
-      const sortedFields = [...t.fields]
+      const baseFields = [...t.fields]
+        .filter(f => !f.isSynthetic)
         .sort((a, b) => (a.alias || a.displayName || '').localeCompare(b.alias || b.displayName || ''));
-        //TODO: removed this from above .sort:  .filter(f => !f.isAutoId)
+      const syntheticByParent = {};
+      for (const f of t.fields) {
+        if (f.isSynthetic && f.parentField) {
+          if (!syntheticByParent[f.parentField]) syntheticByParent[f.parentField] = [];
+          syntheticByParent[f.parentField].push(f);
+        }
+      }
 
-      for (const f of sortedFields) {
+      const makeFieldItem = (f, extraClass) => {
         const ti = DataLaVistaCore.FIELD_TYPE_ICONS[f.displayType] || DataLaVistaCore.FIELD_TYPE_ICONS.default;
         const fitem = document.createElement('div');
-        fitem.className = 'field-item';
+        fitem.className = 'field-item' + (extraClass ? ' ' + extraClass : '');
         fitem.draggable = true;
         fitem.style.paddingLeft = '14px';
         fitem.innerHTML = `
@@ -670,12 +677,55 @@ function renderFieldsPanel() {
           safeDragSet(e, { type: 'field', table: tkey, field: f.alias, internalName: f.internalName });
           e.stopPropagation();
         });
-        // Right-click on field: only "Rename"
         fitem.addEventListener('contextmenu', (e) => {
           e.preventDefault();
           showCtxMenu(e, { level: 'field', tableKey: tkey, fieldAlias: f.alias });
         });
-        flist.appendChild(fitem);
+        return fitem;
+      };
+
+      for (const f of baseFields) {
+        const children = syntheticByParent[f.alias] || [];
+        if (!children.length) {
+          flist.appendChild(makeFieldItem(f, ''));
+        } else {
+          // Parent item with expand toggle
+          const ti = DataLaVistaCore.FIELD_TYPE_ICONS[f.displayType] || DataLaVistaCore.FIELD_TYPE_ICONS.default;
+          const fitem = document.createElement('div');
+          fitem.className = 'field-item';
+          fitem.draggable = true;
+          fitem.style.paddingLeft = '14px';
+          fitem.innerHTML = `
+            <span class="field-item-parent-toggle" title="Show/hide sub-fields">▶</span>
+            <span class="field-type-icon ${ti.cls}" title="${f.displayName || f.alias}">${ti.icon}</span>
+            <span class="field-label" id="flabel-${CSS.escape(tkey)}-${CSS.escape(f.alias)}" title="${f.displayName || f.alias}">${f.alias}</span>
+          `;
+          fitem.addEventListener('dragstart', e => {
+            safeDragSet(e, { type: 'field', table: tkey, field: f.alias, internalName: f.internalName });
+            e.stopPropagation();
+          });
+          fitem.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            showCtxMenu(e, { level: 'field', tableKey: tkey, fieldAlias: f.alias });
+          });
+          flist.appendChild(fitem);
+
+          // Synthetic children container, collapsed by default
+          const childList = document.createElement('div');
+          childList.className = 'field-item-synthetic-list hidden';
+          for (const sf of children) {
+            childList.appendChild(makeFieldItem(sf, 'field-item-synthetic'));
+          }
+          flist.appendChild(childList);
+
+          // Wire toggle
+          const toggleArrow = fitem.querySelector('.field-item-parent-toggle');
+          toggleArrow.addEventListener('click', e => {
+            e.stopPropagation();
+            const open = childList.classList.toggle('hidden');
+            toggleArrow.classList.toggle('open', !open);
+          });
+        }
       }
 
       // Tables start collapsed by default

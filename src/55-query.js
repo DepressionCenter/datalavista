@@ -39,6 +39,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 
         try {
           const results = await _executeQuery(sql);
+          // Evict autosuggest cache for dlv_results/dlv_active — columns may have changed
+          _dlvAcEvict('|');
           showQueryPreview(results);
           renderDesignFieldsPanel();
           if (DataLaVistaState.reportMode !== 'view') showUseInDesign();

@@ -153,7 +153,7 @@ validateAliasUniqueness(fields) {
             displayType: vc.displayType,
             isSynthetic: vc.isSynthetic,
             parentField: vc.parentField,
-            isAutoId: vc.isSynthetic  // hide synthetics from basic QB
+            isAutoId: false
           });
         }
 

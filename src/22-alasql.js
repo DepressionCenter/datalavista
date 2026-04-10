@@ -114,6 +114,149 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           return !arr || !Array.isArray(arr) || arr.length === 0;
       };
 
+      // ── DLV_VIEW: forces execution of a view for keywords like SEARCH that only operate on raw tables ─────────
+      alasql.from.DLV_VIEW = function(viewName, opts, cb, idx, query) {
+        let cols = '*';
+        if (typeof opts === 'string') {
+            try {
+                const parsed = JSON.parse(opts);
+                if (Array.isArray(parsed.columns) && parsed.columns.length > 0) {
+                    cols = parsed.columns.join(', ');
+                }
+            } catch(e) {}
+        }
+
+        const results = alasql('SELECT ' + cols + ' FROM ' + viewName);
+        if (cb) return cb(results, idx, query);
+        return results;
+    };
+
+
+      /**
+ * DLV_ARRAY_EXPAND
+ * Expands an array-of-objects column into a flat result set.
+ *
+ * @param {string} tableName  - Table or view name
+ * @param {string} opts       - JSON string with options:
+ *   @param {string}   opts.columnToExpand  - (required) Column containing array of objects
+ *   @param {string}   [opts.parentId]      - Field to use as ParentId; falls back to Id, ID, or row number
+ *   @param {string[]} [opts.elements]      - Child fields to include; omit for all fields
+ *   @param {boolean}  [opts.skipEmptyArrays=false] - Skip rows with null/empty arrays
+ *
+ * Output columns: ParentId, ParentRowNumber, ChildRowNumber, ...(child fields)
+ *
+ * Minimum usage:
+ *   SELECT * FROM DLV_ARRAY_EXPAND("MyTable", '{"columnToExpand":"MyArrayCol"}')
+ *
+ * Full usage:
+ *   SELECT * FROM DLV_ARRAY_EXPAND("MyTable", '{"columnToExpand":"RecipientData","parentId":"ID","elements":["Title","Id"],"skipEmptyArrays":true}')
+ */
+alasql.from.DLV_ARRAY_EXPAND = function(tableName, opts, cb, idx, query) {
+    let parentIdField = null, columnToExpand = null, elements = null, skipEmptyArrays = false;
+
+    if (typeof opts === 'string') {
+        try {
+            const parsed = JSON.parse(opts);
+            parentIdField   = parsed.parentId       || null;
+            columnToExpand  = parsed.columnToExpand || null;
+            elements        = Array.isArray(parsed.elements) && parsed.elements.length > 0 ? parsed.elements : null;
+            skipEmptyArrays = parsed.skipEmptyArrays === true;
+        } catch(e) {}
+    }
+
+    if (!columnToExpand) {
+        if (cb) return cb([], idx, query);
+        return [];
+    }
+
+    const whereClause = skipEmptyArrays
+        ? ' WHERE ' + columnToExpand + ' IS NOT NULL AND ' + columnToExpand + '->length > 0'
+        : '';
+
+    const sqlQuery = 'SELECT COALESCE(' + (parentIdField ? parentIdField + ',' : '') + 'Id,ID) AS ParentId, ROWNUM() AS RowNumber, ' + columnToExpand + ' FROM ' + tableName + whereClause;
+    const data = alasql(sqlQuery);
+    const results = [];
+
+    data.forEach(row => {
+        const arr = row[columnToExpand];
+        const parentId = row['ParentId'];
+        const parentRowNumber = row['RowNumber'];
+
+        if (arr && Array.isArray(arr) && arr.length > 0) {
+            Array.prototype.push.apply(results, arr.map((child, i) => {
+                const childData = elements
+                    ? elements.reduce((acc, key) => { acc[key] = child[key]; return acc; }, {})
+                    : { ...child };
+                return { ParentId: parentId, ParentRowNumber: parentRowNumber, ChildRowNumber: i + 1, ...childData };
+            }));
+        } else if (!skipEmptyArrays) {
+            results.push({ ParentId: parentId, ParentRowNumber: parentRowNumber });
+        }
+    });
+
+    if (cb) return cb(results, idx, query);
+    return results;
+};
+
+/**
+ * DLV_ARRAY_EXTRACT_ELEMENT
+ * Extracts a single field from all objects in an array column — flat, distinct, sorted.
+ *
+ * @param {string} tableName - Table or view name
+ * @param {string} opts      - JSON string with options (all required):
+ *   @param {string} opts.columnToExpand - Column containing array of objects
+ *   @param {string} opts.element        - Field name to extract from each child object
+ *
+ * Output columns: one column named after opts.element, distinct values, sorted ascending
+ *
+ * Usage:
+ *   SELECT * FROM DLV_ARRAY_EXTRACT_ELEMENT("MyTable", '{"columnToExpand":"RecipientData","element":"Title"}')
+ */
+alasql.from.DLV_ARRAY_EXTRACT_ELEMENT = function(tableName, opts, cb, idx, query) {
+    let columnToExpand = null, elementName = null;
+
+    if (typeof opts === 'string') {
+        try {
+            const parsed = JSON.parse(opts);
+            columnToExpand = parsed.columnToExpand || null;
+            elementName    = parsed.element        || null;
+        } catch(e) {}
+    }
+
+    if (!tableName || !columnToExpand || !elementName) {
+        if (cb) return cb([], idx, query);
+        return [];
+    }
+
+    const data = alasql(
+        'SELECT ' + columnToExpand + ' FROM ' + tableName +
+        ' WHERE ' + columnToExpand + ' IS NOT NULL AND ' + columnToExpand + '->length > 0'
+    );
+    const seen = new Set();
+    const results = [];
+
+    data.forEach(row => {
+        const arr = row[columnToExpand];
+        if (Array.isArray(arr) && arr.length > 0) {
+            arr.forEach(child => {
+                const val = child[elementName];
+                if (val !== undefined && val !== null && !seen.has(val)) {
+                    seen.add(val);
+                    results.push({ [elementName]: val });
+                }
+            });
+        }
+    });
+
+    results.sort((a, b) => {
+        const av = a[elementName], bv = b[elementName];
+        return av < bv ? -1 : av > bv ? 1 : 0;
+    });
+
+    if (cb) return cb(results, idx, query);
+    return results;
+};
+
       // ── DLV_DISPLAY: human-readable display value from any field value ──────
       alasql.fn.DLV_DISPLAY = function(val) {
         if (val === null || val === undefined) return null;

@@ -112,7 +112,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           el.style.cssText = `width:${w.widthPct}%;height:${w.heightVh}vh;min-height:120px;border-color:${w.borderColor};border-width:${w.borderSize}px;background:${w.widgetBackgroundColor||'#fefefe'}`;
           el.innerHTML = `
             <div class="widget-header${w.showTitle === false ? ' hidden' : ''}" style="${titleHdrStyle}"><span class="widget-title" style="${titleSpanStyle}">${w.title}</span></div>
-            <div class="widget-content" id="prev-wcontent-${w.id}">
+            <div class="widget-content${['bar','line','pie','scatter'].includes(w.type) ? ' widget-content-chart' : ''}" id="prev-wcontent-${w.id}">
               ${getPrevWidgetContent(w)}
             </div>
           `;
@@ -154,8 +154,17 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
   if (!chartEl) return;
   const id = 'prev_' + w.id;
   if (DataLaVistaState.charts[id]) { try { DataLaVistaState.charts[id].dispose(); } catch(e){} }
+  if (DataLaVistaState._chartROs && DataLaVistaState._chartROs[id]) {
+    try { DataLaVistaState._chartROs[id].disconnect(); } catch(e) {}
+  }
   const chart = echarts.init(chartEl);
   DataLaVistaState.charts[id] = chart;
+  if (typeof ResizeObserver !== 'undefined') {
+    if (!DataLaVistaState._chartROs) DataLaVistaState._chartROs = {};
+    const ro = new ResizeObserver(() => { try { chart.resize(); } catch(e) {} });
+    ro.observe(chartEl);
+    DataLaVistaState._chartROs[id] = ro;
+  }
   const chartData = buildWidgetData(w);
   const option = _buildChartOption(w, chartData);
   if (!option) {

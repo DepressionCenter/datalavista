@@ -446,26 +446,45 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
     </div>
   `;
 
-        // Render field checkboxes with aggregate dropdown
+        // Render field checkboxes with aggregate dropdown; group synthetic children under parent
         const grid = document.getElementById('basic-fields-grid');
         const aggs = DataLaVistaState.basicQB.fieldAggs || {};
+        const baseRows = rows.filter(f => !f.isSynthetic);
+        const synByParent = {};
         for (const f of rows) {
+          if (f.isSynthetic && f.parentField) {
+            if (!synByParent[f.parentField]) synByParent[f.parentField] = [];
+            synByParent[f.parentField].push(f);
+          }
+        }
+
+        const makeFieldRow = (f, extraClass) => {
           const checked = DataLaVistaState.basicQB.selectedFields.includes(f.alias);
           const currentAgg = aggs[f.alias] || '';
           const ti = DataLaVistaCore.FIELD_TYPE_ICONS[f.displayType] || DataLaVistaCore.FIELD_TYPE_ICONS.default;
           const availableAggs = aggsForType(f.displayType);
           const aggOpts = availableAggs.map(a => `<option value="${a.val}" ${a.val === currentAgg ? 'selected' : ''}>${a.label}</option>`).join('');
           const div = document.createElement('div');
-          div.className = 'basic-field-row' + (checked ? '' : ' field-row-unchecked');
+          div.className = 'basic-field-row' + (checked ? '' : ' field-row-unchecked') + (extraClass ? ' ' + extraClass : '');
           div.innerHTML = `
       <input type="checkbox" id="bfchk-${f.alias}" ${checked ? 'checked' : ''}
         onchange="toggleBasicField('${f.alias}', this.checked)"/>
       <span class="field-type-icon ${ti.cls}" style="font-size:10px">${ti.icon}</span>
       <label for="bfchk-${f.alias}" title="${f.displayName}" style="flex:1">${f.alias}</label>
-      ${checked ? `<select class="form-input field-agg-select" title="Aggregate function"
-        onchange="setFieldAgg('${f.alias}', this.value)">${aggOpts}</select>` : ''}
+      ${checked ? '<select class="form-input field-agg-select" title="Aggregate function" onchange="setFieldAgg(\'' + f.alias + '\', this.value)">' + aggOpts + '</select>' : ''}
     `;
-          grid.appendChild(div);
+          return div;
+        };
+
+        for (const f of baseRows) {
+          grid.appendChild(makeFieldRow(f, ''));
+          const children = synByParent[f.alias] || [];
+          if (children.length) {
+            const group = document.createElement('div');
+            group.className = 'basic-field-synthetic-group';
+            for (const sf of children) group.appendChild(makeFieldRow(sf, 'basic-field-synthetic'));
+            grid.appendChild(group);
+          }
         }
 
         renderBasicConditions();
@@ -559,7 +578,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         area.innerHTML = renderConditionRows(
           DataLaVistaState.basicQB.conditions, cols,
           (ci, v) => `DataLaVistaState.basicQB.conditions[${ci}].conj=${v}; rebuildBasicSQL()`,
-          (ci, v) => `DataLaVistaState.basicQB.conditions[${ci}].field=${v}; renderBasicConditions(); rebuildBasicSQL()`,
+          (ci, v) => `DataLaVistaState.basicQB.conditions[${ci}].field=${v}; DataLaVistaState.basicQB.conditions[${ci}].value=''; DataLaVistaState.basicQB.conditions[${ci}].value2=''; DataLaVistaState.basicQB.conditions[${ci}].elementKey=''; renderBasicConditions(); rebuildBasicSQL()`,
           (ci, v) => `DataLaVistaState.basicQB.conditions[${ci}].op=${v}; renderBasicConditions(); rebuildBasicSQL()`,
           (ci, v) => `DataLaVistaState.basicQB.conditions[${ci}].value=${v}; rebuildBasicSQL()`,
           (ci)    => `removeBasicCondition(${ci})`,
