@@ -69,7 +69,7 @@ Most enterprise data is trapped behind bloated frameworks or expensive BI tools.
 + Go to your site's home page and create a new page using the Modern Script Editor template. Use "DataLaVista" for the page title.
 + In the "Modern Script Editor" webpart, click "Markup" then click the "{ }" button to open the code editor.
 + Copy and the paste the code from [DataLaVista.html](DataLaVista.html) into the script editor.
-  - Note: if your site has CSP restrictions for JavaScript in place, then use the DataLaVista-nojs.html file instead. Change the script tag for datalavista towards the top of the <head> section to point to /SiteAssets/datlavista.js. Then, upload datalavista.js to your /SiteAssets directory.
+  - Note: If your SharePoint tenant has CSP restrictions that block inline JavaScript, use DataLaVista-nojs.html instead. Update the script tag near the bottom of the file (before </body>) to point to htttp://you-tenant.sharepoint.com/sites/your-site/SiteAssets/datalavista.js, then upload datalavista.js to your site's /SiteAssets directory.
 + Save, and refresh the page.
 <p>
 <a href="https://code.depressioncenter.org/datalavista/presentations/sharepoint-installation-1.mp4" target="_blank" title="Click to open full video with SharePoint installation instructions"><img src="images/sharepoint-installation-1.gif" alt="Click to open full video with SharePoint installation instructions" style="width: 600px; height: auto" /></a>
