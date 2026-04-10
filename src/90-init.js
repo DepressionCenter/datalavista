@@ -207,7 +207,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 
 
     if (DataLaVistaState.reportMode === 'view') {
-        /* *** DATALAVISTA REPORT MODE *** */
+        /* *** DATALAVISTA REPORT VIEW MODE *** */
         swapReportMode('view'); // Apply report mode UI classes and button visibility
         if(reportParam && reportParam.trim() !== '') {
           document.getElementById('preview-canvas').innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-secondary);font-size:14px">Your DataLaVista dashboard is loading...</div>';
@@ -220,7 +220,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         
         await loadReportFromUrl(reportParam);
       } else {
-        /* *** DATALAVISTA DESIGNER MODE *** */
+        /* *** DATALAVISTA DESIGNER EDIT MODE *** */
         swapReportMode('edit'); // Apply report mode UI classes and button visibility
         initToolbox();
         initResizers();

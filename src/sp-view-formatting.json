@@ -15,10 +15,11 @@
       "width": "100%"
     },
     "children": [
+
       {
         "elmType": "a",
         "style": {
-          "display": "=if(endsWith([$FileLeafRef], '.json'), 'flex', 'none')",
+          "display": "=if([$FSObjType] == '1', 'none', if([$File_x0020_Type] == 'json', 'flex', 'none'))",
           "align-items": "center",
           "justify-content": "center",
           "width": "42px",
@@ -34,15 +35,16 @@
         },
         "attributes": {
           "iconName": "BIDashboard",
-          "href": "=@currentWeb + '/SitePages/DataLaVista.aspx?report=' + [$FileRef] + '&env=Embedded'",
+          "href": "=@currentWeb + '/SitePages/DataLaVista.aspx?report=' + if(indexOf(@currentWeb, '/sites/') > 0, substring(@currentWeb, 0, indexOf(@currentWeb, '/sites/')) + [$FileRef], if(indexOf(@currentWeb, '/teams/') > 0, substring(@currentWeb, 0, indexOf(@currentWeb, '/teams/')) + [$FileRef], @currentWeb + [$FileRef])) + 'reportMode=view&env=Embedded'",
           "target": "_blank",
-          "title": "Launch Dashboard"
+          "title": "Launch DataLaVista Dashboard"
         }
       },
+
       {
         "elmType": "div",
         "style": {
-          "display": "=if(endsWith([$FileLeafRef], '.json'), 'none', 'flex')",
+          "display": "=if([$FSObjType] == '1', 'flex', if([$File_x0020_Type] == 'pbix', 'flex', if([$File_x0020_Type] == 'pbit', 'flex', if([$File_x0020_Type] == 'loop', 'flex', if([$File_x0020_Type] == 'mp4', 'flex', 'none')))))",
           "align-items": "center",
           "justify-content": "center",
           "width": "42px",
@@ -50,19 +52,53 @@
           "border-radius": "8px",
           "margin-right": "16px",
           "flex-shrink": "0",
-          "background-color": "=if(endsWith([$FileLeafRef], '.pbix'), '#FFCB05', if(endsWith([$FileLeafRef], '.pbit'), '#FFCB05', '#f0f4f8'))",
-          "color": "=if(endsWith([$FileLeafRef], '.pbix'), '#00274C', if(endsWith([$FileLeafRef], '.pbit'), '#00274C', '#4a6278'))",
+          "background-color": "=if([$FSObjType] == '1', '#fff4cc', if([$File_x0020_Type] == 'pbix', '#FFCB05', if([$File_x0020_Type] == 'pbit', '#FFCB05', '#e8edf2')))",
+          "color": "=if([$FSObjType] == '1', '#00274C', if([$File_x0020_Type] == 'pbix', '#00274C', if([$File_x0020_Type] == 'pbit', '#00274C', '#2c4a5e')))",
           "font-size": "22px",
           "cursor": "pointer"
         },
         "attributes": {
-          "iconName": "=if(endsWith([$FileLeafRef], '.pbix'), 'PowerBILogo', if(endsWith([$FileLeafRef], '.pbit'), 'PowerBILogo', 'Document'))",
-          "title": "Open file"
+          "iconName": "=if([$FSObjType] == '1', 'FabricFolder', if([$File_x0020_Type] == 'pbix', 'PowerBILogo', if([$File_x0020_Type] == 'pbit', 'PowerBILogo', if([$File_x0020_Type] == 'loop', 'PageLink', 'Video'))))",
+          "title": "=if([$FSObjType] == '1', 'Open folder', if([$File_x0020_Type] == 'loop', 'Open Loop component', if([$File_x0020_Type] == 'mp4', 'Play video', 'Open Power BI file')))"
         },
         "customRowAction": {
           "action": "defaultClick"
         }
       },
+
+      {
+        "elmType": "div",
+        "style": {
+          "display": "=if([$FSObjType] == '1', 'none', if([$File_x0020_Type] == 'json', 'none', if([$File_x0020_Type] == 'pbix', 'none', if([$File_x0020_Type] == 'pbit', 'none', if([$File_x0020_Type] == 'loop', 'none', if([$File_x0020_Type] == 'mp4', 'none', 'flex'))))))",
+          "align-items": "center",
+          "justify-content": "center",
+          "width": "42px",
+          "height": "42px",
+          "border-radius": "8px",
+          "margin-right": "16px",
+          "flex-shrink": "0",
+          "background-color": "#f0f4f8",
+          "cursor": "pointer"
+        },
+        "children": [
+          {
+            "elmType": "img",
+            "style": {
+              "width": "24px",
+              "height": "24px"
+            },
+            "attributes": {
+              "src": "=if([$File_x0020_Type] == 'url', 'https://static2.sharepointonline.com/files/fabric/assets/item-types/20/link.svg', 'https://static2.sharepointonline.com/files/fabric/assets/item-types/20/' + [$File_x0020_Type] + '.svg')",
+              "title": "=[$FileLeafRef] + ' - Open file'",
+              "alt": "=[$File_x0020_Type] + ' file'"
+            }
+          }
+        ],
+        "customRowAction": {
+          "action": "defaultClick"
+        }
+      },
+
       {
         "elmType": "div",
         "style": {
@@ -74,10 +110,11 @@
           "flex-shrink": "1"
         },
         "children": [
+
           {
             "elmType": "a",
             "style": {
-              "display": "=if(endsWith([$FileLeafRef], '.json'), 'flex', 'none')",
+              "display": "=if([$FSObjType] == '1', 'none', if([$File_x0020_Type] == 'json', 'flex', 'none'))",
               "flex-direction": "column",
               "flex-grow": "1",
               "text-decoration": "none",
@@ -86,9 +123,9 @@
               "padding-right": "8px"
             },
             "attributes": {
-              "href": "=@currentWeb + '/SitePages/DataLaVista.aspx?report=' + [$FileRef] + '&env=Embedded'",
+              "href": "=@currentWeb + '/SitePages/DataLaVista.aspx?report=' + if(indexOf(@currentWeb, '/sites/') > 0, substring(@currentWeb, 0, indexOf(@currentWeb, '/sites/')) + [$FileRef], if(indexOf(@currentWeb, '/teams/') > 0, substring(@currentWeb, 0, indexOf(@currentWeb, '/teams/')) + [$FileRef], @currentWeb + [$FileRef])) + '&reportMode=view&&env=Embedded'",
               "target": "_blank",
-              "title": "Launch Dashboard"
+              "title": "=[$FileLeafRef] + ' - Launch DataLaVista Dashboard'"
             },
             "children": [
               {
@@ -114,10 +151,11 @@
               }
             ]
           },
+
           {
             "elmType": "div",
             "style": {
-              "display": "=if(endsWith([$FileLeafRef], '.json'), 'none', 'flex')",
+              "display": "=if([$FSObjType] == '1', 'flex', if([$File_x0020_Type] == 'json', 'none', 'flex'))",
               "flex-direction": "column",
               "flex-grow": "1",
               "cursor": "pointer",
@@ -142,7 +180,7 @@
               },
               {
                 "elmType": "div",
-                "txtContent": "=if(endsWith([$FileLeafRef], '.pbix'), 'Power BI Report', if(endsWith([$FileLeafRef], '.pbit'), 'Power BI Template', 'Standard Document'))",
+                "txtContent": "=if([$FSObjType] == '1', 'Folder', if([$File_x0020_Type] == 'pbix', 'Power BI Report', if([$File_x0020_Type] == 'pbit', 'Power BI Template', if([$File_x0020_Type] == 'loop', 'Loop Component', if([$File_x0020_Type] == 'mp4', 'Video', if([$File_x0020_Type] == 'xlsx', 'Excel Workbook', if([$File_x0020_Type] == 'xls', 'Excel Workbook', if([$File_x0020_Type] == 'csv', 'CSV Data File', if([$File_x0020_Type] == 'docx', 'Word Document', if([$File_x0020_Type] == 'doc', 'Word Document', if([$File_x0020_Type] == 'pptx', 'PowerPoint Presentation', if([$File_x0020_Type] == 'ppt', 'PowerPoint Presentation', if([$File_x0020_Type] == 'pdf', 'PDF Document', if([$File_x0020_Type] == 'py', 'Python Script', if([$File_x0020_Type] == 'r', 'R Script', if([$File_x0020_Type] == 'sql', 'SQL File', if([$File_x0020_Type] == 'txt', 'Text File', if([$File_x0020_Type] == 'md', 'Markdown File', if([$File_x0020_Type] == 'zip', 'ZIP Archive', if([$File_x0020_Type] == 'url', 'Web Shortcut', 'Standard Document')))))))))))))))))))))",
                 "style": {
                   "font-size": "12px",
                   "color": "#4a6278",
@@ -151,11 +189,12 @@
               }
             ]
           },
+
           {
             "elmType": "div",
             "attributes": {
               "iconName": "MoreVertical",
-              "title": "More options"
+              "title": "More options for this item"
             },
             "customRowAction": {
               "action": "openContextMenu"
@@ -173,6 +212,7 @@
           }
         ]
       },
+
       {
         "elmType": "div",
         "style": {
@@ -199,12 +239,13 @@
             "txtContent": "[$Modified]",
             "style": {
               "font-size": "11px",
-              "color": "#7a8fa0",
+              "color": "#5f7282",
               "margin-top": "2px"
             }
           }
         ]
       },
+
       {
         "elmType": "div",
         "style": {
@@ -218,15 +259,15 @@
             "elmType": "a",
             "txtContent": "✏️ Edit",
             "attributes": {
-              "href": "=@currentWeb + '/SitePages/DataLaVista.aspx?report=' + [$FileRef] + '&reportMode=edit'",
+              "href": "=@currentWeb + '/SitePages/DataLaVista.aspx?report=' + if(indexOf(@currentWeb, '/sites/') > 0, substring(@currentWeb, 0, indexOf(@currentWeb, '/sites/')) + [$FileRef], if(indexOf(@currentWeb, '/teams/') > 0, substring(@currentWeb, 0, indexOf(@currentWeb, '/teams/')) + [$FileRef], @currentWeb + [$FileRef])) + '&reportMode=edit&env=Embedded'",
               "target": "_blank",
-              "title": "Edit Dashboard"
+              "title": "=[$FileLeafRef] + ' - Edit Dashboard'"
             },
             "style": {
-              "display": "=if(endsWith([$FileLeafRef], '.json'), 'inline-block', 'none')",
+              "display": "=if([$FSObjType] == '1', 'none', if([$File_x0020_Type] == 'json', 'inline-block', 'none'))",
               "padding": "6px 14px",
               "border": "1px solid rgba(0, 39, 76, 0.25)",
-              "color": "rgba(0, 39, 76, 0.6)",
+              "color": "#2d5078",
               "border-radius": "20px",
               "font-size": "12px",
               "font-weight": "500",
@@ -239,7 +280,7 @@
             "elmType": "a",
             "txtContent": "▶ Launch",
             "style": {
-              "display": "=if(endsWith([$FileLeafRef], '.json'), 'inline-block', 'none')",
+              "display": "=if([$FSObjType] == '1', 'none', if([$File_x0020_Type] == 'json', 'inline-block', 'none'))",
               "padding": "6px 18px",
               "background-color": "#00274C",
               "color": "#FFCB05",
@@ -251,15 +292,16 @@
               "cursor": "pointer"
             },
             "attributes": {
-              "href": "=@currentWeb + '/SitePages/DataLaVista.aspx?report=' + [$FileRef] + '&env=Embedded'",
-              "target": "_blank"
+              "href": "=@currentWeb + '/SitePages/DataLaVista.aspx?report=' + if(indexOf(@currentWeb, '/sites/') > 0, substring(@currentWeb, 0, indexOf(@currentWeb, '/sites/')) + [$FileRef], if(indexOf(@currentWeb, '/teams/') > 0, substring(@currentWeb, 0, indexOf(@currentWeb, '/teams/')) + [$FileRef], @currentWeb + [$FileRef])) + '&reportMode=view&env=Embedded'",
+              "target": "_blank",
+              "title": "=[$FileLeafRef] + ' - Launch Dashboard'"
             }
           },
           {
             "elmType": "div",
             "txtContent": "⚡ Open",
             "style": {
-              "display": "=if(endsWith([$FileLeafRef], '.json'), 'none', if(endsWith([$FileLeafRef], '.pbix'), 'inline-block', if(endsWith([$FileLeafRef], '.pbit'), 'inline-block', 'none')))",
+              "display": "=if([$FSObjType] == '1', 'none', if([$File_x0020_Type] == 'json', 'none', if([$File_x0020_Type] == 'pbix', 'inline-block', if([$File_x0020_Type] == 'pbit', 'inline-block', 'none'))))",
               "padding": "6px 18px",
               "background-color": "#FFCB05",
               "color": "#00274C",
@@ -276,6 +318,7 @@
           }
         ]
       }
+
     ]
   }
 }
