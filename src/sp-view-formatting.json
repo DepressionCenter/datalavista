@@ -180,7 +180,7 @@
               },
               {
                 "elmType": "div",
-                "txtContent": "=if([$FSObjType] == '1', 'Folder', if([$File_x0020_Type] == 'pbix', 'Power BI Report', if([$File_x0020_Type] == 'pbit', 'Power BI Template', if([$File_x0020_Type] == 'loop', 'Loop Component', if([$File_x0020_Type] == 'mp4', 'Video', if([$File_x0020_Type] == 'xlsx', 'Excel Workbook', if([$File_x0020_Type] == 'xls', 'Excel Workbook', if([$File_x0020_Type] == 'csv', 'CSV Data File', if([$File_x0020_Type] == 'docx', 'Word Document', if([$File_x0020_Type] == 'doc', 'Word Document', if([$File_x0020_Type] == 'pptx', 'PowerPoint Presentation', if([$File_x0020_Type] == 'ppt', 'PowerPoint Presentation', if([$File_x0020_Type] == 'pdf', 'PDF Document', if([$File_x0020_Type] == 'py', 'Python Script', if([$File_x0020_Type] == 'r', 'R Script', if([$File_x0020_Type] == 'sql', 'SQL File', if([$File_x0020_Type] == 'txt', 'Text File', if([$File_x0020_Type] == 'md', 'Markdown File', if([$File_x0020_Type] == 'zip', 'ZIP Archive', if([$File_x0020_Type] == 'url', 'Web Shortcut', 'Standard Document')))))))))))))))))))))",
+                "txtContent": "=if([$FSObjType] == '1', 'Folder', if(endsWith([$FileLeafRef],'json'), 'DataLaVista™ Dashboard', if(endsWith([$FileLeafRef],'pbi') || endsWith([$FileLeafRef],'pbix') || endsWith([$FileLeafRef],'pbit'), 'Power BI Report', 'File (' + [$File_x0020_Type] + ')')))",
                 "style": {
                   "font-size": "12px",
                   "color": "#4a6278",
