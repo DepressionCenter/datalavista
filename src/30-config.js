@@ -85,13 +85,66 @@ function generateWidgetSQL(w, tableRef = '_results') {
 }
 
 
-// TODO: If running in SharePoint and we already have a report URL (via param + edit mode or after publishing),
-// we should save the config back to that same URL instead of downloading a new file.
-// This will allow for true in-place editing without needing to re-upload a new file each time. We can detect this scenario by checking if the current URL has a valid SharePoint file reference and if we're in edit mode, then use the SharePoint REST API to update the file content instead of triggering a download.
-function saveConfig() {
+async function saveConfig() {
   const config = buildConfig();
   const json = JSON.stringify(config, null, 2);
+
+  if (DataLaVistaState.lastPublishedUrl && DataLaVistaState.reportUrl && DataLaVistaState.isSpSite) {
+    const reportUrl = DataLaVistaState.reportUrl;
+    const siteUrl = DataLaVistaState.spSiteUrl;
+    try {
+      if (reportUrl.includes('/Lists/')) {
+        await _saveConfigToSpList(json, reportUrl, siteUrl);
+      } else {
+        await _saveConfigToSpFile(json, reportUrl, siteUrl);
+      }
+      toast('Saved to SharePoint!', 'success');
+      setStatus('Report saved to SharePoint.', 'success');
+    } catch (err) {
+      toast((err && err.message) || 'Save to SharePoint failed.', 'error');
+      setStatus('Save to SharePoint failed. See console for details.', 'error');
+      console.error('Save to SharePoint failed:', err);
+    }
+    return;
+  }
+
   downloadText(json, (DataLaVistaState.design.title ? DataLaVistaState.design.title : 'DataLaVista-config') + '.json', 'application/json');
+}
+
+async function _saveConfigToSpFile(json, reportUrl, siteUrl) {
+  const origin = new URL(siteUrl).origin;
+  const serverRelUrl = reportUrl.startsWith(origin) ? reportUrl.slice(origin.length) : reportUrl;
+  const lastSlash = serverRelUrl.lastIndexOf('/');
+  const folderRelUrl = serverRelUrl.substring(0, lastSlash);
+  const filename = decodeURIComponent(serverRelUrl.substring(lastSlash + 1));
+  const enc = encodeURIComponent(folderRelUrl);
+  const res = await spFetchWrite(
+    `${siteUrl}/_api/web/GetFolderByServerRelativeUrl('${enc}')/Files/add(url='${encodeURIComponent(filename)}',overwrite=true)`,
+    { method: 'POST', headers: { 'Accept': 'application/json' }, body: json },
+    siteUrl
+  );
+  if (!res.ok) { const t = await res.text(); throw new Error(`Save failed (${res.status}): ${t}`); }
+}
+
+async function _saveConfigToSpList(json, reportUrl, siteUrl) {
+  const listsMatch = reportUrl.match(/\/Lists\/([^/]+)\/Attachments\/(\d+)\/([^/]+)/);
+  if (!listsMatch) throw new Error('Unable to parse SharePoint list URL for save.');
+  const [, listTitle, itemId, filenameEnc] = listsMatch;
+  const filename = decodeURIComponent(filenameEnc);
+  const enc = encodeURIComponent(listTitle);
+  try {
+    await spFetchWrite(
+      `${siteUrl}/_api/web/lists/getbytitle('${enc}')/items(${itemId})/AttachmentFiles/getbyfilename('${encodeURIComponent(filename)}')`,
+      { method: 'POST', headers: { 'X-HTTP-Method': 'DELETE' } },
+      siteUrl
+    );
+  } catch(e) {}
+  const ar = await spFetchWrite(
+    `${siteUrl}/_api/web/lists/getbytitle('${enc}')/items(${itemId})/AttachmentFiles/add(FileName='${encodeURIComponent(filename)}')`,
+    { method: 'POST', headers: { 'Accept': 'application/json' }, body: json },
+    siteUrl
+  );
+  if (!ar.ok) { const t = await ar.text(); throw new Error(`Save failed (${ar.status}): ${t}`); }
 }
 
 // Build a clean, minimal config object from the current state, suitable for saving or sharing

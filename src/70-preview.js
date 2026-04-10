@@ -279,7 +279,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         _lastGeneratedJson = JSON.stringify(buildConfig(), null, 2);
 
         /** @type {HTMLButtonElement} */ (document.getElementById('btn-copy-json')).disabled = false;
-        /** @type {HTMLButtonElement} */ (document.getElementById('btn-dl-json')).disabled = false;
 
         setStatus('Report config ready.', 'success');
         toast('Report generated!', 'success');
@@ -356,11 +355,14 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         const link = /** @type {HTMLAnchorElement|null} */ (document.getElementById('gen-publish-url'));
         if (!container || !link || !url) return;
         _lastPublishedUrl = url;
+        DataLaVistaState.lastPublishedUrl = url;
         link.textContent = url.length > 86
           ? url.slice(0, 40) + '\u2026' + url.slice(-45)
           : url;
         link.href = url;
         container.style.display = 'flex';
+        const saveBtn = /** @type {HTMLButtonElement|null} */ (document.getElementById('btn-save-config'));
+        if (saveBtn) saveBtn.textContent = '☁ Save to SharePoint';
       }
 
       function sharePublishedUrl() {

@@ -278,6 +278,17 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
             setStatus('Loading report…', 'loading');
             const cfg = await fetchJSONWithFallbacks(reportParam);
             await loadConfig(cfg);
+            // If on SP and reportUrl matches the same SP tenant/site collection, show the published URL
+            // as if the user had already published, and wire Save to write back to SharePoint.
+            if (DataLaVistaState.isSpSite && DataLaVistaState.reportUrl) {
+              const spSiteUrl = DataLaVistaState.spSiteUrl;
+              const spBase = spSiteUrl.substring(0, spSiteUrl.lastIndexOf('/') + 1);
+              if (spBase && DataLaVistaState.reportUrl.startsWith(spBase)) {
+                const dlvUrl = new URL(window.location.href);
+                const publishedUrl = dlvUrl.origin + dlvUrl.pathname + '?report=' + encodeURIComponent(DataLaVistaState.reportUrl);
+                _showPublishResult(publishedUrl);
+              }
+            }
           } catch (err) {
             toast('Unable to load report.', 'error');
             console.log('❌ DataLaVista was unable to load the report: \n ' + err.message);

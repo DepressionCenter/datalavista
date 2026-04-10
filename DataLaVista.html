@@ -3272,7 +3272,7 @@ with this program. If not, see https://www.gnu.org/licenses/.
       <button class="btn btn-default btn-sm" id="btn-connect" title="Come with me if you want to load... more data."
         onclick="showConnectPopup()">⚡ Connect + Load</button>
       <button class="btn btn-default btn-sm" id="btn-save-config" title="Come with me if you want your report to live."
-        onclick="saveConfig()" disabled>💾 Save Config</button>
+        onclick="saveConfig()" disabled>💾 Save</button>
       <div class="toolbar-sep" id="btn-sep-after-save-config"></div>
       <div id="status-bar">Not connected — click Connect / Load to begin</div>
       <div class="toolbar-spacer"></div>
@@ -3561,9 +3561,7 @@ This program is distributed in the hope that it will be useful, but WITHOUT ANY 
               <span>⚙ Report Config (JSON)</span>
               <div class="gen-actions">
                 <button class="btn btn-default btn-sm" id="btn-copy-json" onclick="copyGenCode()" disabled>📋
-                  Copy</button>
-                <button class="btn btn-default btn-sm" id="btn-dl-json" onclick="downloadGenCode()" disabled>⬇
-                  Download .json</button>
+                  Copy Report to Clipboard</button>
               </div>
             </div>
             <div class="gen-info-section">
@@ -10368,13 +10366,66 @@ function generateWidgetSQL(w, tableRef = '_results') {
 }
 
 
-// TODO: If running in SharePoint and we already have a report URL (via param + edit mode or after publishing),
-// we should save the config back to that same URL instead of downloading a new file.
-// This will allow for true in-place editing without needing to re-upload a new file each time. We can detect this scenario by checking if the current URL has a valid SharePoint file reference and if we're in edit mode, then use the SharePoint REST API to update the file content instead of triggering a download.
-function saveConfig() {
+async function saveConfig() {
   const config = buildConfig();
   const json = JSON.stringify(config, null, 2);
+
+  if (DataLaVistaState.lastPublishedUrl && DataLaVistaState.reportUrl && DataLaVistaState.isSpSite) {
+    const reportUrl = DataLaVistaState.reportUrl;
+    const siteUrl = DataLaVistaState.spSiteUrl;
+    try {
+      if (reportUrl.includes('/Lists/')) {
+        await _saveConfigToSpList(json, reportUrl, siteUrl);
+      } else {
+        await _saveConfigToSpFile(json, reportUrl, siteUrl);
+      }
+      toast('Saved to SharePoint!', 'success');
+      setStatus('Report saved to SharePoint.', 'success');
+    } catch (err) {
+      toast((err && err.message) || 'Save to SharePoint failed.', 'error');
+      setStatus('Save to SharePoint failed. See console for details.', 'error');
+      console.error('Save to SharePoint failed:', err);
+    }
+    return;
+  }
+
   downloadText(json, (DataLaVistaState.design.title ? DataLaVistaState.design.title : 'DataLaVista-config') + '.json', 'application/json');
+}
+
+async function _saveConfigToSpFile(json, reportUrl, siteUrl) {
+  const origin = new URL(siteUrl).origin;
+  const serverRelUrl = reportUrl.startsWith(origin) ? reportUrl.slice(origin.length) : reportUrl;
+  const lastSlash = serverRelUrl.lastIndexOf('/');
+  const folderRelUrl = serverRelUrl.substring(0, lastSlash);
+  const filename = decodeURIComponent(serverRelUrl.substring(lastSlash + 1));
+  const enc = encodeURIComponent(folderRelUrl);
+  const res = await spFetchWrite(
+    `${siteUrl}/_api/web/GetFolderByServerRelativeUrl('${enc}')/Files/add(url='${encodeURIComponent(filename)}',overwrite=true)`,
+    { method: 'POST', headers: { 'Accept': 'application/json' }, body: json },
+    siteUrl
+  );
+  if (!res.ok) { const t = await res.text(); throw new Error(`Save failed (${res.status}): ${t}`); }
+}
+
+async function _saveConfigToSpList(json, reportUrl, siteUrl) {
+  const listsMatch = reportUrl.match(/\/Lists\/([^/]+)\/Attachments\/(\d+)\/([^/]+)/);
+  if (!listsMatch) throw new Error('Unable to parse SharePoint list URL for save.');
+  const [, listTitle, itemId, filenameEnc] = listsMatch;
+  const filename = decodeURIComponent(filenameEnc);
+  const enc = encodeURIComponent(listTitle);
+  try {
+    await spFetchWrite(
+      `${siteUrl}/_api/web/lists/getbytitle('${enc}')/items(${itemId})/AttachmentFiles/getbyfilename('${encodeURIComponent(filename)}')`,
+      { method: 'POST', headers: { 'X-HTTP-Method': 'DELETE' } },
+      siteUrl
+    );
+  } catch(e) {}
+  const ar = await spFetchWrite(
+    `${siteUrl}/_api/web/lists/getbytitle('${enc}')/items(${itemId})/AttachmentFiles/add(FileName='${encodeURIComponent(filename)}')`,
+    { method: 'POST', headers: { 'Accept': 'application/json' }, body: json },
+    siteUrl
+  );
+  if (!ar.ok) { const t = await ar.text(); throw new Error(`Save failed (${ar.status}): ${t}`); }
 }
 
 // Build a clean, minimal config object from the current state, suitable for saving or sharing
@@ -18133,7 +18184,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         _lastGeneratedJson = JSON.stringify(buildConfig(), null, 2);
 
         /** @type {HTMLButtonElement} */ (document.getElementById('btn-copy-json')).disabled = false;
-        /** @type {HTMLButtonElement} */ (document.getElementById('btn-dl-json')).disabled = false;
 
         setStatus('Report config ready.', 'success');
         toast('Report generated!', 'success');
@@ -18210,11 +18260,14 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         const link = /** @type {HTMLAnchorElement|null} */ (document.getElementById('gen-publish-url'));
         if (!container || !link || !url) return;
         _lastPublishedUrl = url;
+        DataLaVistaState.lastPublishedUrl = url;
         link.textContent = url.length > 86
           ? url.slice(0, 40) + '\u2026' + url.slice(-45)
           : url;
         link.href = url;
         container.style.display = 'flex';
+        const saveBtn = /** @type {HTMLButtonElement|null} */ (document.getElementById('btn-save-config'));
+        if (saveBtn) saveBtn.textContent = '☁ Save to SharePoint';
       }
 
       function sharePublishedUrl() {
@@ -18438,7 +18491,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 
 
     if (DataLaVistaState.reportMode === 'view') {
-        /* *** DATALAVISTA REPORT MODE *** */
+        /* *** DATALAVISTA REPORT VIEW MODE *** */
         swapReportMode('view'); // Apply report mode UI classes and button visibility
         if(reportParam && reportParam.trim() !== '') {
           document.getElementById('preview-canvas').innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-secondary);font-size:14px">Your DataLaVista dashboard is loading...</div>';
@@ -18451,7 +18504,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         
         await loadReportFromUrl(reportParam);
       } else {
-        /* *** DATALAVISTA DESIGNER MODE *** */
+        /* *** DATALAVISTA DESIGNER EDIT MODE *** */
         swapReportMode('edit'); // Apply report mode UI classes and button visibility
         initToolbox();
         initResizers();
@@ -18509,6 +18562,17 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
             setStatus('Loading report…', 'loading');
             const cfg = await fetchJSONWithFallbacks(reportParam);
             await loadConfig(cfg);
+            // If on SP and reportUrl matches the same SP tenant/site collection, show the published URL
+            // as if the user had already published, and wire Save to write back to SharePoint.
+            if (DataLaVistaState.isSpSite && DataLaVistaState.reportUrl) {
+              const spSiteUrl = DataLaVistaState.spSiteUrl;
+              const spBase = spSiteUrl.substring(0, spSiteUrl.lastIndexOf('/') + 1);
+              if (spBase && DataLaVistaState.reportUrl.startsWith(spBase)) {
+                const dlvUrl = new URL(window.location.href);
+                const publishedUrl = dlvUrl.origin + dlvUrl.pathname + '?report=' + encodeURIComponent(DataLaVistaState.reportUrl);
+                _showPublishResult(publishedUrl);
+              }
+            }
           } catch (err) {
             toast('Unable to load report.', 'error');
             console.log('❌ DataLaVista was unable to load the report: \n ' + err.message);
