@@ -525,6 +525,7 @@ async function loadConfig(cfg) {
   renderFilterBar();
   updateDashboardTitleTooltipIcon(); // apply info icon if tooltip is set
 
+  let querySucceeded = false;
   try{
     if(DataLaVistaState.reportMode === 'view' || DataLaVistaState.activeTab === 'dashboardPreview') {
       setStatus('Refreshing dashboard preview...', 'info');
@@ -534,10 +535,7 @@ async function loadConfig(cfg) {
       await runQuery();
     }
     DataLaVistaState.queryResultsReady = true;
-    if(DataLaVistaCore.reportMode!=='view') {
-      showUseInDesign();
-    }
-    
+    querySucceeded = true;
   } catch(e) {
     console.warn('Error refreshing dashboard preview after config load:', e);
   }
@@ -553,6 +551,9 @@ async function loadConfig(cfg) {
     // that were saved with the config, so the user lands on the right panel.
     setQBMode(DataLaVistaState.queryMode || 'basic');
     switchQMTab(DataLaVistaState.qmTab || 'qb');
+    // Re-enable design tabs after all renders/mode-switches, since rebuildBasicSQL()
+    // called by setQBMode() invokes hideUseInDesign() which would disable them.
+    if (querySucceeded) showUseInDesign();
     setStatus('Config loaded', 'success');
     toast('Config loaded successfully', 'success');
   }

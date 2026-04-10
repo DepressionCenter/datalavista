@@ -268,9 +268,30 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           renderDashboardTitleProperties();
         });
         
+        // If a report URL was provided with reportMode=Edit, populate config-url and load it into the designer
+        if (reportParam && reportParam.trim() !== '') {
+          const configUrlEl = /** @type {HTMLInputElement|null} */ (document.getElementById('config-url'));
+          if (configUrlEl) configUrlEl.value = DataLaVistaState.reportUrl || reportParam;
+          try {
+            showLoadingPopup('⏳ Loading report. Please wait...');
+            hideConnectPopup();
+            setStatus('Loading report…', 'loading');
+            const cfg = await fetchJSONWithFallbacks(reportParam);
+            await loadConfig(cfg);
+          } catch (err) {
+            toast('Unable to load report.', 'error');
+            console.log('❌ DataLaVista was unable to load the report: \n ' + err.message);
+            setStatus('DataLaVista was unable to load the report. See console for details', 'error');
+          } finally {
+            hideLoadingPopup();
+          }
+        }
+
         // Show the connect popup by default to encourage users to connect to their data,
         // but if we detect we're in SharePoint edit mode, hide it since it can interfere with page editing.
-        if (DataLaVistaState.isSpSite) {
+        if (reportParam && reportParam.trim() !== '') {
+          // Report was loaded — don't show the connect popup
+        } else if (DataLaVistaState.isSpSite) {
           // We are in SharePoint
           if (DataLaVistaState.spPageMode=='edit') {
             // If we're in SharePoint edit mode, hide the connect popup since it can interfere with page editing.
