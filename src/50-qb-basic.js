@@ -578,7 +578,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         area.innerHTML = renderConditionRows(
           DataLaVistaState.basicQB.conditions, cols,
           (ci, v) => `DataLaVistaState.basicQB.conditions[${ci}].conj=${v}; rebuildBasicSQL()`,
-          (ci, v) => `DataLaVistaState.basicQB.conditions[${ci}].field=${v}; DataLaVistaState.basicQB.conditions[${ci}].value=''; DataLaVistaState.basicQB.conditions[${ci}].value2=''; DataLaVistaState.basicQB.conditions[${ci}].elementKey=''; renderBasicConditions(); rebuildBasicSQL()`,
+          (ci, v) => `DataLaVistaState.basicQB.conditions[${ci}].field=${v}; DataLaVistaState.basicQB.conditions[${ci}].value=(sniffType(${v})==='boolean'?'true':''); DataLaVistaState.basicQB.conditions[${ci}].value2=''; DataLaVistaState.basicQB.conditions[${ci}].elementKey=''; renderBasicConditions(); rebuildBasicSQL()`,
           (ci, v) => `DataLaVistaState.basicQB.conditions[${ci}].op=${v}; renderBasicConditions(); rebuildBasicSQL()`,
           (ci, v) => `DataLaVistaState.basicQB.conditions[${ci}].value=${v}; rebuildBasicSQL()`,
           (ci)    => `removeBasicCondition(${ci})`,

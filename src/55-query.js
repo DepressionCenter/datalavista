@@ -133,7 +133,19 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       function showQueryPreview(results) {
         const wrap  = document.getElementById('preview-table-wrap');
         const count = document.getElementById('preview-row-count');
-        count.textContent = `${results.length} rows (showing top 20)`;
+
+        // Extract last LIMIT clause value from the current SQL (digits only — safe for attribute injection)
+        const sql = DataLaVistaState.sql || '';
+        const limitMatches = [...sql.matchAll(/\bLIMIT\s+(\d+)/gi)];
+        const limitVal = limitMatches.length ? limitMatches[limitMatches.length - 1][1] : null;
+
+        const previewTip = 'This preview displays a maximum of 20 rows.';
+        const limitTip   = 'The number of results is currently limited to this number. Before publishing your dashboard, you may want to remove the row limit in the query builder properties.';
+        const rowsSpan   = '<span data-dlv-tip="' + previewTip + '">' + results.length + ' rows (showing top 20)</span>';
+        const limitSpan  = limitVal
+          ? ' <span style="color:red;font-size:smaller" data-dlv-tip="' + limitTip + '">Results limited to: ' + limitVal + '</span>'
+          : '';
+        count.innerHTML = rowsSpan + limitSpan;
 
         if (!results.length) {
           wrap.innerHTML = '<div class="text-muted text-sm" style="padding:12px">No results</div>';

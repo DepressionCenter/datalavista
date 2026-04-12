@@ -1469,18 +1469,26 @@ function _buildChartOption(w, chartData) {
       function openWidgetFieldAdvProps(wid, fieldName, idx, role) {
         const w = DataLaVistaState.design.widgets.find(x => x.id === wid);
         if (!w) return;
-        if (!Array.isArray(w.seriesProps) || !w.seriesProps.length) w.seriesProps = _getSeriesProps(w);
-        const existing = w.seriesProps[idx] || {};
+        // For 'x' role, read/write from w.xProps to avoid colliding with seriesProps[0] (Y[0])
+        const isXRole = role === 'x';
+        if (!isXRole) {
+          if (!Array.isArray(w.seriesProps) || !w.seriesProps.length) w.seriesProps = _getSeriesProps(w);
+        }
+        const existing = isXRole ? (w.xProps || {}) : (w.seriesProps[idx] || {});
         const local = { label: existing.label || '', color: existing.color || '' };
         const esc = (s) => (s || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 
         const _fa = {};
         _fa.prop = (k, v) => { local[k] = v; };
         _fa.apply = () => {
-          if (!Array.isArray(w.seriesProps)) w.seriesProps = _getSeriesProps(w);
-          if (!w.seriesProps[idx]) w.seriesProps[idx] = { field: fieldName, agg: '', label: '', color: '', conditions: [] };
-          w.seriesProps[idx].label = local.label;
-          w.seriesProps[idx].color = local.color;
+          if (isXRole) {
+            w.xProps = Object.assign(w.xProps || {}, { label: local.label, color: local.color });
+          } else {
+            if (!Array.isArray(w.seriesProps)) w.seriesProps = _getSeriesProps(w);
+            if (!w.seriesProps[idx]) w.seriesProps[idx] = { field: fieldName, agg: '', label: '', color: '', conditions: [] };
+            w.seriesProps[idx].label = local.label;
+            w.seriesProps[idx].color = local.color;
+          }
           const ov = document.getElementById('_wfa-overlay');
           if (ov) ov.remove();
           _widgetRefresh(wid);
@@ -1678,7 +1686,7 @@ function _renderBarLineOptionsHTML(w, wid) {
 
         _s.condAdd = () => {
           if (!cols.length) return;
-          local.conditions.push({ conj: 'AND', field: cols[0], op: '=', value: '' });
+          local.conditions.push({ conj: 'AND', field: cols[0], op: '=', value: sniffType(cols[0]) === 'boolean' ? 'true' : '' });
           _s.rerender();
         };
         _s.condRemove = (ci) => { local.conditions.splice(ci, 1); _s.rerender(); };
@@ -1686,7 +1694,7 @@ function _renderBarLineOptionsHTML(w, wid) {
           if (!local.conditions[ci]) return;
           local.conditions[ci][prop] = val;
           // Reset op/value when switching fields or element keys to avoid stale ops/values
-          if (prop === 'field') { local.conditions[ci].op = '='; local.conditions[ci].value = ''; local.conditions[ci].value2 = ''; local.conditions[ci].elementKey = ''; }
+          if (prop === 'field') { local.conditions[ci].op = '='; local.conditions[ci].value = sniffType(local.conditions[ci].field) === 'boolean' ? 'true' : ''; local.conditions[ci].value2 = ''; local.conditions[ci].elementKey = ''; }
           if (prop === 'elementKey') { local.conditions[ci].op = '='; local.conditions[ci].value = ''; local.conditions[ci].value2 = ''; }
           if (prop === 'op' || prop === 'field' || prop === 'elementKey') _s.rerender();
         };
@@ -1854,7 +1862,7 @@ function _renderBarLineOptionsHTML(w, wid) {
         if (prop === 'op' || prop === 'field' || prop === 'elementKey') {
           if (prop === 'field' || prop === 'elementKey') {
             w.conditions[idx].op = '=';
-            w.conditions[idx].value = '';
+            w.conditions[idx].value = (prop === 'field' && sniffType(w.conditions[idx].field) === 'boolean') ? 'true' : '';
             w.conditions[idx].value2 = '';
             if (prop === 'field') w.conditions[idx].elementKey = '';
           }

@@ -602,7 +602,14 @@ async function loadConfig(cfg) {
     renderAdvancedQB();
     // Restore the QB mode (basic/advanced) and active sub-tab (qb/sql/dataPreview)
     // that were saved with the config, so the user lands on the right panel.
+    // Temporarily lock SQL so rebuildBasicSQL/rebuildAdvancedSQL inside setQBMode
+    // don't overwrite the SQL that was loaded from the config.
+    const _savedSqlLocked = DataLaVistaState.sqlLocked;
+    DataLaVistaState.sqlLocked = true;
     setQBMode(DataLaVistaState.queryMode || 'basic');
+    DataLaVistaState.sqlLocked = _savedSqlLocked;
+    // Re-apply the loaded SQL and editor state after QB mode is set
+    if (DataLaVistaState.sql && /** @type {any} */ (window)._cmEditor) /** @type {any} */ (window)._cmEditor.setValue(DataLaVistaState.sql);
     switchQMTab(DataLaVistaState.qmTab || 'qb');
     // Re-enable design tabs after all renders/mode-switches, since rebuildBasicSQL()
     // called by setQBMode() invokes hideUseInDesign() which would disable them.
