@@ -1206,7 +1206,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         // Reset op/value when field or elementKey changes to avoid stale operators/values
         if (prop === 'field' || prop === 'elementKey') {
           nd.conditions[idx].op = '=';
-          nd.conditions[idx].value = '';
+          nd.conditions[idx].value = (prop === 'field' && sniffType(nd.conditions[idx].field) === 'boolean') ? 'true' : '';
           nd.conditions[idx].value2 = '';
           if (prop === 'field') nd.conditions[idx].elementKey = '';
         }
