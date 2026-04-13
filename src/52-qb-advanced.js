@@ -314,7 +314,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
             const parentT = DataLaVistaState.tables[rel.parentTableKey];
             const childFieldAlias  = (childT?.fields || []).find(f => f.internalName === rel.childField)?.alias || rel.childField;
             const parentFieldAlias = (parentT?.fields || []).find(f => f.internalName === rel.parentField)?.alias || rel.parentField;
-            joinType = (rel.source === 'sharepoint-lookup' && rel.isMultiSelect) ? 'DLV_INCLUDES' : (rel.joinType || 'LEFT');
+            joinType = (rel.source === 'sharepoint-lookup' && rel.isMultiSelect) ? 'DLV_LOOKUP' : (rel.joinType || 'LEFT');
             fromKey  = childFieldAlias;
             toKey    = parentFieldAlias;
             fromNodeId = existingTableToNodes[rel.childTableKey][0];
@@ -954,7 +954,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
             { val: 'CROSS',    label: 'Cross Join',          desc: 'ℹ️ Combine tables, repeating all rows in 2nd table for every row in 1st table' },
             { val: 'UNION',    label: 'Union',               desc: 'ℹ️ Combine tables, removing duplicate rows' },
             { val: 'UNION ALL',label: 'Union All',           desc: 'ℹ️ Combine tables, keeping duplicate rows' },
-            { val: 'DLV_INCLUDES', label: 'Lookup Join (SP)',    desc: 'ℹ️ SharePoint lookup join — uses DLV_INCLUDES() to match lookup array against parent ID' }
+            { val: 'DLV_LOOKUP',   label: 'Lookup Join (SP)',    desc: 'ℹ️ SharePoint multi-select lookup join — uses DLV_LOOKUP() to pre-expand the array and do a clean JOIN' }
           ];
 
           const augmentFields = (t, tableKey) => {
@@ -1712,10 +1712,15 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           normalizeJoinKeys(j);
           if (j.type === 'CROSS') {
             sql += `\nCROSS JOIN ${fromFrag(newNodeId, newNd)}`;
-            //TODO: Remove legacy INCLUDES
-          } else if (j.type === 'DLV_INCLUDES' || j.type === 'INCLUDES') {
+          } else if (j.type === 'DLV_LOOKUP' || j.type === 'DLV_INCLUDES' || j.type === 'INCLUDES') {
             const kp = j.keys[0];
-            sql += `\nLEFT JOIN ${fromFrag(newNodeId, newNd)} ON DLV_INCLUDES([${fromAlias}].[${kp.fromKey}], 'Id', [${toAlias}].[${kp.toKey}])`;
+            // DLV_LOOKUP pre-expands the array once and returns a joinable table — O(n) vs O(n*m).
+            // Use toAlias as the lookup alias so existing SELECT field references stay valid.
+            const localViewName  = getView(fromNd.tableName);
+            const remoteViewName = getView(toNd.tableName);
+            const localPK = 'Id';
+            const parentKeyCol = `${localViewName}_${localPK}`;
+            sql += `\nLEFT JOIN DLV_LOOKUP('${localViewName}.${kp.fromKey}', '${localViewName}.${localPK} = ${remoteViewName}.${kp.toKey}') AS [${toAlias}] ON [${fromAlias}].[${localPK}] = [${toAlias}].[${parentKeyCol}]`;
           } else {
             const onClauses = j.keys.map(kp => `[${fromAlias}].[${kp.fromKey}] = [${toAlias}].[${kp.toKey}]`).join(' AND ');
             sql += `\n${j.type} JOIN ${fromFrag(newNodeId, newNd)} ON ${onClauses}`;

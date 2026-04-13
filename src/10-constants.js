@@ -70,7 +70,7 @@ const DataLaVistaCore = {
   'MATRIX', 'OF', 'STRING', 'NUMBER', 'DATE', 'BOOLEAN', 'OBJECT', 'SEARCH',
   'REPLACE', 'REMOVE', 'RENAME', 'MODIFY', 'REINDEX', 'TRUNCATE', 'BEGIN',
   'COMMIT', 'ROLLBACK', 'TRANSACTION', 'SAVEPOINT', 'RELEASE',
-  'DLV_ARRAY_MATCH', 'DLV_ARRAY_EMPTY', 'DLV_ARRAY_EXPAND', 'DLV_ARRAY_EXTRACT_ELEMENT',
+  'DLV_ARRAY_MATCH', 'DLV_ARRAY_EMPTY', 'DLV_ARRAY_EXPAND', 'DLV_ARRAY_EXTRACT_ELEMENT', 'DLV_ARRAY_INCLUDES',
   'DLV_JOIN', 'DLV_LOOKUP', 'DLV_KEYS', 'DLV_DROP', 'DLV_DISPLAY', 'DLV_IDS', 
   'DLV_EMAIL','DLV_EMAILS', 'DLV_PICTURE_URL','DLV_NORMALIZE_DATE',
   'DLV_TAX_LABELS','DLV_TAX_IDS','DLV_PARSE_BOOL', 'DLV_PARSE_DATE'
@@ -791,11 +791,11 @@ function condToSQL(c, colExpr, displayType) {
     return `${colExpr}->length ${lop} ${v}`;
   }
 
-  // ── array-of-objects — DLV_INCLUDES ──────────────────────────────────────
+  // ── array-of-objects — DLV_ARRAY_INCLUDES ────────────────────────────────
   if (ek && ['=','!=','>','>=','<','<='].includes(op)) {
     const v = _fmtSQLVal(raw, dt);
-    if (op === '=') return `DLV_INCLUDES(${colExpr}, '${ek}', ${v})`;
-    return `DLV_INCLUDES(${colExpr}, '${ek}', ${v}, '${op}')`;
+    if (op === '=') return `DLV_ARRAY_INCLUDES(${colExpr}, '${ek}', ${v})`;
+    return `DLV_ARRAY_INCLUDES(${colExpr}, '${ek}', ${v}, '${op}')`;
   }
 
   // ── standard comparison ────────────────────────────────────────────────────
@@ -1046,7 +1046,6 @@ function safeJSONParse(str, label) {
 
 // Compare two values with SQL-like operators, treating null/undefined as SQL NULL (null = null is true, but null < 5 is false).
 function sqlCompare(a, op, b) {
-  console.log('DEBUG: sqlCompare', { a, op, b });
     // Null checks
     if (op === '='  || op === '==') return a == null ? b == null : a === b;  // null = null is true
     if (op === '!=' || op === '<>') return a == null ? b != null : a !== b;

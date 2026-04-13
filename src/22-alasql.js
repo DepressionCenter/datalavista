@@ -78,6 +78,12 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         const op = operator || '=';
 
         if (elementName != null && elementName !== '') {
+            if (op === '=') {
+                return lookupArray.some(member =>
+                    member && member[elementName] != null &&
+                    member[elementName] === elementValue
+                );
+            }
             return lookupArray.some(member =>
                 member && member[elementName] != null &&
                 sqlCompare(member[elementName], op, elementValue)
@@ -93,11 +99,13 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         );
     };
 
-    // Legacy wrapper — calls DLV_INCLUDES with no elementName (triggers Id/ID/id fallback)
-    // TODO: Delete this once all code is migrated to DLV_INCLUDES,
-    // and replace INCLUDES() with DLV_INCLUDES() in any SQL loaded through loadConfig().
+    // DLV_ARRAY_INCLUDES is the canonical name; DLV_INCLUDES kept for backward compat with saved SQL.
+    alasql.fn.DLV_ARRAY_INCLUDES = alasql.fn.DLV_INCLUDES;
+
+    // Legacy wrapper — calls DLV_ARRAY_INCLUDES with no elementName (triggers Id/ID/id fallback).
+    // TODO: Delete once all saved SQL is migrated off INCLUDES().
     alasql.fn.INCLUDES = function (lookupArray, itemKey) {
-        return alasql.fn.DLV_INCLUDES(lookupArray, null, itemKey);
+        return alasql.fn.DLV_ARRAY_INCLUDES(lookupArray, null, itemKey);
     };
 
 
@@ -230,8 +238,20 @@ alasql.from.DLV_LOOKUP = function(localParam, joinParam, cb, idx, query) {
   const parentKeyColName = `${localTable}_${localPK}`;
 
   // ── 2. Get local table rows (PK + lookup array column) ────────────────────
+  // *Data columns are view-only synthetics — never fall back to raw tables.
+  // alasql 4.17+ lazy-compiles a view's .select() on first direct JOIN; pre-warm
+  // both views here so the nested alasql() calls below don't hit that error.
+  const _ensureView = (name) => {
+    try {
+      if (alasql.tables?.[name]?.view && typeof alasql.tables[name].select !== 'function') {
+        alasql(`SELECT * FROM [${name}] LIMIT 0`);
+      }
+    } catch(_) {}
+  };
+
   let sourceRows;
   try {
+    _ensureView(localTable);
     sourceRows = alasql(`SELECT * FROM [${localTable}]`);
   } catch(e) {
     console.error('[DLV_LOOKUP] Failed to query local table:', e.message);
@@ -242,6 +262,7 @@ alasql.from.DLV_LOOKUP = function(localParam, joinParam, cb, idx, query) {
   // ── 3. Get remote table, build Map keyed by remotePK ─────────────────────
   let remoteRows;
   try {
+    _ensureView(remoteTable);
     remoteRows = alasql(`SELECT * FROM [${remoteTable}]`);
   } catch(e) {
     console.error('[DLV_LOOKUP] Failed to query remote table:', e.message);

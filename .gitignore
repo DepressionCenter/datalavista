@@ -9,6 +9,7 @@
 .claudeignore
 .gemini/
 .copilot/
+CLAUDE.md
 
 # Ignore temporary files
 *.tmp

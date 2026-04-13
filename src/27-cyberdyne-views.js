@@ -545,7 +545,7 @@ validateAliasUniqueness(fields) {
         const typeStr = (field.TypeAsString || field.type || '').toLowerCase();
         const isMultiSelect = typeStr.includes('multi') || typeStr.includes('multichoice');
         const childJoinField = isMultiSelect
-          ? field.alias + 'Data'   // array field → DLV_INCLUDES join
+          ? field.alias + 'Data'   // array field → DLV_LOOKUP join
           : field.alias + 'Id';    // scalar FK  → regular LEFT JOIN
 
         const exists = DataLaVistaState.relationships.some(r =>
