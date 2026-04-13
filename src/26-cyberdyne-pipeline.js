@@ -276,12 +276,11 @@ const CyberdynePipeline = {
     const alasqlName = '_raw_' + rawTableName;
     const existing = Object.keys(alasql.tables).find(k => k.toLowerCase() === alasqlName.toLowerCase());
     if (existing) {
-      // Update data in-place so any VIEW referencing this table stays valid
-      alasql.tables[existing].data = data;
+      alasql(`TRUNCATE TABLE [${existing}]`);
+      alasql(`INSERT INTO [${existing}] SELECT * FROM ?`, [data]);
     } else {
       alasql(`CREATE TABLE [${alasqlName}]`);
-      const actual = Object.keys(alasql.tables).find(k => k.toLowerCase() === alasqlName.toLowerCase()) || alasqlName;
-      alasql.tables[actual].data = data;
+      alasql(`INSERT INTO [${alasqlName}] SELECT * FROM ?`, [data]);
     }
   },
 

@@ -220,12 +220,11 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       const alasqlName = '_raw_' + tableKey;
       const existing = Object.keys(alasql.tables).find(k => k.toLowerCase() === alasqlName.toLowerCase());
       if (existing) {
-        // Update data in-place so any VIEW referencing this table stays valid
-        alasql.tables[existing].data = t.data;
+        alasql(`TRUNCATE TABLE [${existing}]`);
+        alasql(`INSERT INTO [${existing}] SELECT * FROM ?`, [t.data]);
       } else {
         alasql(`CREATE TABLE [${alasqlName}]`);
-        const actual = Object.keys(alasql.tables).find(k => k.toLowerCase() === alasqlName.toLowerCase()) || alasqlName;
-        alasql.tables[actual].data = t.data;
+        alasql(`INSERT INTO [${alasqlName}] SELECT * FROM ?`, [t.data]);
       }
     }
 

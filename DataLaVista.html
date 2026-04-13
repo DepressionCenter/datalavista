@@ -25,11 +25,10 @@ with this program. If not, see https://www.gnu.org/licenses/.
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>DataLaVista™: Reports & Dashboards</title>
+  <title>DataLaVista™: Dashboard Designer</title>
 
   <!-- AlaSQL -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/alasql/4.1.3/alasql.min.js"></script>
-  <!--script src="https://cdn.jsdelivr.net/npm/alasql@4.17.2/dist/alasql.min.js" integrity="sha256-cSUWm7ESD8Wh7fMFQMkVwlbYugKkhpH1q6bPGIZy9bg=" crossorigin="anonymous"></script -->
+  <script src="https://cdn.jsdelivr.net/npm/alasql@4.17.2/dist/alasql.min.js" integrity="sha256-cSUWm7ESD8Wh7fMFQMkVwlbYugKkhpH1q6bPGIZy9bg=" crossorigin="anonymous"></script>
   <!-- ECharts -->
   <script src="https://cdn.jsdelivr.net/npm/echarts@6.0.0/dist/echarts.min.js" integrity="sha256-uqjf5+HZM2uY6Jhrp+IOoV582+oe9CpZ1ZR4Yy+kWh0=" crossorigin="anonymous"></script>
   <!-- SheetJS v0.18.5 -->
@@ -3956,8 +3955,8 @@ const DataLaVistaCore = {
   'MATRIX', 'OF', 'STRING', 'NUMBER', 'DATE', 'BOOLEAN', 'OBJECT', 'SEARCH',
   'REPLACE', 'REMOVE', 'RENAME', 'MODIFY', 'REINDEX', 'TRUNCATE', 'BEGIN',
   'COMMIT', 'ROLLBACK', 'TRANSACTION', 'SAVEPOINT', 'RELEASE',
-  'DLV_ARRAY_MATCH', 'DLV_ARRAY_EMPTY', 'DLV_INCLUDES', 'DLV_JOIN', 'DLV_KEYS',
-  'DLV_DROP', 'DLV_DISPLAY', 'DLV_IDS', 
+  'DLV_ARRAY_MATCH', 'DLV_ARRAY_EMPTY', 'DLV_ARRAY_EXPAND', 'DLV_ARRAY_EXTRACT_ELEMENT',
+  'DLV_JOIN', 'DLV_LOOKUP', 'DLV_KEYS', 'DLV_DROP', 'DLV_DISPLAY', 'DLV_IDS', 
   'DLV_EMAIL','DLV_EMAILS', 'DLV_PICTURE_URL','DLV_NORMALIZE_DATE',
   'DLV_TAX_LABELS','DLV_TAX_IDS','DLV_PARSE_BOOL', 'DLV_PARSE_DATE'
 ],
@@ -4932,6 +4931,7 @@ function safeJSONParse(str, label) {
 
 // Compare two values with SQL-like operators, treating null/undefined as SQL NULL (null = null is true, but null < 5 is false).
 function sqlCompare(a, op, b) {
+  console.log('DEBUG: sqlCompare', { a, op, b });
     // Null checks
     if (op === '='  || op === '==') return a == null ? b == null : a === b;  // null = null is true
     if (op === '!=' || op === '<>') return a == null ? b != null : a !== b;
@@ -5090,12 +5090,12 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
  * DLV_ARRAY_EXPAND
  * Expands an array-of-objects column into a flat result set.
  *
- * @param {string} tableName  - Table or view name
+ * @param {string} tableName  - Table or view name that contains the array or lookup column to expand
  * @param {string} opts       - JSON string with options:
  *   @param {string}   opts.columnToExpand  - (required) Column containing array of objects
- *   @param {string}   [opts.parentId]      - Field to use as ParentId; falls back to Id, ID, or row number
- *   @param {string[]} [opts.elements]      - Child fields to include; omit for all fields
- *   @param {boolean}  [opts.skipEmptyArrays=false] - Skip rows with null/empty arrays
+ *   @param {string}   [opts.parentId]      - Field to use as primary key of the table that contains the lookup; falls back to Id, ID, key, TableId, or row number
+ *   @param {string[]} [opts.elements]      - Child fields from lookup column to include; defaults to Id
+ *   @param {boolean}  [opts.skipEmptyArrays=false] - Skip rows with null/empty arrays (false by default, which will return one row with nulls for child fields - left join)
  *
  * Output columns: ParentId, ParentRowNumber, ChildRowNumber, ...(child fields)
  *
@@ -5114,7 +5114,7 @@ alasql.from.DLV_ARRAY_EXPAND = function(tableName, opts, cb, idx, query) {
             parentIdField   = parsed.parentId       || null;
             columnToExpand  = parsed.columnToExpand || null;
             elements        = Array.isArray(parsed.elements) && parsed.elements.length > 0 ? parsed.elements : null;
-            skipEmptyArrays = parsed.skipEmptyArrays === true;
+            skipEmptyArrays = parsed.skipEmptyArrays === false;
         } catch(e) {}
     }
 
@@ -5123,11 +5123,12 @@ alasql.from.DLV_ARRAY_EXPAND = function(tableName, opts, cb, idx, query) {
         return [];
     }
 
+    const selectParentIdColumn = 'COALESCE(' + (parentIdField ? parentIdField + ',' : '') + 'Id,ID,key,' + tableName + 'Id) AS ParentId';
     const whereClause = skipEmptyArrays
         ? ' WHERE ' + columnToExpand + ' IS NOT NULL AND ' + columnToExpand + '->length > 0'
         : '';
 
-    const sqlQuery = 'SELECT COALESCE(' + (parentIdField ? parentIdField + ',' : '') + 'Id,ID) AS ParentId, ROWNUM() AS RowNumber, ' + columnToExpand + ' FROM ' + tableName + whereClause;
+    const sqlQuery = 'SELECT ' + selectParentIdColumn + ', ROWNUM() AS RowNumber, ' + columnToExpand + ' FROM ' + tableName + whereClause;
     const data = alasql(sqlQuery);
     const results = [];
 
@@ -5151,6 +5152,110 @@ alasql.from.DLV_ARRAY_EXPAND = function(tableName, opts, cb, idx, query) {
     if (cb) return cb(results, idx, query);
     return results;
 };
+
+
+/**
+ * DLV_LOOKUP
+ * Expands a local lookup array and joins it against a remote table.
+ *
+ * @param {string} localParam  - "LocalTable.LookupColumn"
+ * @param {string} joinParam   - "LocalTable.LocalPK = RemoteTable.RemoteKey"
+ *
+ * Output: all remote table columns + {LocalTable}_{LocalPK} for joining back
+ *
+ * Example:
+ *   LEFT JOIN DLV_LOOKUP('EventSummary.AttendeesData', 'EventSummary.ID = People.ID') AS [Attendees]
+ *     ON [EventSummary].[ID] = [Attendees].[EventSummary_ID]
+ */
+alasql.from.DLV_LOOKUP = function(localParam, joinParam, cb, idx, query) {
+
+  // ── 1. Parse params by splitting on '.' and '=' ───────────────────────────
+  const [localTable,  lookupColumn] = localParam.split('.');
+  const [leftSide,    rightSide]    = joinParam.split('=').map(s => s.trim());
+  const [, localPK]                 = leftSide.split('.');
+  const [remoteTable, remotePK]     = rightSide.split('.');
+
+  if (!localTable || !lookupColumn || !localPK || !remoteTable || !remotePK) {
+    console.error('[DLV_LOOKUP] Could not parse params:', localParam, joinParam);
+    if (cb) return cb([], idx, query);
+    return [];
+  }
+
+  const parentKeyColName = `${localTable}_${localPK}`;
+
+  // ── 2. Get local table rows (PK + lookup array column) ────────────────────
+  let sourceRows;
+  try {
+    sourceRows = alasql(`SELECT * FROM [${localTable}]`);
+  } catch(e) {
+    console.error('[DLV_LOOKUP] Failed to query local table:', e.message);
+    if (cb) return cb([], idx, query);
+    return [];
+  }
+
+  // ── 3. Get remote table, build Map keyed by remotePK ─────────────────────
+  let remoteRows;
+  try {
+    remoteRows = alasql(`SELECT * FROM [${remoteTable}]`);
+  } catch(e) {
+    console.error('[DLV_LOOKUP] Failed to query remote table:', e.message);
+    if (cb) return cb([], idx, query);
+    return [];
+  }
+
+  // Build lookup map — try exact remotePK field name, then 'Id' as Pascal fallback
+  // e.g. remotePK = 'ID' → also try 'Id'
+  const remoteMap = new Map();
+  for (const row of remoteRows) {
+    const keyVal = row[remotePK] ?? row['Id'] ?? row['ID'] ?? row['id'];
+    if (keyVal != null) {
+      if (!remoteMap.has(keyVal)) remoteMap.set(keyVal, []);
+      remoteMap.get(keyVal).push(row);
+    }
+  }
+
+  // ── 4. Expand array + join ────────────────────────────────────────────────
+  const results = [];
+
+  for (const sourceRow of sourceRows) {
+    const parentId = sourceRow[localPK] ?? sourceRow['Id'] ?? sourceRow['ID'];
+    const arr      = sourceRow[lookupColumn];
+
+    if (!arr || !Array.isArray(arr) || arr.length === 0) {
+      // LEFT JOIN semantics: keep parent, nulls for remote columns
+      results.push({ [parentKeyColName]: parentId });
+      continue;
+    }
+
+    for (const element of arr) {
+      // Array element e.g. { Id: 5, Title: 'John Smith' }
+      // Extract the key that points to the remote table PK
+      const elementKeyVal = element[remotePK] ?? element['Id'] ?? element['ID'] ?? element['id'];
+
+      if (elementKeyVal == null) {
+        results.push({ [parentKeyColName]: parentId });
+        continue;
+      }
+
+      const matched = remoteMap.get(elementKeyVal);
+      if (!matched || matched.length === 0) {
+        // No remote match — LEFT JOIN: emit with nulls
+        results.push({ [parentKeyColName]: parentId });
+      } else {
+        for (const remoteRow of matched) {
+          results.push({
+            ...remoteRow,                  // all remote table columns
+            [parentKeyColName]: parentId   // parent PK tag — last so it can't be clobbered
+          });
+        }
+      }
+    }
+  }
+
+  if (cb) return cb(results, idx, query);
+  return results;
+};
+
 
 /**
  * DLV_ARRAY_EXTRACT_ELEMENT
@@ -5477,6 +5582,7 @@ alasql.from.DLV_ARRAY_EXTRACT_ELEMENT = function(tableName, opts, cb, idx, query
      */
     function preprocessSQL(sql) {
       // Only process plain SELECT statements
+      // TODO: Why this restriction? Can we safely handle more complex queries (e.g. with CTEs, subqueries, unions) by applying this logic to each SELECT clause?
       const selectRe = /^(\s*SELECT\s+)([\s\S]+?)(\s+FROM\b)/i;
       const m = sql.match(selectRe);
       if (!m) return sql;
@@ -5855,12 +5961,11 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       const alasqlName = '_raw_' + tableKey;
       const existing = Object.keys(alasql.tables).find(k => k.toLowerCase() === alasqlName.toLowerCase());
       if (existing) {
-        // Update data in-place so any VIEW referencing this table stays valid
-        alasql.tables[existing].data = t.data;
+        alasql(`TRUNCATE TABLE [${existing}]`);
+        alasql(`INSERT INTO [${existing}] SELECT * FROM ?`, [t.data]);
       } else {
         alasql(`CREATE TABLE [${alasqlName}]`);
-        const actual = Object.keys(alasql.tables).find(k => k.toLowerCase() === alasqlName.toLowerCase()) || alasqlName;
-        alasql.tables[actual].data = t.data;
+        alasql(`INSERT INTO [${alasqlName}] SELECT * FROM ?`, [t.data]);
       }
     }
 
@@ -8922,12 +9027,11 @@ const CyberdynePipeline = {
     const alasqlName = '_raw_' + rawTableName;
     const existing = Object.keys(alasql.tables).find(k => k.toLowerCase() === alasqlName.toLowerCase());
     if (existing) {
-      // Update data in-place so any VIEW referencing this table stays valid
-      alasql.tables[existing].data = data;
+      alasql(`TRUNCATE TABLE [${existing}]`);
+      alasql(`INSERT INTO [${existing}] SELECT * FROM ?`, [data]);
     } else {
       alasql(`CREATE TABLE [${alasqlName}]`);
-      const actual = Object.keys(alasql.tables).find(k => k.toLowerCase() === alasqlName.toLowerCase()) || alasqlName;
-      alasql.tables[actual].data = data;
+      alasql(`INSERT INTO [${alasqlName}] SELECT * FROM ?`, [data]);
     }
   },
 
@@ -15154,6 +15258,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       // RUN QUERY
       // ============================================================
       async function runQuery() {
+        console.log('DEBUG: ' + Date.now() + ': Entered runQuery()');
         const sql = window._cmEditor ? window._cmEditor.getValue() : DataLaVistaState.sql;
         if (!sql.trim() && DataLaVistaState.reportMode !== 'view') { toast('Please enter a SQL query', 'error'); return; }
         DataLaVistaState.sql = sql;
@@ -15168,15 +15273,21 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         hideUseInDesign();
 
         try {
+          console.log('DEBUG: ' + Date.now() + ': Awaiting _executeQuery()...');
           const results = await _executeQuery(sql);
+          console.log('DEBUG: ' + Date.now() + ': _executeQuery() completed with # results:', results.length);
           // Evict autosuggest cache for dlv_results/dlv_active — columns may have changed
+          console.log('DEBUG: ' + Date.now() + ': Calling _dlvAcEvict("|") to clear autosuggest cache for dlv_results/dlv_active');
           _dlvAcEvict('|');
+          console.log('DEBUG: ' + Date.now() + ': Calling showQueryPreview()...');
           showQueryPreview(results);
+          console.log('DEBUG: ' + Date.now() + ': Calling renderDesignFieldsPanel()...');
           renderDesignFieldsPanel();
           if (DataLaVistaState.reportMode !== 'view') showUseInDesign();
           setStatus(`Query returned ${results.length} rows`, 'success');
           toast(`Query returned ${results.length} rows`, 'success');
         } catch (err) {
+          console.log('DEBUG: ' + Date.now() + ': Error occurred while executing query:', err);
           console.error(err);
           toast('Query error: ' + err.message, 'error');
           setStatus('Query error: ' + err.message, 'error');
@@ -15188,9 +15299,12 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       // Loads table data, registers AlaSQL tables/views, runs the SQL, and materializes
       // results into [dlv_results] / [dlv_active]. Returns the result rows array.
       async function _executeQuery(sql) {
+        console.log('DEBUG: ' + new Date().toLocaleString() + ': Entered _executeQuery()');
         const referencedTables = findReferencedTables(sql);
+        console.log('DEBUG: ' + new Date().toLocaleString() + ': findReferencedTables() found referenced tables:', referencedTables);
 
         for (const tname of referencedTables) {
+          console.log('DEBUG: ' + new Date().toLocaleString() + ': Ensuring data for referenced table:', tname);
           await ensureTableData(tname, true);
         }
 
@@ -15198,6 +15312,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           const t = DataLaVistaState.tables[tname];
           if (!t || !t.data || !t.data.length) continue;
 
+          console.log('DEBUG: ' + new Date().toLocaleString() + ': Registering table in AlaSQL:', tname);
           registerTableInAlaSQL(tname);
 
           const viewName = t.viewName || CyberdynePipeline.getViewForTable(tname);
@@ -15205,6 +15320,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
             // Only call updateViewSQL if the AlaSQL view object is missing — avoids errors
             // after loadConfig() which resets the metadata registry but not AlaSQL view objects.
             const alasqlViewExists = !!(alasql.tables?.[viewName]?.view);
+            console.log('DEBUG: ' + new Date().toLocaleString() + ': Checking if AlaSQL view exists for', viewName, ':', alasqlViewExists);
             if (!alasqlViewExists) {
               try { CyberdynePipeline.updateViewSQL(viewName); }
               catch (e) {
@@ -15217,14 +15333,36 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           }
         }
 
+        // Ensure .select is compiled on all views before running JOINs.
+        // New AlaSQL lazily compiles .select only when a view is used as primary FROM target;
+        // JOIN targets need it pre-compiled or the query fails.
+        for (const tname of referencedTables) {
+          const t = DataLaVistaState.tables[tname];
+          if (!t) continue;
+          const viewName = t.viewName || CyberdynePipeline.getViewForTable(tname);
+          if (viewName && alasql.tables?.[viewName]?.view) {
+            if (typeof alasql.tables[viewName].select !== 'function') {
+              try { alasql(`SELECT * FROM [${viewName}] LIMIT 0`); } catch(e) {
+                console.warn(`[_executeQuery] Failed to pre-compile .select for view ${viewName}:`, e.message);
+              }
+            }
+          }
+        }
+
+        console.log('DEBUG: Preprocessing SQL...');
         const processedSQL = preprocessSQL(sql);
+        console.log('DEBUG: ' + new Date().toLocaleString() + ': Processed SQL ready for execution:', processedSQL);
+
+        console.log('DEBUG: *** Executing SQL in AlaSQL... ***');
         const results = alasql(processedSQL);
+        console.log('DEBUG: ' + new Date().toLocaleString() + ': ***AlaSQL execution completed.*** # results:', results.length);
         if (!Array.isArray(results)) throw new Error('Query returned no results');
 
-        alasql('DROP TABLE IF EXISTS [dlv_results]');
+        console.log('DEBUG: Materializing results into [dlv_results] and [dlv_active]...');
+        // TODO: Instead of dropping/recreating tables/views on every query, could we ALTER TABLE? ALTER VIEW is not supported by alasql.
         alasql('DROP VIEW  IF EXISTS [dlv_active]');
-        alasql('CREATE TABLE [dlv_results]');
-        alasql.tables['dlv_results'].data = results;   // O(1) reference assignment
+        alasql('DROP TABLE IF EXISTS [dlv_results]');
+        alasql('SELECT * INTO [dlv_results] FROM ?', [results]);
         alasql('CREATE VIEW [dlv_active] AS SELECT * FROM [dlv_results]');
 
         DataLaVistaState.queryResultsReady = true;
@@ -18923,6 +19061,28 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         renderConditionRows,
         renderSortRows,
         showAggPopup,
+        showPropPopup,
+        setActiveJoinKeyProp,
+        removeActiveJoinKey,
+        addActiveJoinKey,
+        showWidgetFieldAggPopup,
+        setWidgetFieldAgg,
+        openSeriesAdvancedProps,
+        openWidgetFieldAdvProps,
+        _wpDragStart,
+        _wpDrop,
+        _wpDropFieldToSection,
+        _wpDragOver,
+        _wpDragLeave,
+        widgetAddYField,
+        widgetUpdateYField,
+        widgetRemoveYField,
+        widgetAddCond,
+        widgetUpdateCond,
+        widgetRemoveCond,
+        widgetAddSort,
+        widgetUpdateSort,
+        widgetRemoveSort,
         init
       };
 /* ============================================================

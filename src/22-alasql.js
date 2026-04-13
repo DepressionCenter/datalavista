@@ -136,12 +136,12 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
  * DLV_ARRAY_EXPAND
  * Expands an array-of-objects column into a flat result set.
  *
- * @param {string} tableName  - Table or view name
+ * @param {string} tableName  - Table or view name that contains the array or lookup column to expand
  * @param {string} opts       - JSON string with options:
  *   @param {string}   opts.columnToExpand  - (required) Column containing array of objects
- *   @param {string}   [opts.parentId]      - Field to use as ParentId; falls back to Id, ID, or row number
- *   @param {string[]} [opts.elements]      - Child fields to include; omit for all fields
- *   @param {boolean}  [opts.skipEmptyArrays=false] - Skip rows with null/empty arrays
+ *   @param {string}   [opts.parentId]      - Field to use as primary key of the table that contains the lookup; falls back to Id, ID, key, TableId, or row number
+ *   @param {string[]} [opts.elements]      - Child fields from lookup column to include; defaults to Id
+ *   @param {boolean}  [opts.skipEmptyArrays=false] - Skip rows with null/empty arrays (false by default, which will return one row with nulls for child fields - left join)
  *
  * Output columns: ParentId, ParentRowNumber, ChildRowNumber, ...(child fields)
  *
@@ -160,7 +160,7 @@ alasql.from.DLV_ARRAY_EXPAND = function(tableName, opts, cb, idx, query) {
             parentIdField   = parsed.parentId       || null;
             columnToExpand  = parsed.columnToExpand || null;
             elements        = Array.isArray(parsed.elements) && parsed.elements.length > 0 ? parsed.elements : null;
-            skipEmptyArrays = parsed.skipEmptyArrays === true;
+            skipEmptyArrays = parsed.skipEmptyArrays === false;
         } catch(e) {}
     }
 
@@ -169,11 +169,12 @@ alasql.from.DLV_ARRAY_EXPAND = function(tableName, opts, cb, idx, query) {
         return [];
     }
 
+    const selectParentIdColumn = 'COALESCE(' + (parentIdField ? parentIdField + ',' : '') + 'Id,ID,key,' + tableName + 'Id) AS ParentId';
     const whereClause = skipEmptyArrays
         ? ' WHERE ' + columnToExpand + ' IS NOT NULL AND ' + columnToExpand + '->length > 0'
         : '';
 
-    const sqlQuery = 'SELECT COALESCE(' + (parentIdField ? parentIdField + ',' : '') + 'Id,ID) AS ParentId, ROWNUM() AS RowNumber, ' + columnToExpand + ' FROM ' + tableName + whereClause;
+    const sqlQuery = 'SELECT ' + selectParentIdColumn + ', ROWNUM() AS RowNumber, ' + columnToExpand + ' FROM ' + tableName + whereClause;
     const data = alasql(sqlQuery);
     const results = [];
 
@@ -197,6 +198,110 @@ alasql.from.DLV_ARRAY_EXPAND = function(tableName, opts, cb, idx, query) {
     if (cb) return cb(results, idx, query);
     return results;
 };
+
+
+/**
+ * DLV_LOOKUP
+ * Expands a local lookup array and joins it against a remote table.
+ *
+ * @param {string} localParam  - "LocalTable.LookupColumn"
+ * @param {string} joinParam   - "LocalTable.LocalPK = RemoteTable.RemoteKey"
+ *
+ * Output: all remote table columns + {LocalTable}_{LocalPK} for joining back
+ *
+ * Example:
+ *   LEFT JOIN DLV_LOOKUP('EventSummary.AttendeesData', 'EventSummary.ID = People.ID') AS [Attendees]
+ *     ON [EventSummary].[ID] = [Attendees].[EventSummary_ID]
+ */
+alasql.from.DLV_LOOKUP = function(localParam, joinParam, cb, idx, query) {
+
+  // ── 1. Parse params by splitting on '.' and '=' ───────────────────────────
+  const [localTable,  lookupColumn] = localParam.split('.');
+  const [leftSide,    rightSide]    = joinParam.split('=').map(s => s.trim());
+  const [, localPK]                 = leftSide.split('.');
+  const [remoteTable, remotePK]     = rightSide.split('.');
+
+  if (!localTable || !lookupColumn || !localPK || !remoteTable || !remotePK) {
+    console.error('[DLV_LOOKUP] Could not parse params:', localParam, joinParam);
+    if (cb) return cb([], idx, query);
+    return [];
+  }
+
+  const parentKeyColName = `${localTable}_${localPK}`;
+
+  // ── 2. Get local table rows (PK + lookup array column) ────────────────────
+  let sourceRows;
+  try {
+    sourceRows = alasql(`SELECT * FROM [${localTable}]`);
+  } catch(e) {
+    console.error('[DLV_LOOKUP] Failed to query local table:', e.message);
+    if (cb) return cb([], idx, query);
+    return [];
+  }
+
+  // ── 3. Get remote table, build Map keyed by remotePK ─────────────────────
+  let remoteRows;
+  try {
+    remoteRows = alasql(`SELECT * FROM [${remoteTable}]`);
+  } catch(e) {
+    console.error('[DLV_LOOKUP] Failed to query remote table:', e.message);
+    if (cb) return cb([], idx, query);
+    return [];
+  }
+
+  // Build lookup map — try exact remotePK field name, then 'Id' as Pascal fallback
+  // e.g. remotePK = 'ID' → also try 'Id'
+  const remoteMap = new Map();
+  for (const row of remoteRows) {
+    const keyVal = row[remotePK] ?? row['Id'] ?? row['ID'] ?? row['id'];
+    if (keyVal != null) {
+      if (!remoteMap.has(keyVal)) remoteMap.set(keyVal, []);
+      remoteMap.get(keyVal).push(row);
+    }
+  }
+
+  // ── 4. Expand array + join ────────────────────────────────────────────────
+  const results = [];
+
+  for (const sourceRow of sourceRows) {
+    const parentId = sourceRow[localPK] ?? sourceRow['Id'] ?? sourceRow['ID'];
+    const arr      = sourceRow[lookupColumn];
+
+    if (!arr || !Array.isArray(arr) || arr.length === 0) {
+      // LEFT JOIN semantics: keep parent, nulls for remote columns
+      results.push({ [parentKeyColName]: parentId });
+      continue;
+    }
+
+    for (const element of arr) {
+      // Array element e.g. { Id: 5, Title: 'John Smith' }
+      // Extract the key that points to the remote table PK
+      const elementKeyVal = element[remotePK] ?? element['Id'] ?? element['ID'] ?? element['id'];
+
+      if (elementKeyVal == null) {
+        results.push({ [parentKeyColName]: parentId });
+        continue;
+      }
+
+      const matched = remoteMap.get(elementKeyVal);
+      if (!matched || matched.length === 0) {
+        // No remote match — LEFT JOIN: emit with nulls
+        results.push({ [parentKeyColName]: parentId });
+      } else {
+        for (const remoteRow of matched) {
+          results.push({
+            ...remoteRow,                  // all remote table columns
+            [parentKeyColName]: parentId   // parent PK tag — last so it can't be clobbered
+          });
+        }
+      }
+    }
+  }
+
+  if (cb) return cb(results, idx, query);
+  return results;
+};
+
 
 /**
  * DLV_ARRAY_EXTRACT_ELEMENT
@@ -523,6 +628,7 @@ alasql.from.DLV_ARRAY_EXTRACT_ELEMENT = function(tableName, opts, cb, idx, query
      */
     function preprocessSQL(sql) {
       // Only process plain SELECT statements
+      // TODO: Why this restriction? Can we safely handle more complex queries (e.g. with CTEs, subqueries, unions) by applying this logic to each SELECT clause?
       const selectRe = /^(\s*SELECT\s+)([\s\S]+?)(\s+FROM\b)/i;
       const m = sql.match(selectRe);
       if (!m) return sql;
