@@ -108,7 +108,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           const viewName = t.viewName || CyberdynePipeline.getViewForTable(tname);
           if (viewName && alasql.tables?.[viewName]?.view) {
             if (typeof alasql.tables[viewName].select !== 'function') {
-              try { alasql(`SELECT * FROM [${viewName}] LIMIT 0`); } catch(e) {
+              try { alasql(`SELECT * FROM [${viewName}] LIMIT 1`); } catch(e) {
                 console.warn(`[_executeQuery] Failed to pre-compile .select for view ${viewName}:`, e.message);
               }
             }
@@ -127,9 +127,9 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         console.log('DEBUG: Materializing results into [dlv_results] and [dlv_active]...');
         // TODO: Instead of dropping/recreating tables/views on every query, could we ALTER TABLE? ALTER VIEW is not supported by alasql.
         alasql('DROP VIEW  IF EXISTS [dlv_active]');
-        alasql('DROP TABLE IF EXISTS [dlv_results]');
+        alasql('DROP TABLE IF EXISTS [dlv_results]'); alasql('CREATE TABLE [dlv_results]');
         alasql('SELECT * INTO [dlv_results] FROM ?', [results]);
-        alasql('CREATE VIEW [dlv_active] AS SELECT * FROM [dlv_results]');
+        alasql('CREATE VIEW [dlv_active] AS SELECT * FROM [dlv_results]'); try { alasql('SELECT * FROM [dlv_active] LIMIT 1'); } catch(e) { }
 
         DataLaVistaState.queryResultsReady = true;
         DataLaVistaState.design.previewFilteredData = null;

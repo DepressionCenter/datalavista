@@ -30,6 +30,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       let selectedNode = null;
       let selectedJoin = null;
       let _advOptsFieldsExpanded = false; // track expand/collapse of fields list in options panel
+      let _expandedLookupFields = {};    // { nodeId: Set<fieldAlias> } — which lookup fields are expanded
 
       function renderAdvancedQB() {
         const canvas = document.getElementById('qb-canvas');
@@ -96,6 +97,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
                 poofAndRemove(nodeEl, () => {
                   delete DataLaVistaState.advancedQB.nodes[nodeId];
                   delete DataLaVistaState.advancedQB.nodeAliases?.[nodeId];
+                  delete _expandedLookupFields[nodeId];
                   DataLaVistaState.advancedQB.joins = DataLaVistaState.advancedQB.joins.filter(j => j.fromNode !== nodeId && j.toNode !== nodeId);
                   redrawJoins(); rebuildAdvancedSQL(); renderAdvOptionsPanel(null, null);
                 });
@@ -210,7 +212,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         } else {
           // Auto-select Title/Name fields — same logic as basic QB
           for (const f of t.fields) {
-            if (f.isAutoId) continue;
+            if (f.isAutoId || f.isLookupRaw) continue;
             if (f.internalName === 'Title' ||
                 (f.alias || '').toLowerCase() === 'name' ||
                 (f.alias || '').toLowerCase().includes('fullname') ||
@@ -220,7 +222,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           }
           // Fallback: if nothing matched, select the first non-auto field
           if (!defaultFields.length) {
-            const first = t.fields.find(f => !f.isAutoId);
+            const first = t.fields.find(f => !f.isAutoId && !f.isLookupRaw);
             if (first) defaultFields.push(first.alias);
           }
         }
@@ -246,7 +248,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           conditions: [],
           sorts: [],
           groupBy: [],
-          fieldAggs: {}
+          fieldAggs: {},
+          lookupAggFields: {}   // { [parentAlias]: [{ field, agg, alias }] }
         };
 
         if (sqlAlias) {
@@ -492,6 +495,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
               poofAndRemove(el, () => {
                 delete DataLaVistaState.advancedQB.nodes[id];
                 delete DataLaVistaState.advancedQB.nodeAliases?.[id];
+                delete _expandedLookupFields[id];
                 DataLaVistaState.advancedQB.joins =
                   DataLaVistaState.advancedQB.joins.filter(j => j.fromNode !== id && j.toNode !== id);
                 redrawJoins(); rebuildAdvancedSQL(); renderAdvOptionsPanel(null, null);
@@ -690,7 +694,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         const idx = nd.selectedFields.indexOf(field);
         if (idx >= 0) {
           nd.selectedFields.splice(idx, 1);
-          if (nd.fieldAggs) delete nd.fieldAggs[field];
+          if (nd.fieldAggs)        delete nd.fieldAggs[field];
+          if (nd.lookupAggFields)  delete nd.lookupAggFields[field];
         } else {
           nd.selectedFields.push(field);
         }
@@ -763,6 +768,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
               poofAndRemove(el, () => {
                 delete DataLaVistaState.advancedQB.nodes[nodeId];
                 delete DataLaVistaState.advancedQB.nodeAliases?.[nodeId];
+                delete _expandedLookupFields[nodeId];
                 DataLaVistaState.advancedQB.joins = DataLaVistaState.advancedQB.joins.filter(j => j.fromNode !== nodeId && j.toNode !== nodeId);
                 redrawJoins(); rebuildAdvancedSQL(); renderAdvOptionsPanel(null, null);
               });
@@ -838,6 +844,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 
       function removeAdvNode(id) {
         delete DataLaVistaState.advancedQB.nodes[id];
+        delete _expandedLookupFields[id];
         DataLaVistaState.advancedQB.joins = DataLaVistaState.advancedQB.joins.filter(j => j.fromNode !== id && j.toNode !== id);
         document.getElementById('adv-' + id)?.remove();
         redrawJoins();
@@ -874,7 +881,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         const _baseFields = t.fields.filter(f => !f.isSynthetic);
         const _synByParent = {};
         for (const f of t.fields) {
-          if (f.isSynthetic && f.parentField) {
+          if (f.isSynthetic && f.parentField && !f.isLookupRaw) {
             if (!_synByParent[f.parentField]) _synByParent[f.parentField] = [];
             _synByParent[f.parentField].push(f);
           }
@@ -953,12 +960,12 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
             { val: 'RIGHT',    label: 'Right Join',          desc: 'ℹ️ Everything on the right, only matching rows on the left' },
             { val: 'CROSS',    label: 'Cross Join',          desc: 'ℹ️ Combine tables, repeating all rows in 2nd table for every row in 1st table' },
             { val: 'UNION',    label: 'Union',               desc: 'ℹ️ Combine tables, removing duplicate rows' },
-            { val: 'UNION ALL',label: 'Union All',           desc: 'ℹ️ Combine tables, keeping duplicate rows' },
-            { val: 'DLV_LOOKUP',   label: 'Lookup Join (SP)',    desc: 'ℹ️ SharePoint multi-select lookup join — uses DLV_LOOKUP() to pre-expand the array and do a clean JOIN' }
+            { val: 'UNION ALL',label: 'Union All',           desc: 'ℹ️ Combine tables, keeping duplicate rows' }
+            // DLV_LOOKUP removed: multi-select lookups are now handled via field-level expansion (▶ in the Fields list)
           ];
 
           const augmentFields = (t, tableKey) => {
-            const fields = [...(t?.fields || [])];
+            const fields = [...(t?.fields || [])].filter(f => !f.isLookupRaw);
             const aliases = new Set(fields.map(f => f.alias));
             for (const r of (DataLaVistaState.relationships || [])) {
               if (r.childTableKey === tableKey && r.childField && !aliases.has(r.childField)) {
@@ -1033,13 +1040,14 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           if (!nd) return;
           const t = DataLaVistaState.tables[nd.tableName];
           if (!t) return;
-          const fields = t.fields.filter(f => !f.isAutoId);
+          const fields = t.fields.filter(f => !f.isAutoId && !f.isLookupRaw);
 
-          // Ensure state arrays / maps exist on older nodes
-          if (!nd.conditions) nd.conditions = [];
-          if (!nd.sorts)      nd.sorts = [];
-          if (!nd.groupBy)    nd.groupBy = [];
-          if (!nd.fieldAggs)  nd.fieldAggs = {};
+          // Ensure state arrays / maps exist on older nodes (loaded from saved config)
+          if (!nd.conditions)       nd.conditions = [];
+          if (!nd.sorts)            nd.sorts = [];
+          if (!nd.groupBy)          nd.groupBy = [];
+          if (!nd.fieldAggs)        nd.fieldAggs = {};
+          if (!nd.lookupAggFields)  nd.lookupAggFields = {};
 
           // ── FIELDS section ───────────────────────────────────────
           const FIELDS_COLLAPSED_COUNT = 5;
@@ -1048,16 +1056,26 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
             const sel = nd.selectedFields.includes(f.alias);
             const agg = nd.fieldAggs[f.alias] || '';
             const aggActive = agg !== '';
+            const expandable = _isExpandableLookupField(f, t);
+            const expanded   = expandable && _expandedLookupFields[id]?.has(f.alias);
+            const aggBtn = expandable
+              ? `<button class="adv-agg-btn" disabled title="Expand ▼ to select child field aggregates">∑</button>`
+              : `<button class="adv-agg-btn${aggActive ? ' has-agg' : ''}"
+                  title="${aggActive ? agg : 'No aggregate'}"
+                  onclick="event.stopPropagation();showAdvAggPopup('${id}','${f.alias}',this)">${aggActive ? getAggIcon(agg) : '∑'}</button>`;
+            const expandBtn = expandable
+              ? `<button class="adv-expand-btn${expanded ? ' expanded' : ''}" title="${expanded ? 'Collapse' : 'Expand child fields'}"
+                  onclick="event.stopPropagation();_toggleLookupExpand('${id}','${f.alias}')">${expanded ? '▼' : '▶'}</button>`
+              : '';
+            const childRows = expanded ? _renderChildFieldRows(id, nd, f) : '';
             return `<div class="adv-field-row${sel ? ' selected' : ''}"
                 onclick="advNodeToggleField('${id}','${f.alias}')" draggable="true"
                 ondragstart="event.stopPropagation();safeDragSet(event,{type:'adv-field-pill',nodeId:'${id}',field:'${f.alias}'})">
               <input type="checkbox" ${sel ? 'checked' : ''}/>
               <span class="field-type-icon ${ti.cls}">${ti.icon}</span>
               <span class="field-name">${f.alias}</span>
-              <button class="adv-agg-btn${aggActive ? ' has-agg' : ''}"
-                title="${aggActive ? agg : 'No aggregate'}"
-                onclick="event.stopPropagation();showAdvAggPopup('${id}','${f.alias}',this)">${aggActive ? getAggIcon(agg) : '∑'}</button>
-            </div>`;
+              ${expandBtn}${aggBtn}
+            </div>${childRows}`;
           };
           const renderFieldsSection = () => {
             const visible = _advOptsFieldsExpanded ? fields : fields.slice(0, FIELDS_COLLAPSED_COUNT);
@@ -1231,7 +1249,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         const nd = DataLaVistaState.advancedQB.nodes[nodeId];
         if (!nd) return;
         const t = DataLaVistaState.tables[nd.tableName];
-        const fields = t ? t.fields.filter(f => !f.isAutoId) : [];
+        const fields = t ? t.fields.filter(f => !f.isAutoId && !f.isLookupRaw) : [];
         if (!nd.conditions) nd.conditions = [];
         nd.conditions.push({ conj: 'AND', field: fields[0]?.alias || '', op: '=', value: '' });
         rebuildAdvancedSQL();
@@ -1255,7 +1273,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         const nd = DataLaVistaState.advancedQB.nodes[nodeId];
         if (!nd) return;
         const t = DataLaVistaState.tables[nd.tableName];
-        const fields = t ? t.fields.filter(f => !f.isAutoId) : [];
+        const fields = t ? t.fields.filter(f => !f.isAutoId && !f.isLookupRaw) : [];
         if (!nd.sorts) nd.sorts = [];
         nd.sorts.push({ field: fields[0]?.alias || '', dir: 'ASC' });
         rebuildAdvancedSQL();
@@ -1279,7 +1297,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         const nd = DataLaVistaState.advancedQB.nodes[nodeId];
         if (!nd) return;
         const t = DataLaVistaState.tables[nd.tableName];
-        const fields = t ? t.fields.filter(f => !f.isAutoId) : [];
+        const fields = t ? t.fields.filter(f => !f.isAutoId && !f.isLookupRaw) : [];
         if (!nd.groupBy) nd.groupBy = [];
         nd.groupBy.push(fields[0]?.alias || '');
         rebuildAdvancedSQL();
@@ -1599,6 +1617,165 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         });
       }
 
+      // ── Lookup / array-of-objects field expansion helpers ──────────────────────
+
+      // Resolve the PK field alias for a table (e.g. 'ID' for SP tables). Used when generating DLV_LOOKUP SQL.
+      function _resolveTablePK(table) {
+        const pk = (table?.fields || []).find(f => f.internalName === 'ID' || f.internalName === 'Id')
+                || (table?.fields || []).find(f => /^id$/i.test(f.alias));
+        return pk?.alias || 'ID';
+      }
+
+      // Returns true if a field should get the expand-to-children UX (SP multi-select or local array of objects)
+      function _isExpandableLookupField(f, t) {
+        if (!f || !t || f.isLookupRaw || f.isAutoId) return false;
+        // SP multi-select lookup: parent field has displayType 'lookup' AND a *Data synthetic exists
+        if (f.displayType === 'lookup')
+          return (t.fields || []).some(x => x.alias === f.alias + 'Data');
+        // Local array of objects: check displayType flag (set during normalization)
+        return f.displayType === 'array' || f.displayType === 'object';
+      }
+
+      // Aggregates available for child fields by type
+      function _childAggsForType(displayType) {
+        const base = [
+          { val: 'COUNT_DISTINCT', label: 'COUNT DISTINCT' },
+          { val: 'COUNT',          label: 'COUNT' },
+          { val: 'GROUP_CONCAT',   label: 'LIST (semicolon)' },
+        ];
+        if (displayType === 'number') return [
+          ...base,
+          { val: 'SUM', label: 'SUM' },
+          { val: 'AVG', label: 'AVG' },
+          { val: 'MIN', label: 'MIN' },
+          { val: 'MAX', label: 'MAX' },
+        ];
+        if (displayType === 'date') return [
+          { val: 'COUNT_DISTINCT', label: 'COUNT DISTINCT' },
+          { val: 'COUNT',          label: 'COUNT' },
+          { val: 'MIN',            label: 'MIN (earliest)' },
+          { val: 'MAX',            label: 'MAX (latest)' },
+          { val: 'GROUP_CONCAT',   label: 'LIST (semicolon)' },
+        ];
+        if (displayType === 'boolean') return [
+          { val: 'COUNT_DISTINCT', label: 'COUNT DISTINCT' },
+          { val: 'COUNT',          label: 'COUNT' },
+        ];
+        return base;
+      }
+
+      // Get the child fields for an expandable field:
+      //   SP multi-select lookup → remote table fields (no lookup/array/object)
+      //   Local array of objects → keys extracted from DLV_KEYS
+      // tableKey = nd.tableName (the raw table key, same as the key in DataLaVistaState.tables)
+      function _getChildFieldsForLookup(f, tableKey) {
+        if (f.displayType === 'lookup') {
+          // Find the relationship entry for this SP multi-select lookup
+          const rel = (DataLaVistaState.relationships || []).find(r =>
+            r.source === 'sharepoint-lookup' && r.isMultiSelect &&
+            r.childTableKey === tableKey &&
+            r.childField === f.alias + 'Data'
+          );
+          const remoteKey = rel?.parentTableKey;
+          const remoteTable = remoteKey && DataLaVistaState.tables[remoteKey];
+          if (!remoteTable) return [];
+          return (remoteTable.fields || []).filter(rf =>
+            !rf.isAutoId && !rf.isLookupRaw &&
+            rf.displayType !== 'lookup' && rf.displayType !== 'array' && rf.displayType !== 'object'
+          );
+        }
+        // Local array of objects — scan raw table data for the first non-null array value
+        const rawRows = (tableKey && DataLaVistaState.tables[tableKey]?.data) || [];
+        const arr = rawRows.find(row => row[f.alias] != null && Array.isArray(row[f.alias]))?.[f.alias];
+        if (!arr || !arr.length) return [];
+        // Collect unique keys from the first 100 objects in the array
+        const keys = new Set();
+        for (let i = 0; i < Math.min(arr.length, 100); i++) {
+          if (arr[i] && typeof arr[i] === 'object' && !Array.isArray(arr[i]))
+            Object.keys(arr[i]).forEach(k => keys.add(k));
+        }
+        return [...keys].filter(Boolean).map(k => ({ alias: k, displayType: 'default', internalName: k }));
+      }
+
+      // Get the remote view name for an SP multi-select lookup field
+      function _getRemoteViewForLookup(tableKey, lookupAlias) {
+        const rel = (DataLaVistaState.relationships || []).find(r =>
+          r.source === 'sharepoint-lookup' && r.isMultiSelect &&
+          r.childTableKey === tableKey &&
+          r.childField === lookupAlias + 'Data'
+        );
+        if (!rel) return null;
+        return CyberdynePipeline.rawTableToView[rel.parentTableKey] || rel.parentTableKey;
+      }
+
+      // Toggle expand/collapse of a lookup field's child list in the options panel
+      function _toggleLookupExpand(nodeId, fieldAlias) {
+        if (!_expandedLookupFields[nodeId]) _expandedLookupFields[nodeId] = new Set();
+        if (_expandedLookupFields[nodeId].has(fieldAlias))
+          _expandedLookupFields[nodeId].delete(fieldAlias);
+        else
+          _expandedLookupFields[nodeId].add(fieldAlias);
+        renderAdvOptionsPanel('node', nodeId);
+      }
+
+      // Toggle a child field on/off; default agg = COUNT_DISTINCT
+      function _toggleLookupChild(nodeId, parentAlias, childField, checked) {
+        const nd = DataLaVistaState.advancedQB.nodes[nodeId];
+        if (!nd) return;
+        if (!nd.lookupAggFields) nd.lookupAggFields = {};
+        if (!nd.lookupAggFields[parentAlias]) nd.lookupAggFields[parentAlias] = [];
+        if (checked) {
+          if (!nd.lookupAggFields[parentAlias].find(x => x.field === childField)) {
+            nd.lookupAggFields[parentAlias].push({
+              field: childField,
+              agg: 'COUNT_DISTINCT',
+              alias: parentAlias + '_' + childField
+            });
+          }
+        } else {
+          nd.lookupAggFields[parentAlias] = nd.lookupAggFields[parentAlias].filter(x => x.field !== childField);
+        }
+        rebuildAdvancedSQL();
+        renderAdvOptionsPanel('node', nodeId);
+      }
+
+      // Change the aggregate for a checked child field
+      function _setLookupChildAgg(nodeId, parentAlias, childField, newAgg) {
+        const nd = DataLaVistaState.advancedQB.nodes[nodeId];
+        if (!nd?.lookupAggFields?.[parentAlias]) return;
+        const entry = nd.lookupAggFields[parentAlias].find(x => x.field === childField);
+        if (entry) { entry.agg = newAgg; rebuildAdvancedSQL(); }
+      }
+
+      // Render the indented child-field rows for an expanded lookup/array field
+      function _renderChildFieldRows(nodeId, nd, parentField) {
+        const t = DataLaVistaState.tables[nd.tableName];
+        if (!t) return '';
+        const childFields = _getChildFieldsForLookup(parentField, nd.tableName);
+        if (!childFields.length) return '<div class="adv-child-fields"><span style="font-size:10px;color:var(--text-disabled)">No child fields found</span></div>';
+        const entries = nd.lookupAggFields?.[parentField.alias] || [];
+        const rows = childFields.map(cf => {
+          const entry = entries.find(x => x.field === cf.alias);
+          const checked = !!entry;
+          const currentAgg = entry?.agg || 'COUNT_DISTINCT';
+          const aggs = _childAggsForType(cf.displayType);
+          const ti  = DataLaVistaCore.FIELD_TYPE_ICONS[cf.displayType] || DataLaVistaCore.FIELD_TYPE_ICONS.default;
+          const aggOptions = aggs.map(a =>
+            `<option value="${a.val}"${currentAgg === a.val ? ' selected' : ''}>${a.label}</option>`
+          ).join('');
+          return `<div class="adv-field-row adv-child-field-row${checked ? ' selected' : ''}" style="padding-left:22px">
+            <input type="checkbox" ${checked ? 'checked' : ''}
+              onclick="event.stopPropagation();_toggleLookupChild('${nodeId}','${parentField.alias}','${cf.alias}',this.checked)"/>
+            <span class="field-type-icon ${ti.cls}">${ti.icon}</span>
+            <span class="field-name" style="font-size:11px">${parentField.alias} → ${cf.alias}</span>
+            <select class="form-input" style="height:22px;font-size:10px;padding:0 2px;min-width:0;width:auto" ${!checked ? 'disabled' : ''}
+              onchange="_setLookupChildAgg('${nodeId}','${parentField.alias}','${cf.alias}',this.value)"
+              onclick="event.stopPropagation()">${aggOptions}</select>
+          </div>`;
+        }).join('');
+        return `<div class="adv-child-fields">${rows}</div>`;
+      }
+
       function rebuildAdvancedSQL() {
         if (DataLaVistaState.sqlLocked) return;
         const nodes = Object.entries(DataLaVistaState.advancedQB.nodes);
@@ -1650,6 +1827,54 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           return count === 1 ? `  ${col}` : `  ${col} AS [${outAlias}]`;
         }) : ['  *'];
 
+        // Single pass: build child SELECT entries and subquery JOIN SQL for lookupAggFields.
+        // SP multi-select lookup fields → pre-aggregated subquery JOIN (one row per source PK, no fanout).
+        // Local array-of-object fields → DLV_ARRAY_AGG scalar in SELECT (no JOIN needed).
+        const childSelects = [];
+        const lookupJoins  = [];
+        for (const [nid, nd] of nodes) {
+          if (!nd.lookupAggFields) continue;
+          const nodeAlias = getNodeAlias(nid, nd);
+          const t = DataLaVistaState.tables[nd.tableName];
+          const localView = getView(nd.tableName);
+          const localPK   = _resolveTablePK(t);
+          const parentKeyCol = `${localView}_${localPK}`;
+
+          for (const [parentAlias, childEntries] of Object.entries(nd.lookupAggFields)) {
+            if (!childEntries || !childEntries.length) continue;
+            const parentField = t?.fields?.find(f => f.alias === parentAlias);
+            if (!parentField) continue;
+
+            for (const { field, agg, alias } of childEntries) {
+              if (parentField.displayType === 'lookup') {
+                childSelects.push(`  [_dlv_${parentAlias}].[${alias}]`);
+              } else {
+                childSelects.push(`  DLV_ARRAY_AGG([${nodeAlias}].[${parentAlias}], '${field}', '${agg}') AS [${alias}]`);
+              }
+            }
+
+            if (parentField.displayType === 'lookup') {
+              const remoteView = _getRemoteViewForLookup(nd.tableName, parentAlias);
+              if (remoteView) {
+                const subAlias    = '_dlv_' + parentAlias;
+                const selectExprs = childEntries.map(({ field, agg, alias }) => {
+                  if (agg === 'COUNT_DISTINCT') return `    COUNT(DISTINCT [${field}]) AS [${alias}]`;
+                  if (agg === 'GROUP_CONCAT')   return `    GROUP_CONCAT([${field}] ORDER BY [${field}] ASC SEPARATOR ';') AS [${alias}]`;
+                  return `    ${agg}([${field}]) AS [${alias}]`;
+                }).join(',\n');
+                lookupJoins.push(
+                  `\nLEFT JOIN (\n  SELECT [${parentKeyCol}],\n${selectExprs}\n` +
+                  `  FROM DLV_LOOKUP('${localView}.${parentAlias}Data', '${localView}.${localPK} = ${remoteView}.ID')\n` +
+                  `  GROUP BY [${parentKeyCol}]\n) AS [${subAlias}] ON [${nodeAlias}].[${localPK}] = [${subAlias}].[${parentKeyCol}]`
+                );
+              }
+            }
+          }
+        }
+        const finalSelects = childSelects.length
+          ? [...(allFields.length ? selects : []), ...childSelects]
+          : selects;
+
         // Auto GROUP BY: if any field has an agg, non-agg fields need to be in GROUP BY
         const hasAnyAgg = allFields.some(f => f.agg);
         if (hasAnyAgg) {
@@ -1693,7 +1918,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           DataLaVistaState.sql = sql; if (window._cmEditor) window._cmEditor.setValue(sql); return;
         }
 
-        let sql = `SELECT\n${selects.join(',\n')}\nFROM ${fromFrag(mainId, mainNd)}`;
+        let sql = `SELECT\n${finalSelects.join(',\n')}\nFROM ${fromFrag(mainId, mainNd)}`;
 
         const joinedNodes = new Set([mainId]);
         for (const j of joins) {
@@ -1718,14 +1943,22 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
             // Use toAlias as the lookup alias so existing SELECT field references stay valid.
             const localViewName  = getView(fromNd.tableName);
             const remoteViewName = getView(toNd.tableName);
-            const localPK = 'Id';
+            const fromTable = DataLaVistaState.tables[fromNd.tableName];
+            const localPK = _resolveTablePK(fromTable);
             const parentKeyCol = `${localViewName}_${localPK}`;
-            sql += `\nLEFT JOIN DLV_LOOKUP('${localViewName}.${kp.fromKey}', '${localViewName}.${localPK} = ${remoteViewName}.${kp.toKey}') AS [${toAlias}] ON [${fromAlias}].[${localPK}] = [${toAlias}].[${parentKeyCol}]`;
+            // If the fromKey field is a lookup type, DLV_LOOKUP needs the *Data column
+            const fromFieldMeta = fromTable ? fromTable.fields.find(f => f.alias === kp.fromKey) : null;
+            const lookupColName = (fromFieldMeta && fromFieldMeta.displayType === 'lookup')
+              ? kp.fromKey + 'Data'
+              : kp.fromKey;
+            sql += `\nLEFT JOIN DLV_LOOKUP('${localViewName}.${lookupColName}', '${localViewName}.${localPK} = ${remoteViewName}.${kp.toKey}') AS [${toAlias}] ON [${fromAlias}].[${localPK}] = [${toAlias}].[${parentKeyCol}]`;
           } else {
             const onClauses = j.keys.map(kp => `[${fromAlias}].[${kp.fromKey}] = [${toAlias}].[${kp.toKey}]`).join(' AND ');
             sql += `\n${j.type} JOIN ${fromFrag(newNodeId, newNd)} ON ${onClauses}`;
           }
         }
+
+        if (lookupJoins.length) sql += lookupJoins.join('');
 
         const allWhere = [];
         for (const [nid, nd] of nodes) {

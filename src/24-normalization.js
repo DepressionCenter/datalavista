@@ -45,7 +45,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       if (Array.isArray(val)) {
         return val.map(v => {
           if (typeof v === 'object' && v !== null) {
-            return v.Label || v.Title || v.Name || v.Value || v.lookupValue || JSON.stringify(v);
+            return v.Label || v.Title || v.Name || v.Value || v.value || v.lookupValue || v.LookupValue || v.displayValue || v.DisplayValue || JSON.stringify(v);
           }
           return v;
         }).join(', ');
@@ -56,88 +56,11 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         // TaxKeyword / Enterprise Keywords
         if (val.TermGuid !== undefined) return val.Label || val.Title || '';
         if (val.results && Array.isArray(val.results)) {
-          return val.results.map(r => r.Label || r.Title || r.Name || r.lookupValue || JSON.stringify(r)).join(', ');
+          return val.results.map(r => r.Label || r.Title || r.Name || r.lookupValue || r.LookupValue || r.displayValue || r.DisplayValue || JSON.stringify(r)).join(', ');
         }
-        return val.Label || val.Title || val.Name || val.lookupValue || val.Value || JSON.stringify(val);
+        return val.Label || val.Title || val.Name || val.Value || val.value || val.lookupValue || val.LookupValue || val.displayValue || val.DisplayValue || JSON.stringify(val);
       }
       return val;
-    }
-
-    // Normalize a single row of SharePoint data
-    function normalizeRow(row, fields) {
-      const out = {};
-      for (const f of fields) {
-        let val = row[f.internalName];
-        if (val === undefined) val = row[f.internalName + 'Id'] !== undefined ? null : undefined;
-        if (val === undefined) { out[f.alias] = null; continue; }
-
-        // Lookup fields
-        if (f.type === 'lookup') {
-          const idVal = row[f.internalName + 'Id'];
-          out[f.alias + 'Id'] = idVal !== undefined ? idVal : null;
-          out[f.alias] = normalizeObject(val);
-        }
-        // Multi-lookup
-        else if (f.type === 'lookup-multi') {
-          const results = (val && val.results) ? val.results : (Array.isArray(val) ? val : []);
-          const ids = row[f.internalName + 'Id'];
-          const idResults = ids ? ((ids.results || ids) || []) : [];
-          out[f.alias + 'Id'] = Array.isArray(idResults) ? idResults.join(',') : idResults;
-          out[f.alias] = results.map(r => r.lookupValue || r.Label || r.Title || r.Name || String(r)).join(', ');
-        }
-        // TaxKeyword / Managed Metadata
-        else if (f.type === 'taxkeyword') {
-          const results = (val && val.results) ? val.results : (Array.isArray(val) ? val : (val ? [val] : []));
-          out[f.alias + 'Id'] = results.map(r => r.WssId || r.TermGuid || '').join(',');
-          out[f.alias] = results.map(r => r.Label || r.Term || r.Title || '').join(', ');
-        }
-        // Person/User fields
-        else if (f.type === 'user') {
-          const idVal = row[f.internalName + 'Id'];
-          out[f.alias + 'Id'] = idVal !== undefined ? idVal : null;
-          out[f.alias] = normalizeObject(val);
-        }
-        // Multi-user
-        else if (f.type === 'user-multi') {
-          const results = (val && val.results) ? val.results : (Array.isArray(val) ? val : []);
-          const ids = row[f.internalName + 'Id'];
-          const idResults = ids ? ((ids.results || ids) || []) : [];
-          out[f.alias + 'Id'] = Array.isArray(idResults) ? idResults.join(',') : String(idResults);
-          out[f.alias] = results.map(r => r.Title || r.Name || String(r)).join(', ');
-        }
-        // Choice/multi-choice
-        else if (f.type === 'choice-multi') {
-          const results = (val && val.results) ? val.results : (Array.isArray(val) ? val : (val ? [val] : []));
-          out[f.alias] = results.join(', ');
-        }
-        // Date
-        else if (
-          f.type.startsWith('date') ||
-          (f.type === 'calculated' && f.calculatedFieldType === 'date')
-        ) {
-          out[f.alias] = normalizeDate(val);
-        }
-        // Boolean
-        else if (
-            f.type.startsWith('bool') ||
-            f.type.toLowerCase() === 'yesno' ||
-            f.type.toLowerCase() === 'yes/no' ||
-            (f.type === 'calculated' && f.calculatedFieldType === 'boolean')
-            ) {
-            out[f.alias] = (
-              (typeof val === 'boolean' && val === true) ||
-              (typeof val === 'string' && val.toString().toLowerCase() === 'yes') ||
-              (typeof val === 'string' && val.toString().toLowerCase() === 'true') ||
-              (typeof val === 'number' && val === 1) ||
-              (typeof val === 'string' && val.toString() === '1')
-            ) ? true : false;
-        }
-        // Default
-        else {
-          out[f.alias] = normalizeObject(val);
-        }
-      }
-      return out;
     }
 
     // Parse SharePoint field type

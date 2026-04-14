@@ -412,6 +412,7 @@ function rankSuggestions(rules, cols, meta) {
       }
 
       function addFilterToBar(field) {
+        if (/Data$|Ids$/.test(field)) { toast('Cannot filter on raw lookup data fields', 'warning'); return; }
         if (DataLaVistaState.design.filters.find(f => f.field === field)) { toast('Filter for ' + field + ' already added', 'warning'); return; }
         DataLaVistaState.design.filters.push({ field, label: field, position: 'bar' });
         renderFilterBar();
@@ -442,7 +443,7 @@ function rankSuggestions(rules, cols, meta) {
         const _candidates = (() => {
           const t = tableName && DataLaVistaState.tables[tableName];
           return (t && t.fields && t.fields.length)
-            ? t.fields.map(f => f.alias)
+            ? t.fields.filter(f => !f.isAutoId && !f.isLookupRaw).map(f => f.alias)
             : DataLaVistaState.queryColumns;
         })();
         const _initFields = fields || (() => {
@@ -531,7 +532,7 @@ function rankSuggestions(rules, cols, meta) {
         }
 
         if (tableName && DataLaVistaState.tables[tableName]) {
-          widget.fields = DataLaVistaState.tables[tableName].fields.filter(f => !f.isAutoId).map(f => f.alias).slice(0, 8);
+          widget.fields = DataLaVistaState.tables[tableName].fields.filter(f => !f.isAutoId && !f.isLookupRaw).map(f => f.alias).slice(0, 8);
         }
 
         DataLaVistaState.design.widgets.push(widget);
@@ -2376,8 +2377,26 @@ function _renderBarLineOptionsHTML(w, wid) {
             };
           } else {
             let uniqueVals = [];
+            const _tk = findTableKeyForAlias(f.field);
+            const _fMeta = _tk && DataLaVistaState.tables[_tk]
+              ? DataLaVistaState.tables[_tk].fields.find(x => x.alias === f.field)
+              : null;
+            const _isLookupField = _fMeta && _fMeta.displayType === 'lookup';
             if (alasql.tables && alasql.tables['dlv_results']) {
-              uniqueVals = [...new Set(alasql('SELECT * FROM [dlv_results]').map(r => r[f.field]).filter(v => v !== null && v !== undefined))].sort();
+              const rawVals = alasql('SELECT * FROM [dlv_results]').map(r => r[f.field]).filter(v => v !== null && v !== undefined);
+              if (_isLookupField) {
+                // Lookup fields store semicolon-separated text — split and deduplicate
+                const allParts = [];
+                for (const v of rawVals) {
+                  for (const part of String(v).split(';')) {
+                    const t = part.trim();
+                    if (t) allParts.push(t);
+                  }
+                }
+                uniqueVals = [...new Set(allParts)].sort();
+              } else {
+                uniqueVals = [...new Set(rawVals)].sort();
+              }
             }
             input = document.createElement('select');
             input.className = 'form-input';
@@ -2415,11 +2434,26 @@ function _renderBarLineOptionsHTML(w, wid) {
         refreshWidgets();
       }
 
+      function _filterFieldIsLookup(fieldAlias) {
+        const tk = findTableKeyForAlias(fieldAlias);
+        const fm = tk && DataLaVistaState.tables[tk]
+          ? DataLaVistaState.tables[tk].fields.find(x => x.alias === fieldAlias)
+          : null;
+        return !!(fm && fm.displayType === 'lookup');
+      }
+
       function refreshWidgets() {
         const hasView = !!(alasql.tables && alasql.tables['dlv_results']);
         if (hasView) {
           const allFilters = { ...(DataLaVistaState.previewFilters || {}), ...(DataLaVistaState.drillFilters || {}) };
-          const whereClauses = Object.entries(allFilters).map(([f, v]) => `[${f}] = '${String(v).replace(/'/g, "''")}'`);
+          const whereClauses = Object.entries(allFilters).map(([f, v]) => {
+            const vEsc = String(v).replace(/'/g, "''");
+            if (_filterFieldIsLookup(f)) {
+              // Match individual values within semicolon-separated lookup text
+              return `([${f}] = '${vEsc}' OR [${f}] LIKE '${vEsc};%' OR [${f}] LIKE '%;${vEsc}' OR [${f}] LIKE '%;${vEsc};%')`;
+            }
+            return `[${f}] = '${vEsc}'`;
+          });
           alasql('DROP VIEW IF EXISTS [dlv_active]');
           const where = whereClauses.length ? ` WHERE ${whereClauses.join(' AND ')}` : '';
           alasql(`CREATE VIEW [dlv_active] AS SELECT * FROM [dlv_results]${where}`);

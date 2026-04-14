@@ -70,7 +70,7 @@ const DataLaVistaCore = {
   'MATRIX', 'OF', 'STRING', 'NUMBER', 'DATE', 'BOOLEAN', 'OBJECT', 'SEARCH',
   'REPLACE', 'REMOVE', 'RENAME', 'MODIFY', 'REINDEX', 'TRUNCATE', 'BEGIN',
   'COMMIT', 'ROLLBACK', 'TRANSACTION', 'SAVEPOINT', 'RELEASE',
-  'DLV_ARRAY_MATCH', 'DLV_ARRAY_EMPTY', 'DLV_ARRAY_EXPAND', 'DLV_ARRAY_EXTRACT_ELEMENT', 'DLV_ARRAY_INCLUDES',
+  'DLV_ARRAY_MATCH', 'DLV_ARRAY_EMPTY', 'DLV_ARRAY_EXPAND', 'DLV_ARRAY_EXTRACT_ELEMENT', 'DLV_ARRAY_INCLUDES', 'COUNT_LOOKUP_VALUES',
   'DLV_JOIN', 'DLV_LOOKUP', 'DLV_KEYS', 'DLV_DROP', 'DLV_DISPLAY', 'DLV_IDS', 
   'DLV_EMAIL','DLV_EMAILS', 'DLV_PICTURE_URL','DLV_NORMALIZE_DATE',
   'DLV_TAX_LABELS','DLV_TAX_IDS','DLV_PARSE_BOOL', 'DLV_PARSE_DATE'
@@ -89,7 +89,8 @@ QB_AGGS: [
   { val: 'AVG', label: 'AVG  (Average)', types: 'numeric' },
   { val: 'MEDIAN', label: 'MEDIAN', types: 'numeric' },
   { val: 'VAR', label: 'VAR  (Variance)', types: 'numeric' },
-  { val: 'STDEV', label: 'STDEV  (Std Dev)', types: 'numeric' }
+  { val: 'STDEV', label: 'STDEV  (Std Dev)', types: 'numeric' },
+  { val: 'COUNT_LOOKUP_VALUES', label: 'COUNT VALUES  (array length)', types: 'lookup' }
 ],
 
 // Base Filter Conditions
@@ -711,11 +712,19 @@ function condToSQL(c, colExpr, displayType) {
   const op  = c.op  || '=';
   const raw  = c.value  != null ? String(c.value)  : '';
   const raw2 = c.value2 != null ? String(c.value2) : '';
-  const ek   = c.elementKey || '';
   const dt   = (displayType || 'text').toLowerCase();
+
+  // ── lookup type: redirect to *Data column ────────────────────────────────
+  // colExpr is e.g. [alias].[FieldName] → dataColExpr = [alias].[FieldNameData]
+  const isLookup = dt === 'lookup';
+  const dataColExpr = isLookup ? colExpr.replace(/\]$/, 'Data]') : colExpr;
+  const ek   = c.elementKey || (isLookup ? 'Title' : '');
 
   // ── no-value ops ──────────────────────────────────────────────────────────
   if (op === 'NULL') {
+    if (isLookup) {
+      return `(${dataColExpr} IS NULL OR ${dataColExpr}->length = 0)`;
+    }
     if (dt === 'number' || dt === 'boolean' || dt === 'date') {
       return `${colExpr} IS NULL`;
     }
@@ -725,6 +734,9 @@ function condToSQL(c, colExpr, displayType) {
     return `${colExpr} IS NULL`;
   }
   if (op === 'NOTNULL') {
+    if (isLookup) {
+      return `(${dataColExpr} IS NOT NULL AND ${dataColExpr}->length > 0)`;
+    }
     if (dt === 'number' || dt === 'boolean' || dt === 'date') {
       return `${colExpr} IS NOT NULL`;
     }
@@ -793,9 +805,10 @@ function condToSQL(c, colExpr, displayType) {
 
   // ── array-of-objects — DLV_ARRAY_INCLUDES ────────────────────────────────
   if (ek && ['=','!=','>','>=','<','<='].includes(op)) {
+    const arrExpr = isLookup ? dataColExpr : colExpr;
     const v = _fmtSQLVal(raw, dt);
-    if (op === '=') return `DLV_ARRAY_INCLUDES(${colExpr}, '${ek}', ${v})`;
-    return `DLV_ARRAY_INCLUDES(${colExpr}, '${ek}', ${v}, '${op}')`;
+    if (op === '=') return `DLV_ARRAY_INCLUDES(${arrExpr}, '${ek}', ${v})`;
+    return `DLV_ARRAY_INCLUDES(${arrExpr}, '${ek}', ${v}, '${op}')`;
   }
 
   // ── standard comparison ────────────────────────────────────────────────────
@@ -821,13 +834,16 @@ function _dlvAcEvict(prefix) {
   }
 }
 
-function _dlvAcLoad(tableKey, fieldAlias, elementKey) {
+function _dlvAcLoad(tableKey, fieldAlias, elementKey, displayType) {
   const key = (tableKey || '') + '|' + (fieldAlias || '') + '|' + (elementKey || '');
   if (_dlvAcCache[key]) return _dlvAcCache[key]; // only populated entries are cached
   const values = [];
   try {
     const fa = fieldAlias || '';
-    const ek = elementKey || '';
+    // For lookup fields, default ek = 'Title' and expand the *Data column
+    const isLookup = (displayType || '').toLowerCase() === 'lookup';
+    const ek = elementKey || (isLookup ? 'Title' : '');
+    const columnToExpand = isLookup ? fa + 'Data' : fa;
 
     if (ek) {
       // ── Array-of-objects element key: use DLV_ARRAY_EXTRACT_ELEMENT ─────────
@@ -836,7 +852,7 @@ function _dlvAcLoad(tableKey, fieldAlias, elementKey) {
         || tableKey;
       // Embed as SQL literals — FROM table-functions don't support ? parameters
       const vnameEsc = vname.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-      const opts = JSON.stringify({ columnToExpand: fa, element: ek }).replace(/'/g, "\\'");
+      const opts = JSON.stringify({ columnToExpand, element: ek }).replace(/'/g, "\\'");
       const rows = alasql('SELECT * FROM DLV_ARRAY_EXTRACT_ELEMENT("' + vnameEsc + '", \'' + opts + '\')');
       for (var ei = 0; ei < rows.length; ei++) {
         const v = rows[ei][ek];

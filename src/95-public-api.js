@@ -41,7 +41,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         fetchSPFields,
         normalizeDate,
         normalizeObject,
-        normalizeRow,
         parseFieldType,
         fieldDisplayType,
         toCamelCase,

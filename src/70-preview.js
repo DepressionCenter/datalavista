@@ -81,7 +81,17 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           filterBar.classList.remove('hidden');
           for (const filter of barFilters) {
             const _fRows = (alasql.tables && alasql.tables['dlv_results']) ? alasql('SELECT * FROM [dlv_results]') : [];
-            const values = ['(All)', ...[...new Set(_fRows.map(r => r[filter.field]).filter(v => v != null))].sort()];
+            const _rawVals = _fRows.map(r => r[filter.field]).filter(v => v != null);
+            const _isLookupF = typeof _filterFieldIsLookup === 'function' && _filterFieldIsLookup(filter.field);
+            let _flatVals;
+            if (_isLookupF) {
+              const _parts = [];
+              for (const v of _rawVals) { for (const p of String(v).split(';')) { const t = p.trim(); if (t) _parts.push(t); } }
+              _flatVals = [...new Set(_parts)].sort();
+            } else {
+              _flatVals = [...new Set(_rawVals)].sort();
+            }
+            const values = ['(All)', ..._flatVals];
             const wrap = document.createElement('div');
             wrap.className = 'filter-chip';
             wrap.innerHTML = `<span style="font-size:11px;font-weight:600">${filter.label}:</span>
@@ -190,7 +200,13 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         // Rebuild [dlv_active] using combined previewFilters + drillFilters
         alasql('DROP VIEW IF EXISTS [dlv_active]');
         const allFilters = { ...(DataLaVistaState.previewFilters || {}), ...(DataLaVistaState.drillFilters || {}) };
-        const whereClauses = Object.entries(allFilters).map(([f, v]) => `[${f}] = '${String(v).replace(/'/g, "''")}'`);
+        const whereClauses = Object.entries(allFilters).map(([f, v]) => {
+          const vEsc = String(v).replace(/'/g, "''");
+          if (typeof _filterFieldIsLookup === 'function' && _filterFieldIsLookup(f)) {
+            return `([${f}] = '${vEsc}' OR [${f}] LIKE '${vEsc};%' OR [${f}] LIKE '%;${vEsc}' OR [${f}] LIKE '%;${vEsc};%')`;
+          }
+          return `[${f}] = '${vEsc}'`;
+        });
         if (whereClauses.length) {
           alasql(`CREATE VIEW [dlv_active] AS SELECT * FROM [dlv_results] WHERE ${whereClauses.join(' AND ')}`);
         } else {

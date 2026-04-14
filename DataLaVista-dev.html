@@ -1626,6 +1626,22 @@ with this program. If not, see https://www.gnu.org/licenses/.
       transition: all var(--transition);
     }
     .adv-agg-btn.has-agg { background: #e9950d; color: white; border-color: transparent; }
+    .adv-agg-btn[disabled] { pointer-events: none; opacity: 0.35; cursor: default; }
+
+    /* ── Expand arrow button for lookup/array fields ─────────── */
+    .adv-expand-btn {
+      font-size: 9px; padding: 1px 4px; border-radius: 3px; min-width: 18px; text-align: center;
+      background: transparent; border: 1px solid var(--border);
+      cursor: pointer; flex-shrink: 0; color: var(--text-secondary);
+      transition: background var(--transition);
+    }
+    .adv-expand-btn:hover { background: var(--surface2); }
+
+    /* ── Child field rows (indented under expandable parent) ─── */
+    .adv-child-fields { margin-left: 0; }
+    .adv-child-field-row { background: var(--surface2); margin-bottom: 1px; }
+    .adv-child-field-row.selected { background: var(--primary-ultralight); }
+    .adv-child-field-row input[type=checkbox] { pointer-events: auto; }
 
     /* ── Agg popup ───────────────────────────────────────────── */
     .adv-agg-popup {

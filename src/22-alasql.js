@@ -244,7 +244,7 @@ alasql.from.DLV_LOOKUP = function(localParam, joinParam, cb, idx, query) {
   const _ensureView = (name) => {
     try {
       if (alasql.tables?.[name]?.view && typeof alasql.tables[name].select !== 'function') {
-        alasql(`SELECT * FROM [${name}] LIMIT 0`);
+        alasql(`SELECT * FROM [${name}] LIMIT 1`);
       }
     } catch(_) {}
   };
@@ -383,30 +383,31 @@ alasql.from.DLV_ARRAY_EXTRACT_ELEMENT = function(tableName, opts, cb, idx, query
     return results;
 };
 
+      // ── Shared label extractor used by DLV_DISPLAY and DLV_JOIN ─────────────
+      const _dlvLabel = o =>
+        o.Title || o.Label || o.Name || o.Value || o.value ||
+        o.lookupValue || o.LookupValue || o.displayValue || o.DisplayValue || null;
+
       // ── DLV_DISPLAY: human-readable display value from any field value ──────
       alasql.fn.DLV_DISPLAY = function(val) {
         if (val === null || val === undefined) return null;
         if (typeof val === 'string' || typeof val === 'number' || typeof val === 'boolean') return val;
         if (Array.isArray(val)) {
           const parts = val.map(v => {
-            if (typeof v === 'object' && v !== null) {
-              return v.Title || v.Label || v.Name || v.Value || v.lookupValue || v.displayValue || JSON.stringify(v);
-            }
+            if (typeof v === 'object' && v !== null) return _dlvLabel(v) || JSON.stringify(v);
             return v != null ? String(v) : null;
           }).filter(s => s != null && s !== '');
           return parts.length > 0 ? parts.join('; ') : null;
         }
         if (typeof val === 'object') {
-          // Un-expanded SP deferred reference — no data available yet
           if (val.__deferred) return null;
           if (val.TermGuid !== undefined) return val.Label || val.Title || null;
           if (val.results && Array.isArray(val.results)) {
-            const parts = val.results.map(r => r.Label || r.Title || r.Name || r.lookupValue || JSON.stringify(r)).filter(s => s);
+            const parts = val.results.map(r => _dlvLabel(r) || JSON.stringify(r)).filter(s => s);
             return parts.length > 0 ? parts.join('; ') : null;
           }
-          // SP URL field: return the URL, not the Description
           if (val.Url !== undefined) return val.Url || null;
-          return val.Title || val.Label || val.Name || val.lookupValue || val.Value || null;
+          return _dlvLabel(val);
         }
         return String(val);
       };
@@ -428,22 +429,54 @@ alasql.from.DLV_ARRAY_EXTRACT_ELEMENT = function(tableName, opts, cb, idx, query
         if (!Array.isArray(arr)) return null;
         const parts = arr.map(v => {
           if (typeof v === 'object' && v !== null) {
-            if (prop) {
-              const pv = v[prop];
-              if (pv != null) return String(pv);
-            }
-            return v.Title || v.Label || v.Name || v.Value || v.lookupValue || JSON.stringify(v);
+            if (prop) { const pv = v[prop]; if (pv != null) return String(pv); }
+            return _dlvLabel(v) || JSON.stringify(v);
           }
           return v != null ? String(v) : null;
         }).filter(s => s != null && s !== '');
         return parts.length > 0 ? parts.join(separator) : null;
       };
 
-      // ── DLV_KEYS: return the keys of an object joined with '; ' ────────────────
-      alasql.fn.DLV_KEYS = function(obj, separator = '; ') {
-          if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return null;
-          const keys = Object.keys(obj);
-          return keys.length > 0 ? keys.join(separator) : null;
+      // ── DLV_KEYS: return the keys of an object (or array of objects) joined with '; ' ─
+      // Single object: DLV_KEYS(obj, separator)
+      // Array of objects: DLV_KEYS(arr, sampleSize) — scans first N objects, returns union of unique keys
+      alasql.fn.DLV_KEYS = function(obj, separatorOrN = '; ') {
+        if (!obj) return null;
+        if (Array.isArray(obj)) {
+          const n   = typeof separatorOrN === 'number' ? separatorOrN : 100;
+          const sep = typeof separatorOrN === 'string'  ? separatorOrN : '; ';
+          const keys = new Set();
+          for (let i = 0; i < Math.min(obj.length, n); i++) {
+            if (obj[i] && typeof obj[i] === 'object' && !Array.isArray(obj[i]))
+              Object.keys(obj[i]).forEach(k => keys.add(k));
+          }
+          return keys.size > 0 ? [...keys].join(sep) : null;
+        }
+        if (typeof obj !== 'object') return null;
+        const keys = Object.keys(obj);
+        return keys.length > 0 ? keys.join(typeof separatorOrN === 'string' ? separatorOrN : '; ') : null;
+      };
+
+      // ── DLV_ARRAY_AGG: aggregate values of a named field from an array of objects ──
+      // Usage: DLV_ARRAY_AGG(array, fieldName, aggType)
+      // aggType: 'GROUP_CONCAT' | 'COUNT' | 'COUNT_DISTINCT' | 'SUM' | 'MIN' | 'MAX' | 'AVG'
+      // Returns a scalar — useful for aggregating local (non-SP) arrays without any JOIN.
+      alasql.fn.DLV_ARRAY_AGG = function(arr, fieldName, aggType = 'GROUP_CONCAT') {
+        if (!arr || !Array.isArray(arr) || !fieldName) return null;
+        const vals = arr
+          .map(el => (el && typeof el === 'object' ? el[fieldName] : undefined))
+          .filter(v => v != null);
+        if (!vals.length) return (aggType === 'COUNT' || aggType === 'COUNT_DISTINCT') ? 0 : null;
+        switch ((aggType || '').toUpperCase()) {
+          case 'GROUP_CONCAT':   return vals.join(';');
+          case 'COUNT':          return vals.length;
+          case 'COUNT_DISTINCT': return new Set(vals.map(String)).size;
+          case 'SUM':            return vals.reduce((s, v) => s + Number(v), 0);
+          case 'MIN':            return vals.reduce((m, v) => (v < m ? v : m), vals[0]);
+          case 'MAX':            return vals.reduce((m, v) => (v > m ? v : m), vals[0]);
+          case 'AVG':            return vals.reduce((s, v) => s + Number(v), 0) / vals.length;
+          default:               return vals.join(';');
+        }
       };
 
       // ── DLV_ARRAY_MATCH: filter scalar arrays with a comparison operator ──────────

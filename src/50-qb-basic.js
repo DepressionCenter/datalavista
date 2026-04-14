@@ -291,11 +291,14 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       function aggsForType(displayType) {
         const isNumeric = displayType === 'number';
         const isDate = displayType === 'date';
-        // text, lookup, bool, array → only 'all' tier
+        const isLookup = displayType === 'lookup';
+        // text, bool, array → only 'all' tier
+        // lookup → 'all' + 'lookup' tier
         // date → 'all' + 'ordered'
         // number → all tiers
         return DataLaVistaCore.QB_AGGS.filter(a => {
           if (a.types === 'all') return true;
+          if (a.types === 'lookup') return isLookup;
           if (a.types === 'ordered') return isNumeric || isDate;
           if (a.types === 'numeric') return isNumeric;
           return false;
@@ -330,6 +333,12 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           const col = `[${alias}].[${fa}]`;
           if (!agg) return col;
           if (agg === 'COUNT_DISTINCT') return `COUNT(DISTINCT ${col}) AS [CountDistinct_${fa}]`;
+          if (agg === 'COUNT_LOOKUP_VALUES') {
+            const dataCol = `[${alias}].[${fa}Data]`;
+            return anyAgg
+              ? `SUM(${dataCol}->length) AS [CountLookupValues_${fa}]`
+              : `${dataCol}->length AS [CountLookupValues_${fa}]`;
+          }
           return `${agg}(${col}) AS [${agg}_${fa}]`;
         }) : [`[${alias}].*`];
 
@@ -382,7 +391,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         }
         dropZone.style.display = 'none';
 
-        const rows = t.fields.filter(f => !f.isAutoId);
+        const rows = t.fields.filter(f => !f.isAutoId && !f.isLookupRaw);
 
         content.innerHTML = `
     <div class="basic-table-card">
@@ -536,7 +545,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       function selectAllBasicFields() {
         const t = DataLaVistaState.tables[DataLaVistaState.basicQB.tableName];
         if (!t) return;
-        DataLaVistaState.basicQB.selectedFields = t.fields.filter(f => !f.isAutoId).map(f => f.alias);
+        DataLaVistaState.basicQB.selectedFields = t.fields.filter(f => !f.isAutoId && !f.isLookupRaw).map(f => f.alias);
         renderBasicQB();
       }
       function clearBasicFields() { DataLaVistaState.basicQB.selectedFields = []; renderBasicQB(); }
@@ -549,7 +558,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       function addBasicCondition() {
         const t = DataLaVistaState.tables[DataLaVistaState.basicQB.tableName];
         if (!t) return;
-        const fields = t.fields.filter(f => !f.isAutoId);
+        const fields = t.fields.filter(f => !f.isAutoId && !f.isLookupRaw);
         const firstField = fields[0];
         const defaultValue = firstField?.displayType === 'boolean' ? 'true' : '';
         DataLaVistaState.basicQB.conditions.push({ conj: 'AND', field: firstField?.alias || '', op: '=', value: defaultValue });
@@ -568,7 +577,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         const tname = DataLaVistaState.basicQB.tableName;
         const t = DataLaVistaState.tables[tname];
         if (!t) return;
-        const fields = t.fields.filter(f => !f.isAutoId);
+        const fields = t.fields.filter(f => !f.isAutoId && !f.isLookupRaw);
         const cols = fields.map(f => ({
           alias: f.alias,
           displayType: f.displayType,
@@ -592,7 +601,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       function addBasicSort() {
         const t = DataLaVistaState.tables[DataLaVistaState.basicQB.tableName];
         if (!t) return;
-        const fields = t.fields.filter(f => !f.isAutoId);
+        const fields = t.fields.filter(f => !f.isAutoId && !f.isLookupRaw);
         DataLaVistaState.basicQB.sorts.push({ field: fields[0]?.alias || '', dir: 'ASC' });
         renderBasicSorts();
       }
@@ -608,7 +617,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         if (!area) return;
         const t = DataLaVistaState.tables[DataLaVistaState.basicQB.tableName];
         if (!t) return;
-        const fields = t.fields.filter(f => !f.isAutoId);
+        const fields = t.fields.filter(f => !f.isAutoId && !f.isLookupRaw);
         const cols = fields.map(f => f.alias);
         area.innerHTML = renderSortRows(
           DataLaVistaState.basicQB.sorts, cols,
@@ -634,7 +643,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       function addBasicGroupBy() {
         const t = DataLaVistaState.tables[DataLaVistaState.basicQB.tableName];
         if (!t) return;
-        const fields = t.fields.filter(f => !f.isAutoId);
+        const fields = t.fields.filter(f => !f.isAutoId && !f.isLookupRaw);
         if (!DataLaVistaState.basicQB.groupBy) DataLaVistaState.basicQB.groupBy = [];
         DataLaVistaState.basicQB.groupBy.push(fields[0]?.alias || '');
         renderBasicGroupBy();
@@ -652,7 +661,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         if (!area) return;
         const t = DataLaVistaState.tables[DataLaVistaState.basicQB.tableName];
         if (!t) return;
-        const fields = t.fields.filter(f => !f.isAutoId);
+        const fields = t.fields.filter(f => !f.isAutoId && !f.isLookupRaw);
         const groups = DataLaVistaState.basicQB.groupBy || [];
 
         area.innerHTML = '';
