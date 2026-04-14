@@ -4304,6 +4304,7 @@ function getArrayScalarOps(scalarType) {
   }
   return [
     ...group1,
+    { val: 'ARR_CONTAINS',  label: 'contains value',                  group: 'By element value' },
     { val: 'ARR_LEN_EQ',    label: '# of elements equal to',         group: 'By # of elements' },
     { val: 'ARR_LEN_NE',    label: '# of elements not equals',       group: 'By # of elements' },
     { val: 'ARR_LEN_GT',    label: '# of elements greater than',     group: 'By # of elements' },
@@ -4690,6 +4691,12 @@ function condToSQL(c, colExpr, displayType) {
   // ── array empty/not-empty ─────────────────────────────────────────────────
   if (op === 'ARR_EMPTY')     return `DLV_ARRAY_EMPTY(${colExpr}) = true`;
   if (op === 'ARR_NOT_EMPTY') return `DLV_ARRAY_EMPTY(${colExpr}) = false`;
+
+  // ── array scalar — contains (substring/value match) ─────────────────────
+  if (op === 'ARR_CONTAINS') {
+    const v = _fmtSQLVal(raw, dt);
+    return `DLV_ARRAY_MATCH(${colExpr}, 'contains', ${v})`;
+  }
 
   // ── array scalar — any-element comparisons ────────────────────────────────
   if (op.startsWith('ARR_ANY_')) {
@@ -5103,6 +5110,16 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         return v !== undefined ? v : null;
       };
 
+      // ── DLV_ID_PROP: extract id from an object, trying Id → ID → id → Key → key ──
+      alasql.fn.DLV_ID_PROP = function(obj) {
+        if (obj === null || obj === undefined) return null;
+        if (typeof obj !== 'object' || Array.isArray(obj)) return null;
+        for (const k of ['Id', 'ID', 'id', 'Key', 'key']) {
+          if (obj[k] !== undefined) return obj[k];
+        }
+        return null;
+      };
+
       // ── DLV_ARRAY_EMPTY: returns true if array is null, not an array, or has no elements ──
       alasql.fn.DLV_ARRAY_EMPTY = function (arr) {
           return !arr || !Array.isArray(arr) || arr.length === 0;
@@ -5475,15 +5492,24 @@ alasql.from.DLV_ARRAY_EXTRACT_ELEMENT = function(tableName, opts, cb, idx, query
       // e.g. DLV_ARRAY_MATCH(Tags, '=', 'Urgent')
       //      DLV_ARRAY_MATCH(Scores, '>=', 90)
       alasql.fn.DLV_ARRAY_MATCH = function (arr, operator, value, value2) {
-    if (!arr || !Array.isArray(arr)) return false;
-
-    if (operator === 'BETWEEN') {
-        if (value == null || value2 == null) return false;
-        return arr.some(item => sqlCompare(item, '>=', value) && sqlCompare(item, '<=', value2));
-    }
-
-    return arr.some(item => sqlCompare(item, operator, value));
-};
+        if (!arr || !Array.isArray(arr)) return false;
+        try {
+          if (operator === 'BETWEEN') {
+            if (value == null || value2 == null) return false;
+            return arr.some(item => sqlCompare(item, '>=', value) && sqlCompare(item, '<=', value2));
+          }
+          if (operator === 'contains') {
+            if (value == null) return false;
+            const needle = String(value);
+            return arr.some(item => {
+              const s = String(item);
+              const needleNum = Number(needle);
+              return s === needle || (!isNaN(item) && !isNaN(needleNum) && Number(item) === needleNum);
+            });
+          }
+          return arr.some(item => sqlCompare(item, operator, value));
+        } catch (e) { return false; }
+      };
 
       // ── DLV_EMAIL: extract email address from a SharePoint claims string ─────
       alasql.fn.DLV_EMAIL = function(claimsStr) {
@@ -10359,7 +10385,7 @@ validateAliasUniqueness(fields) {
     _expandGenericObject(field, outKey, rawCol) {
       return [
         this._vc   (outKey,          field.internalName, `DLV_DISPLAY(${rawCol})`,    'text',   'text',   false, field.internalName),
-        this._vc   (outKey + 'Id',   field.internalName, `DLV_PROP(${rawCol}, 'Id')`, 'text',   'text',   true,  field.internalName),
+        this._vc   (outKey + 'Id',   field.internalName, `DLV_ID_PROP(${rawCol})`,   'text',   'text',   true,  field.internalName),
         this._vcRaw(outKey + 'Data', field.internalName, rawCol,                       'object', 'object', field.internalName),
       ];
     },
@@ -10368,7 +10394,7 @@ validateAliasUniqueness(fields) {
     _expandGenericArray(field, outKey, rawCol) {
       return [
         this._vc   (outKey,          field.internalName, `DLV_JOIN(${rawCol}, '')`, 'lookup', 'lookup', false, field.internalName),
-        this._vcRaw(outKey + 'Ids',  field.internalName, `DLV_IDS(${rawCol})`,      'text',   'text',   field.internalName),
+        this._vcRaw(outKey + 'Ids',  field.internalName, `DLV_IDS(${rawCol})`,      'array',  'array',  field.internalName),
         this._vcRaw(outKey + 'Data', field.internalName, rawCol,                     'array',  'array',  field.internalName),
       ];
     },
@@ -13016,7 +13042,9 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
         const todayStr = fmt(today);
 
-        function fiscalStart(yr) { return new Date(yr, 6, 1); }   // July 1
+        const fyM = (DataLaVistaState.FiscalYearStartMonth || 7) - 1;  // 0-indexed
+        function fiscalStart(yr) { return new Date(yr, fyM, 1); }
+        function fiscalEnd(yr)   { return new Date(yr + 1, fyM, 0); }  // last day before next FY start
         function academicStart(yr) { return new Date(yr, 7, 1); } // Aug 1
 
         switch (op) {
@@ -13030,16 +13058,15 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
             return `${colExpr} >= '${y}-01-01' AND ${colExpr} <= '${y}-12-31'`;
           }
           case 'THIS_FISCAL': {
-            // Fiscal year: July 1 – June 30
-            const fy = today.getMonth() >= 6 ? today.getFullYear() : today.getFullYear() - 1;
+            const fy = today.getMonth() >= fyM ? today.getFullYear() : today.getFullYear() - 1;
             const s = fmt(fiscalStart(fy));
-            const e = fmt(new Date(fy + 1, 5, 30));
+            const e = fmt(fiscalEnd(fy));
             return `${colExpr} >= ${s} AND ${colExpr} <= ${e}`;
           }
           case 'LAST_FISCAL': {
-            const fy = (today.getMonth() >= 6 ? today.getFullYear() : today.getFullYear() - 1) - 1;
+            const fy = (today.getMonth() >= fyM ? today.getFullYear() : today.getFullYear() - 1) - 1;
             const s = fmt(fiscalStart(fy));
-            const e = fmt(new Date(fy + 1, 5, 30));
+            const e = fmt(fiscalEnd(fy));
             return `${colExpr} >= ${s} AND ${colExpr} <= ${e}`;
           }
           case 'THIS_ACADEMIC': {
@@ -13114,9 +13141,10 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           }
           case 'PAST_X_FISCAL': {
             const x = parseInt(value) || 1;
-            const fy = (today.getMonth() >= 6 ? today.getFullYear() : today.getFullYear() - 1) - x + 1;
+            const fy = (today.getMonth() >= fyM ? today.getFullYear() : today.getFullYear() - 1) - x + 1;
             const s = fmt(fiscalStart(fy));
-            const currFyEnd = (() => { const fy2 = today.getMonth() >= 6 ? today.getFullYear() : today.getFullYear() - 1; return fmt(new Date(fy2 + 1, 5, 30)); })();
+            const currFy = today.getMonth() >= fyM ? today.getFullYear() : today.getFullYear() - 1;
+            const currFyEnd = fmt(fiscalEnd(currFy));
             return `${colExpr} >= ${s} AND ${colExpr} <= ${currFyEnd}`;
           }
           default: return null;

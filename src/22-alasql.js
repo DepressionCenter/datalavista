@@ -117,6 +117,16 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         return v !== undefined ? v : null;
       };
 
+      // ── DLV_ID_PROP: extract id from an object, trying Id → ID → id → Key → key ──
+      alasql.fn.DLV_ID_PROP = function(obj) {
+        if (obj === null || obj === undefined) return null;
+        if (typeof obj !== 'object' || Array.isArray(obj)) return null;
+        for (const k of ['Id', 'ID', 'id', 'Key', 'key']) {
+          if (obj[k] !== undefined) return obj[k];
+        }
+        return null;
+      };
+
       // ── DLV_ARRAY_EMPTY: returns true if array is null, not an array, or has no elements ──
       alasql.fn.DLV_ARRAY_EMPTY = function (arr) {
           return !arr || !Array.isArray(arr) || arr.length === 0;
@@ -489,15 +499,24 @@ alasql.from.DLV_ARRAY_EXTRACT_ELEMENT = function(tableName, opts, cb, idx, query
       // e.g. DLV_ARRAY_MATCH(Tags, '=', 'Urgent')
       //      DLV_ARRAY_MATCH(Scores, '>=', 90)
       alasql.fn.DLV_ARRAY_MATCH = function (arr, operator, value, value2) {
-    if (!arr || !Array.isArray(arr)) return false;
-
-    if (operator === 'BETWEEN') {
-        if (value == null || value2 == null) return false;
-        return arr.some(item => sqlCompare(item, '>=', value) && sqlCompare(item, '<=', value2));
-    }
-
-    return arr.some(item => sqlCompare(item, operator, value));
-};
+        if (!arr || !Array.isArray(arr)) return false;
+        try {
+          if (operator === 'BETWEEN') {
+            if (value == null || value2 == null) return false;
+            return arr.some(item => sqlCompare(item, '>=', value) && sqlCompare(item, '<=', value2));
+          }
+          if (operator === 'contains') {
+            if (value == null) return false;
+            const needle = String(value);
+            return arr.some(item => {
+              const s = String(item);
+              const needleNum = Number(needle);
+              return s === needle || (!isNaN(item) && !isNaN(needleNum) && Number(item) === needleNum);
+            });
+          }
+          return arr.some(item => sqlCompare(item, operator, value));
+        } catch (e) { return false; }
+      };
 
       // ── DLV_EMAIL: extract email address from a SharePoint claims string ─────
       alasql.fn.DLV_EMAIL = function(claimsStr) {

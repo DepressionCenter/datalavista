@@ -862,7 +862,7 @@ validateAliasUniqueness(fields) {
     _expandGenericObject(field, outKey, rawCol) {
       return [
         this._vc   (outKey,          field.internalName, `DLV_DISPLAY(${rawCol})`,    'text',   'text',   false, field.internalName),
-        this._vc   (outKey + 'Id',   field.internalName, `DLV_PROP(${rawCol}, 'Id')`, 'text',   'text',   true,  field.internalName),
+        this._vc   (outKey + 'Id',   field.internalName, `DLV_ID_PROP(${rawCol})`,   'text',   'text',   true,  field.internalName),
         this._vcRaw(outKey + 'Data', field.internalName, rawCol,                       'object', 'object', field.internalName),
       ];
     },
@@ -871,7 +871,7 @@ validateAliasUniqueness(fields) {
     _expandGenericArray(field, outKey, rawCol) {
       return [
         this._vc   (outKey,          field.internalName, `DLV_JOIN(${rawCol}, '')`, 'lookup', 'lookup', false, field.internalName),
-        this._vcRaw(outKey + 'Ids',  field.internalName, `DLV_IDS(${rawCol})`,      'text',   'text',   field.internalName),
+        this._vcRaw(outKey + 'Ids',  field.internalName, `DLV_IDS(${rawCol})`,      'array',  'array',  field.internalName),
         this._vcRaw(outKey + 'Data', field.internalName, rawCol,                     'array',  'array',  field.internalName),
       ];
     },

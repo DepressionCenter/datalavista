@@ -403,6 +403,7 @@ function getArrayScalarOps(scalarType) {
   }
   return [
     ...group1,
+    { val: 'ARR_CONTAINS',  label: 'contains value',                  group: 'By element value' },
     { val: 'ARR_LEN_EQ',    label: '# of elements equal to',         group: 'By # of elements' },
     { val: 'ARR_LEN_NE',    label: '# of elements not equals',       group: 'By # of elements' },
     { val: 'ARR_LEN_GT',    label: '# of elements greater than',     group: 'By # of elements' },
@@ -789,6 +790,12 @@ function condToSQL(c, colExpr, displayType) {
   // ── array empty/not-empty ─────────────────────────────────────────────────
   if (op === 'ARR_EMPTY')     return `DLV_ARRAY_EMPTY(${colExpr}) = true`;
   if (op === 'ARR_NOT_EMPTY') return `DLV_ARRAY_EMPTY(${colExpr}) = false`;
+
+  // ── array scalar — contains (substring/value match) ─────────────────────
+  if (op === 'ARR_CONTAINS') {
+    const v = _fmtSQLVal(raw, dt);
+    return `DLV_ARRAY_MATCH(${colExpr}, 'contains', ${v})`;
+  }
 
   // ── array scalar — any-element comparisons ────────────────────────────────
   if (op.startsWith('ARR_ANY_')) {

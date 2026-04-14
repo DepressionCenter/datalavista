@@ -180,7 +180,9 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
         const todayStr = fmt(today);
 
-        function fiscalStart(yr) { return new Date(yr, 6, 1); }   // July 1
+        const fyM = (DataLaVistaState.FiscalYearStartMonth || 7) - 1;  // 0-indexed
+        function fiscalStart(yr) { return new Date(yr, fyM, 1); }
+        function fiscalEnd(yr)   { return new Date(yr + 1, fyM, 0); }  // last day before next FY start
         function academicStart(yr) { return new Date(yr, 7, 1); } // Aug 1
 
         switch (op) {
@@ -194,16 +196,15 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
             return `${colExpr} >= '${y}-01-01' AND ${colExpr} <= '${y}-12-31'`;
           }
           case 'THIS_FISCAL': {
-            // Fiscal year: July 1 – June 30
-            const fy = today.getMonth() >= 6 ? today.getFullYear() : today.getFullYear() - 1;
+            const fy = today.getMonth() >= fyM ? today.getFullYear() : today.getFullYear() - 1;
             const s = fmt(fiscalStart(fy));
-            const e = fmt(new Date(fy + 1, 5, 30));
+            const e = fmt(fiscalEnd(fy));
             return `${colExpr} >= ${s} AND ${colExpr} <= ${e}`;
           }
           case 'LAST_FISCAL': {
-            const fy = (today.getMonth() >= 6 ? today.getFullYear() : today.getFullYear() - 1) - 1;
+            const fy = (today.getMonth() >= fyM ? today.getFullYear() : today.getFullYear() - 1) - 1;
             const s = fmt(fiscalStart(fy));
-            const e = fmt(new Date(fy + 1, 5, 30));
+            const e = fmt(fiscalEnd(fy));
             return `${colExpr} >= ${s} AND ${colExpr} <= ${e}`;
           }
           case 'THIS_ACADEMIC': {
@@ -278,9 +279,10 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           }
           case 'PAST_X_FISCAL': {
             const x = parseInt(value) || 1;
-            const fy = (today.getMonth() >= 6 ? today.getFullYear() : today.getFullYear() - 1) - x + 1;
+            const fy = (today.getMonth() >= fyM ? today.getFullYear() : today.getFullYear() - 1) - x + 1;
             const s = fmt(fiscalStart(fy));
-            const currFyEnd = (() => { const fy2 = today.getMonth() >= 6 ? today.getFullYear() : today.getFullYear() - 1; return fmt(new Date(fy2 + 1, 5, 30)); })();
+            const currFy = today.getMonth() >= fyM ? today.getFullYear() : today.getFullYear() - 1;
+            const currFyEnd = fmt(fiscalEnd(currFy));
             return `${colExpr} >= ${s} AND ${colExpr} <= ${currFyEnd}`;
           }
           default: return null;
