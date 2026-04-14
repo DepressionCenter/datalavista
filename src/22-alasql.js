@@ -385,7 +385,7 @@ alasql.from.DLV_ARRAY_EXTRACT_ELEMENT = function(tableName, opts, cb, idx, query
 
       // ── Shared label extractor used by DLV_DISPLAY and DLV_JOIN ─────────────
       const _dlvLabel = o =>
-        o.Title || o.Label || o.Name || o.Value || o.value ||
+        o.Title || o.Label || o.Name || o.name || o.Value || o.value ||
         o.lookupValue || o.LookupValue || o.displayValue || o.DisplayValue || null;
 
       // ── DLV_DISPLAY: human-readable display value from any field value ──────
@@ -407,7 +407,7 @@ alasql.from.DLV_ARRAY_EXTRACT_ELEMENT = function(tableName, opts, cb, idx, query
             return parts.length > 0 ? parts.join('; ') : null;
           }
           if (val.Url !== undefined) return val.Url || null;
-          return _dlvLabel(val);
+          return _dlvLabel(val) || JSON.stringify(val);
         }
         return String(val);
       };
@@ -417,7 +417,13 @@ alasql.from.DLV_ARRAY_EXTRACT_ELEMENT = function(tableName, opts, cb, idx, query
         if (!Array.isArray(arr)) return null;
         const ids = arr.map(v => {
           if (typeof v === 'object' && v !== null) {
-            return v.Id !== undefined ? v.Id : (v.ID !== undefined ? v.ID : null);
+            const id = v.Id !== undefined ? v.Id
+                     : v.ID !== undefined ? v.ID
+                     : v.id !== undefined ? v.id
+                     : v.Key !== undefined ? v.Key
+                     : v.key !== undefined ? v.key
+                     : null;
+            return id;
           }
           return null;
         }).filter(id => id != null);

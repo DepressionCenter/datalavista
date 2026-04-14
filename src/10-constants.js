@@ -275,6 +275,7 @@ const DataLaVistaState = {
   reportUrl: null, // if ?report=<url> param is provided, this holds the URL of the report being edited
   relationships: [], // auto-detected and manual relationships: [{ id, source, childTableKey, childField, parentTableKey, parentField, joinType, spLookupField }]
   drillFilters: {},  // cross-widget click filters: { fieldName: value } — rebuilt on every chart/table click
+  FiscalYearStartMonth: 7,  // 1=Jan … 12=Dec; month when the fiscal year starts (default: 7 = July)
   _initialized: false
 }; // End dlvRawState
 
