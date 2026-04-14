@@ -761,7 +761,8 @@ validateAliasUniqueness(fields) {
           ? this._expandTaxonomyMulti(field, outKey, rawCol)
           : this._expandTaxonomy(field, outKey, rawCol);
       }
-      if (ft === 'url') return this._expandUrlField(field, outKey, rawCol);
+      if (ft === 'url')          return this._expandUrlField(field, outKey, rawCol);
+      if (ft === 'choice-multi') return this._expandChoiceMulti(field, outKey, rawCol);
       if (typeStr === 'calculated' && (field.CalculatedTypeAsString || field.calculatedFieldType)) {
         const newFieldType = parseFieldType(field.CalculatedTypeAsString || field.calculatedFieldType);
         // Shallow-clone to avoid mutating the shared state field object
@@ -807,10 +808,11 @@ validateAliasUniqueness(fields) {
 
     _expandUserMulti(field, outKey, rawCol) {
       return [
-        this._vc   (outKey,            field.internalName, `DLV_JOIN(${rawCol}, 'Title')`, 'text',  'text',  false, field.internalName),
-        this._vcRaw(outKey + 'Ids',    field.internalName, `DLV_IDS(${rawCol})`,           'text',  'text',  field.internalName),
-        this._vc   (outKey + 'Emails', field.internalName, `DLV_EMAILS(${rawCol})`,        'text',  'text',  true,  field.internalName),
-        this._vcRaw(outKey + 'Data',   field.internalName, rawCol,                         'array', 'array', field.internalName),
+        this._vc   (outKey,              field.internalName, `DLV_JOIN(${rawCol}, 'Title')`, 'lookup', 'lookup', false, field.internalName),
+        this._vcRaw(outKey + 'Ids',      field.internalName, `DLV_IDS(${rawCol})`,           'array',  'array',  field.internalName),
+        this._vc   (outKey + 'Emails',   field.internalName, `DLV_EMAILS(${rawCol})`,        'array',  'array',  true,  field.internalName),
+        this._vc   (outKey + 'Count',    field.internalName, `${rawCol}->length`,             'number', 'number', true,  field.internalName),
+        this._vcRaw(outKey + 'Data',     field.internalName, rawCol,                          'array',  'array',  field.internalName),
       ];
     },
 
@@ -825,9 +827,10 @@ validateAliasUniqueness(fields) {
     // Parent field kept as 'lookup' so pickers, filters, and agg options treat it as array-of-objects.
     _expandLookupMulti(field, outKey, rawCol) {
       return [
-        this._vc   (outKey,          field.internalName, `DLV_JOIN(${rawCol}, 'Title')`, 'lookup', 'lookup', false, field.internalName),
-        this._vcRaw(outKey + 'Ids',  field.internalName, `DLV_IDS(${rawCol})`,           'text',   'text',   field.internalName),
-        this._vcRaw(outKey + 'Data', field.internalName, rawCol,                          'array',  'array',  field.internalName),
+        this._vc   (outKey,           field.internalName, `DLV_JOIN(${rawCol}, 'Title')`, 'lookup', 'lookup', false, field.internalName),
+        this._vcRaw(outKey + 'Ids',   field.internalName, `DLV_IDS(${rawCol})`,           'array',  'array',  field.internalName),
+        this._vc   (outKey + 'Count', field.internalName, `${rawCol}->length`,             'number', 'number', true,  field.internalName),
+        this._vcRaw(outKey + 'Data',  field.internalName, rawCol,                          'array',  'array',  field.internalName),
       ];
     },
 
@@ -841,17 +844,18 @@ validateAliasUniqueness(fields) {
 
     _expandTaxonomyMulti(field, outKey, rawCol) {
       return [
-        this._vc   (outKey,          field.internalName, `DLV_TAX_LABELS(${rawCol})`, 'text',  'text',  false, field.internalName),
-        this._vcRaw(outKey + 'Ids',  field.internalName, `DLV_TAX_IDS(${rawCol})`,   'text',  'text',  field.internalName),
-        this._vcRaw(outKey + 'Data', field.internalName, rawCol,                       'array', 'array', field.internalName),
+        this._vc   (outKey,              field.internalName, `DLV_TAX_LABELS(${rawCol})`,     'text',   'text',   false, field.internalName),
+        this._vcRaw(outKey + 'Ids',      field.internalName, `DLV_TAX_IDS(${rawCol})`,        'array',  'array',  field.internalName),
+        this._vc   (outKey + 'Labels',   field.internalName, `DLV_TAX_LABELS_ONLY(${rawCol})`, 'array',  'array',  true,  field.internalName),
+        this._vc   (outKey + 'Count',    field.internalName, `${rawCol}->length`,               'number', 'number', true,  field.internalName),
+        this._vcRaw(outKey + 'Data',     field.internalName, rawCol,                            'array',  'array',  field.internalName),
       ];
     },
 
     _expandUrlField(field, outKey, rawCol) {
       return [
-        this._vc   (outKey,           field.internalName, `DLV_PROP(${rawCol}, 'Url')`,         'text',   'text',   false, field.internalName),
-        this._vc   (outKey + 'Label', field.internalName, `DLV_PROP(${rawCol}, 'Description')`, 'text',   'text',   true,  field.internalName),
-        this._vcRaw(outKey + 'Data',  field.internalName, rawCol,                                'object', 'object', field.internalName),
+        this._vc(outKey,           field.internalName, `DLV_PROP(${rawCol}, 'Url')`,         'text', 'text', false, field.internalName),
+        this._vc(outKey + 'Label', field.internalName, `DLV_PROP(${rawCol}, 'Description')`, 'text', 'text', true,  field.internalName),
       ];
     },
 
@@ -889,6 +893,14 @@ validateAliasUniqueness(fields) {
     _expandNumberField(field, outKey, rawCol) {
       return [
         this._vc(outKey, field.internalName, `DLV_PARSE_NUMBER(${rawCol})`, 'number', field.displayType || field.type || 'number', false, field.internalName),
+      ];
+    },
+
+    _expandChoiceMulti(field, outKey, rawCol) {
+      return [
+        this._vc   (outKey,           field.internalName, `DLV_JOIN(${rawCol}, '')`, 'text',   'text',   false, field.internalName),
+        this._vc   (outKey + 'Count', field.internalName, `${rawCol}->length`,        'number', 'number', true,  field.internalName),
+        this._vcRaw(outKey + 'Data',  field.internalName, rawCol,                     'array',  'array',  field.internalName),
       ];
     },
 

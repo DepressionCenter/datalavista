@@ -427,7 +427,7 @@ alasql.from.DLV_ARRAY_EXTRACT_ELEMENT = function(tableName, opts, cb, idx, query
           }
           return null;
         }).filter(id => id != null);
-        return ids.length > 0 ? ids.join('; ') : null;
+        return ids.length > 0 ? ids : null;
       };
 
       // ── DLV_JOIN: map array elements to a property and join with separator ('; ' by default)
@@ -514,7 +514,7 @@ alasql.from.DLV_ARRAY_EXTRACT_ELEMENT = function(tableName, opts, cb, idx, query
           const match = name.match(/([a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/i);
           return match ? match[1] : null;
         }).filter(e => e);
-        return emails.length > 0 ? emails.join('; ') : null;
+        return emails.length > 0 ? emails : null;
       };
 
       // ── DLV_PICTURE_URL: build SP user photo URL from claims string ──────────
@@ -615,13 +615,30 @@ alasql.from.DLV_ARRAY_EXTRACT_ELEMENT = function(tableName, opts, cb, idx, query
             }
             return String(v);
           }).filter(s => s && s !== '|');
-          return ids.length > 0 ? ids.join('; ') : null;
+          return ids.length > 0 ? ids : null;
         }
         if (typeof val === 'object' && val !== null) {
-          if (val.TermGuid !== undefined) return `${val.Label || ''}|${val.TermGuid || ''}`;
+          if (val.TermGuid !== undefined) return [`${val.Label || ''}|${val.TermGuid || ''}`];
           if (val.results && Array.isArray(val.results)) return alasql.fn.DLV_TAX_IDS(val.results);
         }
         return null;
+      };
+
+      // ── DLV_TAX_LABELS_ONLY: return array of label strings (no TermGuid) ─────
+      alasql.fn.DLV_TAX_LABELS_ONLY = function(val) {
+        if (val === null || val === undefined) return null;
+        if (Array.isArray(val)) {
+          const labels = val.map(v => (typeof v === 'object' && v !== null) ? (v.Label || v.Term || v.Title || '') : String(v)).filter(l => l);
+          return labels.length > 0 ? labels : null;
+        }
+        if (typeof val === 'object') {
+          if (val.TermGuid !== undefined) {
+            const l = val.Label || val.Title;
+            return l ? [l] : null;
+          }
+          if (val.results && Array.isArray(val.results)) return alasql.fn.DLV_TAX_LABELS_ONLY(val.results);
+        }
+        return typeof val === 'string' ? [val] : null;
       };
 
       // Safely parse strings to Booleans (handles SharePoint's "Yes"/"1"/etc.)
