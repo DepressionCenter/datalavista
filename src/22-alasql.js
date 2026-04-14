@@ -586,6 +586,52 @@ alasql.from.DLV_ARRAY_EXTRACT_ELEMENT = function(tableName, opts, cb, idx, query
         return val; // return original if no pattern matched
       };
 
+      // ── DLV_DATE_PART: extract a named part from a normalised date string ───────
+      // Expects val to already be in 'YYYY-MM-DD' or 'YYYY-MM-DD HH:mm:ss' format
+      // (i.e. pre-processed by DLV_NORMALIZE_DATE).  In SQL: DLV_DATE_PART(DLV_NORMALIZE_DATE(col), 'part')
+      // Parts: 'date', 'time', 'year', 'yearText', 'fiscalYear',
+      //        'month', 'monthText', 'monthName', 'day', 'dayName', 'hour', 'hourText'
+      alasql.fn.DLV_DATE_PART = function(val, part) {
+        if (val === null || val === undefined || val === '') return null;
+        const norm = String(val);
+        if (!norm) return null;
+
+        const spaceIdx = norm.indexOf(' ');
+        const datePart = spaceIdx >= 0 ? norm.substring(0, spaceIdx) : norm;
+        const timePart = spaceIdx >= 0 ? norm.substring(spaceIdx + 1) : null;
+
+        const [yr, mo, dy] = datePart.split('-').map(Number);
+        const hr = timePart ? parseInt(timePart, 10) : 0;
+
+        const MONTH_NAMES = ['January','February','March','April','May','June',
+                             'July','August','September','October','November','December'];
+        const DAY_NAMES   = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+
+        switch (part) {
+          case 'date':      return datePart;
+          case 'time':      return timePart ? norm : norm + ' 00:00:00';
+          case 'year':      return yr;
+          case 'yearText':  return String(yr);
+          case 'fiscalYear': {
+            const fyStart = (DataLaVistaState.FiscalYearStartMonth || 7);
+            const startYr = mo >= fyStart ? yr : yr - 1;
+            return 'FY' + startYr + '-' + (startYr + 1);
+          }
+          case 'month':     return mo;
+          case 'monthText': return String(mo).padStart(2, '0');
+          case 'monthName': return MONTH_NAMES[mo - 1] || null;
+          case 'day': {
+            // getDay() is 0=Sun…6=Sat; spec wants Sunday=1
+            const dow = new Date(yr, mo - 1, dy).getDay();
+            return dow + 1;
+          }
+          case 'dayName':   return DAY_NAMES[new Date(yr, mo - 1, dy).getDay()];
+          case 'hour':      return hr;
+          case 'hourText':  return String(hr).padStart(2, '0');
+          default:          return null;
+        }
+      };
+
       // ── DLV_TAX_LABELS: get taxonomy labels joined with '; ' ─────────────────
       alasql.fn.DLV_TAX_LABELS = function(val) {
         if (val === null || val === undefined) return null;

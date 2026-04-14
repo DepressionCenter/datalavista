@@ -877,9 +877,47 @@ validateAliasUniqueness(fields) {
     },
 
     _expandDateField(field, outKey, rawCol) {
-      return [
-        this._vc(outKey, field.internalName, `DLV_NORMALIZE_DATE(${rawCol})`, 'date', 'date', false, field.internalName),
+      const aliasLc  = outKey.toLowerCase();
+      const endsDate = aliasLc.endsWith('date');
+      const endsTime = /(?:dt|ts|timestamp|datetime|time)$/.test(aliasLc);
+      // Include hour synthetics when alias signals time, or when ambiguous (could be either)
+      const inclTime = endsTime || !endsDate;
+      const nd = `DLV_NORMALIZE_DATE(${rawCol})`;   // shorthand used below
+      const dp = (p) => `DLV_DATE_PART(${nd}, '${p}')`;
+
+      const mainExpr = endsDate ? dp('date') : nd;
+
+      const cols = [
+        this._vc(outKey, field.internalName, mainExpr, 'date', 'date', false, field.internalName),
       ];
+
+      // Date / Time companions
+      if (endsDate) {
+        cols.push(this._vc(outKey + 'Time', field.internalName, dp('time'), 'date', 'date', true, field.internalName));
+      } else if (endsTime) {
+        cols.push(this._vc(outKey + 'Date', field.internalName, dp('date'), 'date', 'date', true, field.internalName));
+      } else {
+        cols.push(this._vc(outKey + 'Date', field.internalName, dp('date'), 'date', 'date', true, field.internalName));
+        cols.push(this._vc(outKey + 'Time', field.internalName, dp('time'), 'date', 'date', true, field.internalName));
+      }
+
+      // Always: year, fiscal year, month, day-of-week
+      cols.push(this._vc(outKey + 'Year',       field.internalName, dp('year'),       'number', 'number', true, field.internalName));
+      cols.push(this._vc(outKey + 'YearText',   field.internalName, dp('yearText'),   'text',   'text',   true, field.internalName));
+      cols.push(this._vc(outKey + 'FiscalYear', field.internalName, dp('fiscalYear'), 'text',   'text',   true, field.internalName));
+      cols.push(this._vc(outKey + 'Month',      field.internalName, dp('month'),      'number', 'number', true, field.internalName));
+      cols.push(this._vc(outKey + 'MonthText',  field.internalName, dp('monthText'),  'text',   'text',   true, field.internalName));
+      cols.push(this._vc(outKey + 'MonthName',  field.internalName, dp('monthName'),  'text',   'text',   true, field.internalName));
+      cols.push(this._vc(outKey + 'Day',        field.internalName, dp('day'),        'number', 'number', true, field.internalName));
+      cols.push(this._vc(outKey + 'DayName',    field.internalName, dp('dayName'),    'text',   'text',   true, field.internalName));
+
+      // Hour synthetics (when time is relevant)
+      if (inclTime) {
+        cols.push(this._vc(outKey + 'Hour',     field.internalName, dp('hour'),     'number', 'number', true, field.internalName));
+        cols.push(this._vc(outKey + 'HourText', field.internalName, dp('hourText'), 'text',   'text',   true, field.internalName));
+      }
+
+      return cols;
     },
 
     // ── Boolean Fields ───────────────────────────────────────────

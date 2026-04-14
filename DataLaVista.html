@@ -5413,7 +5413,7 @@ alasql.from.DLV_ARRAY_EXTRACT_ELEMENT = function(tableName, opts, cb, idx, query
           }
           return null;
         }).filter(id => id != null);
-        return ids.length > 0 ? ids.join('; ') : null;
+        return ids.length > 0 ? ids : null;
       };
 
       // ── DLV_JOIN: map array elements to a property and join with separator ('; ' by default)
@@ -5500,7 +5500,7 @@ alasql.from.DLV_ARRAY_EXTRACT_ELEMENT = function(tableName, opts, cb, idx, query
           const match = name.match(/([a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/i);
           return match ? match[1] : null;
         }).filter(e => e);
-        return emails.length > 0 ? emails.join('; ') : null;
+        return emails.length > 0 ? emails : null;
       };
 
       // ── DLV_PICTURE_URL: build SP user photo URL from claims string ──────────
@@ -5572,6 +5572,52 @@ alasql.from.DLV_ARRAY_EXTRACT_ELEMENT = function(tableName, opts, cb, idx, query
         return val; // return original if no pattern matched
       };
 
+      // ── DLV_DATE_PART: extract a named part from a normalised date string ───────
+      // Expects val to already be in 'YYYY-MM-DD' or 'YYYY-MM-DD HH:mm:ss' format
+      // (i.e. pre-processed by DLV_NORMALIZE_DATE).  In SQL: DLV_DATE_PART(DLV_NORMALIZE_DATE(col), 'part')
+      // Parts: 'date', 'time', 'year', 'yearText', 'fiscalYear',
+      //        'month', 'monthText', 'monthName', 'day', 'dayName', 'hour', 'hourText'
+      alasql.fn.DLV_DATE_PART = function(val, part) {
+        if (val === null || val === undefined || val === '') return null;
+        const norm = String(val);
+        if (!norm) return null;
+
+        const spaceIdx = norm.indexOf(' ');
+        const datePart = spaceIdx >= 0 ? norm.substring(0, spaceIdx) : norm;
+        const timePart = spaceIdx >= 0 ? norm.substring(spaceIdx + 1) : null;
+
+        const [yr, mo, dy] = datePart.split('-').map(Number);
+        const hr = timePart ? parseInt(timePart, 10) : 0;
+
+        const MONTH_NAMES = ['January','February','March','April','May','June',
+                             'July','August','September','October','November','December'];
+        const DAY_NAMES   = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+
+        switch (part) {
+          case 'date':      return datePart;
+          case 'time':      return timePart ? norm : norm + ' 00:00:00';
+          case 'year':      return yr;
+          case 'yearText':  return String(yr);
+          case 'fiscalYear': {
+            const fyStart = (DataLaVistaState.FiscalYearStartMonth || 7);
+            const startYr = mo >= fyStart ? yr : yr - 1;
+            return 'FY' + startYr + '-' + (startYr + 1);
+          }
+          case 'month':     return mo;
+          case 'monthText': return String(mo).padStart(2, '0');
+          case 'monthName': return MONTH_NAMES[mo - 1] || null;
+          case 'day': {
+            // getDay() is 0=Sun…6=Sat; spec wants Sunday=1
+            const dow = new Date(yr, mo - 1, dy).getDay();
+            return dow + 1;
+          }
+          case 'dayName':   return DAY_NAMES[new Date(yr, mo - 1, dy).getDay()];
+          case 'hour':      return hr;
+          case 'hourText':  return String(hr).padStart(2, '0');
+          default:          return null;
+        }
+      };
+
       // ── DLV_TAX_LABELS: get taxonomy labels joined with '; ' ─────────────────
       alasql.fn.DLV_TAX_LABELS = function(val) {
         if (val === null || val === undefined) return null;
@@ -5601,13 +5647,30 @@ alasql.from.DLV_ARRAY_EXTRACT_ELEMENT = function(tableName, opts, cb, idx, query
             }
             return String(v);
           }).filter(s => s && s !== '|');
-          return ids.length > 0 ? ids.join('; ') : null;
+          return ids.length > 0 ? ids : null;
         }
         if (typeof val === 'object' && val !== null) {
-          if (val.TermGuid !== undefined) return `${val.Label || ''}|${val.TermGuid || ''}`;
+          if (val.TermGuid !== undefined) return [`${val.Label || ''}|${val.TermGuid || ''}`];
           if (val.results && Array.isArray(val.results)) return alasql.fn.DLV_TAX_IDS(val.results);
         }
         return null;
+      };
+
+      // ── DLV_TAX_LABELS_ONLY: return array of label strings (no TermGuid) ─────
+      alasql.fn.DLV_TAX_LABELS_ONLY = function(val) {
+        if (val === null || val === undefined) return null;
+        if (Array.isArray(val)) {
+          const labels = val.map(v => (typeof v === 'object' && v !== null) ? (v.Label || v.Term || v.Title || '') : String(v)).filter(l => l);
+          return labels.length > 0 ? labels : null;
+        }
+        if (typeof val === 'object') {
+          if (val.TermGuid !== undefined) {
+            const l = val.Label || val.Title;
+            return l ? [l] : null;
+          }
+          if (val.results && Array.isArray(val.results)) return alasql.fn.DLV_TAX_LABELS_ONLY(val.results);
+        }
+        return typeof val === 'string' ? [val] : null;
       };
 
       // Safely parse strings to Booleans (handles SharePoint's "Yes"/"1"/etc.)
@@ -10195,7 +10258,8 @@ validateAliasUniqueness(fields) {
           ? this._expandTaxonomyMulti(field, outKey, rawCol)
           : this._expandTaxonomy(field, outKey, rawCol);
       }
-      if (ft === 'url') return this._expandUrlField(field, outKey, rawCol);
+      if (ft === 'url')          return this._expandUrlField(field, outKey, rawCol);
+      if (ft === 'choice-multi') return this._expandChoiceMulti(field, outKey, rawCol);
       if (typeStr === 'calculated' && (field.CalculatedTypeAsString || field.calculatedFieldType)) {
         const newFieldType = parseFieldType(field.CalculatedTypeAsString || field.calculatedFieldType);
         // Shallow-clone to avoid mutating the shared state field object
@@ -10241,10 +10305,11 @@ validateAliasUniqueness(fields) {
 
     _expandUserMulti(field, outKey, rawCol) {
       return [
-        this._vc   (outKey,            field.internalName, `DLV_JOIN(${rawCol}, 'Title')`, 'text',  'text',  false, field.internalName),
-        this._vcRaw(outKey + 'Ids',    field.internalName, `DLV_IDS(${rawCol})`,           'text',  'text',  field.internalName),
-        this._vc   (outKey + 'Emails', field.internalName, `DLV_EMAILS(${rawCol})`,        'text',  'text',  true,  field.internalName),
-        this._vcRaw(outKey + 'Data',   field.internalName, rawCol,                         'array', 'array', field.internalName),
+        this._vc   (outKey,              field.internalName, `DLV_JOIN(${rawCol}, 'Title')`, 'lookup', 'lookup', false, field.internalName),
+        this._vcRaw(outKey + 'Ids',      field.internalName, `DLV_IDS(${rawCol})`,           'array',  'array',  field.internalName),
+        this._vc   (outKey + 'Emails',   field.internalName, `DLV_EMAILS(${rawCol})`,        'array',  'array',  true,  field.internalName),
+        this._vc   (outKey + 'Count',    field.internalName, `${rawCol}->length`,             'number', 'number', true,  field.internalName),
+        this._vcRaw(outKey + 'Data',     field.internalName, rawCol,                          'array',  'array',  field.internalName),
       ];
     },
 
@@ -10259,9 +10324,10 @@ validateAliasUniqueness(fields) {
     // Parent field kept as 'lookup' so pickers, filters, and agg options treat it as array-of-objects.
     _expandLookupMulti(field, outKey, rawCol) {
       return [
-        this._vc   (outKey,          field.internalName, `DLV_JOIN(${rawCol}, 'Title')`, 'lookup', 'lookup', false, field.internalName),
-        this._vcRaw(outKey + 'Ids',  field.internalName, `DLV_IDS(${rawCol})`,           'text',   'text',   field.internalName),
-        this._vcRaw(outKey + 'Data', field.internalName, rawCol,                          'array',  'array',  field.internalName),
+        this._vc   (outKey,           field.internalName, `DLV_JOIN(${rawCol}, 'Title')`, 'lookup', 'lookup', false, field.internalName),
+        this._vcRaw(outKey + 'Ids',   field.internalName, `DLV_IDS(${rawCol})`,           'array',  'array',  field.internalName),
+        this._vc   (outKey + 'Count', field.internalName, `${rawCol}->length`,             'number', 'number', true,  field.internalName),
+        this._vcRaw(outKey + 'Data',  field.internalName, rawCol,                          'array',  'array',  field.internalName),
       ];
     },
 
@@ -10275,17 +10341,18 @@ validateAliasUniqueness(fields) {
 
     _expandTaxonomyMulti(field, outKey, rawCol) {
       return [
-        this._vc   (outKey,          field.internalName, `DLV_TAX_LABELS(${rawCol})`, 'text',  'text',  false, field.internalName),
-        this._vcRaw(outKey + 'Ids',  field.internalName, `DLV_TAX_IDS(${rawCol})`,   'text',  'text',  field.internalName),
-        this._vcRaw(outKey + 'Data', field.internalName, rawCol,                       'array', 'array', field.internalName),
+        this._vc   (outKey,              field.internalName, `DLV_TAX_LABELS(${rawCol})`,     'text',   'text',   false, field.internalName),
+        this._vcRaw(outKey + 'Ids',      field.internalName, `DLV_TAX_IDS(${rawCol})`,        'array',  'array',  field.internalName),
+        this._vc   (outKey + 'Labels',   field.internalName, `DLV_TAX_LABELS_ONLY(${rawCol})`, 'array',  'array',  true,  field.internalName),
+        this._vc   (outKey + 'Count',    field.internalName, `${rawCol}->length`,               'number', 'number', true,  field.internalName),
+        this._vcRaw(outKey + 'Data',     field.internalName, rawCol,                            'array',  'array',  field.internalName),
       ];
     },
 
     _expandUrlField(field, outKey, rawCol) {
       return [
-        this._vc   (outKey,           field.internalName, `DLV_PROP(${rawCol}, 'Url')`,         'text',   'text',   false, field.internalName),
-        this._vc   (outKey + 'Label', field.internalName, `DLV_PROP(${rawCol}, 'Description')`, 'text',   'text',   true,  field.internalName),
-        this._vcRaw(outKey + 'Data',  field.internalName, rawCol,                                'object', 'object', field.internalName),
+        this._vc(outKey,           field.internalName, `DLV_PROP(${rawCol}, 'Url')`,         'text', 'text', false, field.internalName),
+        this._vc(outKey + 'Label', field.internalName, `DLV_PROP(${rawCol}, 'Description')`, 'text', 'text', true,  field.internalName),
       ];
     },
 
@@ -10307,9 +10374,47 @@ validateAliasUniqueness(fields) {
     },
 
     _expandDateField(field, outKey, rawCol) {
-      return [
-        this._vc(outKey, field.internalName, `DLV_NORMALIZE_DATE(${rawCol})`, 'date', 'date', false, field.internalName),
+      const aliasLc  = outKey.toLowerCase();
+      const endsDate = aliasLc.endsWith('date');
+      const endsTime = /(?:dt|ts|timestamp|datetime|time)$/.test(aliasLc);
+      // Include hour synthetics when alias signals time, or when ambiguous (could be either)
+      const inclTime = endsTime || !endsDate;
+      const nd = `DLV_NORMALIZE_DATE(${rawCol})`;   // shorthand used below
+      const dp = (p) => `DLV_DATE_PART(${nd}, '${p}')`;
+
+      const mainExpr = endsDate ? dp('date') : nd;
+
+      const cols = [
+        this._vc(outKey, field.internalName, mainExpr, 'date', 'date', false, field.internalName),
       ];
+
+      // Date / Time companions
+      if (endsDate) {
+        cols.push(this._vc(outKey + 'Time', field.internalName, dp('time'), 'date', 'date', true, field.internalName));
+      } else if (endsTime) {
+        cols.push(this._vc(outKey + 'Date', field.internalName, dp('date'), 'date', 'date', true, field.internalName));
+      } else {
+        cols.push(this._vc(outKey + 'Date', field.internalName, dp('date'), 'date', 'date', true, field.internalName));
+        cols.push(this._vc(outKey + 'Time', field.internalName, dp('time'), 'date', 'date', true, field.internalName));
+      }
+
+      // Always: year, fiscal year, month, day-of-week
+      cols.push(this._vc(outKey + 'Year',       field.internalName, dp('year'),       'number', 'number', true, field.internalName));
+      cols.push(this._vc(outKey + 'YearText',   field.internalName, dp('yearText'),   'text',   'text',   true, field.internalName));
+      cols.push(this._vc(outKey + 'FiscalYear', field.internalName, dp('fiscalYear'), 'text',   'text',   true, field.internalName));
+      cols.push(this._vc(outKey + 'Month',      field.internalName, dp('month'),      'number', 'number', true, field.internalName));
+      cols.push(this._vc(outKey + 'MonthText',  field.internalName, dp('monthText'),  'text',   'text',   true, field.internalName));
+      cols.push(this._vc(outKey + 'MonthName',  field.internalName, dp('monthName'),  'text',   'text',   true, field.internalName));
+      cols.push(this._vc(outKey + 'Day',        field.internalName, dp('day'),        'number', 'number', true, field.internalName));
+      cols.push(this._vc(outKey + 'DayName',    field.internalName, dp('dayName'),    'text',   'text',   true, field.internalName));
+
+      // Hour synthetics (when time is relevant)
+      if (inclTime) {
+        cols.push(this._vc(outKey + 'Hour',     field.internalName, dp('hour'),     'number', 'number', true, field.internalName));
+        cols.push(this._vc(outKey + 'HourText', field.internalName, dp('hourText'), 'text',   'text',   true, field.internalName));
+      }
+
+      return cols;
     },
 
     // ── Boolean Fields ───────────────────────────────────────────
@@ -10323,6 +10428,14 @@ validateAliasUniqueness(fields) {
     _expandNumberField(field, outKey, rawCol) {
       return [
         this._vc(outKey, field.internalName, `DLV_PARSE_NUMBER(${rawCol})`, 'number', field.displayType || field.type || 'number', false, field.internalName),
+      ];
+    },
+
+    _expandChoiceMulti(field, outKey, rawCol) {
+      return [
+        this._vc   (outKey,           field.internalName, `DLV_JOIN(${rawCol}, '')`, 'text',   'text',   false, field.internalName),
+        this._vc   (outKey + 'Count', field.internalName, `${rawCol}->length`,        'number', 'number', true,  field.internalName),
+        this._vcRaw(outKey + 'Data',  field.internalName, rawCol,                     'array',  'array',  field.internalName),
       ];
     },
 
