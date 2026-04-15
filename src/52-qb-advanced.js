@@ -1040,7 +1040,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           if (!nd) return;
           const t = DataLaVistaState.tables[nd.tableName];
           if (!t) return;
-          const fields = t.fields.filter(f => !f.isAutoId && !f.isLookupRaw);
+          const fields = t.fields.filter(f => !f.isAutoId && !f.isLookupRaw && !_isDateSyntheticChild(f, t));
 
           // Ensure state arrays / maps exist on older nodes (loaded from saved config)
           if (!nd.conditions)       nd.conditions = [];
@@ -1056,18 +1056,27 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
             const sel = nd.selectedFields.includes(f.alias);
             const agg = nd.fieldAggs[f.alias] || '';
             const aggActive = agg !== '';
-            const expandable = _isExpandableLookupField(f, t);
-            const expanded   = expandable && _expandedLookupFields[id]?.has(f.alias);
+            const expandable     = _isExpandableLookupField(f, t);
+            const dateExpandable = _isExpandableDateField(f, t);
+            const isExpandable   = expandable || dateExpandable;
+            const expanded       = isExpandable && _expandedLookupFields[id]?.has(f.alias);
+            const aggBtnCls   = 'adv-agg-btn' + (aggActive ? ' has-agg' : '');
+            const aggBtnTitle = aggActive ? agg : 'No aggregate';
+            const aggBtnContent = aggActive ? getAggIcon(agg) : '∑';
             const aggBtn = expandable
-              ? `<button class="adv-agg-btn" disabled title="Expand ▼ to select child field aggregates">∑</button>`
-              : `<button class="adv-agg-btn${aggActive ? ' has-agg' : ''}"
-                  title="${aggActive ? agg : 'No aggregate'}"
-                  onclick="event.stopPropagation();showAdvAggPopup('${id}','${f.alias}',this)">${aggActive ? getAggIcon(agg) : '∑'}</button>`;
-            const expandBtn = expandable
-              ? `<button class="adv-expand-btn${expanded ? ' expanded' : ''}" title="${expanded ? 'Collapse' : 'Expand child fields'}"
-                  onclick="event.stopPropagation();_toggleLookupExpand('${id}','${f.alias}')">${expanded ? '▼' : '▶'}</button>`
+              ? '<button class="adv-agg-btn" disabled title="Expand ▼ to select child field aggregates">∑</button>'
+              : '<button class="' + aggBtnCls + '" title="' + aggBtnTitle + '"'
+                + ' onclick="event.stopPropagation();showAdvAggPopup(\'' + id + '\',\'' + f.alias + '\',this)">'
+                + aggBtnContent + '</button>';
+            const expandBtnCls = 'adv-expand-btn' + (expanded ? ' expanded' : '');
+            const expandBtn = isExpandable
+              ? '<button class="' + expandBtnCls + '" title="' + (expanded ? 'Collapse' : 'Expand') + '"'
+                + ' onclick="event.stopPropagation();_toggleLookupExpand(\'' + id + '\',\'' + f.alias + '\')">'
+                + (expanded ? '▼' : '▶') + '</button>'
               : '';
-            const childRows = expanded ? _renderChildFieldRows(id, nd, f) : '';
+            const childRows = expanded
+              ? (expandable ? _renderChildFieldRows(id, nd, f) : _renderDateChildRows(id, nd, f, t))
+              : '';
             return `<div class="adv-field-row${sel ? ' selected' : ''}"
                 onclick="advNodeToggleField('${id}','${f.alias}')" draggable="true"
                 ondragstart="event.stopPropagation();safeDragSet(event,{type:'adv-field-pill',nodeId:'${id}',field:'${f.alias}'})">
@@ -1632,8 +1641,58 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         // SP multi-select lookup: parent field has displayType 'lookup' AND a *Data synthetic exists
         if (f.displayType === 'lookup')
           return (t.fields || []).some(x => x.alias === f.alias + 'Data');
-        // Local array of objects: check displayType flag (set during normalization)
+        // Local array of objects only — synthetic scalar-array fields (Emails, Labels, Ids, …) are not expandable
+        if (f.isSynthetic) return false;
         return f.displayType === 'array' || f.displayType === 'object';
+      }
+
+      // Returns true if f is a synthetic field whose parent is a date-typed field
+      function _isDateSyntheticChild(f, t) {
+        if (!f.isSynthetic || !f.parentField) return false;
+        const parent = (t.fields || []).find(p => p.internalName === f.parentField && !p.isSynthetic);
+        return parent?.displayType === 'date' || parent?.type === 'date';
+      }
+
+      // Returns all visible date synthetic companions for a date parent field
+      function _getDateSyntheticChildren(f, t) {
+        return (t.fields || []).filter(sf =>
+          sf.isSynthetic && sf.parentField === f.internalName && !sf.isLookupRaw
+        );
+      }
+
+      // Returns true if f is a non-synthetic date field that has synthetic date companions
+      function _isExpandableDateField(f, t) {
+        if (f.isSynthetic || f.isLookupRaw || f.isAutoId) return false;
+        if (f.displayType !== 'date' && f.type !== 'date') return false;
+        return _getDateSyntheticChildren(f, t).length > 0;
+      }
+
+      // Render indented child rows for an expanded date field
+      function _renderDateChildRows(nodeId, nd, parentField, t) {
+        const children = _getDateSyntheticChildren(parentField, t);
+        if (!children.length) return '';
+        const rows = children.map(cf => {
+          const ti = DataLaVistaCore.FIELD_TYPE_ICONS[cf.displayType] || DataLaVistaCore.FIELD_TYPE_ICONS.default;
+          const sel = nd.selectedFields.includes(cf.alias);
+          const agg = nd.fieldAggs[cf.alias] || '';
+          const aggActive = agg !== '';
+          const aggCls = 'adv-agg-btn' + (aggActive ? ' has-agg' : '');
+          const aggTitle = aggActive ? agg : 'No aggregate';
+          const aggContent = aggActive ? getAggIcon(agg) : '∑';
+          const aggBtn = '<button class="' + aggCls + '" title="' + aggTitle + '"'
+            + ' onclick="event.stopPropagation();showAdvAggPopup(\'' + nodeId + '\',\'' + cf.alias + '\',this)">'
+            + aggContent + '</button>';
+          const rowCls = 'adv-field-row adv-child-field-row' + (sel ? ' selected' : '');
+          return '<div class="' + rowCls + '" style="padding-left:22px"'
+            + ' onclick="advNodeToggleField(\'' + nodeId + '\',\'' + cf.alias + '\')" draggable="true"'
+            + ' ondragstart="event.stopPropagation();safeDragSet(event,{type:\'adv-field-pill\',nodeId:\'' + nodeId + '\',field:\'' + cf.alias + '\'})">'
+            + '<input type="checkbox" ' + (sel ? 'checked' : '') + ' onclick="event.stopPropagation();" onchange="advNodeToggleField(\'' + nodeId + '\',\'' + cf.alias + '\')"/>'
+            + '<span class="field-type-icon ' + ti.cls + '">' + ti.icon + '</span>'
+            + '<span class="field-name" style="font-size:11px">' + cf.alias + '</span>'
+            + aggBtn
+            + '</div>';
+        }).join('');
+        return '<div class="adv-child-fields">' + rows + '</div>';
       }
 
       // Aggregates available for child fields by type
