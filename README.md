@@ -41,7 +41,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 **🕶️ Tell your expensive BI tools: "Data la vista, baby!"** ™
 
 
-**DataLaVista**™ is a lightweight, client-side reporting and dashboard toolkit. It brings the full power of SQL directly to your browser, allowing you to build high-performance visualizations without the need for expensive server-side licenses or complex backend infrastructure.
+**DataLaVista**™ is a lightweight, client-side reporting and dashboard toolkit (no data leaves the tool's installed environment). It brings the full power of SQL directly to your browser, allowing you to build high-performance visualizations without the need for expensive server-side licenses or complex backend infrastructure.
 
 <a href="https://code.depressioncenter.org/datalavista/DataLaVista.html" title="Click to try it live!" target="_blank"><img src="images/datalavista-screenshot-1.png" 
     alt="Screenshot of Data La Vista in action, terminating a data silo, displaying a SQL query with auto-completion dropdown menu and a dashboard designer with a table and pie chart with filters." 
