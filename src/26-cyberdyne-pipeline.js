@@ -118,9 +118,34 @@ const CyberdynePipeline = {
     }
     if (validCount === 0) return 'text';
     const threshold = validCount * 0.6;
-    if (arrayCount > 0)          return 'array';
+
+    if (arrayCount > 0) {
+      // Sub-classify: array-of-objects vs array-of-primitives
+      for (const row of sample) {
+        const val = row[column];
+        if (Array.isArray(val) && val.length > 0) {
+          const first = val.find(v => v != null);
+          if (first !== undefined && typeof first === 'object' && !Array.isArray(first)) return 'array-objects';
+          return 'array-primitives';
+        }
+      }
+      return 'array-primitives';
+    }
+
     if (objectCount > 0)         return 'object';
-    if (dateCount >= threshold)  return 'date';
+
+    if (dateCount >= threshold) {
+      // Datetime detection: any non-midnight time component → datetime
+      const hasTime = sample.some(row => {
+        const v = row[column];
+        if (!v) return false;
+        const s = String(v);
+        const m = s.match(/T(\d{2}):(\d{2}):(\d{2})/);
+        return m && !(m[1] === '00' && m[2] === '00' && m[3] === '00');
+      });
+      return hasTime ? 'datetime' : 'date';
+    }
+
     if (numericCount >= threshold) return 'number';
     if (boolCount >= threshold)  return 'boolean';
     return 'text';
@@ -128,7 +153,21 @@ const CyberdynePipeline = {
 
   /** Map internal type to display type */
   mapDisplayType(type) {
-    const map = { number: 'number', boolean: 'boolean', date: 'date', array: 'array', object: 'object', lookup: 'lookup' };
+    const map = {
+      number:           'number',
+      boolean:          'boolean',
+      date:             'date',
+      datetime:         'datetime',
+      array:            'array',
+      'array-primitives': 'array',
+      'array-objects':  'lookup-multi',
+      object:           'object',
+      lookup:           'lookup',
+      'lookup-multi':   'lookup-multi',
+      user:             'user',
+      'user-multi':     'user-multi',
+      url:              'url',
+    };
     return map[type] || 'text';
   },
 
@@ -186,13 +225,28 @@ const CyberdynePipeline = {
     const firstRow = rows[0];
     return Object.keys(firstRow).map(name => {
       const type = this.guessFieldType(name, rows);
+      const displayType = this.mapDisplayType(type);
+      // dataType: canonical SQL storage type
+      let dataType = 'text';
+      if (type === 'number') dataType = 'number';
+      else if (type === 'date' || type === 'datetime') dataType = 'date';
+      else if (type === 'boolean') dataType = 'boolean';
+      else if (type === 'array' || type === 'array-primitives' || type === 'array-objects') dataType = 'array';
+      else if (type === 'object') dataType = 'object';
+      const alias = toPascalCase(name) || name;
       return {
-        internalName: name,
-        displayName: name,
-        alias: toPascalCase(name) || name,
+        internalName:  name,
+        displayName:   name,
+        alias:         alias,
+        userAlias:     alias,
+        rawType:       'inferred',
+        rawTypeSource: 'inferred',
         type,
-        displayType: this.mapDisplayType(type),
-        required: false
+        dataType,
+        displayType,
+        displayFormat: null,
+        derivedColumns: null,
+        required:      false
       };
     });
   },

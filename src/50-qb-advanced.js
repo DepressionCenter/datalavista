@@ -23,6 +23,263 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       // ============================================================
       // QUERY BUILDER — ADVANCED MODE
       // ============================================================
+
+      // ── Utility functions moved from 50-qb-basic.js ──────────────────────────
+      // These were originally in the basic QB file but are shared by advanced QB,
+      // the design tab, and the public API. They live here now that basic QB is gone.
+
+      // Which aggregates are visible for a given field displayType.
+      // Used by showAggPopup() in 42-ui-shared.js (shared by advanced QB + design tab).
+      /** @param {string} displayType */
+      function aggsForType(displayType) {
+        const NONE          = { val: '',             label: '— none —' };
+        const COUNT         = { val: 'COUNT',        label: 'COUNT' };
+        const COUNT_DIST    = { val: 'COUNT_DISTINCT', label: 'COUNT DISTINCT' };
+        const LIST          = { val: 'LIST',         label: 'LIST' };
+        const SUM           = { val: 'SUM',          label: 'SUM' };
+        const AVG           = { val: 'AVG',          label: 'AVG' };
+        const MIN           = { val: 'MIN',          label: 'MIN' };
+        const MAX           = { val: 'MAX',          label: 'MAX' };
+        const MEDIAN        = { val: 'MEDIAN',       label: 'MEDIAN' };
+        const MODE          = { val: 'MODE',         label: 'MODE' };
+        const STDEV         = { val: 'STDEV',        label: 'STD DEV' };
+        const VAR           = { val: 'VAR',          label: 'VARIANCE' };
+        const CV            = { val: 'CV',           label: 'CV (Coeff. of Variation)' };
+        const EARLIEST      = { val: 'EARLIEST',     label: 'EARLIEST' };
+        const LATEST        = { val: 'LATEST',       label: 'LATEST' };
+        const FIRST_ALPHA   = { val: 'FIRST_ALPHA',  label: 'FIRST ALPHABETICALLY' };
+        const LAST_ALPHA    = { val: 'LAST_ALPHA',   label: 'LAST ALPHABETICALLY' };
+
+        if (displayType === 'number')
+          return [NONE, COUNT, COUNT_DIST, SUM, AVG, MIN, MAX, MEDIAN, MODE, STDEV, VAR, CV, LIST];
+        if (displayType === 'date' || displayType === 'datetime')
+          return [NONE, COUNT, COUNT_DIST, EARLIEST, LATEST, MEDIAN, MODE, LIST];
+        if (displayType === 'boolean')
+          return [NONE, COUNT, COUNT_DIST];
+        if (displayType === 'user' || displayType === 'lookup' || displayType === 'url')
+          return [NONE, COUNT, COUNT_DIST, FIRST_ALPHA, LAST_ALPHA, MODE, LIST];
+        if (displayType === 'user-multi' || displayType === 'lookup-multi')
+          return [NONE, COUNT, COUNT_DIST, LIST];
+        if (displayType === 'array')
+          return [NONE, COUNT, LIST];
+        if (displayType === 'object')
+          return [NONE, COUNT];
+        // text and default
+        return [NONE, COUNT, COUNT_DIST, FIRST_ALPHA, LAST_ALPHA, MODE, LIST];
+      }
+
+      // Transpile a stored aggregate val into a SQL fragment.
+      // colExpr: bare SQL column reference (e.g. [alias].[field])
+      // alias:   desired output alias (omitted → no AS clause)
+      /** @param {string} agg @param {string} colExpr @param {string} [alias] */
+      function aggToSQL(agg, colExpr, alias) {
+        const AS = alias ? ` AS [${alias}]` : '';
+        const col = colExpr;
+        switch (agg) {
+          case 'EARLIEST':
+          case 'FIRST_ALPHA':   return `MIN(${col})${AS}`;
+          case 'LATEST':
+          case 'LAST_ALPHA':    return `MAX(${col})${AS}`;
+          case 'LIST':
+          case 'GROUP_CONCAT':  return `GROUP_CONCAT(${col} ORDER BY ${col} ASC SEPARATOR ';')${AS}`;
+          case 'COUNT_DISTINCT': return `COUNT(DISTINCT ${col})${AS}`;
+          case '':
+          case undefined:
+          case null:            return alias ? `${col} AS [${alias}]` : col;
+          default:              return `${agg}(${col})${AS}`;
+        }
+      }
+
+      // Date macro helpers — converts date filter macros (e.g. 'THIS_MONTH') to SQL range expressions.
+      // Used by condToSQL() in 10-constants.js and by advanced QB WHERE clause building.
+      /** @param {string} op @param {*} value @param {string} colExpr */
+      function dateMacroToSQL(op, value, colExpr) {
+        const now = new Date();
+        const pad = (/** @type {number} */ n) => String(n).padStart(2, '0');
+        const fmt = (/** @type {Date} */ d) => `'${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}'`;
+
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const todayStr = fmt(today);
+
+        const fyM = (DataLaVistaState.FiscalYearStartMonth || 7) - 1;  // 0-indexed
+        function fiscalStart(/** @type {number} */ yr) { return new Date(yr, fyM, 1); }
+        function fiscalEnd(/** @type {number} */ yr)   { return new Date(yr + 1, fyM, 0); }  // last day before next FY start
+        function academicStart(/** @type {number} */ yr) { return new Date(yr, 7, 1); } // Aug 1
+
+        switch (op) {
+          case 'THIS_YEAR': {
+            const s = fmt(new Date(today.getFullYear(), 0, 1));
+            const e = fmt(new Date(today.getFullYear(), 11, 31));
+            return `${colExpr} >= ${s} AND ${colExpr} <= ${e}`;
+          }
+          case 'LAST_YEAR': {
+            const y = today.getFullYear() - 1;
+            return `${colExpr} >= '${y}-01-01' AND ${colExpr} <= '${y}-12-31'`;
+          }
+          case 'THIS_FISCAL': {
+            const fy = today.getMonth() >= fyM ? today.getFullYear() : today.getFullYear() - 1;
+            const s = fmt(fiscalStart(fy));
+            const e = fmt(fiscalEnd(fy));
+            return `${colExpr} >= ${s} AND ${colExpr} <= ${e}`;
+          }
+          case 'LAST_FISCAL': {
+            const fy = (today.getMonth() >= fyM ? today.getFullYear() : today.getFullYear() - 1) - 1;
+            const s = fmt(fiscalStart(fy));
+            const e = fmt(fiscalEnd(fy));
+            return `${colExpr} >= ${s} AND ${colExpr} <= ${e}`;
+          }
+          case 'THIS_ACADEMIC': {
+            // Academic year: Aug 1 – July 31
+            const ay = today.getMonth() >= 7 ? today.getFullYear() : today.getFullYear() - 1;
+            const s = fmt(academicStart(ay));
+            const e = fmt(new Date(ay + 1, 6, 31));
+            return `${colExpr} >= ${s} AND ${colExpr} <= ${e}`;
+          }
+          case 'LAST_ACADEMIC': {
+            const ay = (today.getMonth() >= 7 ? today.getFullYear() : today.getFullYear() - 1) - 1;
+            const s = fmt(academicStart(ay));
+            const e = fmt(new Date(ay + 1, 6, 31));
+            return `${colExpr} >= ${s} AND ${colExpr} <= ${e}`;
+          }
+          case 'THIS_MONTH': {
+            const s = fmt(new Date(today.getFullYear(), today.getMonth(), 1));
+            const e = fmt(new Date(today.getFullYear(), today.getMonth() + 1, 0));
+            return `${colExpr} >= ${s} AND ${colExpr} <= ${e}`;
+          }
+          case 'LAST_MONTH': {
+            const s = fmt(new Date(today.getFullYear(), today.getMonth() - 1, 1));
+            const e = fmt(new Date(today.getFullYear(), today.getMonth(), 0));
+            return `${colExpr} >= ${s} AND ${colExpr} <= ${e}`;
+          }
+          case 'THIS_WEEK': {
+            const dow = today.getDay();
+            const s = new Date(today); s.setDate(today.getDate() - dow);
+            const e = new Date(s); e.setDate(s.getDate() + 6);
+            return `${colExpr} >= ${fmt(s)} AND ${colExpr} <= ${fmt(e)}`;
+          }
+          case 'LAST_WEEK': {
+            const dow = today.getDay();
+            const s = new Date(today); s.setDate(today.getDate() - dow - 7);
+            const e = new Date(s); e.setDate(s.getDate() + 6);
+            return `${colExpr} >= ${fmt(s)} AND ${colExpr} <= ${fmt(e)}`;
+          }
+          case 'THIS_BIZ_WEEK': {
+            const dow = today.getDay();
+            // Adjust day of week so Monday is 0, Tuesday is 1... Sunday is 6
+            const diffToMonday = dow === 0 ? 6 : dow - 1;
+            const s = new Date(today); s.setDate(today.getDate() - diffToMonday); // Monday
+            const e = new Date(s); e.setDate(s.getDate() + 4); // Friday
+            return `${colExpr} >= ${fmt(s)} AND ${colExpr} <= ${fmt(e)}`;
+          }
+          case 'LAST_BIZ_WEEK': {
+            const dow = today.getDay();
+            const diffToMonday = dow === 0 ? 6 : dow - 1;
+            const s = new Date(today); s.setDate(today.getDate() - diffToMonday - 7); // Last Monday
+            const e = new Date(s); e.setDate(s.getDate() + 4); // Last Friday
+            return `${colExpr} >= ${fmt(s)} AND ${colExpr} <= ${fmt(e)}`;
+          }
+          case 'TODAY': return `${colExpr} >= ${todayStr} AND ${colExpr} < '${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate() + 1)}'`;
+          case 'PAST_X_DAYS': {
+            const x = parseInt(value) || 1;
+            const s = new Date(today); s.setDate(today.getDate() - x + 1);
+            return `${colExpr} >= ${fmt(s)} AND ${colExpr} <= ${todayStr}`;
+          }
+          case 'PAST_X_MONTHS': {
+            const x = parseInt(value) || 1;
+            const s = new Date(today); s.setMonth(today.getMonth() - x + 1); s.setDate(1);
+            return `${colExpr} >= ${fmt(s)} AND ${colExpr} <= ${todayStr}`;
+          }
+          case 'PAST_X_YEARS': {
+            const x = parseInt(value) || 1;
+            const s = new Date(today); s.setFullYear(today.getFullYear() - x + 1); s.setMonth(0); s.setDate(1);
+            return `${colExpr} >= ${fmt(s)} AND ${colExpr} <= ${todayStr}`;
+          }
+          case 'PAST_X_FISCAL': {
+            const x = parseInt(value) || 1;
+            const fy = (today.getMonth() >= fyM ? today.getFullYear() : today.getFullYear() - 1) - x + 1;
+            const s = fmt(fiscalStart(fy));
+            const currFy = today.getMonth() >= fyM ? today.getFullYear() : today.getFullYear() - 1;
+            const currFyEnd = fmt(fiscalEnd(currFy));
+            return `${colExpr} >= ${s} AND ${colExpr} <= ${currFyEnd}`;
+          }
+          default: return null;
+        }
+      }
+
+      // ── [REMOVE AFTER: once confirmed no reports use basic QB] ───────────────
+      // Copies basic QB state into a new advanced QB node. Called by loadConfig()
+      // when loading an old report that had basic QB as the active query mode.
+      // Safe to call repeatedly — does nothing if adv QB already has nodes.
+      function _migrateBasicToAdvancedQB() {
+        const bqb = DataLaVistaState.basicQB;
+        if (!bqb || !bqb.tableName) return;                            // nothing to migrate
+        const nodes = DataLaVistaState.advancedQB.nodes || {};
+        if (Object.keys(nodes).length > 0) return;                    // adv QB already has content — don't clobber
+        const t = DataLaVistaState.tables[bqb.tableName];
+        const id = /** @type {string} */ ('node_1');
+        DataLaVistaState.advancedQB.nodes = {};
+        const _nodes = /** @type {any} */ (DataLaVistaState.advancedQB.nodes);
+        _nodes[id] = {
+          tableName:      bqb.tableName,
+          x:              80,
+          y:              60,
+          selectedFields: bqb.selectedFields.length ? [...bqb.selectedFields] : [],
+          alias:          (t && t.alias) || bqb.tableName,
+          conditions:     (/** @type {any[]} */ (bqb.conditions || [])).map(c => ({ ...c })),
+          sorts:          (/** @type {any[]} */ (bqb.sorts     || [])).map(s => ({ ...s })),
+          groupBy:        [...(bqb.groupBy || [])],
+          fieldAggs:      Object.assign({}, bqb.fieldAggs || {})
+        };
+        advNodeCounter = 1;
+        DataLaVistaState.advancedQB.rowLimit = bqb.rowLimit || 500;
+      }
+      // ── END REMOVE AFTER ────────────────────────────────────────────────────
+
+      // ── SQL editor drop handler (moved from 50-qb-basic.js) ─────────────────
+      // Handles drag-drop onto the CodeMirror SQL editor wrapper.
+      // When the query is empty and a table/field is dropped, adds a node to the
+      // advanced QB canvas and switches to the QB tab instead of the old basic QB behavior.
+      function onDropToSQLEditor(event) {
+        event.preventDefault();
+        const data = safeDragParse(event);
+        const cm = /** @type {any} */ (window)._cmEditor;
+        if (!cm) return;
+        const isQueryEmpty = (!cm || cm.getValue().trim().replace('-- Connect to a data source and drag a table into the query builder\n-- or write your SQL here directly\nSELECT \'DataLaVista\'', '').length < 1);
+        // Set cursor to drop position
+        const pos = cm.coordsChar({ left: event.clientX, top: event.clientY });
+        cm.setCursor(pos);
+        if (!data) {
+          // Prefer plain text for a code editor, fall back to HTML stripped of tags
+          let text = event.dataTransfer.getData('text/plain');
+          if (!text) {
+            const html = event.dataTransfer.getData('text/html');
+            if (html) text = stripHtml(html);
+          }
+          if (text) cm.replaceSelection(text);
+        } else if (data.type === 'table') {
+          const t = (/** @type {any} */ (DataLaVistaState.tables))[data.table];
+          if (!t) return;
+          if (isQueryEmpty) {
+            addAdvNode(data.table, 80, 60);
+            switchQMTab('qb');
+          } else {
+            if (cm) cm.replaceSelection(`[${data.table}]`);
+            ensureTableData(data.table);
+          }
+        } else if (data.type === 'field') {
+          const t = (/** @type {any} */ (DataLaVistaState.tables))[data.table];
+          if (!t) return;
+          if (isQueryEmpty) {
+            addAdvNode(data.table, 80, 60, data.field);  // preselectedField
+            switchQMTab('qb');
+          } else {
+            if (cm) cm.replaceSelection(`[${data.field}]`);
+            ensureTableData(data.table);
+          }
+        }
+        // Unknown custom data type — ignore
+      }
+
       let advNodeCounter = 0;
       let draggingNode = null;
       let draggingOffset = { x: 0, y: 0 };
@@ -252,6 +509,10 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           lookupAggFields: {}   // { [parentAlias]: [{ field, agg, alias }] }
         };
 
+        // Auto-assign primary table to the first node added
+        if (!DataLaVistaState.advancedQB.primaryNodeId)
+          DataLaVistaState.advancedQB.primaryNodeId = id;
+
         if (sqlAlias) {
           DataLaVistaState.advancedQB.nodeAliases ??= {};
           DataLaVistaState.advancedQB.nodeAliases[id] = sqlAlias;
@@ -407,7 +668,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 
         canvas.appendChild(el);
 
-        // Fill pills now that element is in DOM
+        // Mark primary table glow and fill pills now that element is in DOM
+        updatePrimaryTableVisual();
         updateAdvNodePills(id);
 
         // Drag header to move node (ignore join/trash icons and buttons)
@@ -498,6 +760,12 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
                 delete _expandedLookupFields[id];
                 DataLaVistaState.advancedQB.joins =
                   DataLaVistaState.advancedQB.joins.filter(j => j.fromNode !== id && j.toNode !== id);
+                // Reassign primary table if the deleted node was primary
+                if (DataLaVistaState.advancedQB.primaryNodeId === id) {
+                  const rem = Object.keys(DataLaVistaState.advancedQB.nodes);
+                  DataLaVistaState.advancedQB.primaryNodeId = rem.length ? rem[0] : null;
+                  updatePrimaryTableVisual();
+                }
                 redrawJoins(); rebuildAdvancedSQL(); renderAdvOptionsPanel(null, null);
               });
             });
@@ -520,7 +788,13 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 
       // ── Returns a short icon/label for an aggregate function ─────────────────
       function getAggIcon(agg) {
-        const m = { COUNT:'🔢', COUNT_DISTINCT:'🔢*', SUM:'∑', AVG:'x̄', MEDIAN:'med', MIN:'↓', MAX:'↑', FIRST:'⟨', LAST:'⟩', STDEV:'σ', VAR:'σ²' };
+        const m = {
+          COUNT:'#', COUNT_DISTINCT:'#*', SUM:'∑', AVG:'x̄', MEDIAN:'med', MODE:'Mo',
+          MIN:'↓', MAX:'↑', STDEV:'σ', VAR:'σ²', CV:'CV',
+          EARLIEST:'↓', LATEST:'↑', FIRST_ALPHA:'A↓', LAST_ALPHA:'A↑', LIST:'≡',
+          // legacy
+          FIRST:'⟨', LAST:'⟩', GROUP_CONCAT:'≡'
+        };
         return m[agg] || '∑';
       }
 
@@ -696,6 +970,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           nd.selectedFields.splice(idx, 1);
           if (nd.fieldAggs)        delete nd.fieldAggs[field];
           if (nd.lookupAggFields)  delete nd.lookupAggFields[field];
+          if (nd.groupBy) { const gbIdx = nd.groupBy.indexOf(field); if (gbIdx >= 0) nd.groupBy.splice(gbIdx, 1); }
         } else {
           nd.selectedFields.push(field);
         }
@@ -847,6 +1122,12 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         delete _expandedLookupFields[id];
         DataLaVistaState.advancedQB.joins = DataLaVistaState.advancedQB.joins.filter(j => j.fromNode !== id && j.toNode !== id);
         document.getElementById('adv-' + id)?.remove();
+        // Reassign primary table if the deleted node was primary
+        if (DataLaVistaState.advancedQB.primaryNodeId === id) {
+          const rem = Object.keys(DataLaVistaState.advancedQB.nodes);
+          DataLaVistaState.advancedQB.primaryNodeId = rem.length ? rem[0] : null;
+          updatePrimaryTableVisual();
+        }
         redrawJoins();
         rebuildAdvancedSQL();
         renderAdvOptionsPanel(null, null);
@@ -860,6 +1141,22 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         selectedNode = id;
         DataLaVistaState.advancedQB.activeJoinIdx = -1;
         renderAdvOptionsPanel('node', id);
+      }
+
+      // ── Primary Table: visual glow + options panel checkbox ──────────────────
+      function updatePrimaryTableVisual() {
+        const pid = DataLaVistaState.advancedQB.primaryNodeId;
+        for (const nid of Object.keys(DataLaVistaState.advancedQB.nodes || {}))
+          document.getElementById('adv-' + nid)?.classList.toggle('primary-table', nid === pid);
+      }
+
+      function setPrimaryAdvNode(nodeId, checked) {
+        if (!checked) return; // must pick another table to unset; uncheck is a no-op
+        DataLaVistaState.advancedQB.primaryNodeId = nodeId;
+        updatePrimaryTableVisual();
+        rebuildAdvancedSQL();
+        // Re-render options panel so checkbox states refresh
+        if (selectedNode) renderAdvOptionsPanel('node', selectedNode);
       }
 
       function showNodeProps(nodeId) {
@@ -1049,6 +1346,18 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           if (!nd.fieldAggs)        nd.fieldAggs = {};
           if (!nd.lookupAggFields)  nd.lookupAggFields = {};
 
+          // ── PRIMARY TABLE checkbox ───────────────────────────────
+          const isPrimary = DataLaVistaState.advancedQB.primaryNodeId === id;
+          const primaryHTML = `
+            <div class="adv-node-section">
+              <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+                <input type="checkbox" ${isPrimary ? 'checked' : ''}
+                  onchange="setPrimaryAdvNode('${id}', this.checked)"/>
+                <span style="font-size:12px;font-weight:600">Primary Table</span>
+              </label>
+              <div style="font-size:11px;color:var(--text-disabled);margin-top:2px">Aggregates on this table are the outer grouping level.</div>
+            </div>`;
+
           // ── FIELDS section ───────────────────────────────────────
           const FIELDS_COLLAPSED_COUNT = 5;
           const renderFieldRow = f => {
@@ -1061,11 +1370,14 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
             const isExpandable   = expandable || dateExpandable;
             const expanded       = isExpandable && _expandedLookupFields[id]?.has(f.alias);
             const aggBtnCls   = 'adv-agg-btn' + (aggActive ? ' has-agg' : '');
-            const aggBtnTitle = aggActive ? agg : 'No aggregate';
+            const aggLabel    = aggActive ? (aggsForType(f.displayType).find(a => a.val === agg)?.label || agg) : 'No aggregate';
             const aggBtnContent = aggActive ? getAggIcon(agg) : '∑';
-            const aggBtn = expandable
+            // For expandable non-lookup arrays, check if they actually have object children.
+            // Primitive arrays (choice-multi) have no object children and should get a normal agg button.
+            const hasObjChildren = expandable && (f.displayType !== 'array' || _getChildFieldsForLookup(f, nd.tableName).length > 0);
+            const aggBtn = hasObjChildren
               ? '<button class="adv-agg-btn" disabled title="Expand ▼ to select child field aggregates">∑</button>'
-              : '<button class="' + aggBtnCls + '" title="' + aggBtnTitle + '"'
+              : '<button class="' + aggBtnCls + '" title="' + aggLabel + '"'
                 + ' onclick="event.stopPropagation();showAdvAggPopup(\'' + id + '\',\'' + f.alias + '\',this)">'
                 + aggBtnContent + '</button>';
             const expandBtnCls = 'adv-expand-btn' + (expanded ? ' expanded' : '');
@@ -1082,7 +1394,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
                 ondragstart="event.stopPropagation();safeDragSet(event,{type:'adv-field-pill',nodeId:'${id}',field:'${f.alias}'})">
               <input type="checkbox" ${sel ? 'checked' : ''}/>
               <span class="field-type-icon ${ti.cls}">${ti.icon}</span>
-              <span class="field-name">${f.alias}</span>
+              <span class="field-name">${f.userAlias || f.alias}</span>
               ${expandBtn}${aggBtn}
             </div>${childRows}`;
           };
@@ -1168,7 +1480,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
             : null;
 
           setTitle(nd.alias || nd.tableName);
-          body.innerHTML = `
+          body.innerHTML = primaryHTML + `
             <div class="adv-node-section">
               <div class="adv-node-section-hdr"><span>FIELDS</span></div>
               <div id="adv-node-fields">${renderFieldsSection()}</div>
@@ -1688,39 +2000,46 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
             + ' ondragstart="event.stopPropagation();safeDragSet(event,{type:\'adv-field-pill\',nodeId:\'' + nodeId + '\',field:\'' + cf.alias + '\'})">'
             + '<input type="checkbox" ' + (sel ? 'checked' : '') + ' onclick="event.stopPropagation();" onchange="advNodeToggleField(\'' + nodeId + '\',\'' + cf.alias + '\')"/>'
             + '<span class="field-type-icon ' + ti.cls + '">' + ti.icon + '</span>'
-            + '<span class="field-name" style="font-size:11px">' + cf.alias + '</span>'
+            + '<span class="field-name" style="font-size:11px">' + (cf.userAlias || cf.alias) + '</span>'
             + aggBtn
             + '</div>';
         }).join('');
         return '<div class="adv-child-fields">' + rows + '</div>';
       }
 
-      // Aggregates available for child fields by type
+      // Aggregates available for child fields by type (no "none" option — child fields always have an agg)
       function _childAggsForType(displayType) {
-        const base = [
-          { val: 'COUNT_DISTINCT', label: 'COUNT DISTINCT' },
-          { val: 'COUNT',          label: 'COUNT' },
-          { val: 'GROUP_CONCAT',   label: 'LIST (semicolon)' },
-        ];
-        if (displayType === 'number') return [
-          ...base,
-          { val: 'SUM', label: 'SUM' },
-          { val: 'AVG', label: 'AVG' },
-          { val: 'MIN', label: 'MIN' },
-          { val: 'MAX', label: 'MAX' },
-        ];
-        if (displayType === 'date') return [
-          { val: 'COUNT_DISTINCT', label: 'COUNT DISTINCT' },
-          { val: 'COUNT',          label: 'COUNT' },
-          { val: 'MIN',            label: 'MIN (earliest)' },
-          { val: 'MAX',            label: 'MAX (latest)' },
-          { val: 'GROUP_CONCAT',   label: 'LIST (semicolon)' },
-        ];
-        if (displayType === 'boolean') return [
-          { val: 'COUNT_DISTINCT', label: 'COUNT DISTINCT' },
-          { val: 'COUNT',          label: 'COUNT' },
-        ];
-        return base;
+        const COUNT_DIST  = { val: 'COUNT_DISTINCT', label: 'COUNT DISTINCT' };
+        const COUNT       = { val: 'COUNT',          label: 'COUNT' };
+        const LIST        = { val: 'LIST',           label: 'LIST' };
+        const SUM         = { val: 'SUM',            label: 'SUM' };
+        const AVG         = { val: 'AVG',            label: 'AVG' };
+        const MIN         = { val: 'MIN',            label: 'MIN' };
+        const MAX         = { val: 'MAX',            label: 'MAX' };
+        const MEDIAN      = { val: 'MEDIAN',         label: 'MEDIAN' };
+        const MODE        = { val: 'MODE',           label: 'MODE' };
+        const STDEV       = { val: 'STDEV',          label: 'STD DEV' };
+        const VAR         = { val: 'VAR',            label: 'VARIANCE' };
+        const CV          = { val: 'CV',             label: 'CV (Coeff. of Variation)' };
+        const EARLIEST    = { val: 'EARLIEST',       label: 'EARLIEST' };
+        const LATEST      = { val: 'LATEST',         label: 'LATEST' };
+        const FIRST_ALPHA = { val: 'FIRST_ALPHA',    label: 'FIRST ALPHABETICALLY' };
+        const LAST_ALPHA  = { val: 'LAST_ALPHA',     label: 'LAST ALPHABETICALLY' };
+
+        if (displayType === 'number')
+          return [COUNT_DIST, COUNT, SUM, AVG, MIN, MAX, MEDIAN, MODE, STDEV, VAR, CV, LIST];
+        if (displayType === 'date')
+          return [COUNT_DIST, COUNT, EARLIEST, LATEST, MEDIAN, MODE, LIST];
+        if (displayType === 'boolean')
+          return [COUNT_DIST, COUNT];
+        if (displayType === 'array')
+          return [COUNT, LIST];
+        if (displayType === 'object')
+          return [COUNT];
+        if (displayType === 'lookup')
+          return [];
+        // text and default
+        return [COUNT_DIST, COUNT, FIRST_ALPHA, LAST_ALPHA, MODE, LIST];
       }
 
       // Get the child fields for an expandable field:
@@ -1826,7 +2145,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
             <input type="checkbox" ${checked ? 'checked' : ''}
               onclick="event.stopPropagation();_toggleLookupChild('${nodeId}','${parentField.alias}','${cf.alias}',this.checked)"/>
             <span class="field-type-icon ${ti.cls}">${ti.icon}</span>
-            <span class="field-name" style="font-size:11px">${parentField.alias} → ${cf.alias}</span>
+            <span class="field-name" style="font-size:11px">${parentField.userAlias || parentField.alias} → ${cf.userAlias || cf.alias}</span>
             <select class="form-input" style="height:22px;font-size:10px;padding:0 2px;min-width:0;width:auto" ${!checked ? 'disabled' : ''}
               onchange="_setLookupChildAgg('${nodeId}','${parentField.alias}','${cf.alias}',this.value)"
               onclick="event.stopPropagation()">${aggOptions}</select>
@@ -1866,7 +2185,99 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         const [mainId, mainNd] = nodes[0];
         const mainView = getView(mainNd.tableName);
 
-        // Collect SELECT fields, detect duplicate output aliases, apply per-field aggregates
+        // ── Determine primary node for rollup decisions ───────────────────────
+        const primaryId = DataLaVistaState.advancedQB.primaryNodeId || nodes[0]?.[0];
+        const primaryNd = primaryId && DataLaVistaState.advancedQB.nodes[primaryId];
+        const primaryT  = primaryNd && DataLaVistaState.tables[primaryNd.tableName];
+        // hasParentAgg: primary node has ≥1 aggregate on a non-lookup/non-array/non-object field
+        const hasParentAgg = !!primaryNd && Object.entries(primaryNd.fieldAggs || {}).some(([fa, agg]) => {
+          if (!agg) return false;
+          const fld = primaryT?.fields?.find(x => x.alias === fa);
+          return fld && !['lookup','object','array'].includes(fld.displayType);
+        });
+
+        // Helper: resolve user-friendly agg val to the base SQL op used for rollup matching
+        const _resolveAggOp = agg => ({ EARLIEST:'MIN', FIRST_ALPHA:'MIN', LATEST:'MAX',
+          LAST_ALPHA:'MAX', LIST:'GROUP_CONCAT', GROUP_CONCAT:'GROUP_CONCAT' }[agg] || agg);
+
+        // Helper: rollup subquery + outer expressions for SP lookup child fields.
+        // Returns { subExprs: string[], outerExpr: string }
+        const _lookupRollup = (agg, field, alias, subAlias) => {
+          const op = _resolveAggOp(agg);
+          const f = `[${field}]`, a = `[${alias}]`, sub = `[${subAlias}]`;
+          switch (op) {
+            case 'MIN': case 'MAX': case 'SUM':
+              return { subExprs: [`${op}(${f}) AS ${a}`],
+                outerExpr: `${op}(${sub}.${a}) AS ${a}` };
+            case 'COUNT':
+              return { subExprs: [`COUNT(${f}) AS ${a}`],
+                outerExpr: `SUM(${sub}.${a}) AS ${a}` };
+            case 'AVG': {
+              const sA = `[${alias}_sum]`, cA = `[${alias}_cnt]`;
+              return { subExprs: [`SUM(${f}) AS ${sA}`, `COUNT(${f}) AS ${cA}`],
+                outerExpr: `SUM(${sub}.${sA}) / NULLIF(SUM(${sub}.${cA}), 0) AS ${a}` };
+            }
+            case 'STDEV': {
+              const sA = `[${alias}_sum]`, sqA = `[${alias}_sq]`, cA = `[${alias}_cnt]`;
+              return { subExprs: [`SUM(${f}) AS ${sA}`, `SUM(${f}*${f}) AS ${sqA}`, `COUNT(${f}) AS ${cA}`],
+                outerExpr: `DLV_SQRT(SUM(${sub}.${sqA}) / NULLIF(SUM(${sub}.${cA}), 0) - DLV_POW2(SUM(${sub}.${sA}) / NULLIF(SUM(${sub}.${cA}), 0))) AS ${a}` };
+            }
+            case 'VAR': {
+              const sA = `[${alias}_sum]`, sqA = `[${alias}_sq]`, cA = `[${alias}_cnt]`;
+              return { subExprs: [`SUM(${f}) AS ${sA}`, `SUM(${f}*${f}) AS ${sqA}`, `COUNT(${f}) AS ${cA}`],
+                outerExpr: `SUM(${sub}.${sqA}) / NULLIF(SUM(${sub}.${cA}), 0) - DLV_POW2(SUM(${sub}.${sA}) / NULLIF(SUM(${sub}.${cA}), 0)) AS ${a}` };
+            }
+            case 'CV': {
+              const sA = `[${alias}_sum]`, sqA = `[${alias}_sq]`, cA = `[${alias}_cnt]`;
+              return { subExprs: [`SUM(${f}) AS ${sA}`, `SUM(${f}*${f}) AS ${sqA}`, `COUNT(${f}) AS ${cA}`],
+                outerExpr: `DLV_SQRT(SUM(${sub}.${sqA}) / NULLIF(SUM(${sub}.${cA}), 0) - DLV_POW2(SUM(${sub}.${sA}) / NULLIF(SUM(${sub}.${cA}), 0))) / NULLIF(SUM(${sub}.${sA}) / NULLIF(SUM(${sub}.${cA}), 0), 0) AS ${a}` };
+            }
+            case 'GROUP_CONCAT':
+              return { subExprs: [`GROUP_CONCAT(${f} ORDER BY ${f} ASC SEPARATOR ';') AS ${a}`],
+                outerExpr: `DLV_MERGE_LIST(${sub}.${a}) AS ${a}` };
+            case 'COUNT_DISTINCT': {
+              const lA = `[${alias}_list]`;
+              return { subExprs: [`GROUP_CONCAT(${f} ORDER BY ${f} ASC SEPARATOR ';') AS ${lA}`],
+                outerExpr: `DLV_MERGE_COUNT_DISTINCT(${sub}.${lA}) AS ${a}` };
+            }
+            case 'MEDIAN': {
+              const lA = `[${alias}_list]`;
+              return { subExprs: [`GROUP_CONCAT(${f} ORDER BY ${f} ASC SEPARATOR ';') AS ${lA}`],
+                outerExpr: `DLV_MERGE_MEDIAN(${sub}.${lA}) AS ${a}` };
+            }
+            case 'MODE': {
+              const lA = `[${alias}_list]`;
+              return { subExprs: [`GROUP_CONCAT(${f} ORDER BY ${f} ASC SEPARATOR ';') AS ${lA}`],
+                outerExpr: `DLV_MERGE_MODE(${sub}.${lA}) AS ${a}` };
+            }
+            default:
+              return { subExprs: [`${op}(${f}) AS ${a}`],
+                outerExpr: `${op}(${sub}.${a}) AS ${a}` };
+          }
+        };
+
+        // Helper: rollup outer SELECT expr for local DLV_ARRAY_AGG child fields.
+        const _arrayAggRollup = (agg, nodeAlias, parentAlias, field, alias) => {
+          const op = _resolveAggOp(agg);
+          const arr = `[${nodeAlias}].[${parentAlias}]`, a = `[${alias}]`;
+          switch (op) {
+            case 'MIN':    return `MIN(DLV_ARRAY_AGG(${arr}, '${field}', 'MIN')) AS ${a}`;
+            case 'MAX':    return `MAX(DLV_ARRAY_AGG(${arr}, '${field}', 'MAX')) AS ${a}`;
+            case 'SUM':    return `SUM(DLV_ARRAY_AGG(${arr}, '${field}', 'SUM')) AS ${a}`;
+            case 'COUNT':  return `SUM(DLV_ARRAY_AGG(${arr}, '${field}', 'COUNT')) AS ${a}`;
+            case 'AVG':    return `SUM(DLV_ARRAY_AGG(${arr}, '${field}', 'SUM')) / NULLIF(SUM(DLV_ARRAY_AGG(${arr}, '${field}', 'COUNT')), 0) AS ${a}`;
+            case 'STDEV':  return `DLV_SQRT(SUM(DLV_ARRAY_AGG(${arr}, '${field}', 'SUM_SQ')) / NULLIF(SUM(DLV_ARRAY_AGG(${arr}, '${field}', 'COUNT')), 0) - DLV_POW2(SUM(DLV_ARRAY_AGG(${arr}, '${field}', 'SUM')) / NULLIF(SUM(DLV_ARRAY_AGG(${arr}, '${field}', 'COUNT')), 0))) AS ${a}`;
+            case 'VAR':    return `SUM(DLV_ARRAY_AGG(${arr}, '${field}', 'SUM_SQ')) / NULLIF(SUM(DLV_ARRAY_AGG(${arr}, '${field}', 'COUNT')), 0) - DLV_POW2(SUM(DLV_ARRAY_AGG(${arr}, '${field}', 'SUM')) / NULLIF(SUM(DLV_ARRAY_AGG(${arr}, '${field}', 'COUNT')), 0)) AS ${a}`;
+            case 'CV':     return `DLV_SQRT(SUM(DLV_ARRAY_AGG(${arr}, '${field}', 'SUM_SQ')) / NULLIF(SUM(DLV_ARRAY_AGG(${arr}, '${field}', 'COUNT')), 0) - DLV_POW2(SUM(DLV_ARRAY_AGG(${arr}, '${field}', 'SUM')) / NULLIF(SUM(DLV_ARRAY_AGG(${arr}, '${field}', 'COUNT')), 0))) / NULLIF(SUM(DLV_ARRAY_AGG(${arr}, '${field}', 'SUM')) / NULLIF(SUM(DLV_ARRAY_AGG(${arr}, '${field}', 'COUNT')), 0), 0) AS ${a}`;
+            case 'GROUP_CONCAT': return `DLV_MERGE_LIST(DLV_ARRAY_AGG(${arr}, '${field}', 'GROUP_CONCAT')) AS ${a}`;
+            case 'COUNT_DISTINCT': return `DLV_MERGE_COUNT_DISTINCT(DLV_ARRAY_AGG(${arr}, '${field}', 'GROUP_CONCAT')) AS ${a}`;
+            case 'MEDIAN': return `DLV_MERGE_MEDIAN(DLV_ARRAY_AGG(${arr}, '${field}', 'GROUP_CONCAT')) AS ${a}`;
+            case 'MODE':   return `DLV_MERGE_MODE(DLV_ARRAY_AGG(${arr}, '${field}', 'GROUP_CONCAT')) AS ${a}`;
+            default:       return `${op}(DLV_ARRAY_AGG(${arr}, '${field}', '${op}')) AS ${a}`;
+          }
+        };
+
+        // ── Collect SELECT fields, detect duplicate output aliases, apply per-field aggregates
         const allFields = [];
         for (const [id, nd] of nodes) {
           const fieldAggs = nd.fieldAggs || {};
@@ -1880,15 +2291,14 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           const count = seenAliases[fa] = (seenAliases[fa] || 0) + 1;
           const outAlias = count === 1 ? fa : fa + (count - 1);
           const col = `[${vname}].[${fa}]`;
-          if (agg === 'COUNT_DISTINCT') return `  COUNT(DISTINCT ${col}) AS [${outAlias}]`;
-          if (agg)                      return `  ${agg}(${col}) AS [${outAlias}]`;
-          // For single-table or unambiguous fields, omit AS (view column is already named fa)
-          return count === 1 ? `  ${col}` : `  ${col} AS [${outAlias}]`;
+          if (!agg) return count === 1 ? `  ${col}` : `  ${col} AS [${outAlias}]`;
+          return '  ' + aggToSQL(agg, col, outAlias);
         }) : ['  *'];
 
-        // Single pass: build child SELECT entries and subquery JOIN SQL for lookupAggFields.
+        // ── Build child SELECT entries and subquery JOIN SQL for lookupAggFields.
         // SP multi-select lookup fields → pre-aggregated subquery JOIN (one row per source PK, no fanout).
         // Local array-of-object fields → DLV_ARRAY_AGG scalar in SELECT (no JOIN needed).
+        // When hasParentAgg, use rollup-aware expressions to avoid aggregating pre-aggregated values.
         const childSelects = [];
         const lookupJoins  = [];
         for (const [nid, nd] of nodes) {
@@ -1904,28 +2314,47 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
             const parentField = t?.fields?.find(f => f.alias === parentAlias);
             if (!parentField) continue;
 
-            for (const { field, agg, alias } of childEntries) {
-              if (parentField.displayType === 'lookup') {
-                childSelects.push(`  [_dlv_${parentAlias}].[${alias}]`);
-              } else {
-                childSelects.push(`  DLV_ARRAY_AGG([${nodeAlias}].[${parentAlias}], '${field}', '${agg}') AS [${alias}]`);
-              }
-            }
-
             if (parentField.displayType === 'lookup') {
               const remoteView = _getRemoteViewForLookup(nd.tableName, parentAlias);
-              if (remoteView) {
-                const subAlias    = '_dlv_' + parentAlias;
-                const selectExprs = childEntries.map(({ field, agg, alias }) => {
-                  if (agg === 'COUNT_DISTINCT') return `    COUNT(DISTINCT [${field}]) AS [${alias}]`;
-                  if (agg === 'GROUP_CONCAT')   return `    GROUP_CONCAT([${field}] ORDER BY [${field}] ASC SEPARATOR ';') AS [${alias}]`;
-                  return `    ${agg}([${field}]) AS [${alias}]`;
-                }).join(',\n');
+              if (!remoteView) continue;
+              const subAlias = '_dlv_' + parentAlias;
+
+              if (hasParentAgg) {
+                // Rollup mode: subquery carries intermediate values; outer SELECT applies rollup ops
+                const subExprsAll = [], outerExprs = [];
+                for (const { field, agg, alias } of childEntries) {
+                  const { subExprs, outerExpr } = _lookupRollup(agg, field, alias, subAlias);
+                  subExprsAll.push(...subExprs.map(e => `    ${e}`));
+                  outerExprs.push(`  ${outerExpr}`);
+                }
+                childSelects.push(...outerExprs);
+                lookupJoins.push(
+                  `\nLEFT JOIN (\n  SELECT [${parentKeyCol}],\n${subExprsAll.join(',\n')}\n` +
+                  `  FROM DLV_LOOKUP('${localView}.${parentAlias}Data', '${localView}.${localPK} = ${remoteView}.ID')\n` +
+                  `  GROUP BY [${parentKeyCol}]\n) AS [${subAlias}] ON [${nodeAlias}].[${localPK}] = [${subAlias}].[${parentKeyCol}]`
+                );
+              } else {
+                // Direct mode: subquery aggregates fully; outer SELECT just references the column
+                for (const { alias } of childEntries) {
+                  childSelects.push(`  [${subAlias}].[${alias}]`);
+                }
+                const selectExprs = childEntries.map(({ field, agg, alias }) =>
+                  '    ' + aggToSQL(agg, `[${field}]`, alias)
+                ).join(',\n');
                 lookupJoins.push(
                   `\nLEFT JOIN (\n  SELECT [${parentKeyCol}],\n${selectExprs}\n` +
                   `  FROM DLV_LOOKUP('${localView}.${parentAlias}Data', '${localView}.${localPK} = ${remoteView}.ID')\n` +
                   `  GROUP BY [${parentKeyCol}]\n) AS [${subAlias}] ON [${nodeAlias}].[${localPK}] = [${subAlias}].[${parentKeyCol}]`
                 );
+              }
+            } else {
+              // Local array of objects — DLV_ARRAY_AGG scalar (no JOIN)
+              for (const { field, agg, alias } of childEntries) {
+                if (hasParentAgg) {
+                  childSelects.push(`  ${_arrayAggRollup(agg, nodeAlias, parentAlias, field, alias)}`);
+                } else {
+                  childSelects.push(`  DLV_ARRAY_AGG([${nodeAlias}].[${parentAlias}], '${field}', '${_resolveAggOp(agg)}') AS [${alias}]`);
+                }
               }
             }
           }
@@ -1937,7 +2366,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         // Auto GROUP BY: if any field has an agg, non-agg fields need to be in GROUP BY
         const hasAnyAgg = allFields.some(f => f.agg);
         if (hasAnyAgg) {
-          for (const [id, nd] of nodes) {
+          for (const [, nd] of nodes) {
             if (!nd.groupBy) nd.groupBy = [];
             const fieldAggs = nd.fieldAggs || {};
             for (const fa of nd.selectedFields) {
@@ -1957,9 +2386,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
               ? nd.selectedFields.map(fa => {
                   const agg = fAggs[fa] || '';
                   const col = `[${nodeAlias}].[${fa}]`;
-                  if (agg === 'COUNT_DISTINCT') return `  COUNT(DISTINCT ${col}) AS [${fa}]`;
-                  if (agg)                      return `  ${agg}(${col}) AS [${fa}]`;
-                  return `  ${col}`;
+                  if (!agg) return `  ${col}`;
+                  return '  ' + aggToSQL(agg, col, fa);
                 }).join(',\n')
               : '  *';
             let part = `SELECT\n${nodeSelects}\nFROM ${fromFrag(nid, nd)}`;
@@ -2069,11 +2497,9 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           DataLaVistaState.sql = '';
           hideUseInDesign();
         } else {
-          DataLaVistaState.basicQB = { tableName: null, selectedFields: [], filters: [] };
-          DataLaVistaState.advancedQB = { nodes: {}, joins: [], activeJoinIdx: -1, nodeAliases: {}, rowLimit: 500 };
+          DataLaVistaState.advancedQB = { nodes: {}, joins: [], activeJoinIdx: -1, nodeAliases: {}, rowLimit: 500, primaryNodeId: null };
           if (window._cmEditor) window._cmEditor.setValue('');
           DataLaVistaState.sql = '';
-          renderBasicQB();
-          if (DataLaVistaState.queryMode === 'advanced') renderAdvancedQB();
+          renderAdvancedQB();
         }
       }

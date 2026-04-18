@@ -792,14 +792,16 @@ function rankSuggestions(rules, cols, meta) {
             if (!agg) return `[${yf}] AS [${alias}]`;
 
             if (!sConds.length) {
-              if (agg === 'COUNT_DISTINCT') return `COUNT(DISTINCT [${yf}]) AS [${alias}]`;
-              return `${agg}([${yf}]) AS [${alias}]`;
+              return aggToSQL(agg, `[${yf}]`, alias);
             }
+            // Conditions-filtered aggregates — transpile user-friendly vals to SQL ops for CASE patterns
+            const sqlOp = { EARLIEST:'MIN', FIRST_ALPHA:'MIN', LATEST:'MAX', LAST_ALPHA:'MAX',
+              LIST:'GROUP_CONCAT', GROUP_CONCAT:'GROUP_CONCAT' }[agg] || agg;
             const caseWhen = _condsToWhereBody(sConds);
-            if (agg === 'SUM')            return `SUM(CASE WHEN ${caseWhen} THEN 1 ELSE 0 END) AS [${alias}]`;
-            if (agg === 'COUNT')          return `COUNT(CASE WHEN ${caseWhen} THEN 1 ELSE NULL END) AS [${alias}]`;
-            if (agg === 'COUNT_DISTINCT') return `COUNT(DISTINCT CASE WHEN ${caseWhen} THEN [${yf}] ELSE NULL END) AS [${alias}]`;
-            return `${agg}(CASE WHEN ${caseWhen} THEN [${yf}] ELSE NULL END) AS [${alias}]`;
+            if (sqlOp === 'SUM')           return `SUM(CASE WHEN ${caseWhen} THEN 1 ELSE 0 END) AS [${alias}]`;
+            if (sqlOp === 'COUNT')         return `COUNT(CASE WHEN ${caseWhen} THEN 1 ELSE NULL END) AS [${alias}]`;
+            if (sqlOp === 'COUNT_DISTINCT') return `COUNT(DISTINCT CASE WHEN ${caseWhen} THEN [${yf}] ELSE NULL END) AS [${alias}]`;
+            return `${sqlOp}(CASE WHEN ${caseWhen} THEN [${yf}] ELSE NULL END) AS [${alias}]`;
           });
           selParts = [xPart, ...yParts];
         } else {
@@ -808,8 +810,7 @@ function rankSuggestions(rules, cols, meta) {
             if (_isVirtCount(col)) return `COUNT(*) AS [__dlv_count__]`;
             const agg = _getAgg(i);
             if (!agg) return `[${col}]`;
-            if (agg === 'COUNT_DISTINCT') return `COUNT(DISTINCT [${col}]) AS [${col}]`;
-            return `${agg}([${col}]) AS [${col}]`;
+            return aggToSQL(agg, `[${col}]`, col);
           });
         }
 

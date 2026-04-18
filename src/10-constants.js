@@ -29,17 +29,19 @@ const DataLaVistaCore = {
   /* ===== CONSTANTS ===== */
   // Field type icons for display in field lists, query builder, etc.
   FIELD_TYPE_ICONS: {
-    'text': { icon: '📝', cls: 'type-text' },
-    'number': { icon: '#️⃣', cls: 'type-number' },
-    'integer': { icon: '#️⃣', cls: 'type-number' },
-    'decimal': { icon: '#️⃣', cls: 'type-number' },
-    'currency': { icon: '#️⃣', cls: 'type-number' },
-    'date': { icon: '📅', cls: 'type-date' },
-    'bool': { icon: '✅', cls: 'type-bool' },
-    'boolean': { icon: '✅', cls: 'type-bool' },
-    'lookup': { icon: '🔍', cls: 'type-lookup' },
-    'array': { icon: '🍱', cls: 'type-array' },
-    'default': { icon: '🔡', cls: 'type-text' }
+    'text':         { icon: '📝', cls: 'type-text' },      // data shown as text
+    'number':       { icon: '#️⃣', cls: 'type-number' },   // data shown as numbers
+    'date':         { icon: '📅', cls: 'type-date' },      // data shown as date
+    'datetime':     { icon: '🕒', cls: 'type-date' },      // data shown as datetime
+    'boolean':      { icon: '✅', cls: 'type-bool' },      // data shown as true/false
+    'url':          { icon: '🔗', cls: 'type-url' },       // data shown as text or hyperlink
+    'user':         { icon: '👤', cls: 'type-user' },      // SP single user/person
+    'user-multi':   { icon: '👥', cls: 'type-user' },      // SP multi user/person
+    'lookup':       { icon: '🔍', cls: 'type-lookup' },    // SP single lookup / single taxonomy
+    'lookup-multi': { icon: '🔍', cls: 'type-lookup' },    // SP multi lookup / multi taxonomy / choice-multi
+    'object':       { icon: '📦', cls: 'type-object' },    // single generic object
+    'array':        { icon: '🍱', cls: 'type-array' },     // array of primitives
+    'default':      { icon: '❓', cls: 'type-text' }       // unknown/unclassified
   },
 
   // Table/source type icons — SharePoint has sub-keys (list vs library); others are flat.
@@ -76,21 +78,25 @@ const DataLaVistaCore = {
   'DLV_TAX_LABELS','DLV_TAX_IDS','DLV_PARSE_BOOL', 'DLV_PARSE_DATE'
 ],
 
-// Base Aggregation Options for Query Builder (used in field picker dropdowns and design-level aggregates)
+// Base Aggregation Options for Query Builder (reference list; filtering is done in aggsForType())
 QB_AGGS: [
-  { val: '', label: '— none —', types: 'all' },
-  { val: 'COUNT', label: 'COUNT', types: 'all' },
-  { val: 'COUNT_DISTINCT', label: 'COUNT DISTINCT', types: 'all' },
-  { val: 'FIRST', label: 'FIRST', types: 'all' },
-  { val: 'LAST', label: 'LAST', types: 'all' },
-  { val: 'MAX', label: 'MAX  (Maximum)', types: 'ordered' },
-  { val: 'MIN', label: 'MIN  (Minimum)', types: 'ordered' },
-  { val: 'SUM', label: 'SUM  (Sum)', types: 'numeric' },
-  { val: 'AVG', label: 'AVG  (Average)', types: 'numeric' },
-  { val: 'MEDIAN', label: 'MEDIAN', types: 'numeric' },
-  { val: 'VAR', label: 'VAR  (Variance)', types: 'numeric' },
-  { val: 'STDEV', label: 'STDEV  (Std Dev)', types: 'numeric' },
-  { val: 'COUNT_LOOKUP_VALUES', label: 'COUNT VALUES  (array length)', types: 'lookup' }
+  { val: '',             label: '— none —',                    types: 'all' },
+  { val: 'COUNT',        label: 'COUNT',                       types: 'all' },
+  { val: 'COUNT_DISTINCT', label: 'COUNT DISTINCT',            types: 'all' },
+  { val: 'LIST',         label: 'LIST',                        types: 'all' },
+  { val: 'SUM',          label: 'SUM',                         types: 'numeric' },
+  { val: 'AVG',          label: 'AVG',                         types: 'numeric' },
+  { val: 'MIN',          label: 'MIN',                         types: 'numeric' },
+  { val: 'MAX',          label: 'MAX',                         types: 'numeric' },
+  { val: 'MEDIAN',       label: 'MEDIAN',                      types: 'numeric' },
+  { val: 'MODE',         label: 'MODE',                        types: 'all' },
+  { val: 'STDEV',        label: 'STD DEV',                     types: 'numeric' },
+  { val: 'VAR',          label: 'VARIANCE',                    types: 'numeric' },
+  { val: 'CV',           label: 'CV (Coeff. of Variation)',    types: 'numeric' },
+  { val: 'EARLIEST',     label: 'EARLIEST',                    types: 'date' },
+  { val: 'LATEST',       label: 'LATEST',                      types: 'date' },
+  { val: 'FIRST_ALPHA',  label: 'FIRST ALPHABETICALLY',        types: 'text' },
+  { val: 'LAST_ALPHA',   label: 'LAST ALPHABETICALLY',         types: 'text' },
 ],
 
 // Base Filter Conditions
@@ -236,7 +242,7 @@ SKIP_FIELDS: new Set([
 const DataLaVistaState = {
   dataSources: {},   // dsName -> { type, url, auth, token, fileName, alias, tables: [internalTableKeys] },											  
   tables: {},        // internalName -> { displayName, alias, fields: [], data: [], loaded: false }
-  queryMode: 'basic',
+  queryMode: 'advanced',
   basicQB: { // Basic Query Builder
     tableName: null,
     selectedFields: [],
@@ -324,7 +330,7 @@ function getFilterOps(displayType = 'text', options = {}) {
     return ops;
   }
 
-  if (dt === 'date') {
+  if (dt === 'date' || dt === 'datetime') {
     const ops = [
       { val: '=',   label: '= equals' },
       { val: '!=',  label: '≠ not equals' },
@@ -339,6 +345,39 @@ function getFilterOps(displayType = 'text', options = {}) {
       { val: 'NOTNULL', label: '✓ is not blank' },
     );
     if (!forArrayElement) ops.push(...DataLaVistaCore.DATE_MACRO_OPS);
+    return ops;
+  }
+
+  // Object — is blank / is not blank only
+  if (dt === 'object') {
+    return [
+      { val: 'NULL',    label: '∅ is blank' },
+      { val: 'NOTNULL', label: '✓ is not blank' },
+    ];
+  }
+
+  // Multi-value types — text ops on joined value + array-length ops
+  if (dt === 'user-multi' || dt === 'lookup-multi') {
+    const ops = [
+      { val: '=',   label: '= equals' },
+      { val: '!=',  label: '≠ not equals' },
+      { val: 'STARTS_WITH',     label: '↦ starts with' },
+      { val: 'NOT_STARTS_WITH', label: '↦ does not start with' },
+      { val: 'ENDS_WITH',       label: '⇥ ends with' },
+      { val: 'NOT_ENDS_WITH',   label: '⇥ does not end with' },
+      { val: 'CONTAINS',        label: '~ contains' },
+      { val: 'NOT_CONTAINS',    label: '≁ does not contain' },
+      { val: 'NULL',            label: '∅ is blank' },
+      { val: 'NOTNULL',         label: '✓ is not blank' },
+      { val: 'ARR_LEN_EQ',      label: '# of elements equal to' },
+      { val: 'ARR_LEN_NE',      label: '# of elements not equals' },
+      { val: 'ARR_LEN_GT',      label: '# of elements greater than' },
+      { val: 'ARR_LEN_GTE',     label: '# of elements greater or equal' },
+      { val: 'ARR_LEN_LT',      label: '# of elements less than' },
+      { val: 'ARR_LEN_LTE',     label: '# of elements less or equal' },
+      { val: 'ARR_EMPTY',       label: 'is empty',     noInput: true },
+      { val: 'ARR_NOT_EMPTY',   label: 'is not empty', noInput: true },
+    ];
     return ops;
   }
 
@@ -471,8 +510,8 @@ function buildFilterValueInput(displayType, isMacro, macroMeta, value, handlerJS
       : `<span class="qb-val-blank"></span>`;
   }
 
-  // Date
-  if (displayType === 'date') {
+  // Date / Datetime
+  if (displayType === 'date' || displayType === 'datetime') {
     if (op === 'BETWEEN') {
       return `<input type="date" class="form-input qb-val-input qb-between-input" value="${safeVal}" onchange="${handlerJS}"/>`
            + sep
@@ -585,7 +624,7 @@ function getObjectKeysForField(tableKey, fieldAlias, displayType) {
   // SP lookup / person / taxonomy presets
   if (dt === 'lookup' || dt === 'lookup-multi')
     return [{ key: 'Id', type: 'number' }, { key: 'Title', type: 'text' }];
-  if (dt === 'person' || dt === 'person-multi')
+  if (dt === 'user' || dt === 'user-multi')
     return [{ key: 'Id', type: 'number' }, { key: 'Title', type: 'text' }, { key: 'Name', type: 'text' }, { key: 'Email', type: 'text' }];
   if (dt === 'taxonomyfieldtypemulti' || dt === 'taxonomyfieldtype' || dt === 'taxonomyfield' || dt === 'taxonomy' || dt === 'taxkeyword' || dt === 'taxonomy-multi' || dt === 'taxkeyword-multi')
     return [{ key: 'TermGuid', type: 'text' }, { key: 'Label', type: 'text' }];
@@ -624,7 +663,7 @@ function classifyDisplayType(displayType, tableKey, fieldInternalName, fieldAlia
     { baseType: bt, isObject: false, isArrayObjects: false, isArrayScalar: false, scalarType: null, objectKeys: null },
     extra
   );
-  const _arrObjTypes = ['lookup','lookup-multi','person','person-multi','taxonomy','taxkeyword','taxonomy-multi','taxkeyword-multi'];
+  const _arrObjTypes = ['lookup','lookup-multi','user','user-multi','taxonomy','taxkeyword','taxonomy-multi','taxkeyword-multi'];
 
   if (dt === 'boolean') return _base('boolean');
   if (dt === 'number')  return _base('number');

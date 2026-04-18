@@ -277,10 +277,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         }
 
         // Rebuild QB SQL
-        if (DataLaVistaState.basicQB.tableName) {
-          const t = DataLaVistaState.tables[DataLaVistaState.basicQB.tableName];
-          if (t && t.dataSource === dsName) rebuildBasicSQL();
-        }
         if (Object.keys(DataLaVistaState.advancedQB.nodes || {}).length) {
           const anyFromDs = Object.values(DataLaVistaState.advancedQB.nodes).some(nd => {
             const t = DataLaVistaState.tables[nd.tableName];
@@ -290,7 +286,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         }
 
         renderFieldsPanel();
-        renderBasicQB();
         renderAdvancedQB();
         setupCodeMirror();
         toast(`Data source renamed to "${newAlias}"`, 'success');
@@ -334,11 +329,9 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         }
 
         // Rebuild QB SQL to use new alias in FROM clause
-        if (DataLaVistaState.basicQB.tableName === tableKey) rebuildBasicSQL();
         if (Object.keys(DataLaVistaState.advancedQB.nodes || {}).length) rebuildAdvancedSQL();
 
         renderFieldsPanel();
-        renderBasicQB();
         renderAdvancedQB();
         setupCodeMirror();
         toast(`Table renamed to "${newAlias}"`, 'success');
@@ -363,10 +356,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         // NOTE: data rows are keyed by internalName, not alias — no row migration needed.
         // The AS alias in generated SQL is what produces the output column name.
 
-        // Update basicQB selectedFields (which track aliases)
-        const sfIdx = DataLaVistaState.basicQB.selectedFields.indexOf(oldAlias);
-        if (sfIdx !== -1) { DataLaVistaState.basicQB.selectedFields[sfIdx] = newAlias; rebuildBasicSQL(); }
-
         // Update advanced QB selectedFields in nodes
         for (const nd of Object.values(DataLaVistaState.advancedQB.nodes || {})) {
           if (nd.tableName === tableKey) {
@@ -388,7 +377,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         });
 
         renderFieldsPanel();
-        renderBasicQB();
         renderAdvancedQB();
         setupCodeMirror();
         toast(`Field renamed to "${newAlias}"`, 'success');
@@ -460,11 +448,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         const tableViewName = CyberdynePipeline.rawTableToView[tableKey];
         if (tableViewName) CyberdynePipeline.deleteView(tableViewName);
         dropTableFromAlaSQL(tableKey);
-        // Remove from basicQB if active
-        if (DataLaVistaState.basicQB.tableName === tableKey) {
-          DataLaVistaState.basicQB = { tableName: null, selectedFields: [], fieldAggs: {}, conditions: [], sorts: [], groupBy: [], rowLimit: 500 };
-          renderBasicQB();
-        }
         // Remove from advanced QB nodes
         for (const [id, nd] of Object.entries(DataLaVistaState.advancedQB.nodes || {})) {
           if (nd.tableName === tableKey) {

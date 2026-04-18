@@ -1455,6 +1455,11 @@ with this program. If not, see https://www.gnu.org/licenses/.
       box-shadow: 0 0 0 3px var(--primary-light);
     }
 
+    .qb-table-node.primary-table {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px var(--primary-light), 0 0 14px 4px rgba(0, 120, 212, 0.35);
+    }
+
     .qb-node-header {
       background: var(--primary);
       color: white;
@@ -3346,13 +3351,7 @@ with this program. If not, see https://www.gnu.org/licenses/.
 
           <!-- Query-main tab toolbar -->
           <div id="qm-tabs">
-            <div class="qm-tab active" id="qmt-qb" onclick="switchQMTab('qb')">
-              🧩 Query Builder
-              <span class="qm-subtabs" id="qb-subtabs">
-                <span class="qm-sub active" id="qb-basic-btn" onclick="event.stopPropagation();setQBMode('basic')">Basic</span>
-                <span class="qm-sub" id="qb-adv-btn" onclick="event.stopPropagation();setQBMode('advanced')">Advanced</span>
-              </span>
-            </div>
+            <div class="qm-tab active" id="qmt-qb" onclick="switchQMTab('qb')">🧩 Query Builder</div>
             <div class="qm-tab" id="qmt-sql" onclick="switchQMTab('sql')">📜 SQL Editor</div>
             <div class="qm-tab" id="qmt-dataPreview" onclick="switchQMTab('dataPreview')">✨ Results</div>
             <div class="qm-spacer"></div>
@@ -3368,21 +3367,8 @@ with this program. If not, see https://www.gnu.org/licenses/.
           <!-- Panel: Query Builder -->
           <div id="qm-panel-qb" class="active">
             <div id="qb-section">
-              <!-- Basic QB -->
-              <div id="qb-basic">
-                <div id="qb-basic-drop" class="drop-zone"
-                  ondragover="event.preventDefault(); this.classList.add('drag-over')"
-                  ondragleave="this.classList.remove('drag-over')" ondrop="onDropToBasicQB(event)">
-                  <div>
-                    <div style="font-size:24px;margin-bottom:4px">📋</div>
-                    <div>Drag a table or field here to start building your query</div>
-                  </div>
-                </div>
-                <div id="qb-basic-content"></div>
-              </div>
-
               <!-- Advanced QB -->
-              <div id="qb-advanced" style="display:none">
+              <div id="qb-advanced">
                 <div id="qb-canvas-wrap">
                   <div id="qb-canvas" ondragover="event.preventDefault()" ondrop="onDropToAdvancedQB(event)">
                     <svg id="qb-svg"></svg>

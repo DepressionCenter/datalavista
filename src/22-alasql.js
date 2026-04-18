@@ -475,7 +475,7 @@ alasql.from.DLV_ARRAY_EXTRACT_ELEMENT = function(tableName, opts, cb, idx, query
 
       // ── DLV_ARRAY_AGG: aggregate values of a named field from an array of objects ──
       // Usage: DLV_ARRAY_AGG(array, fieldName, aggType)
-      // aggType: 'GROUP_CONCAT' | 'COUNT' | 'COUNT_DISTINCT' | 'SUM' | 'MIN' | 'MAX' | 'AVG'
+      // aggType: 'GROUP_CONCAT' | 'COUNT' | 'COUNT_DISTINCT' | 'SUM' | 'SUM_SQ' | 'MIN' | 'MAX' | 'AVG'
       // Returns a scalar — useful for aggregating local (non-SP) arrays without any JOIN.
       alasql.fn.DLV_ARRAY_AGG = function(arr, fieldName, aggType = 'GROUP_CONCAT') {
         if (!arr || !Array.isArray(arr) || !fieldName) return null;
@@ -488,6 +488,7 @@ alasql.from.DLV_ARRAY_EXTRACT_ELEMENT = function(tableName, opts, cb, idx, query
           case 'COUNT':          return vals.length;
           case 'COUNT_DISTINCT': return new Set(vals.map(String)).size;
           case 'SUM':            return vals.reduce((s, v) => s + Number(v), 0);
+          case 'SUM_SQ':         return vals.reduce((s, v) => s + Number(v) * Number(v), 0);
           case 'MIN':            return vals.reduce((m, v) => (v < m ? v : m), vals[0]);
           case 'MAX':            return vals.reduce((m, v) => (v > m ? v : m), vals[0]);
           case 'AVG':            return vals.reduce((s, v) => s + Number(v), 0) / vals.length;
@@ -728,6 +729,101 @@ alasql.from.DLV_ARRAY_EXTRACT_ELEMENT = function(tableName, opts, cb, idx, query
         
         // Return null if invalid to prevent NaN from breaking SQL math aggregates
         return isNaN(parsed) ? null : parsed;
+      };
+
+      // ── MEDIAN: type-safe median (numeric or lexicographic sort) ─────────────
+      // Overrides AlaSQL built-in to support dates and text strings.
+      alasql.aggr.MEDIAN = function(v, s, stage) {
+        if (stage === 1) { s = []; if (v != null) s.push(v); return s; }
+        if (stage === 2) { if (v != null) s.push(v); return s; }
+        if (!s || !s.length) return null;
+        const allNum = s.every(x => !isNaN(Number(x)));
+        const sorted = allNum
+          ? [...s].sort((a, b) => Number(a) - Number(b))
+          : [...s].sort((a, b) => String(a).localeCompare(String(b)));
+        const mid = Math.floor(sorted.length / 2);
+        if (sorted.length % 2 === 0 && allNum)
+          return (Number(sorted[mid - 1]) + Number(sorted[mid])) / 2;
+        return sorted[mid];
+      };
+
+      // ── MODE: most frequently occurring value ────────────────────────────────
+      alasql.aggr.MODE = function(v, s, stage) {
+        if (stage === 1) { s = {}; if (v != null) { const k = String(v); s[k] = 1; } return s; }
+        if (stage === 2 && v != null) { const k = String(v); s[k] = (s[k] || 0) + 1; return s; }
+        const entries = Object.entries(s || {});
+        if (!entries.length) return null;
+        return entries.reduce((best, cur) => cur[1] > best[1] ? cur : best, entries[0])[0];
+      };
+
+      // ── CV: coefficient of variation (population) ────────────────────────────
+      alasql.aggr.CV = function(v, s, stage) {
+        if (stage === 1) { s = { sum: 0, sumSq: 0, n: 0 }; }
+        if (stage <= 2 && v != null) {
+          const x = Number(v);
+          if (!isNaN(x)) { s.sum += x; s.sumSq += x * x; s.n++; }
+          return s;
+        }
+        if (!s || !s.n) return null;
+        const mean = s.sum / s.n;
+        const stdev = Math.sqrt(Math.max(0, s.sumSq / s.n - mean * mean));
+        return mean !== 0 ? stdev / mean : null;
+      };
+
+      // ── DLV_SQRT: safe square root (returns 0 for negatives/null) ───────────
+      alasql.fn.DLV_SQRT = function(x) { return (x != null && x > 0) ? Math.sqrt(x) : 0; };
+
+      // ── DLV_POW2: square a value ─────────────────────────────────────────────
+      alasql.fn.DLV_POW2 = function(x) { return (x != null) ? x * x : null; };
+
+      // ── DLV_MERGE_LIST: merge semicolon-joined strings → deduped sorted list ─
+      alasql.aggr.DLV_MERGE_LIST = function(v, s, stage) {
+        if (stage === 1) { s = new Set(); }
+        if (stage <= 2 && v != null)
+          String(v).split(';').forEach(x => { const t = x.trim(); if (t) s.add(t); });
+        if (stage === 3) return (s && s.size) ? [...s].sort().join('; ') : null;
+        return s;
+      };
+
+      // ── DLV_MERGE_COUNT_DISTINCT: count unique values across merged strings ──
+      alasql.aggr.DLV_MERGE_COUNT_DISTINCT = function(v, s, stage) {
+        if (stage === 1) { s = new Set(); }
+        if (stage <= 2 && v != null)
+          String(v).split(';').forEach(x => { const t = x.trim(); if (t) s.add(t); });
+        if (stage === 3) return (s && s.size) ? s.size : 0;
+        return s;
+      };
+
+      // ── DLV_MERGE_MEDIAN: median over merged semicolon-string values ─────────
+      alasql.aggr.DLV_MERGE_MEDIAN = function(v, s, stage) {
+        if (stage === 1) { s = []; }
+        if (stage <= 2 && v != null)
+          String(v).split(';').forEach(x => { const t = x.trim(); if (t) s.push(t); });
+        if (stage === 3) {
+          if (!s || !s.length) return null;
+          const allNum = s.every(x => !isNaN(Number(x)));
+          const sorted = allNum
+            ? [...s].sort((a, b) => Number(a) - Number(b))
+            : [...s].sort((a, b) => a.localeCompare(b));
+          const mid = Math.floor(sorted.length / 2);
+          if (sorted.length % 2 === 0 && allNum)
+            return (Number(sorted[mid - 1]) + Number(sorted[mid])) / 2;
+          return sorted[mid];
+        }
+        return s;
+      };
+
+      // ── DLV_MERGE_MODE: most frequent value across merged semicolon strings ──
+      alasql.aggr.DLV_MERGE_MODE = function(v, s, stage) {
+        if (stage === 1) { s = {}; }
+        if (stage <= 2 && v != null)
+          String(v).split(';').forEach(x => { const t = x.trim(); if (t) { s[t] = (s[t] || 0) + 1; } });
+        if (stage === 3) {
+          const entries = Object.entries(s || {});
+          if (!entries.length) return null;
+          return entries.reduce((best, cur) => cur[1] > best[1] ? cur : best, entries[0])[0];
+        }
+        return s;
       };
     }
 

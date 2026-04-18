@@ -146,14 +146,19 @@ validateAliasUniqueness(fields) {
         for (const vc of virtualCols) {
           view.columnMappings[vc.alias] = vc.internalName;
           view.fields.push({
-            internalName: vc.internalName,
-            displayName: vc.alias,
-            alias: vc.alias,
-            type: vc.type,
-            displayType: vc.displayType,
-            isSynthetic: vc.isSynthetic,
-            parentField: vc.parentField,
-            isAutoId: false
+            internalName:  vc.internalName,
+            displayName:   vc.alias,
+            alias:         vc.alias,
+            userAlias:     vc.alias,
+            type:          vc.type,
+            dataType:      vc.type,   // type IS the dataType for vc (text/number/date/boolean/array/object)
+            displayType:   vc.displayType,
+            displayFormat: vc.displayFormat || null,
+            derivedColumns: null,
+            isSynthetic:   vc.isSynthetic,
+            parentField:   vc.parentField,
+            isLookupRaw:   vc.isLookupRaw || false,
+            isAutoId:      false
           });
         }
 
@@ -763,8 +768,8 @@ validateAliasUniqueness(fields) {
       }
       if (ft === 'url')          return this._expandUrlField(field, outKey, rawCol);
       if (ft === 'choice-multi') return this._expandChoiceMulti(field, outKey, rawCol);
-      if (typeStr === 'calculated' && (field.CalculatedTypeAsString || field.calculatedFieldType)) {
-        const newFieldType = parseFieldType(field.CalculatedTypeAsString || field.calculatedFieldType);
+      if (typeStr === 'calculated' && (field.CalculatedTypeAsString || field.calculatedType || field.calculatedFieldType)) {
+        const newFieldType = parseFieldType(field.CalculatedTypeAsString || field.calculatedType || field.calculatedFieldType);
         // Shallow-clone to avoid mutating the shared state field object
         field = Object.assign({}, field, { type: newFieldType, displayType: fieldDisplayType(newFieldType) });
         // Re-derive ft so subsequent type-branches route correctly
@@ -772,9 +777,11 @@ validateAliasUniqueness(fields) {
       }
 
       // ── Generic types inferred from data ───────────────────────────────────
-      if (ft === 'object') return this._expandGenericObject(field, outKey, rawCol);
-      if (ft === 'array')  return this._expandGenericArray(field, outKey, rawCol);
-      if (ft === 'date')   return this._expandDateField(field, outKey, rawCol);
+      if (ft === 'object')           return this._expandGenericObject(field, outKey, rawCol);
+      if (ft === 'array-objects')    return this._expandArrayObjects(field, outKey, rawCol);
+      if (ft === 'array-primitives') return this._expandArrayPrimitives(field, outKey, rawCol);
+      if (ft === 'array')            return this._expandArrayPrimitives(field, outKey, rawCol);
+      if (ft === 'date' || ft === 'datetime') return this._expandDateField(field, outKey, rawCol);
 
       // ── Explicit Parsers for SharePoint Calculated Fields ONLY ─────────────
       if (typeStr === 'calculated') {
@@ -787,56 +794,51 @@ validateAliasUniqueness(fields) {
     },
 
     _vc(alias, internalName, sqlExpr, type, displayType, isSynthetic, parentField) {
-      return { alias, internalName, sqlExpr, type, displayType, isSynthetic: !!isSynthetic, parentField };
+      return { alias, internalName, sqlExpr, type, displayType, isSynthetic: !!isSynthetic, parentField, isLookupRaw: false, displayFormat: null };
     },
     // Like _vc but marks the field as a raw lookup internal (hidden from all pickers).
     _vcRaw(alias, internalName, sqlExpr, type, displayType, parentField) {
-      return { alias, internalName, sqlExpr, type, displayType, isSynthetic: true, parentField, isLookupRaw: true };
+      return { alias, internalName, sqlExpr, type, displayType, isSynthetic: true, parentField, isLookupRaw: true, displayFormat: null };
     },
 
     _expandUserSingle(field, outKey, rawCol, siteUrl) {
-      const base = (siteUrl || '..').replace(/\/$/, '');
       return [
-        this._vc   (outKey,              field.internalName, `DLV_DISPLAY(${rawCol})`,                                  'text',   'text',   false, field.internalName),
-        this._vc   (outKey + 'Id',       field.internalName, `DLV_PROP(${rawCol}, 'Id')`,                               'number', 'number', true,  field.internalName),
-        this._vc   (outKey + 'Claims',   field.internalName, `DLV_PROP(${rawCol}, 'Name')`,                             'text',   'text',   true,  field.internalName),
-        this._vc   (outKey + 'Email',    field.internalName, `DLV_EMAIL(DLV_PROP(${rawCol}, 'Name'))`,                  'text',   'text',   true,  field.internalName),
-        this._vc   (outKey + 'PictureUrl', field.internalName, `DLV_PICTURE_URL(DLV_PROP(${rawCol}, 'Name'), '${base}')`, 'text', 'text',   true,  field.internalName),
-        this._vcRaw(outKey + 'Data',     field.internalName, rawCol,                                                     'object', 'object', field.internalName),
+        this._vc   (outKey,          field.internalName, `DLV_DISPLAY(${rawCol})`,              'text',   'user',   false, field.internalName),
+        this._vc   (outKey + 'Id',   field.internalName, `DLV_PROP(${rawCol}, 'Id')`,           'number', 'number', true,  field.internalName),
+        this._vc   (outKey + 'Email', field.internalName, `DLV_EMAIL(DLV_PROP(${rawCol}, 'Name'))`, 'text', 'text', true,  field.internalName),
+        this._vcRaw(outKey + 'Data', field.internalName, rawCol,                                 'object', 'object', field.internalName),
       ];
     },
 
     _expandUserMulti(field, outKey, rawCol) {
       return [
-        this._vc   (outKey,              field.internalName, `DLV_JOIN(${rawCol}, 'Title')`, 'lookup', 'lookup', false, field.internalName),
-        this._vcRaw(outKey + 'Ids',      field.internalName, `DLV_IDS(${rawCol})`,           'array',  'array',  field.internalName),
-        this._vc   (outKey + 'Emails',   field.internalName, `DLV_EMAILS(${rawCol})`,        'array',  'array',  true,  field.internalName),
-        this._vc   (outKey + 'Count',    field.internalName, `${rawCol}->length`,             'number', 'number', true,  field.internalName),
-        this._vcRaw(outKey + 'Data',     field.internalName, rawCol,                          'array',  'array',  field.internalName),
+        this._vc   (outKey,           field.internalName, `DLV_JOIN(${rawCol}, 'Title')`, 'text',   'user-multi', false, field.internalName),
+        this._vc   (outKey + 'Count', field.internalName, `${rawCol}->length`,             'number', 'number',     true,  field.internalName),
+        this._vcRaw(outKey + 'Ids',   field.internalName, `DLV_IDS(${rawCol})`,            'array',  'array',      field.internalName),
+        this._vcRaw(outKey + 'Data',  field.internalName, rawCol,                           'array',  'array',      field.internalName),
       ];
     },
 
     _expandLookupSingle(field, outKey, rawCol) {
       return [
-        this._vc   (outKey,           field.internalName, `DLV_DISPLAY(${rawCol})`,    'text',   'text',   false, field.internalName),
-        this._vc   (outKey + 'Id',    field.internalName, `DLV_PROP(${rawCol}, 'Id')`, 'number', 'number', true,  field.internalName),
-        this._vcRaw(outKey + 'Data',  field.internalName, rawCol,                       'object', 'object', field.internalName),
+        this._vc   (outKey,          field.internalName, `DLV_DISPLAY(${rawCol})`,    'text',   'lookup', false, field.internalName),
+        this._vc   (outKey + 'Id',   field.internalName, `DLV_PROP(${rawCol}, 'Id')`, 'number', 'number', true,  field.internalName),
+        this._vcRaw(outKey + 'Data', field.internalName, rawCol,                       'object', 'object', field.internalName),
       ];
     },
 
-    // Parent field kept as 'lookup' so pickers, filters, and agg options treat it as array-of-objects.
     _expandLookupMulti(field, outKey, rawCol) {
       return [
-        this._vc   (outKey,           field.internalName, `DLV_JOIN(${rawCol}, 'Title')`, 'lookup', 'lookup', false, field.internalName),
-        this._vcRaw(outKey + 'Ids',   field.internalName, `DLV_IDS(${rawCol})`,           'array',  'array',  field.internalName),
-        this._vc   (outKey + 'Count', field.internalName, `${rawCol}->length`,             'number', 'number', true,  field.internalName),
-        this._vcRaw(outKey + 'Data',  field.internalName, rawCol,                          'array',  'array',  field.internalName),
+        this._vc   (outKey,           field.internalName, `DLV_JOIN(${rawCol}, 'Title')`, 'text',   'lookup-multi', false, field.internalName),
+        this._vc   (outKey + 'Count', field.internalName, `${rawCol}->length`,             'number', 'number',       true,  field.internalName),
+        this._vcRaw(outKey + 'Ids',   field.internalName, `DLV_IDS(${rawCol})`,            'array',  'array',        field.internalName),
+        this._vcRaw(outKey + 'Data',  field.internalName, rawCol,                           'array',  'array',        field.internalName),
       ];
     },
 
     _expandTaxonomy(field, outKey, rawCol) {
       return [
-        this._vc   (outKey,          field.internalName, `DLV_TAX_LABELS(${rawCol})`, 'text',   'text',   false, field.internalName),
+        this._vc   (outKey,          field.internalName, `DLV_TAX_LABELS(${rawCol})`, 'text',   'lookup', false, field.internalName),
         this._vc   (outKey + 'Id',   field.internalName, `DLV_TAX_IDS(${rawCol})`,   'text',   'text',   true,  field.internalName),
         this._vcRaw(outKey + 'Data', field.internalName, rawCol,                       'object', 'object', field.internalName),
       ];
@@ -844,64 +846,65 @@ validateAliasUniqueness(fields) {
 
     _expandTaxonomyMulti(field, outKey, rawCol) {
       return [
-        this._vc   (outKey,              field.internalName, `DLV_TAX_LABELS(${rawCol})`,     'text',   'text',   false, field.internalName),
-        this._vcRaw(outKey + 'Ids',      field.internalName, `DLV_TAX_IDS(${rawCol})`,        'array',  'array',  field.internalName),
-        this._vc   (outKey + 'Labels',   field.internalName, `DLV_TAX_LABELS_ONLY(${rawCol})`, 'array',  'array',  true,  field.internalName),
-        this._vc   (outKey + 'Count',    field.internalName, `${rawCol}->length`,               'number', 'number', true,  field.internalName),
-        this._vcRaw(outKey + 'Data',     field.internalName, rawCol,                            'array',  'array',  field.internalName),
+        this._vc   (outKey,            field.internalName, `DLV_TAX_LABELS(${rawCol})`,      'text',   'lookup-multi', false, field.internalName),
+        this._vc   (outKey + 'Count',  field.internalName, `${rawCol}->length`,               'number', 'number',       true,  field.internalName),
+        this._vcRaw(outKey + 'Ids',    field.internalName, `DLV_TAX_IDS(${rawCol})`,          'array',  'array',        field.internalName),
+        this._vc   (outKey + 'Labels', field.internalName, `DLV_TAX_LABELS_ONLY(${rawCol})`,  'array',  'array',        true,  field.internalName),
+        this._vcRaw(outKey + 'Data',   field.internalName, rawCol,                             'array',  'array',        field.internalName),
       ];
     },
 
     _expandUrlField(field, outKey, rawCol) {
       return [
-        this._vc(outKey,           field.internalName, `DLV_PROP(${rawCol}, 'Url')`,         'text', 'text', false, field.internalName),
+        this._vc(outKey,           field.internalName, `DLV_PROP(${rawCol}, 'Url')`,         'text', 'url',  false, field.internalName),
         this._vc(outKey + 'Label', field.internalName, `DLV_PROP(${rawCol}, 'Description')`, 'text', 'text', true,  field.internalName),
       ];
     },
 
     _expandGenericObject(field, outKey, rawCol) {
       return [
-        this._vc   (outKey,          field.internalName, `DLV_DISPLAY(${rawCol})`,    'text',   'text',   false, field.internalName),
-        this._vc   (outKey + 'Id',   field.internalName, `DLV_ID_PROP(${rawCol})`,   'text',   'text',   true,  field.internalName),
-        this._vcRaw(outKey + 'Data', field.internalName, rawCol,                       'object', 'object', field.internalName),
+        this._vc   (outKey,          field.internalName, `DLV_DISPLAY(${rawCol})`,  'text',   'object', false, field.internalName),
+        this._vc   (outKey + 'Id',   field.internalName, `DLV_ID_PROP(${rawCol})`, 'text',   'text',   true,  field.internalName),
+        this._vcRaw(outKey + 'Data', field.internalName, rawCol,                    'object', 'object', field.internalName),
       ];
     },
 
-    // Parent field kept as 'lookup' so pickers, filters, and agg options treat it as array-of-objects.
-    _expandGenericArray(field, outKey, rawCol) {
+    _expandArrayPrimitives(field, outKey, rawCol) {
       return [
-        this._vc   (outKey,          field.internalName, `DLV_JOIN(${rawCol}, '')`, 'lookup', 'lookup', false, field.internalName),
-        this._vcRaw(outKey + 'Ids',  field.internalName, `DLV_IDS(${rawCol})`,      'array',  'array',  field.internalName),
-        this._vcRaw(outKey + 'Data', field.internalName, rawCol,                     'array',  'array',  field.internalName),
+        this._vc   (outKey,           field.internalName, `DLV_JOIN(${rawCol}, '')`, 'text',   'array',  false, field.internalName),
+        this._vc   (outKey + 'Count', field.internalName, `${rawCol}->length`,        'number', 'number', true,  field.internalName),
+        this._vcRaw(outKey + 'Data',  field.internalName, rawCol,                     'array',  'array',  field.internalName),
+      ];
+    },
+
+    _expandArrayObjects(field, outKey, rawCol) {
+      return [
+        this._vc   (outKey,           field.internalName, `DLV_JOIN(${rawCol}, '')`, 'text',   'lookup-multi', false, field.internalName),
+        this._vc   (outKey + 'Count', field.internalName, `${rawCol}->length`,        'number', 'number',       true,  field.internalName),
+        this._vcRaw(outKey + 'Ids',   field.internalName, `DLV_IDS(${rawCol})`,       'array',  'array',        field.internalName),
+        this._vc   (outKey + 'Labels', field.internalName, `DLV_JOIN(${rawCol}, '')`, 'array',  'array',        true,  field.internalName),
+        this._vcRaw(outKey + 'Data',  field.internalName, rawCol,                     'array',  'array',        field.internalName),
       ];
     },
 
     _expandDateField(field, outKey, rawCol) {
-      const aliasLc  = outKey.toLowerCase();
-      const endsDate = aliasLc.endsWith('date');
-      const endsTime = /(?:dt|ts|timestamp|datetime|time)$/.test(aliasLc);
-      // Include hour synthetics when alias signals time, or when ambiguous (could be either)
-      const inclTime = endsTime || !endsDate;
-      const nd = `DLV_NORMALIZE_DATE(${rawCol})`;   // shorthand used below
+      // Use displayType to distinguish date-only vs datetime (not alias heuristic)
+      const isDatetime = (field.displayType === 'datetime') || (field.type === 'datetime');
+      const nd = `DLV_NORMALIZE_DATE(${rawCol})`;
       const dp = (p) => `DLV_DATE_PART(${nd}, '${p}')`;
 
-      const mainExpr = endsDate ? dp('date') : nd;
+      const mainExpr   = isDatetime ? nd : dp('date');
+      const mainDispTy = isDatetime ? 'datetime' : 'date';
 
       const cols = [
-        this._vc(outKey, field.internalName, mainExpr, 'date', 'date', false, field.internalName),
+        this._vc(outKey, field.internalName, mainExpr, 'date', mainDispTy, false, field.internalName),
       ];
 
-      // Date / Time companions
-      if (endsDate) {
-        cols.push(this._vc(outKey + 'Time', field.internalName, dp('time'), 'date', 'date', true, field.internalName));
-      } else if (endsTime) {
+      if (isDatetime) {
         cols.push(this._vc(outKey + 'Date', field.internalName, dp('date'), 'date', 'date', true, field.internalName));
-      } else {
-        cols.push(this._vc(outKey + 'Date', field.internalName, dp('date'), 'date', 'date', true, field.internalName));
-        cols.push(this._vc(outKey + 'Time', field.internalName, dp('time'), 'date', 'date', true, field.internalName));
       }
+      cols.push(this._vc(outKey + 'Time', field.internalName, dp('time'), 'date', 'date', true, field.internalName));
 
-      // Always: year, fiscal year, month, day-of-week
       cols.push(this._vc(outKey + 'Year',       field.internalName, dp('year'),       'number', 'number', true, field.internalName));
       cols.push(this._vc(outKey + 'YearText',   field.internalName, dp('yearText'),   'text',   'text',   true, field.internalName));
       cols.push(this._vc(outKey + 'FiscalYear', field.internalName, dp('fiscalYear'), 'text',   'text',   true, field.internalName));
@@ -911,8 +914,7 @@ validateAliasUniqueness(fields) {
       cols.push(this._vc(outKey + 'Day',        field.internalName, dp('day'),        'number', 'number', true, field.internalName));
       cols.push(this._vc(outKey + 'DayName',    field.internalName, dp('dayName'),    'text',   'text',   true, field.internalName));
 
-      // Hour synthetics (when time is relevant)
-      if (inclTime) {
+      if (isDatetime) {
         cols.push(this._vc(outKey + 'Hour',     field.internalName, dp('hour'),     'number', 'number', true, field.internalName));
         cols.push(this._vc(outKey + 'HourText', field.internalName, dp('hourText'), 'text',   'text',   true, field.internalName));
       }
@@ -936,9 +938,9 @@ validateAliasUniqueness(fields) {
 
     _expandChoiceMulti(field, outKey, rawCol) {
       return [
-        this._vc   (outKey,           field.internalName, `DLV_JOIN(${rawCol}, '')`, 'text',   'text',   false, field.internalName),
-        this._vc   (outKey + 'Count', field.internalName, `${rawCol}->length`,        'number', 'number', true,  field.internalName),
-        this._vcRaw(outKey + 'Data',  field.internalName, rawCol,                     'array',  'array',  field.internalName),
+        this._vc   (outKey,           field.internalName, `DLV_JOIN(${rawCol}, '')`, 'text',   'lookup-multi', false, field.internalName),
+        this._vc   (outKey + 'Count', field.internalName, `${rawCol}->length`,        'number', 'number',       true,  field.internalName),
+        this._vcRaw(outKey + 'Data',  field.internalName, rawCol,                     'array',  'array',        field.internalName),
       ];
     },
 

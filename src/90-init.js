@@ -224,7 +224,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         swapReportMode('edit'); // Apply report mode UI classes and button visibility
         initToolbox();
         initResizers();
-        setQBMode('basic');
         switchQMTab('qb');
         switchTab('query');
         spPickerCheckVisibility();

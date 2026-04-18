@@ -149,22 +149,25 @@ async function _saveConfigToSpList(json, reportUrl, siteUrl) {
 
 // Build a clean, minimal config object from the current state, suitable for saving or sharing
 function buildConfig() {
-  // TODO: DEBUG: It looks like relationships, basicQB and advancedQB are not being included in the config.
-  const cleanFields = (arr) => (arr || []).map(f => ({
-    InternalName: f.InternalName || f.internalName || '',
-    internalName: f.internalName || f.InternalName || '',
-    Title: f.Title || f.displayName || '',
-    displayName: f.displayName || f.Title || '',
-    TypeAsString: f.TypeAsString || '',
-    type: f.type || '',
-    alias: f.alias || '',
-    displayType: f.displayType || 'text',
-    required: !!f.required,
-    maxLength: f.maxLength || null,
-    isAutoId: !!f.isAutoId,
-    choices: (Array.isArray(f.choices) && f.choices.length <= 50) ? f.choices : null,
-    lookupList: f.lookupList || null,
-    lookupField: f.lookupField || null
+  // TODO: DEBUG: It looks like relationships and advancedQB are not being included in the config.
+  const cleanFields = (arr) => (arr || []).filter(f => !f.isSynthetic && !f.isAutoId).map(f => ({
+    internalName:  f.internalName || f.InternalName || '',
+    displayName:   f.displayName  || f.Title        || '',
+    alias:         f.alias        || '',
+    userAlias:     f.userAlias    || f.alias         || '',
+    rawType:       f.rawType      || f.TypeAsString  || '',
+    rawTypeSource: f.rawTypeSource || (f.TypeAsString ? 'sharepoint' : 'unknown'),
+    type:          f.type         || '',
+    dataType:      f.dataType     || 'text',
+    displayType:   f.displayType  || 'text',
+    calculatedType: f.calculatedType || f.calculatedFieldType || null,
+    displayFormat: f.displayFormat || null,
+    required:      !!f.required,
+    maxLength:     f.maxLength     || null,
+    isAutoId:      !!f.isAutoId,
+    choices:       (Array.isArray(f.choices) && f.choices.length <= 50) ? f.choices : null,
+    lookupList:    f.lookupList    || null,
+    lookupField:   f.lookupField   || null
   }));
  
  
@@ -372,7 +375,6 @@ function buildConfig() {
     _license: 'This file is part of DataLaVista™. This is a configuration script for a report designed in DataLaVista™. Copyright © 2026 The Regents of the University of Michigan. This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version. This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details. You should have received a copy of the GNU General Public License along with this program. If not, see https://www.gnu.org/licenses.',
     activeTab: (DataLaVistaState.reportMode === 'view') ? 'dashboardPreview' : 'design',
     advancedQB: DataLaVistaState.advancedQB || {},
-    basicQB: DataLaVistaState.basicQB || {},
     currentWidgetId: DataLaVistaState.currentWidgetId || null,
     dataSources: dataSourcesMeta,
     design: cleanDesign,
@@ -381,7 +383,6 @@ function buildConfig() {
     qbSectionHeight: DataLaVistaState.qbSectionHeight || 60,
     qmTab: DataLaVistaState.qmTab || 'dataPreview',
     queryColumns: Array.isArray(DataLaVistaState.queryColumns) ? [...DataLaVistaState.queryColumns] : [],
-    queryMode: (DataLaVistaState.queryMode && DataLaVistaState.queryMode != null && DataLaVistaState.queryMode != undefined && DataLaVistaState.queryMode != '') ? DataLaVistaState.queryMode : 'sql',
     relationships: (DataLaVistaState.relationships || []).filter(r =>
       _referencedKeys.has(r.childTableKey) || _referencedKeys.has(r.parentTableKey)
     ),
@@ -426,7 +427,21 @@ async function loadConfig(cfg) {
   //DataLaVistaState.activeTab = (DataLaVistaState.reportMode==='view')?'dataPreview':'design';
   DataLaVistaState.advancedQB = cfg.advancedQB || {};
   DataLaVistaState.advancedQB.nodeAliases ??= {};
-  DataLaVistaState.basicQB = cfg.basicQB || {};
+  // Restore or default primaryNodeId — preserves saved value; falls back to first node
+  DataLaVistaState.advancedQB.primaryNodeId ??= null;
+  if (!DataLaVistaState.advancedQB.primaryNodeId) {
+    const firstKey = Object.keys(DataLaVistaState.advancedQB.nodes || {})[0];
+    if (firstKey) DataLaVistaState.advancedQB.primaryNodeId = firstKey;
+  }
+  // [REMOVE AFTER: backward compat — read old basicQB only when basic QB was active, migrate to advanced QB]
+  // If the saved config had basic QB as the active query mode, copy its state into advanced QB so the
+  // canvas shows the right content. Otherwise, ignore basicQB entirely so stale data doesn't pollute.
+  if (cfg.queryMode === 'basic' && cfg.basicQB) {
+    DataLaVistaState.basicQB = cfg.basicQB;
+    _migrateBasicToAdvancedQB();
+    DataLaVistaState.basicQB = {};  // clear after migration — not needed in new state
+  }
+  // [END REMOVE AFTER]
   DataLaVistaState.currentWidgetId = null;
   DataLaVistaState.dataSources = cfg.dataSources || {};
   const loadedDesign = cfg.design || {};
@@ -511,13 +526,32 @@ async function loadConfig(cfg) {
   // Normalize legacy tab name ('previewData' was renamed to 'dataPreview')
   DataLaVistaState.qmTab = (cfg.qmTab === 'previewData') ? 'dataPreview' : (cfg.qmTab || 'qb');
   DataLaVistaState.queryColumns = Array.isArray(cfg.queryColumns) ? [...cfg.queryColumns] : [];
-  DataLaVistaState.queryMode = (cfg.queryMode && cfg.queryMode != null && cfg.queryMode != undefined && cfg.queryMode != '') ? cfg.queryMode : 'sql';
   // Don't load reportMode or reportUrl from config - it's handled by init()
   DataLaVistaState.relationships = Array.isArray(cfg.relationships) ? cfg.relationships : [];
   DataLaVistaState.sql = cfg.sql || '';
   DataLaVistaState.sqlLocked = cfg.sqlLocked || false;
   DataLaVistaState.tables = cfg.tables || {};
- 
+
+  // Back-fill new field schema properties for configs saved before the type-system overhaul
+  for (const tmeta of Object.values(DataLaVistaState.tables)) {
+    for (const fields of [tmeta.fields, tmeta.baseFields, tmeta.originalFields]) {
+      if (!Array.isArray(fields)) continue;
+      for (const f of fields) {
+        if (f.userAlias    == null) f.userAlias    = f.alias        || '';
+        if (f.rawType      == null) f.rawType      = f.TypeAsString || f.type || '';
+        if (f.rawTypeSource == null) f.rawTypeSource = f.TypeAsString ? 'sharepoint' : 'unknown';
+        if (f.dataType     == null) f.dataType     = 'text';
+        if (f.displayFormat == null) f.displayFormat = null;
+        if (f.derivedColumns == null) f.derivedColumns = null;
+        if (f.calculatedType == null) f.calculatedType = f.calculatedFieldType || null;
+        // Re-derive displayType for old configs where DateTime was stored as 'date'
+        if (f.displayType === 'date' && (f.rawType === 'DateTime' || f.type === 'datetime')) {
+          f.displayType = 'datetime';
+        }
+      }
+    }
+  }
+
   // Restore view definitions (gracefully skipped for legacy configs without views)
   if (cfg.views && typeof cfg.views === 'object' && Object.keys(cfg.views).length) {
     CyberdynePipeline.restoreViewsFromConfig(cfg.views);
@@ -598,21 +632,11 @@ async function loadConfig(cfg) {
     if (titleInput) titleInput.value = DataLaVistaState.design.title || '';
     renderDesignCanvas();
     renderFieldsPanel();
-    renderBasicQB();
     renderAdvancedQB();
-    // Restore the QB mode (basic/advanced) and active sub-tab (qb/sql/dataPreview)
-    // that were saved with the config, so the user lands on the right panel.
-    // Temporarily lock SQL so rebuildBasicSQL/rebuildAdvancedSQL inside setQBMode
-    // don't overwrite the SQL that was loaded from the config.
-    const _savedSqlLocked = DataLaVistaState.sqlLocked;
-    DataLaVistaState.sqlLocked = true;
-    setQBMode(DataLaVistaState.queryMode || 'basic');
-    DataLaVistaState.sqlLocked = _savedSqlLocked;
-    // Re-apply the loaded SQL and editor state after QB mode is set
+    renderAdvOptionsPanel();
+    // Re-apply the loaded SQL and restore the active sub-tab (qb/sql/dataPreview)
     if (DataLaVistaState.sql && /** @type {any} */ (window)._cmEditor) /** @type {any} */ (window)._cmEditor.setValue(DataLaVistaState.sql);
     switchQMTab(DataLaVistaState.qmTab || 'qb');
-    // Re-enable design tabs after all renders/mode-switches, since rebuildBasicSQL()
-    // called by setQBMode() invokes hideUseInDesign() which would disable them.
     if (querySucceeded) showUseInDesign();
     setStatus('Config loaded', 'success');
     toast('Config loaded successfully', 'success');
