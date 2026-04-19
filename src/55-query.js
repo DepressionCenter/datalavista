@@ -229,6 +229,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
   // TODO: Need to keep track of source ds/table/internal field ID/data type
   // This will probably break if two tables have the a field with the same alias but different types
   function sniffType(col) {
+    const meta = DataLaVistaState.queryColumnMeta?.[col];
+    if (meta?.displayType) return meta.displayType;
     const typeMap = {};
     for (const t of Object.values(DataLaVistaState.tables)) {
       for (const f of (t.fields || [])) {

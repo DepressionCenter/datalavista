@@ -373,6 +373,7 @@ function buildConfig() {
  
   return {
     _license: 'This file is part of DataLaVista™. This is a configuration script for a report designed in DataLaVista™. Copyright © 2026 The Regents of the University of Michigan. This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version. This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details. You should have received a copy of the GNU General Public License along with this program. If not, see https://www.gnu.org/licenses.',
+    _min_version: 0.5,
     activeTab: (DataLaVistaState.reportMode === 'view') ? 'dashboardPreview' : 'design',
     advancedQB: DataLaVistaState.advancedQB || {},
     currentWidgetId: DataLaVistaState.currentWidgetId || null,
@@ -422,6 +423,7 @@ async function loadConfig(cfg) {
   if (cfg && typeof cfg !== 'object') throw new Error('Invalid report config — no report JSON detected.');
 
   if (!cfg._license) throw new Error('Invalid report config — missing _license key');
+  // TODO: Check the new key, _min_version, and display a warning saying this report maybe incompatible with this version of DataLaVista, if the key doesn't exist or if it is <0.5.
   // Basic validation passed — now clear the existing state and load the config values
   CyberdynePipeline.clearAllViews(); // drop any existing AlaSQL views before reloading
   //DataLaVistaState.activeTab = (DataLaVistaState.reportMode==='view')?'dataPreview':'design';
@@ -634,6 +636,13 @@ async function loadConfig(cfg) {
     renderFieldsPanel();
     renderAdvancedQB();
     renderAdvOptionsPanel();
+    // Rebuild SQL from QB when the QB tab was active (not the manual SQL tab), or when
+    // the config was migrated from basic QB (cfg.queryMode === 'basic').
+    const _qbWasActive = /** @type {any} */ (DataLaVistaState).qmTab === 'qb' || cfg.queryMode === 'basic';
+    if (!DataLaVistaState.sqlLocked && _qbWasActive && Object.keys(DataLaVistaState.advancedQB.nodes || {}).length) {
+      rebuildAdvancedSQL();
+      renderDesignFieldsPanel();
+    }
     // Re-apply the loaded SQL and restore the active sub-tab (qb/sql/dataPreview)
     if (DataLaVistaState.sql && /** @type {any} */ (window)._cmEditor) /** @type {any} */ (window)._cmEditor.setValue(DataLaVistaState.sql);
     switchQMTab(DataLaVistaState.qmTab || 'qb');

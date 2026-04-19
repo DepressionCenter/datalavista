@@ -318,6 +318,60 @@ function rankSuggestions(rules, cols, meta) {
       secFields.appendChild(row);
     }
     body.appendChild(secFields);
+
+    // ── DATA DICTIONARY (only when QB-populated meta is available) ────────
+    const qcMeta = DataLaVistaState.queryColumnMeta || {};
+    if (Object.keys(qcMeta).length) {
+      const secDict = document.createElement('div');
+      secDict.className = 'qb-section';
+      const dictHdr = document.createElement('div');
+      dictHdr.className = 'qb-section-header';
+      dictHdr.style.cursor = 'pointer';
+      dictHdr.innerHTML = '<span>DATA DICTIONARY</span><span style="font-size:10px;font-weight:400">field lineage</span>';
+      secDict.appendChild(dictHdr);
+
+      const dictBody = document.createElement('div');
+      dictBody.style.cssText = 'padding:4px 8px;font-size:11px';
+
+      for (const col of cols) {
+        const m = qcMeta[col];
+        if (!m) continue;
+        const ti = DataLaVistaCore.FIELD_TYPE_ICONS[m.displayType] || DataLaVistaCore.FIELD_TYPE_ICONS.default;
+        const hasAgg = !!m.agg;
+        const hasSrcLabel = m.sourceDisplayName && m.sourceDisplayName !== col;
+        const hasInternal = m.sourceInternalName && m.sourceInternalName !== m.sourceDisplayName;
+
+        const tipParts = ['Output: ' + col];
+        if (hasAgg) tipParts.push('Aggregate: ' + m.agg);
+        tipParts.push('Source field: ' + m.sourceDisplayName + (hasInternal ? ' [' + m.sourceInternalName + ']' : ''));
+        tipParts.push('View: ' + m.viewName);
+        tipParts.push('Table: ' + m.sourceTableName);
+        if (m.sourceDataSource) tipParts.push('Data source: ' + m.sourceDataSource);
+
+        const row = document.createElement('div');
+        row.style.cssText = 'padding:3px 0;border-bottom:1px solid var(--border);line-height:1.4';
+        row.title = tipParts.join('\n');
+
+        const iconHtml  = '<span class="field-type-icon ' + ti.cls + '" style="font-size:10px">' + ti.icon + '</span>';
+        const aggHtml   = hasAgg
+          ? '<span style="font-size:9px;background:var(--accent);color:#fff;border-radius:3px;padding:0 3px;margin:0 3px">' + m.agg + '</span>'
+          : '';
+        const colHtml   = '<strong>' + col + '</strong>';
+        const srcLine   = hasSrcLabel
+          ? '<div style="color:var(--text-muted);margin-left:16px">&#x2190; ' + m.sourceDisplayName + (hasInternal ? ' <span style="opacity:.7">[' + m.sourceInternalName + ']</span>' : '') + '</div>'
+          : (hasInternal ? '<div style="color:var(--text-muted);margin-left:16px">&#x2190; <span style="opacity:.7">[' + m.sourceInternalName + ']</span></div>' : '');
+        const viewLine  = '<div style="color:var(--text-muted);margin-left:16px">&#x2190; ' + m.viewName + ' / ' + m.sourceTableName + '</div>';
+
+        row.innerHTML = iconHtml + aggHtml + colHtml + srcLine + viewLine;
+        dictBody.appendChild(row);
+      }
+
+      dictHdr.addEventListener('click', () => {
+        dictBody.style.display = dictBody.style.display === 'none' ? '' : 'none';
+      });
+      secDict.appendChild(dictBody);
+      body.appendChild(secDict);
+    }
   }
 
   /** Returns the active dataset for widget rendering.
@@ -609,9 +663,9 @@ function rankSuggestions(rules, cols, meta) {
         const isChartWidget = ['bar', 'line', 'pie', 'scatter'].includes(w.type);
 		el.innerHTML = `<div class="widget-header" style="${titleHdrStyle}"><span class="widget-title" style="${titleSpanStyle}">${w.title || ''}</span>${actions}</div>
   <div class="widget-content${isChartWidget ? ' widget-content-chart' : ''}" id="wcontent-${w.id}">${getWidgetContentHTML(w)}</div><div class="widget-resize-handle"></div>`;
-		// Set hidden via DOM property — safe from SharePoint HTML sanitizer
+		// Use .hidden class (display:none !important) — avoids .widget-header{display:flex} override
 		if (w.showTitle === false) {
-		  el.querySelector('.widget-header').hidden = true;
+		  el.querySelector('.widget-header').classList.add('hidden');
 		}
         el.addEventListener('click', e => { if (!e.target.closest('button')) selectWidget(w.id); });
         // Drop fields from panel onto widget
@@ -2189,7 +2243,7 @@ function _renderBarLineOptionsHTML(w, wid) {
         const titleEl = el.querySelector('.widget-title');
 
         if (prop === 'title' && titleEl) titleEl.textContent = value;
-        if (prop === 'showTitle' && hdr) { hdr.hidden = !value; hdr.style.opacity = value ? '' : '0.3'; }
+        if (prop === 'showTitle' && hdr) hdr.classList.toggle('hidden', !value);
         if (prop === 'widthPct') el.style.width = value + '%';
         if (prop === 'heightVh') { el.style.height = value + 'vh'; if (DataLaVistaState.charts[wid]) DataLaVistaState.charts[wid].resize(); }
         if (prop === 'borderColor') el.style.borderColor = value;

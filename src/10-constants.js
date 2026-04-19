@@ -72,10 +72,10 @@ const DataLaVistaCore = {
   'MATRIX', 'OF', 'STRING', 'NUMBER', 'DATE', 'BOOLEAN', 'OBJECT', 'SEARCH',
   'REPLACE', 'REMOVE', 'RENAME', 'MODIFY', 'REINDEX', 'TRUNCATE', 'BEGIN',
   'COMMIT', 'ROLLBACK', 'TRANSACTION', 'SAVEPOINT', 'RELEASE',
-  'DLV_ARRAY_MATCH', 'DLV_ARRAY_EMPTY', 'DLV_ARRAY_EXPAND', 'DLV_ARRAY_EXTRACT_ELEMENT', 'DLV_ARRAY_INCLUDES', 'COUNT_LOOKUP_VALUES',
-  'DLV_JOIN', 'DLV_LOOKUP', 'DLV_KEYS', 'DLV_DROP', 'DLV_DISPLAY', 'DLV_IDS', 
-  'DLV_EMAIL','DLV_EMAILS', 'DLV_PICTURE_URL','DLV_NORMALIZE_DATE',
-  'DLV_TAX_LABELS','DLV_TAX_IDS','DLV_PARSE_BOOL', 'DLV_PARSE_DATE'
+  'DLV_ARRAY_MATCH', 'DLV_ARRAY_EMPTY', 'DLV_ARRAY_EXTRACT_ELEMENT', 'DLV_ARRAY_INCLUDES', 'COUNT_LOOKUP_VALUES',
+  'DLV_JOIN', 'DLV_LOOKUP', 'DLV_UNNEST_LOOKUP', 'DLV_KEYS', 'DLV_DROP', 'DLV_DISPLAY', 'DLV_IDS',
+  'DLV_EMAIL', 'DLV_EMAILS', 'DLV_PICTURE_URL', 'DLV_NORMALIZE_DATE',
+  'DLV_TAX_LABELS', 'DLV_TAX_IDS', 'DLV_PARSE_BOOL', 'DLV_PARSE_DATE'
 ],
 
 // Base Aggregation Options for Query Builder (reference list; filtering is done in aggsForType())
@@ -261,6 +261,7 @@ const DataLaVistaState = {
   sql: '',
   sqlLocked: false,
   queryColumns: [],
+  queryColumnMeta: {},
   design: {
     title: '',
     showDashboardTitle: true,   // whether the title bar is visible in preview/report mode

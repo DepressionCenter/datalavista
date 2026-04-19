@@ -26,48 +26,135 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
     function setupAlaSQL() {
       if (typeof alasql === 'undefined') return;
 
-      // ── MAXDATE: string-safe MAX for dates and text ──────────────────────────
-      const maxDateAggr = function (v, acc, stage) {
-        if (stage === 1) return v;
-        if (stage === 2) { if (!acc) return v; if (!v) return acc; return String(v) > String(acc) ? v : acc; }
-        return acc;
-      };
-      const maxDateFunc = function (a, b) { if (b === undefined) return a; return String(a) > String(b) ? a : b; };
-      alasql.aggr.MAXDATE = maxDateAggr;
-      alasql.aggr.MAX = maxDateAggr;
-      alasql.fn.MAXDATE = maxDateFunc;
-      alasql.fn.MAX = maxDateFunc;
+      /* OVERRIDES OF ALASQL FUNCTIONS */
 
-      // ── MINDATE: string-safe MIN for dates and text ──────────────────────────
-      const minDateAggr = function (v, acc, stage) {
-        if (stage === 1) return v;
-        if (stage === 2) { if (!acc) return v; if (!v) return acc; return String(v) < String(acc) ? v : acc; }
-        return acc;
-      };
-      const minDateFunc = function (a, b) { if (b === undefined) return a; return String(a) < String(b) ? a : b; };
-      alasql.aggr.MINDATE = minDateAggr;
-      alasql.aggr.MIN = minDateAggr;
-      alasql.fn.MINDATE = minDateFunc;
-      alasql.fn.MIN = minDateFunc;
-
-
-      // ── SUM: coerce strings to numbers ──────────────────────────────────────
-      alasql.aggr.SUM = function (v, acc, stage) {
-        const num = parseFloat(v) || 0;
-        if (stage === 1) return num;
-        if (stage === 2) return (acc || 0) + num;
-        return acc;
+      // ── GREATEST / MAX (scalar) and LEAST / MIN (scalar) ─────────────────────
+      // ANSI SQL: skip NULLs; return NULL only if all arguments are NULL
+      // Fixes incorrect null coercion and unreliable Date comparison in v4.17
+      alasql.stdlib.GREATEST = alasql.stdlib.MAX = function () {
+          var args = Array.prototype.slice.call(arguments);
+          return '(function(){ ' +
+              'var vals = [' + args.join(',') + '].filter(function(x){ return x !== null && typeof x !== "undefined"; }); ' +
+              'if(!vals.length) return undefined; ' +
+              'return vals.reduce(function(a,b){ ' +
+                  'var av = a instanceof Date ? a.getTime() : a; ' +
+                  'var bv = b instanceof Date ? b.getTime() : b; ' +
+                  'return av > bv ? a : b; }); ' +
+          '})()';
       };
 
-      // ── LAST: not in AlaSQL natively (FIRST is, so we leave that alone) ────────
-      if (!alasql.aggr.LAST) {
-        alasql.aggr.LAST = function (v, acc, stage) {
+      alasql.stdlib.LEAST = alasql.stdlib.MIN = function () {
+          var args = Array.prototype.slice.call(arguments);
+          return '(function(){ ' +
+              'var vals = [' + args.join(',') + '].filter(function(x){ return x !== null && typeof x !== "undefined"; }); ' +
+              'if(!vals.length) return undefined; ' +
+              'return vals.reduce(function(a,b){ ' +
+                  'var av = a instanceof Date ? a.getTime() : a; ' +
+                  'var bv = b instanceof Date ? b.getTime() : b; ' +
+                  'return av < bv ? a : b; }); ' +
+          '})()';
+      };
+
+      // ── VAR (sample variance) ─────────────────────────────────────────────────
+      // ANSI SQL VAR_SAMP: return NULL for fewer than 2 non-null values
+      // Fixes incorrect return of 0 in v4.17
+      alasql.aggr.VAR = function (v, s, stage) {
+          if (stage === 1) {
+              return v === null ? {sum: 0, sumSq: 0, count: 0} : {sum: v, sumSq: v * v, count: 1};
+          } else if (stage === 2) {
+              if (v !== null) {
+                  s.sum += v;
+                  s.sumSq += v * v;
+                  s.count++;
+              }
+              return s;
+          } else {
+              if (s.count > 1)
+                  return (s.sumSq - (s.sum * s.sum) / s.count) / (s.count - 1);
+              return undefined;
+          }
+      };
+
+      // ── STDEV (sample standard deviation) ────────────────────────────────────
+      // Removes duplicate definition present in v4.17; inherits VAR fix above
+      alasql.aggr.STDEV = function (v, s, stage) {
+          if (stage === 1 || stage === 2) {
+              return alasql.aggr.VAR(v, s, stage);
+          } else {
+              return Math.sqrt(alasql.aggr.VAR(v, s, stage));
+          }
+      };
+
+      // ── VARP (population variance) ────────────────────────────────────────────
+      // ANSI SQL VAR_POP: skip NULLs; return NULL for empty set
+      // Fixes missing null guards and incorrect return of 0 in v4.17
+      alasql.aggr.VARP = function (value, accumulator, stage) {
+          if (stage === 1) {
+              if (value === null || value === undefined)
+                  return {count: 0, sum: 0, sumSq: 0};
+              return {count: 1, sum: value, sumSq: value * value};
+          } else if (stage === 2) {
+              if (value !== null && value !== undefined) {
+                  accumulator.count++;
+                  accumulator.sum += value;
+                  accumulator.sumSq += value * value;
+              }
+              return accumulator;
+          } else {
+              if (accumulator.count === 0) return undefined;
+              var mean = accumulator.sum / accumulator.count;
+              return accumulator.sumSq / accumulator.count - mean * mean;
+          }
+      };
+
+      // STDEVP, STD, STDDEV delegate to VARP and inherit the fix automatically
+      alasql.aggr.STD =
+          alasql.aggr.STDDEV =
+          alasql.aggr.STDEVP =
+              function (v, s, stage) {
+                  if (stage === 1 || stage === 2) {
+                      return alasql.aggr.VARP(v, s, stage);
+                  } else {
+                      return Math.sqrt(alasql.aggr.VARP(v, s, stage));
+                  }
+              };
+
+      // ── QUART / QUART2 / QUART3 ───────────────────────────────────────────────
+      // ANSI SQL PERCENTILE_CONT: linear interpolation; skip NULLs; return NULL for empty set
+      // Fixes step-function behaviour, wrong formula, and missing null guards in v4.17
+      alasql.aggr.QUART = function (v, s, stage, nth) {
+          if (stage === 1) return (v === null || v === undefined) ? [] : [v];
+          if (stage === 2) { if (v !== null && v !== undefined) s.push(v); return s; }
+          if (!s.length) return undefined;
+          nth = nth || 1;
+          var r = s.slice().sort(function(a, b) { return a - b; });
+          var n = r.length;
+          var h = (nth / 4) * (n - 1);
+          var hf = Math.floor(h);
+          var frac = h - hf;
+          if (frac === 0) return r[hf];
+          return r[hf] + frac * (r[hf + 1] - r[hf]);
+      };
+
+      alasql.aggr.QUART2 = function (v, s, stage) {
+          return alasql.aggr.QUART(v, s, stage, 2);
+      };
+
+      alasql.aggr.QUART3 = function (v, s, stage) {
+          return alasql.aggr.QUART(v, s, stage, 3);
+      };
+
+      // ── LAST ──────────────────────────────────────────────────────────────────
+      // Not available natively in alasql v4.17; only FIRST is available
+      alasql.aggr.LAST = alasql.aggr.LAST || function (v, acc, stage) {
           if (stage === 1) return v;
-          if (stage === 2) return v;   // always overwrite with latest value
+          if (stage === 2) return v;
           return acc;
-        };
       };
 
+      /* ENDS OVERRIDES OF ALASQL FUNCTIONS */
+
+      
       // Return true if elementValue is included in lookupArray,
       // checking a specific property if elementName is provided.
       // If no elementName is given, checks if elementValue matches any Id/ID/id properties.
@@ -150,188 +237,254 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
     };
 
 
-      /**
- * DLV_ARRAY_EXPAND
- * Expands an array-of-objects column into a flat result set.
+/**
+ * DLV_UNNEST_LOOKUP - Table-valued function for AlaSQL v4.17
  *
- * @param {string} tableName  - Table or view name that contains the array or lookup column to expand
- * @param {string} opts       - JSON string with options:
- *   @param {string}   opts.columnToExpand  - (required) Column containing array of objects
- *   @param {string}   [opts.parentId]      - Field to use as primary key of the table that contains the lookup; falls back to Id, ID, key, TableId, or row number
- *   @param {string[]} [opts.elements]      - Child fields from lookup column to include; defaults to Id
- *   @param {boolean}  [opts.skipEmptyArrays=false] - Skip rows with null/empty arrays (false by default, which will return one row with nulls for child fields - left join)
+ * Explodes a multi-select lookup column (array of {Id, Title} objects)
+ * from a source table into a flat junction-style table.
  *
- * Output columns: ParentId, ParentRowNumber, ChildRowNumber, ...(child fields)
+ * Usage in SQL:
+ *   FROM DLV_UNNEST_LOOKUP("DepresCen_EventSummary", "AttendeesData")
  *
- * Minimum usage:
- *   SELECT * FROM DLV_ARRAY_EXPAND("MyTable", '{"columnToExpand":"MyArrayCol"}')
+ * Returns rows with columns:
+ *   _SourceID    — the ID (all caps) of the parent row
+ *   _LookupId    — the Id from each object in the array (or NULL if array is empty)
+ *   _LookupTitle — the Title from each object in the array (or NULL if array is empty)
  *
- * Full usage:
- *   SELECT * FROM DLV_ARRAY_EXPAND("MyTable", '{"columnToExpand":"RecipientData","parentId":"ID","elements":["Title","Id"],"skipEmptyArrays":true}')
+ * Behavior:
+ *   - Parent rows with empty/null/missing arrays emit one row
+ *     with _LookupId = NULL and _LookupTitle = NULL.
+ *     This preserves LEFT JOIN semantics when starting FROM this table.
+ *   - Only reads the ID column and the specified lookup column
+ *     from the source table for memory efficiency.
  */
-alasql.from.DLV_ARRAY_EXPAND = function(tableName, opts, cb, idx, query) {
-    let parentIdField = null, columnToExpand = null, elements = null, skipEmptyArrays = false;
+alasql.from.DLV_UNNEST_LOOKUP = function (tableName, opts, cb, idx, query) {
+    let srcTableName, colName;
 
-    if (typeof opts === 'string') {
-        try {
-            const parsed = JSON.parse(opts);
-            parentIdField   = parsed.parentId       || null;
-            columnToExpand  = parsed.columnToExpand || null;
-            elements        = Array.isArray(parsed.elements) && parsed.elements.length > 0 ? parsed.elements : null;
-            skipEmptyArrays = parsed.skipEmptyArrays === false;
-        } catch(e) {}
+    if (typeof tableName === 'string' && typeof opts === 'string') {
+        srcTableName = tableName;
+        colName = opts;
+    } else if (Array.isArray(tableName)) {
+        srcTableName = tableName[0];
+        colName = tableName[1];
+    } else {
+        throw new Error(
+            'DLV_UNNEST_LOOKUP requires two parameters: table name and column name.\n' +
+            'Usage: FROM DLV_UNNEST_LOOKUP("TableName", "ColumnName")'
+        );
     }
 
-    if (!columnToExpand) {
+    // Only fetch the two columns we need for memory efficiency
+    var sourceData = alasql('SELECT [ID], [' + colName + '] FROM [' + srcTableName + ']');
+
+    if (!sourceData || sourceData.length === 0) {
         if (cb) return cb([], idx, query);
         return [];
     }
 
-    const selectParentIdColumn = 'COALESCE(' + (parentIdField ? parentIdField + ',' : '') + 'Id,ID,key,' + tableName + 'Id) AS ParentId';
-    const whereClause = skipEmptyArrays
-        ? ' WHERE ' + columnToExpand + ' IS NOT NULL AND ' + columnToExpand + '->length > 0'
-        : '';
+    var rows = [];
 
-    const sqlQuery = 'SELECT ' + selectParentIdColumn + ', ROWNUM() AS RowNumber, ' + columnToExpand + ' FROM ' + tableName + whereClause;
-    const data = alasql(sqlQuery);
-    const results = [];
+    for (var i = 0; i < sourceData.length; i++) {
+        var parentId = sourceData[i].ID;
+        var lookupArray = sourceData[i][colName];
 
-    data.forEach(row => {
-        const arr = row[columnToExpand];
-        const parentId = row['ParentId'];
-        const parentRowNumber = row['RowNumber'];
-
-        if (arr && Array.isArray(arr) && arr.length > 0) {
-            Array.prototype.push.apply(results, arr.map((child, i) => {
-                const childData = elements
-                    ? elements.reduce((acc, key) => { acc[key] = child[key]; return acc; }, {})
-                    : { ...child };
-                return { ParentId: parentId, ParentRowNumber: parentRowNumber, ChildRowNumber: i + 1, ...childData };
-            }));
-        } else if (!skipEmptyArrays) {
-            results.push({ ParentId: parentId, ParentRowNumber: parentRowNumber });
+        if (Array.isArray(lookupArray) && lookupArray.length > 0) {
+            for (var j = 0; j < lookupArray.length; j++) {
+                rows.push({
+                    _SourceID: parentId,
+                    _LookupId: lookupArray[j].Id != null ? lookupArray[j].Id : null,
+                    _LookupTitle: lookupArray[j].Title || null
+                });
+            }
+        } else {
+            // Placeholder row preserves parent in LEFT JOIN scenarios
+            rows.push({
+                _SourceID: parentId,
+                _LookupId: null,
+                _LookupTitle: null
+            });
         }
-    });
+    }
 
-    if (cb) return cb(results, idx, query);
-    return results;
+    if (cb) return cb(rows, idx, query);
+    return rows;
+};
+
+
+
+/**
+ * DLV_LOOKUP - Table-valued function for AlaSQL v4.17
+ *
+ * Returns the source table's scalar columns joined with the unnested
+ * multi-select lookup column, producing a flat, query-ready result.
+ *
+ * Usage in SQL:
+ *   FROM DLV_LOOKUP("DepresCen_EventSummary", "AttendeesData")
+ *
+ * Returns one row per lookup entry, with columns:
+ *   _SourceID     — the ID of the source/parent row
+ *   _LookupId     — the Id from each looked-up item (NULL if array was empty)
+ *   _LookupTitle  — the Title from each looked-up item (NULL if array was empty)
+ *   + every scalar column from the source table (excluding the lookup array column itself)
+ *
+ * Join patterns:
+ *
+ *   Direction A — "I have People, I want their Events via AttendeesData":
+ *     FROM DepresCen_People p
+ *     LEFT JOIN DLV_LOOKUP("DepresCen_EventSummary", "AttendeesData") e
+ *       ON e._LookupId = p.ID
+ *
+ *   Direction B — "I have Events, I want their Attendees' details":
+ *     FROM DepresCen_EventSummary e
+ *     LEFT JOIN DLV_LOOKUP("DepresCen_EventSummary", "AttendeesData") a
+ *       ON a._SourceID = e.ID
+ *     LEFT JOIN DepresCen_People p ON p.ID = a._LookupId
+ *
+ *   Direction B simplified (if you only need lookup Id and Title):
+ *     FROM DepresCen_EventSummary e
+ *     LEFT JOIN DLV_LOOKUP("DepresCen_EventSummary", "AttendeesData") a
+ *       ON a._SourceID = e.ID
+ *     -- a._LookupId and a._LookupTitle are already available
+ */
+alasql.from.DLV_LOOKUP = function (tableName, opts, cb, idx, query) {
+    var srcTableName, colName;
+
+    if (typeof tableName === 'string' && typeof opts === 'string') {
+        srcTableName = tableName;
+        colName = opts;
+    } else if (Array.isArray(tableName)) {
+        srcTableName = tableName[0];
+        colName = tableName[1];
+    } else {
+        throw new Error(
+            'DLV_LOOKUP requires two parameters: table name and column name.\n' +
+            'Usage: FROM DLV_LOOKUP("TableName", "LookupColumnName")'
+        );
+    }
+
+    // Fetch all rows but we will selectively copy scalar columns only
+    var sourceData = alasql('SELECT * FROM [' + srcTableName + ']');
+
+    if (!sourceData || sourceData.length === 0) {
+        if (cb) return cb([], idx, query);
+        return [];
+    }
+
+    // Identify scalar column names from the first row, excluding:
+    //   - the lookup column itself (array of objects)
+    //   - any other column whose value is a non-null object/array
+    //     (i.e., other multi-select lookup columns)
+    var firstRow = sourceData[0];
+    var scalarKeys = [];
+    for (var key in firstRow) {
+        if (!firstRow.hasOwnProperty(key)) continue;
+        if (key === colName) continue;
+        var val = firstRow[key];
+        if (val !== null && typeof val === 'object') continue;
+        scalarKeys.push(key);
+    }
+
+    var rows = [];
+
+    for (var i = 0; i < sourceData.length; i++) {
+        var parentRow = sourceData[i];
+        var parentId = parentRow.ID;
+        var lookupArray = parentRow[colName];
+
+        if (Array.isArray(lookupArray) && lookupArray.length > 0) {
+            for (var j = 0; j < lookupArray.length; j++) {
+                var row = {
+                    _SourceID: parentId,
+                    _LookupId: lookupArray[j].Id != null ? lookupArray[j].Id : null,
+                    _LookupTitle: lookupArray[j].Title || null
+                };
+                for (var k = 0; k < scalarKeys.length; k++) {
+                    row[scalarKeys[k]] = parentRow[scalarKeys[k]];
+                }
+                rows.push(row);
+            }
+        } else {
+            var row = {
+                _SourceID: parentId,
+                _LookupId: null,
+                _LookupTitle: null
+            };
+            for (var k = 0; k < scalarKeys.length; k++) {
+                row[scalarKeys[k]] = parentRow[scalarKeys[k]];
+            }
+            rows.push(row);
+        }
+    }
+
+    if (cb) return cb(rows, idx, query);
+    return rows;
 };
 
 
 /**
- * DLV_LOOKUP
- * Expands a local lookup array and joins it against a remote table.
+ * MODE - Aggregate function for AlaSQL v4.17
  *
- * @param {string} localParam  - "LocalTable.LookupColumn"
- * @param {string} joinParam   - "LocalTable.LocalPK = RemoteTable.RemoteKey"
+ * Returns the most frequently occurring non-NULL value in a group.
+ * Ties are broken by returning the smallest value (per ANSI SQL:2023
+ * ISO/IEC 9075-2:2023 inverse distribution function semantics).
+ * NULL inputs are ignored per standard aggregate NULL-handling.
+ * 
+ * Note: There's a subtlety in v4.17: in stage 2,
+ * the accumulator variable name in the function signature
+ * is what carries state. This accounts for that.
  *
- * Output: all remote table columns + {LocalTable}_{LocalPK} for joining back
- *
- * Example:
- *   LEFT JOIN DLV_LOOKUP('EventSummary.AttendeesData', 'EventSummary.ID = People.ID') AS [Attendees]
- *     ON [EventSummary].[ID] = [Attendees].[EventSummary_ID]
+ * Usage in SQL:
+ *   SELECT MODE(column) FROM table GROUP BY ...
  */
-alasql.from.DLV_LOOKUP = function(localParam, joinParam, cb, idx, query) {
-
-  // ── 1. Parse params by splitting on '.' and '=' ───────────────────────────
-  const [localTable,  lookupColumn] = localParam.split('.');
-  const [leftSide,    rightSide]    = joinParam.split('=').map(s => s.trim());
-  const [, localPK]                 = leftSide.split('.');
-  const [remoteTable, remotePK]     = rightSide.split('.');
-
-  if (!localTable || !lookupColumn || !localPK || !remoteTable || !remotePK) {
-    console.error('[DLV_LOOKUP] Could not parse params:', localParam, joinParam);
-    if (cb) return cb([], idx, query);
-    return [];
-  }
-
-  const parentKeyColName = `${localTable}_${localPK}`;
-
-  // ── 2. Get local table rows (PK + lookup array column) ────────────────────
-  // *Data columns are view-only synthetics — never fall back to raw tables.
-  // alasql 4.17+ lazy-compiles a view's .select() on first direct JOIN; pre-warm
-  // both views here so the nested alasql() calls below don't hit that error.
-  const _ensureView = (name) => {
-    try {
-      if (alasql.tables?.[name]?.view && typeof alasql.tables[name].select !== 'function') {
-        alasql(`SELECT * FROM [${name}] LIMIT 1`);
-      }
-    } catch(_) {}
-  };
-
-  let sourceRows;
-  try {
-    _ensureView(localTable);
-    sourceRows = alasql(`SELECT * FROM [${localTable}]`);
-  } catch(e) {
-    console.error('[DLV_LOOKUP] Failed to query local table:', e.message);
-    if (cb) return cb([], idx, query);
-    return [];
-  }
-
-  // ── 3. Get remote table, build Map keyed by remotePK ─────────────────────
-  let remoteRows;
-  try {
-    _ensureView(remoteTable);
-    remoteRows = alasql(`SELECT * FROM [${remoteTable}]`);
-  } catch(e) {
-    console.error('[DLV_LOOKUP] Failed to query remote table:', e.message);
-    if (cb) return cb([], idx, query);
-    return [];
-  }
-
-  // Build lookup map — try exact remotePK field name, then 'Id' as Pascal fallback
-  // e.g. remotePK = 'ID' → also try 'Id'
-  const remoteMap = new Map();
-  for (const row of remoteRows) {
-    const keyVal = row[remotePK] ?? row['Id'] ?? row['ID'] ?? row['id'];
-    if (keyVal != null) {
-      if (!remoteMap.has(keyVal)) remoteMap.set(keyVal, []);
-      remoteMap.get(keyVal).push(row);
-    }
-  }
-
-  // ── 4. Expand array + join ────────────────────────────────────────────────
-  const results = [];
-
-  for (const sourceRow of sourceRows) {
-    const parentId = sourceRow[localPK] ?? sourceRow['Id'] ?? sourceRow['ID'];
-    const arr      = sourceRow[lookupColumn];
-
-    if (!arr || !Array.isArray(arr) || arr.length === 0) {
-      // LEFT JOIN semantics: keep parent, nulls for remote columns
-      results.push({ [parentKeyColName]: parentId });
-      continue;
-    }
-
-    for (const element of arr) {
-      // Array element e.g. { Id: 5, Title: 'John Smith' }
-      // Extract the key that points to the remote table PK
-      const elementKeyVal = element[remotePK] ?? element['Id'] ?? element['ID'] ?? element['id'];
-
-      if (elementKeyVal == null) {
-        results.push({ [parentKeyColName]: parentId });
-        continue;
-      }
-
-      const matched = remoteMap.get(elementKeyVal);
-      if (!matched || matched.length === 0) {
-        // No remote match — LEFT JOIN: emit with nulls
-        results.push({ [parentKeyColName]: parentId });
-      } else {
-        for (const remoteRow of matched) {
-          results.push({
-            ...remoteRow,                  // all remote table columns
-            [parentKeyColName]: parentId   // parent PK tag — last so it can't be clobbered
-          });
+alasql.aggr.MODE = function (value, accumulator, stage) {
+    if (stage === 1) {
+        var acc = { counts: Object.create(null), values: [] };
+        if (value != null) {
+            var key = String(value);
+            acc.counts[key] = 1;
+            acc.values.push(value);
         }
-      }
-    }
-  }
+        return acc;
+    } else if (stage === 2) {
+        if (value != null) {
+            var key = String(value);
+            if (accumulator.counts[key] == null) {
+                accumulator.counts[key] = 1;
+                accumulator.values.push(value);
+            } else {
+                accumulator.counts[key]++;
+            }
+        }
+        return accumulator;
+    } else if (stage === 3) {
+        var counts = accumulator.counts;
+        var values = accumulator.values;
+        var maxCount = 0;
+        var candidates = [];
 
-  if (cb) return cb(results, idx, query);
-  return results;
+        for (var i = 0; i < values.length; i++) {
+            var key = String(values[i]);
+            var count = counts[key];
+            if (count > maxCount) {
+                maxCount = count;
+                candidates = [values[i]];
+            } else if (count === maxCount) {
+                candidates.push(values[i]);
+            }
+        }
+
+        if (candidates.length === 0) return null;
+        if (candidates.length === 1) return candidates[0];
+
+        candidates.sort(function (a, b) {
+            if (a < b) return -1;
+            if (a > b) return 1;
+            return 0;
+        });
+        return candidates[0];
+    }
 };
+
 
 
 /**
@@ -745,15 +898,6 @@ alasql.from.DLV_ARRAY_EXTRACT_ELEMENT = function(tableName, opts, cb, idx, query
         if (sorted.length % 2 === 0 && allNum)
           return (Number(sorted[mid - 1]) + Number(sorted[mid])) / 2;
         return sorted[mid];
-      };
-
-      // ── MODE: most frequently occurring value ────────────────────────────────
-      alasql.aggr.MODE = function(v, s, stage) {
-        if (stage === 1) { s = {}; if (v != null) { const k = String(v); s[k] = 1; } return s; }
-        if (stage === 2 && v != null) { const k = String(v); s[k] = (s[k] || 0) + 1; return s; }
-        const entries = Object.entries(s || {});
-        if (!entries.length) return null;
-        return entries.reduce((best, cur) => cur[1] > best[1] ? cur : best, entries[0])[0];
       };
 
       // ── CV: coefficient of variation (population) ────────────────────────────

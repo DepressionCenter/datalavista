@@ -213,6 +213,20 @@ async function doConnect() {
   
     progText.textContent = 'Loading dashboard...';
     await loadConfig(parsed);
+    // If loaded from a URL, pre-fill reportUrl and show the published URL (same as ?report= param loading)
+    if (configUrl) {
+      DataLaVistaState.reportUrl = configUrl;
+      const configUrlEl = document.getElementById('config-url');
+      if (configUrlEl) configUrlEl.value = configUrl;
+      if (DataLaVistaState.isSpSite && DataLaVistaState.spSiteUrl) {
+        const spBase = DataLaVistaState.spSiteUrl.substring(0, DataLaVistaState.spSiteUrl.lastIndexOf('/') + 1);
+        if (spBase && configUrl.startsWith(spBase)) {
+          const dlvUrl = new URL(window.location.href);
+          const publishedUrl = dlvUrl.origin + dlvUrl.pathname + '?report=' + encodeURIComponent(configUrl);
+          _showPublishResult(publishedUrl);
+        }
+      }
+    }
 }
 
     // Post successful connection popup cleanup and UI updates

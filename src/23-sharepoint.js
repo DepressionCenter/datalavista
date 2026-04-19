@@ -24,12 +24,17 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
     // SHAREPOINT REST API ADAPTER
     // ============================================================
     // Rule 1: Use application/json instead of verbose
-    async function spFetch(url, dsName) {
+    async function spFetch(url, dsName, _throttleRetries = 5) {
       const headers = { 'Accept': 'application/json' };
       if (DataLaVistaState.dataSources[dsName] && DataLaVistaState.dataSources[dsName].auth === 'token' && DataLaVistaState.dataSources[dsName].token) {
         headers['Authorization'] = 'Bearer ' + DataLaVistaState.dataSources[dsName].token;
       }
       const res = await fetch(url, { headers, credentials: 'include' });
+      if (res.status === 429 && _throttleRetries > 0) {
+        const retryAfter = Math.max(parseInt(res.headers.get('Retry-After') || '10', 10), 2);
+        await new Promise(r => setTimeout(r, retryAfter * 1000));
+        return spFetch(url, dsName, _throttleRetries - 1);
+      }
       if (!res.ok) {
         // Will be caught by the retry logic later
         const errorText = await res.text();

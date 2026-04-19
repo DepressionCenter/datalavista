@@ -117,14 +117,19 @@ validateAliasUniqueness(fields) {
             // ── Fix 1: warn and rename instead of silently dropping ──────────
             let alias = vc.alias;
             if (seenAliases.has(alias)) {
+              const pascalInternal = toPascalCase(vc.internalName) || vc.internalName;
+              if (pascalInternal && pascalInternal !== alias && !seenAliases.has(pascalInternal)) {
+                alias = pascalInternal;
+              } else {
+                let counter = 2;
+                while (seenAliases.has(alias + '_' + counter)) counter++;
+                alias = alias + '_' + counter;
+              }
               console.warn(
-                `[CyberdynePipeline] _applyViewSQL: Duplicate alias "${alias}" in view "${viewName}"` +
+                `[CyberdynePipeline] _applyViewSQL: Duplicate alias "${vc.alias}" in view "${viewName}"` +
                 ` (internalName: "${vc.internalName}", parentField: "${vc.parentField}").` +
-                ` Suffixing to avoid silent data loss.`
+                ` Resolved to "${alias}" to avoid silent data loss.`
               );
-              let counter = 2;
-              while (seenAliases.has(alias + '_' + counter)) counter++;
-              alias = alias + '_' + counter;
             }
             seenAliases.add(alias);
             // Shallow-clone vc only if the alias actually changed, to avoid
