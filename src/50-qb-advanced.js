@@ -585,6 +585,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         // so subsequent rels get a fresh sibling node instead.
         const usedNewNodeForParent = new Set(); // childTableKey already handled via newNodeId as parent
         const usedNewNodeForChild  = new Set(); // childField already handled via newNodeId as child
+        let _sibParentCount = 0;
+        let _sibChildCount  = 0;
 
         for (const rel of rels) {
           let fromNodeId, toNodeId, fromKey, toKey, joinType;
@@ -626,9 +628,10 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
                 DataLaVistaState.advancedQB.nodeAliases[newNodeId] = firstAlias;
               }
             } else {
+              _sibParentCount++;
               const nd0 = DataLaVistaState.advancedQB.nodes[newNodeId];
               const siblingAlias = deriveSPAlias(rel.childTableKey, rel.childField);
-              toNodeId = addAdvNode(newTableName, (nd0?.x ?? 0) + 200, (nd0?.y ?? 0), undefined, siblingAlias, true);
+              toNodeId = addAdvNode(newTableName, (nd0?.x ?? 0) + 200 + _sibParentCount * 20, (nd0?.y ?? 0) + _sibParentCount * 100, undefined, siblingAlias, true);
             }
             if (joinType === 'DLV_LOOKUP') {
               const secNd = DataLaVistaState.advancedQB.nodes[toNodeId];
@@ -637,6 +640,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
                 for (const f of secNd.selectedFields || []) {
                   if (!secNd.fieldAggs[f]) secNd.fieldAggs[f] = 'COUNT';
                 }
+                updateAdvNodePills(toNodeId);
               }
             }
           } else if (rel.childTableKey === newTableName && existingTableToNodes[rel.parentTableKey]) {
@@ -671,6 +675,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
                 for (const f of secNd.selectedFields || []) {
                   if (!secNd.fieldAggs[f]) secNd.fieldAggs[f] = 'COUNT';
                 }
+                updateAdvNodePills(fromNodeId);
               }
               const preAlreadyJoined = DataLaVistaState.advancedQB.joins.some(j =>
                 j.fromNode === fromNodeId && j.toNode === toNodeId);
@@ -884,9 +889,10 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           'RIGHT':    { l:'none',                       r:'rgba(0,120,212,.45)',         mid:'rgba(0,120,212,.75)' },
           'CROSS':    { l:'rgba(0,120,212,.3)',          r:'rgba(0,120,212,.3)',          mid:'rgba(0,120,212,.55)' },
           'UNION':    { l:'rgba(0,120,212,.5)',          r:'rgba(0,120,212,.5)',          mid:'rgba(0,120,212,.25)' },
-          'UNION ALL':{ l:'rgba(0,120,212,.5)',          r:'rgba(0,120,212,.5)',          mid:'rgba(0,120,212,.5)' }
+          'UNION ALL':{ l:'rgba(0,120,212,.5)',          r:'rgba(0,120,212,.5)',          mid:'rgba(0,120,212,.5)' },
+          'DLV_LOOKUP':{ l:'rgba(0,120,212,.45)',        r:'none',                       mid:'rgba(0,120,212,.75)' }
         };
-        const c = cfgs[type] || cfgs['INNER'];
+        const c = (/** @type {any} */ (cfgs))[type] || cfgs['INNER'];
         return `<svg width="${size}" height="${size}" xmlns="http://www.w3.org/2000/svg" style="display:block">
           <defs><clipPath id="${uid}"><circle cx="${cx2}" cy="${cy}" r="${r}"/></clipPath></defs>
           <circle cx="${cx1}" cy="${cy}" r="${r}" fill="${c.l}" stroke="#0078d4" stroke-width="1.5"/>
@@ -1331,8 +1337,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
             { val: 'RIGHT',    label: 'Right Join',          desc: 'ℹ️ Everything on the right, only matching rows on the left' },
             { val: 'CROSS',    label: 'Cross Join',          desc: 'ℹ️ Combine tables, repeating all rows in 2nd table for every row in 1st table' },
             { val: 'UNION',    label: 'Union',               desc: 'ℹ️ Combine tables, removing duplicate rows' },
-            { val: 'UNION ALL',label: 'Union All',           desc: 'ℹ️ Combine tables, keeping duplicate rows' }
-            // DLV_LOOKUP removed: multi-select lookups are now handled via field-level expansion (▶ in the Fields list)
+            { val: 'UNION ALL',label: 'Union All',           desc: 'ℹ️ Combine tables, keeping duplicate rows' },
+            { val: 'DLV_LOOKUP',label: 'Lookup Join',        desc: 'ℹ️ Everything on the left, only matching rows from the SP lookup on the right.' }
           ];
 
           const augmentFields = (t, tableKey) => {
@@ -1348,8 +1354,15 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           };
           const fromFields = augmentFields(fromT, fromND?.tableName);
           const toFields   = augmentFields(toT,   toND?.tableName);
-          const makeFromOpts = (selectedKey) => fromFields.map(f => `<option value="${f.alias}" ${f.alias === selectedKey ? 'selected' : ''}>${f.alias}${f.isAutoId ? ' [auto]' : ''}</option>`).join('');
-          const makeToOpts   = (selectedKey) => toFields.map(f => `<option value="${f.alias}" ${f.alias === selectedKey ? 'selected' : ''}>${f.alias}${f.isAutoId ? ' [auto]' : ''}</option>`).join('');
+          const isLookupJoin = j.type === 'DLV_LOOKUP';
+          const filteredFromFields = isLookupJoin
+            ? fromFields.filter(f => f.displayType === 'lookup' || f.displayType === 'lookup-multi' || f.displayType === 'array' || (f.alias || '').endsWith('Data'))
+            : fromFields;
+          const filteredToFields = isLookupJoin
+            ? toFields.filter(f => f.isAutoId || f.displayType === 'number' || f.displayType === 'text')
+            : toFields;
+          const makeFromOpts = (selectedKey) => filteredFromFields.map(f => `<option value="${f.alias}" ${f.alias === selectedKey ? 'selected' : ''}>${f.alias}${f.isAutoId ? ' [auto]' : ''}</option>`).join('');
+          const makeToOpts   = (selectedKey) => filteredToFields.map(f => `<option value="${f.alias}" ${f.alias === selectedKey ? 'selected' : ''}>${f.alias}${f.isAutoId ? ' [auto]' : ''}</option>`).join('');
 
           const keyPairRows = j.keys.map((kp, ki) => `
             <div class="adv-join-key-row" style="display:grid;grid-template-columns:1fr auto 1fr auto;gap:4px;align-items:center;margin-bottom:4px">
@@ -1381,11 +1394,17 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
               <input type="text" class="form-input" style="height:26px" value="${toAlias}"
                 oninput="if(DataLaVistaState.advancedQB.nodes['${j.toNode}']) { DataLaVistaState.advancedQB.nodes['${j.toNode}'].alias=this.value; if(DataLaVistaState.advancedQB.nodeAliases?.['${j.toNode}']!==undefined) DataLaVistaState.advancedQB.nodeAliases['${j.toNode}']=this.value; rebuildAdvancedSQL(); }"/>
             </div>
-            <div class="adv-node-section-hdr" style="margin-bottom:6px">KEY FIELDS (AND)</div>
+            <div class="adv-node-section-hdr" style="margin-bottom:6px">KEY FIELDS
+            ${isLookupJoin ? '' : `<span class="qb-badge" style="font-size:10px;padding:2px 8px;cursor:pointer;margin-left:4px"
+              data-opts="${_attrEnc(JSON.stringify([{val:'AND',label:'AND'},{val:'OR',label:'OR'}]))}"
+              data-cur="${_attrEnc(j.keysConj || 'AND')}"
+              data-js="${_attrEnc("setActiveJoinProp('keysConj',__V__)")}"
+              onclick="showPropPopup(this)">${j.keysConj || 'AND'}</span>`}
+          </div>
             <div id="adv-join-key-pairs">
               ${keyPairRows}
             </div>
-            <button class="btn btn-sm" style="width:100%;margin-bottom:10px;font-size:12px" onclick="addActiveJoinKey()">+ Add Key Pair</button>
+            ${isLookupJoin ? '' : `<button class="btn btn-sm" style="width:100%;margin-bottom:10px;font-size:12px" onclick="addActiveJoinKey()">+ Add Key Pair</button>`}
             <div class="form-group" style="margin-top:4px">
               <label>Join Type</label>
               <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
@@ -1411,7 +1430,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           if (!nd) return;
           const t = DataLaVistaState.tables[nd.tableName];
           if (!t) return;
-          const fields = t.fields.filter(f => !f.isAutoId && !f.isLookupRaw && !f.isSynthetic);
+          const fields = t.fields.filter(f => !f.isAutoId && !f.isLookupRaw && !f.isSynthetic).sort((/** @type {any} */ a, /** @type {any} */ b) => (a.alias || '').localeCompare(b.alias || ''));
 
           // Ensure state arrays / maps exist on older nodes (loaded from saved config)
           if (!nd.conditions)       nd.conditions = [];
@@ -1559,14 +1578,18 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           setTitle(nd.alias || nd.tableName);
           body.innerHTML = primaryHTML + `
             <div class="adv-node-section">
-              <div class="adv-node-section-hdr"><span>FIELDS</span></div>
+              <div class="adv-node-section-hdr"><span>FIELDS</span>
+                <div style="display:flex;gap:4px">
+                  <button class="btn btn-ghost btn-sm" onclick="advNodeClearFields('${id}')">- Clear all</button>
+                  <button class="btn btn-ghost btn-sm" onclick="advNodeAddAllFields('${id}')">+ Add all</button>
+                </div>
+              </div>
               <div id="adv-node-fields">${renderFieldsSection()}</div>
             </div>
             <div class="adv-node-section">
               <div class="adv-node-section-hdr">
                 <span>FILTER CONDITIONS</span>
                 <button class="btn btn-ghost btn-sm" onclick="advNodeAddCond('${id}')">+ Add</button>
-                ${nd.conditions.length > 1 ? '<button class="btn btn-ghost btn-sm" style="color:var(--text-disabled)" onclick="advNodeClearAllConds(\'' + id + '\')">Clear all</button>' : ''}
               </div>
               <div id="adv-node-conds" class="adv-drop-zone">${renderNodeConditions()}</div>
             </div>
@@ -1713,6 +1736,27 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         const nd = DataLaVistaState.advancedQB.nodes[nodeId];
         if (!nd) return;
         nd.groupBy.splice(idx, 1);
+        rebuildAdvancedSQL();
+        renderAdvOptionsPanel('node', nodeId);
+      }
+      /** @param {string} nodeId */
+      function advNodeClearFields(nodeId) {
+        const nd = (/** @type {any} */ (DataLaVistaState.advancedQB.nodes))[nodeId];
+        if (!nd) return;
+        nd.selectedFields = [];
+        nd.fieldAggs = {};
+        updateAdvNodePills(nodeId);
+        rebuildAdvancedSQL();
+        renderAdvOptionsPanel('node', nodeId);
+      }
+      /** @param {string} nodeId */
+      function advNodeAddAllFields(nodeId) {
+        const nd = (/** @type {any} */ (DataLaVistaState.advancedQB.nodes))[nodeId];
+        if (!nd) return;
+        const t = (/** @type {any} */ (DataLaVistaState.tables))[nd.tableName];
+        const allAliases = ((t?.fields || []) /** @type {any[]} */ ).filter((/** @type {any} */ f) => !f.isAutoId && !f.isLookupRaw && !f.isSynthetic).map((/** @type {any} */ f) => f.alias);
+        nd.selectedFields = allAliases;
+        updateAdvNodePills(nodeId);
         rebuildAdvancedSQL();
         renderAdvOptionsPanel('node', nodeId);
       }
@@ -1943,7 +1987,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           badge.className = 'join-venn-badge';
           badge.draggable = true;
           badge.title = 'Drag to Clear to remove join • Click to edit';
-          badge.innerHTML = getVennSVG(j.type, 32) + `<span class="join-venn-label">${j.type}</span>`;
+          const _badgeLabel = j.type === 'DLV_LOOKUP' ? 'LOOKUP' : j.type;
+          badge.innerHTML = getVennSVG(j.type, 32) + `<span class="join-venn-label">${_badgeLabel}</span>`;
 
           const jCapture = j;
           badge.addEventListener('click', e => { e.stopPropagation(); selectJoin(jCapture, from, to); });
@@ -2448,7 +2493,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
             const parentField = t?.fields?.find(f => f.alias === parentAlias);
             if (!parentField) continue;
 
-            if (parentField.displayType === 'lookup') {
+            if (parentField.displayType === 'lookup' || parentField.displayType === 'lookup-multi') {
               const remoteView = _getRemoteViewForLookup(nd.tableName, parentAlias);
               if (!remoteView) continue;
               const subAlias = '_dlv_' + parentAlias;
@@ -2598,7 +2643,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
                    + ` ON [${dlvAlias}].[_SourceID] = [${childAlias}].[${localPK}]`;
             }
           } else {
-            const onClauses = j.keys.map(kp => `[${fromAlias}].[${kp.fromKey}] = [${toAlias}].[${kp.toKey}]`).join(' AND ');
+            const _keysConj = j.keysConj === 'OR' ? ' OR ' : ' AND ';
+            const onClauses = j.keys.map(kp => `[${fromAlias}].[${kp.fromKey}] = [${toAlias}].[${kp.toKey}]`).join(_keysConj);
             sql += `\n${j.type} JOIN ${fromFrag(newNodeId, newNd)} ON ${onClauses}`;
           }
         }

@@ -115,13 +115,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           }
         }
 
-        console.log('DEBUG: Preprocessing SQL...');
         const processedSQL = preprocessSQL(sql);
-        console.log('DEBUG: ' + new Date().toLocaleString() + ': Processed SQL ready for execution:', processedSQL);
-
-        console.log('DEBUG: *** Executing SQL in AlaSQL... ***');
         const results = alasql(processedSQL);
-        console.log('DEBUG: ' + new Date().toLocaleString() + ': ***AlaSQL execution completed.*** # results:', results.length);
         if (!Array.isArray(results)) throw new Error('Query returned no results');
 
         console.log('DEBUG: Materializing results into [dlv_results] and [dlv_active]...');

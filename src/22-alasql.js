@@ -31,6 +31,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       // ── GREATEST / MAX (scalar) and LEAST / MIN (scalar) ─────────────────────
       // ANSI SQL: skip NULLs; return NULL only if all arguments are NULL
       // Fixes incorrect null coercion and unreliable Date comparison in v4.17
+      // Here for completness but these cannot be applied dynamically, only on compilation
       alasql.stdlib.GREATEST = alasql.stdlib.MAX = function () {
           var args = Array.prototype.slice.call(arguments);
           return '(function(){ ' +
@@ -54,6 +55,43 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
                   'return av < bv ? a : b; }); ' +
           '})()';
       };
+
+      alasql.aggr.DLV_MIN = function(v, acc, stage) {
+  if (stage === 1) return v;
+  if (stage === 2) {
+    if (acc == null) return v; if (v == null) return acc;
+    var vv = v   instanceof Date ? v.getTime()   : v;
+    var av = acc instanceof Date ? acc.getTime() : acc;
+    if (typeof vv === 'number' && typeof av === 'number') return vv < av ? v : acc;
+    return String(v) < String(acc) ? v : acc;
+  }
+  return acc;
+};
+alasql.aggr.DLV_MAX = function(v, acc, stage) {
+  if (stage === 1) return v;
+  if (stage === 2) {
+    if (acc == null) return v; if (v == null) return acc;
+    var vv = v   instanceof Date ? v.getTime()   : v;
+    var av = acc instanceof Date ? acc.getTime() : acc;
+    if (typeof vv === 'number' && typeof av === 'number') return vv > av ? v : acc;
+    return String(v) > String(acc) ? v : acc;
+  }
+  return acc;
+};
+alasql.fn.DLV_MIN = function(a, b) {
+  if (a == null) return b; if (b == null) return a;
+  var av = a instanceof Date ? a.getTime() : a;
+  var bv = b instanceof Date ? b.getTime() : b;
+  if (typeof av === 'number' && typeof bv === 'number') return av < bv ? a : b;
+  return String(a) < String(b) ? a : b;
+};
+alasql.fn.DLV_MAX = function(a, b) {
+  if (a == null) return b; if (b == null) return a;
+  var av = a instanceof Date ? a.getTime() : a;
+  var bv = b instanceof Date ? b.getTime() : b;
+  if (typeof av === 'number' && typeof bv === 'number') return av > bv ? a : b;
+  return String(a) > String(b) ? a : b;
+};
 
       // ── VAR (sample variance) ─────────────────────────────────────────────────
       // ANSI SQL VAR_SAMP: return NULL for fewer than 2 non-null values
@@ -1009,6 +1047,12 @@ alasql.from.DLV_ARRAY_EXTRACT_ELEMENT = function(tableName, opts, cb, idx, query
      * two joined tables share a field name like "Title".
      */
     function preprocessSQL(sql) {
+      // Rewrite MIN/MAX → DLV_MIN/DLV_MAX so string-safe aggregates are used.
+      // Word boundary prevents double-rewriting DLV_MIN/DLV_MAX.
+      // Applied globally so subqueries (DLV_LOOKUP rollup, etc.) are also covered.
+      // TODO: Remove this once mainstream alasql fixes MIN/MAX issues.
+      sql = sql.replace(/\bMIN\s*\(/gi, 'DLV_MIN(').replace(/\bMAX\s*\(/gi, 'DLV_MAX(');
+      
       // Only process plain SELECT statements
       // TODO: Why this restriction? Can we safely handle more complex queries (e.g. with CTEs, subqueries, unions) by applying this logic to each SELECT clause?
       const selectRe = /^(\s*SELECT\s+)([\s\S]+?)(\s+FROM\b)/i;

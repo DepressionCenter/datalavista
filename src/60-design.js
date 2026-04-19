@@ -933,7 +933,7 @@ function rankSuggestions(rules, cols, meta) {
         if (!conditions.length && !sorts.length && !anyAgg) {
           if (!needsDistinct) return base;
           try {
-            const rd = fromSrc ? alasql(sql) : alasql(sql, [base]);
+            const rd = fromSrc ? alasql(preprocessSQL(sql)) : alasql(preprocessSQL(sql), [base]);
             return Array.isArray(rd) ? rd : base;
           } catch (e) {
             console.warn('buildWidgetData DISTINCT error:', e.message);
@@ -942,7 +942,7 @@ function rankSuggestions(rules, cols, meta) {
         }
 
         try {
-          const result = fromSrc ? alasql(sql) : alasql(sql, [base]);
+          const result = fromSrc ? alasql(preprocessSQL(sql)) : alasql(preprocessSQL(sql), [base]);
           return Array.isArray(result) ? result : base;
         } catch (e) {
           console.warn('buildWidgetData error:', e.message, '|', sql);
