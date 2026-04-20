@@ -180,7 +180,6 @@ validateAliasUniqueness(fields) {
       if (cols.length === 0) return; // Nothing to select yet (lazy SP list)
       try { alasql(`DROP VIEW IF EXISTS [${viewName}]`); } catch (_) {}
       try {
-        console.log(`[CyberdynePipeline] Creating view cyberdyne-views.js Line 142 ${viewName} with columns:`, cols);
         alasql(`CREATE VIEW [${viewName}] AS SELECT ${cols.join(', ')} FROM ${rawTableRef}`);
       } catch (e) { console.warn(`[CyberdynePipeline] Failed to create view ${viewName}:`, e.message); }
     },

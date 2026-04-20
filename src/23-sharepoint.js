@@ -458,10 +458,28 @@ async function fetchTableData(tableName, fetchAll = false) {
         const spSiteUrl = t.url || t.siteUrl || (DataLaVistaState.dataSources[t.dataSource] && DataLaVistaState.dataSources[t.dataSource].siteUrl);
         const baseSelect = new Set(['ID', 'Title', 'Created', 'Modified', 'Author/Id', 'Author/Title', 'Author/Name', 'Editor/Id', 'Editor/Title', 'Editor/Name']);
         const baseExpand = new Set(['Author', 'Editor']);
-        
+
+        // Column pruning: skip fields with no presence in the SQL text (view mode, full fetch only).
+        // Safe because any used field must appear by name somewhere in the SQL.
+        // Skip if SQL contains any wildcard selector (SELECT *, t.*, [View].*).
+        let _pruneSql = null;
+        if (fetchAll && DataLaVistaState.reportMode === 'view') {
+          const _rawSql = (DataLaVistaState.sql || '').trim();
+          if (_rawSql && !/\.\*|\bSELECT\s*\*/i.test(_rawSql)) {
+            _pruneSql = _rawSql.toUpperCase();
+          }
+        }
+
         spFields.forEach(f => {
           const internalName = f.InternalName || f.internalName;
-          if (f.isAutoId || !internalName) return; 
+          if (f.isAutoId || !internalName) return;
+
+          // Skip field if neither its alias nor internalName appears anywhere in the SQL
+          if (_pruneSql) {
+            const aliasUp    = (f.alias    || internalName).toUpperCase();
+            const internalUp = internalName.toUpperCase();
+            if (!_pruneSql.includes(aliasUp) && !_pruneSql.includes(internalUp)) return;
+          }
           
           const typeStr = (f.TypeAsString || f.type || '').toLowerCase();
           const isPeople = typeStr.includes('user');
@@ -483,7 +501,7 @@ async function fetchTableData(tableName, fetchAll = false) {
             baseSelect.add(internalName);
           }
         });
-        
+
         rawData = await fetchSPItemsWithRetry(
           spSiteUrl,
           t.guid,

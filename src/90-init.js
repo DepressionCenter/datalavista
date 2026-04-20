@@ -181,7 +181,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
     DataLaVistaState.spSiteUrl = getSpSiteUrl() || ''; // Store in state for global access and reactivity; default to empty string if not detected
     if(DataLaVistaState.spSiteUrl) {
       DataLaVistaState.isSpSite = true;
-      console.log('Detected SharePoint environment. Site URL: ' + DataLaVistaState.spSiteUrl);
     }
 
     // If running inside SharePoint, check if the page is in edit mode

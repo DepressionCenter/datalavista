@@ -24,7 +24,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       // RUN QUERY
       // ============================================================
       async function runQuery() {
-        console.log('DEBUG: ' + Date.now() + ': Entered runQuery()');
         const sql = window._cmEditor ? window._cmEditor.getValue() : DataLaVistaState.sql;
         if (!sql.trim() && DataLaVistaState.reportMode !== 'view') { toast('Please enter a SQL query', 'error'); return; }
         DataLaVistaState.sql = sql;
@@ -39,21 +38,15 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         hideUseInDesign();
 
         try {
-          console.log('DEBUG: ' + Date.now() + ': Awaiting _executeQuery()...');
           const results = await _executeQuery(sql);
-          console.log('DEBUG: ' + Date.now() + ': _executeQuery() completed with # results:', results.length);
           // Evict autosuggest cache for dlv_results/dlv_active — columns may have changed
-          console.log('DEBUG: ' + Date.now() + ': Calling _dlvAcEvict("|") to clear autosuggest cache for dlv_results/dlv_active');
           _dlvAcEvict('|');
-          console.log('DEBUG: ' + Date.now() + ': Calling showQueryPreview()...');
           showQueryPreview(results);
-          console.log('DEBUG: ' + Date.now() + ': Calling renderDesignFieldsPanel()...');
           renderDesignFieldsPanel();
           if (DataLaVistaState.reportMode !== 'view') showUseInDesign();
           setStatus(`Query returned ${results.length} rows`, 'success');
           toast(`Query returned ${results.length} rows`, 'success');
         } catch (err) {
-          console.log('DEBUG: ' + Date.now() + ': Error occurred while executing query:', err);
           console.error(err);
           toast('Query error: ' + err.message, 'error');
           setStatus('Query error: ' + err.message, 'error');
@@ -65,12 +58,9 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       // Loads table data, registers AlaSQL tables/views, runs the SQL, and materializes
       // results into [dlv_results] / [dlv_active]. Returns the result rows array.
       async function _executeQuery(sql) {
-        console.log('DEBUG: ' + new Date().toLocaleString() + ': Entered _executeQuery()');
         const referencedTables = findReferencedTables(sql);
-        console.log('DEBUG: ' + new Date().toLocaleString() + ': findReferencedTables() found referenced tables:', referencedTables);
 
         for (const tname of referencedTables) {
-          console.log('DEBUG: ' + new Date().toLocaleString() + ': Ensuring data for referenced table:', tname);
           await ensureTableData(tname, true);
         }
 
@@ -78,7 +68,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           const t = DataLaVistaState.tables[tname];
           if (!t || !t.data || !t.data.length) continue;
 
-          console.log('DEBUG: ' + new Date().toLocaleString() + ': Registering table in AlaSQL:', tname);
           registerTableInAlaSQL(tname);
 
           const viewName = t.viewName || CyberdynePipeline.getViewForTable(tname);
@@ -86,7 +75,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
             // Only call updateViewSQL if the AlaSQL view object is missing — avoids errors
             // after loadConfig() which resets the metadata registry but not AlaSQL view objects.
             const alasqlViewExists = !!(alasql.tables?.[viewName]?.view);
-            console.log('DEBUG: ' + new Date().toLocaleString() + ': Checking if AlaSQL view exists for', viewName, ':', alasqlViewExists);
             if (!alasqlViewExists) {
               try { CyberdynePipeline.updateViewSQL(viewName); }
               catch (e) {
@@ -119,7 +107,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         const results = alasql(processedSQL);
         if (!Array.isArray(results)) throw new Error('Query returned no results');
 
-        console.log('DEBUG: Materializing results into [dlv_results] and [dlv_active]...');
         // TODO: Instead of dropping/recreating tables/views on every query, could we ALTER TABLE? ALTER VIEW is not supported by alasql.
         alasql('DROP VIEW  IF EXISTS [dlv_active]');
         alasql('DROP TABLE IF EXISTS [dlv_results]'); alasql('CREATE TABLE [dlv_results]');

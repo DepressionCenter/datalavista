@@ -6261,6 +6261,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
     // SHAREPOINT REST API ADAPTER
     // ============================================================
     // Rule 1: Use application/json instead of verbose
+    // All SharePoint fetches use direct fetch() — never routed through external CORS proxies.
     async function spFetch(url, dsName, _throttleRetries = 5) {
       const headers = { 'Accept': 'application/json' };
       if (DataLaVistaState.dataSources[dsName] && DataLaVistaState.dataSources[dsName].auth === 'token' && DataLaVistaState.dataSources[dsName].token) {
@@ -6694,10 +6695,28 @@ async function fetchTableData(tableName, fetchAll = false) {
         const spSiteUrl = t.url || t.siteUrl || (DataLaVistaState.dataSources[t.dataSource] && DataLaVistaState.dataSources[t.dataSource].siteUrl);
         const baseSelect = new Set(['ID', 'Title', 'Created', 'Modified', 'Author/Id', 'Author/Title', 'Author/Name', 'Editor/Id', 'Editor/Title', 'Editor/Name']);
         const baseExpand = new Set(['Author', 'Editor']);
-        
+
+        // Column pruning: skip fields with no presence in the SQL text (view mode, full fetch only).
+        // Safe because any used field must appear by name somewhere in the SQL.
+        // Skip if SQL contains any wildcard selector (SELECT *, t.*, [View].*).
+        let _pruneSql = null;
+        if (fetchAll && DataLaVistaState.reportMode === 'view') {
+          const _rawSql = (DataLaVistaState.sql || '').trim();
+          if (_rawSql && !/\.\*|\bSELECT\s*\*/i.test(_rawSql)) {
+            _pruneSql = _rawSql.toUpperCase();
+          }
+        }
+
         spFields.forEach(f => {
           const internalName = f.InternalName || f.internalName;
-          if (f.isAutoId || !internalName) return; 
+          if (f.isAutoId || !internalName) return;
+
+          // Skip field if neither its alias nor internalName appears anywhere in the SQL
+          if (_pruneSql) {
+            const aliasUp    = (f.alias    || internalName).toUpperCase();
+            const internalUp = internalName.toUpperCase();
+            if (!_pruneSql.includes(aliasUp) && !_pruneSql.includes(internalUp)) return;
+          }
           
           const typeStr = (f.TypeAsString || f.type || '').toLowerCase();
           const isPeople = typeStr.includes('user');
@@ -6719,7 +6738,7 @@ async function fetchTableData(tableName, fetchAll = false) {
             baseSelect.add(internalName);
           }
         });
-        
+
         rawData = await fetchSPItemsWithRetry(
           spSiteUrl,
           t.guid,
@@ -8745,7 +8764,6 @@ async function loadSharePointListsSource(siteUrl, dsName, newAuth='current', new
         alias: tableAlias,
         dsAlias: dsName,
         fields: fieldMetas,
-        //originalFields: fields, // TODO: Commented out to debug synthetic fields not being generated 3/31/26
         data: [],
         loaded: false,
         sourceType: 'sharepoint',
@@ -8797,8 +8815,9 @@ async function loadSharePointListsSource(siteUrl, dsName, newAuth='current', new
 // ============================================================
 
 // Fetch JSON from a URL trying multiple strategies.
-// Skips external proxies if the URL is on the same site as the current page
-// (or the detected SharePoint site), since proxies can't authenticate there.
+// Skips external proxies if the URL is on the same host as the current page,
+// on the same SharePoint tenant/site, or otherwise same-origin — proxies
+// cannot authenticate to internal servers and must not receive private data.
 async function fetchJSONWithFallbacks(url) {
   if (window.location.protocol === 'file:') {
     throw new Error(
@@ -8813,8 +8832,12 @@ async function fetchJSONWithFallbacks(url) {
     try {
       const target = new URL(url);
       if (target.origin === window.location.origin) return true;
+      if (target.hostname === window.location.hostname) return true;
       const spSite = typeof getSpSiteUrl === 'function' && getSpSiteUrl();
-      if (spSite && url.startsWith(spSite)) return true;
+      if (spSite) {
+        if (url.startsWith(spSite)) return true;
+        try { if (new URL(spSite).origin === target.origin) return true; } catch(_) {}
+      }
     } catch (e) {}
     return false;
   })();
@@ -8845,6 +8868,7 @@ async function fetchJSONWithFallbacks(url) {
 }
 
 // Fetch raw CSV text from a URL trying multiple strategies.
+// Skips external proxies for same-host, same-origin, and SharePoint tenant URLs (privacy).
 async function fetchCSVWithFallbacks(url) {
   const encodedUrl = encodeURIComponent(url);
 
@@ -8852,8 +8876,12 @@ async function fetchCSVWithFallbacks(url) {
     try {
       const target = new URL(url);
       if (target.origin === window.location.origin) return true;
+      if (target.hostname === window.location.hostname) return true;
       const spSite = typeof getSpSiteUrl === 'function' && getSpSiteUrl();
-      if (spSite && url.startsWith(spSite)) return true;
+      if (spSite) {
+        if (url.startsWith(spSite)) return true;
+        try { if (new URL(spSite).origin === target.origin) return true; } catch(_) {}
+      }
     } catch (e) {}
     return false;
   })();
@@ -8872,7 +8900,6 @@ async function fetchCSVWithFallbacks(url) {
   for (const s of strategies) {
     try {
       const text = await s.fn();
-      console.info(`[fetchCSVWithFallbacks] ✅ succeeded via: ${s.name} (${isSameOrigin ? 'same-origin' : 'cross-origin'})`);
       return text;
     } catch (err) {
       errors[s.name] = err.message;
@@ -8881,7 +8908,7 @@ async function fetchCSVWithFallbacks(url) {
   }
 
   const summary = Object.entries(errors).map(([k, v]) => `  [${k}] ${v}`).join('\n');
-  console.error('[fetchCSVWithFallbacks] All strategies failed:', summary);
+  console.warn('[fetchCSVWithFallbacks] All strategies failed:', summary);
   throw new Error('Unable to fetch file. Check the URL and try again.');
 }
 
@@ -10131,7 +10158,6 @@ validateAliasUniqueness(fields) {
       if (cols.length === 0) return; // Nothing to select yet (lazy SP list)
       try { alasql(`DROP VIEW IF EXISTS [${viewName}]`); } catch (_) {}
       try {
-        console.log(`[CyberdynePipeline] Creating view cyberdyne-views.js Line 142 ${viewName} with columns:`, cols);
         alasql(`CREATE VIEW [${viewName}] AS SELECT ${cols.join(', ')} FROM ${rawTableRef}`);
       } catch (e) { console.warn(`[CyberdynePipeline] Failed to create view ${viewName}:`, e.message); }
     },
@@ -11060,7 +11086,7 @@ async function _saveConfigToSpList(json, reportUrl, siteUrl) {
 
 // Build a clean, minimal config object from the current state, suitable for saving or sharing
 function buildConfig() {
-  // TODO: DEBUG: It looks like relationships and advancedQB are not being included in the config.
+  // TODO: DEBUG: Confirm that relationships and advancedQB are  being included in the config.
   const cleanFields = (arr) => (arr || []).filter(f => !f.isSynthetic && !f.isAutoId).map(f => ({
     internalName:  f.internalName || f.InternalName || '',
     displayName:   f.displayName  || f.Title        || '',
@@ -16042,7 +16068,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       // RUN QUERY
       // ============================================================
       async function runQuery() {
-        console.log('DEBUG: ' + Date.now() + ': Entered runQuery()');
         const sql = window._cmEditor ? window._cmEditor.getValue() : DataLaVistaState.sql;
         if (!sql.trim() && DataLaVistaState.reportMode !== 'view') { toast('Please enter a SQL query', 'error'); return; }
         DataLaVistaState.sql = sql;
@@ -16057,21 +16082,15 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         hideUseInDesign();
 
         try {
-          console.log('DEBUG: ' + Date.now() + ': Awaiting _executeQuery()...');
           const results = await _executeQuery(sql);
-          console.log('DEBUG: ' + Date.now() + ': _executeQuery() completed with # results:', results.length);
           // Evict autosuggest cache for dlv_results/dlv_active — columns may have changed
-          console.log('DEBUG: ' + Date.now() + ': Calling _dlvAcEvict("|") to clear autosuggest cache for dlv_results/dlv_active');
           _dlvAcEvict('|');
-          console.log('DEBUG: ' + Date.now() + ': Calling showQueryPreview()...');
           showQueryPreview(results);
-          console.log('DEBUG: ' + Date.now() + ': Calling renderDesignFieldsPanel()...');
           renderDesignFieldsPanel();
           if (DataLaVistaState.reportMode !== 'view') showUseInDesign();
           setStatus(`Query returned ${results.length} rows`, 'success');
           toast(`Query returned ${results.length} rows`, 'success');
         } catch (err) {
-          console.log('DEBUG: ' + Date.now() + ': Error occurred while executing query:', err);
           console.error(err);
           toast('Query error: ' + err.message, 'error');
           setStatus('Query error: ' + err.message, 'error');
@@ -16083,12 +16102,9 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       // Loads table data, registers AlaSQL tables/views, runs the SQL, and materializes
       // results into [dlv_results] / [dlv_active]. Returns the result rows array.
       async function _executeQuery(sql) {
-        console.log('DEBUG: ' + new Date().toLocaleString() + ': Entered _executeQuery()');
         const referencedTables = findReferencedTables(sql);
-        console.log('DEBUG: ' + new Date().toLocaleString() + ': findReferencedTables() found referenced tables:', referencedTables);
 
         for (const tname of referencedTables) {
-          console.log('DEBUG: ' + new Date().toLocaleString() + ': Ensuring data for referenced table:', tname);
           await ensureTableData(tname, true);
         }
 
@@ -16096,7 +16112,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           const t = DataLaVistaState.tables[tname];
           if (!t || !t.data || !t.data.length) continue;
 
-          console.log('DEBUG: ' + new Date().toLocaleString() + ': Registering table in AlaSQL:', tname);
           registerTableInAlaSQL(tname);
 
           const viewName = t.viewName || CyberdynePipeline.getViewForTable(tname);
@@ -16104,7 +16119,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
             // Only call updateViewSQL if the AlaSQL view object is missing — avoids errors
             // after loadConfig() which resets the metadata registry but not AlaSQL view objects.
             const alasqlViewExists = !!(alasql.tables?.[viewName]?.view);
-            console.log('DEBUG: ' + new Date().toLocaleString() + ': Checking if AlaSQL view exists for', viewName, ':', alasqlViewExists);
             if (!alasqlViewExists) {
               try { CyberdynePipeline.updateViewSQL(viewName); }
               catch (e) {
@@ -16137,7 +16151,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         const results = alasql(processedSQL);
         if (!Array.isArray(results)) throw new Error('Query returned no results');
 
-        console.log('DEBUG: Materializing results into [dlv_results] and [dlv_active]...');
         // TODO: Instead of dropping/recreating tables/views on every query, could we ALTER TABLE? ALTER VIEW is not supported by alasql.
         alasql('DROP VIEW  IF EXISTS [dlv_active]');
         alasql('DROP TABLE IF EXISTS [dlv_results]'); alasql('CREATE TABLE [dlv_results]');
@@ -19535,7 +19548,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
     DataLaVistaState.spSiteUrl = getSpSiteUrl() || ''; // Store in state for global access and reactivity; default to empty string if not detected
     if(DataLaVistaState.spSiteUrl) {
       DataLaVistaState.isSpSite = true;
-      console.log('Detected SharePoint environment. Site URL: ' + DataLaVistaState.spSiteUrl);
     }
 
     // If running inside SharePoint, check if the page is in edit mode

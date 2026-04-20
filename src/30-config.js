@@ -149,7 +149,7 @@ async function _saveConfigToSpList(json, reportUrl, siteUrl) {
 
 // Build a clean, minimal config object from the current state, suitable for saving or sharing
 function buildConfig() {
-  // TODO: DEBUG: It looks like relationships and advancedQB are not being included in the config.
+  // TODO: DEBUG: Confirm that relationships and advancedQB are  being included in the config.
   const cleanFields = (arr) => (arr || []).filter(f => !f.isSynthetic && !f.isAutoId).map(f => ({
     internalName:  f.internalName || f.InternalName || '',
     displayName:   f.displayName  || f.Title        || '',
