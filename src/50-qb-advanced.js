@@ -2462,15 +2462,17 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
             const field = t?.fields?.find(f => f.alias === fa);
             const agg = fieldAggs[fa] || '';
             DataLaVistaState.queryColumnMeta[outAlias] = {
-              displayType:        _aggOutputDisplayType(agg, field?.displayType || 'text'),
+              displayType:             _aggOutputDisplayType(agg, field?.displayType || 'text'),
               agg,
-              sourceAlias:        fa,
-              sourceDisplayName:  field?.displayName || fa,
-              sourceInternalName: field?.internalName || fa,
-              sourceTableKey:     nd.tableName,
-              sourceTableName:    t?.displayName || nd.tableName,
-              sourceDataSource:   t?.dataSource || '',
-              viewName:           CyberdynePipeline.rawTableToView[nd.tableName] || nd.tableName,
+              sourceAlias:             fa,
+              sourceDisplayName:       field?.displayName || fa,
+              sourceInternalName:      field?.internalName || fa,
+              sourceTableKey:          nd.tableName,
+              sourceTableName:         t?.displayName || nd.tableName,
+              sourceDataSource:        t?.dataSource || '',
+              viewName:                CyberdynePipeline.rawTableToView[nd.tableName] || nd.tableName,
+              sourceFieldDescription:  field?.description || '',
+              sourceTableDescription:  t?.description || '',
             };
           }
         }

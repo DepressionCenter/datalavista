@@ -670,7 +670,15 @@ with this program. If not, see https://www.gnu.org/licenses/.
       padding: 1px 5px;
       white-space: nowrap;
     }
+    .dd-card-desc {
+      font-size: 11px;
+      color: var(--text-secondary);
+      font-style: italic;
+      margin-bottom: 8px;
+      line-height: 1.5;
+    }
     .dd-card-lineage { margin-bottom: 8px; }
+    .dd-crumb[data-dlv-tip] { cursor: help; }
     .dd-breadcrumb {
       display: flex;
       flex-wrap: wrap;
@@ -3411,7 +3419,7 @@ with this program. If not, see https://www.gnu.org/licenses/.
         <button id="toolbar-reportMode-button-4" class="btn btn-primary btn-sm" onclick="shareLiveReport()" title="Copy live report link to clipboard">📨 Share</button>
       </div>
       <div class="toolbar-sep"></div>
-      <button id="toolbar-button-datadict" class="btn btn-ghost btn-sm btn-help" onclick="openDataDictionaryPopup()" title="Data Dictionary">&#x2261;</button>
+      <button id="toolbar-button-datadict" class="btn btn-ghost btn-sm btn-help" onclick="openDataDictionaryPopup()" title="Data Dictionary">📖</button>
       <div class="toolbar-sep"></div>
       <a href="https://teamdynamix.umich.edu/TDClient/210/DepressionCenter/KB/ArticleDet?ID=15179" target="_blank" title="Help and Documentation"><button id="toolbar-button-help" class="btn btn-ghost btn-sm btn-help" title="Help">?</button></a>
     </div>

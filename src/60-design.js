@@ -317,7 +317,6 @@ function rankSuggestions(rules, cols, meta) {
       });
       const m = (/** @type {Record<string,any>} */ (DataLaVistaState.queryColumnMeta))[col];
       if (m) {
-        const usedW = _ddGetWidgetsUsingField(col);
         const parts = [];
         if (m.sourceDataSource) parts.push('<div><strong>Data Source:</strong> ' + m.sourceDataSource + '</div>');
         if (m.sourceTableName)  parts.push('<div><strong>Table:</strong> ' + m.sourceTableName + '</div>');
@@ -326,11 +325,7 @@ function rankSuggestions(rules, cols, meta) {
         const intSuffix = m.sourceInternalName && m.sourceInternalName !== srcField ? ' [' + m.sourceInternalName + ']' : '';
         parts.push('<div><strong>Source field:</strong> ' + srcField + intSuffix + '</div>');
         if (m.agg) parts.push('<div><strong>Aggregate:</strong> ' + m.agg + '</div>');
-        if (usedW.length) {
-          let wNames = '';
-          for (let _wi = 0; _wi < usedW.length; _wi++) { wNames += (_wi ? ', ' : '') + (usedW[_wi].title || usedW[_wi].type); }
-          parts.push('<div><strong>Used in:</strong> ' + wNames + '</div>');
-        }
+        if (m.sourceFieldDescription) parts.push('<div style="margin-top:4px;font-style:italic;opacity:.85">' + m.sourceFieldDescription + '</div>');
         const tipHtml = '<div style="font-size:11px;line-height:1.9;min-width:180px">'
           + '<div style="font-weight:700;margin-bottom:5px;font-size:12px;padding-bottom:4px;border-bottom:1px solid rgba(255,255,255,.25)">' + col + '</div>'
           + parts.join('')
@@ -2664,8 +2659,10 @@ function _ddGetWidgetsUsingField(fieldName) {
   });
 }
 
+let _ddSearchTimer = 0;
 function _ddFilterCards(text) {
-  _ddRenderCards(text);
+  clearTimeout(_ddSearchTimer);
+  _ddSearchTimer = setTimeout(function() { _ddRenderCards(text); }, 200);
 }
 
 function _ddRenderCards(filterText) {
@@ -2690,7 +2687,8 @@ function _ddRenderCards(filterText) {
 
     if (lower) {
       const haystack = [col, m && m.sourceDisplayName, m && m.sourceInternalName,
-        m && m.viewName, m && m.sourceTableName, m && m.sourceDataSource]
+        m && m.viewName, m && m.sourceTableName, m && m.sourceDataSource,
+        m && m.sourceFieldDescription, m && m.sourceTableDescription]
         .filter(Boolean).join(' ').toLowerCase();
       if (!haystack.includes(lower)) continue;
     }
@@ -2702,24 +2700,33 @@ function _ddRenderCards(filterText) {
 
     const widgetsHtml = usedWidgets.length
       ? usedWidgets.map(function(w) {
-          return '<span class="dd-widget-chip">' + (w.title || w.type).replace(/</g, '&lt;') + '</span>';
+          return '<span class="dd-widget-chip">' + _attrEnc(w.title || w.type) + '</span>';
         }).join('')
       : '<span class="dd-no-widgets">Not used in any widget yet</span>';
 
     const aggBadge = m && m.agg
-      ? '<span class="dd-agg-badge">' + m.agg + '</span>'
+      ? '<span class="dd-agg-badge">' + _attrEnc(m.agg) + '</span>'
+      : '';
+
+    const fieldDescHtml = m && m.sourceFieldDescription
+      ? '<div class="dd-card-desc">' + _attrEnc(m.sourceFieldDescription) + '</div>'
       : '';
 
     let breadcrumbHtml = '';
     if (m) {
       const crumbs = [];
-      if (m.sourceDataSource) crumbs.push('<span class="dd-crumb dd-crumb-ds">Data Source: ' + m.sourceDataSource.replace(/</g, '&lt;') + '</span>');
-      if (m.sourceTableName)  crumbs.push('<span class="dd-crumb dd-crumb-table">Table: ' + m.sourceTableName.replace(/</g, '&lt;') + '</span>');
-      if (m.viewName)         crumbs.push('<span class="dd-crumb dd-crumb-view">View: ' + m.viewName.replace(/</g, '&lt;') + '</span>');
+      if (m.sourceDataSource) crumbs.push('<span class="dd-crumb dd-crumb-ds">' + _attrEnc('Data Source: ' + m.sourceDataSource) + '</span>');
+      if (m.sourceTableName) {
+        const tableDesc = m.sourceTableDescription
+          ? ' data-dlv-tip="' + _attrEnc(m.sourceTableDescription) + '"'
+          : '';
+        crumbs.push('<span class="dd-crumb dd-crumb-table"' + tableDesc + '>Table: ' + _attrEnc(m.sourceTableName) + '</span>');
+      }
+      if (m.viewName)         crumbs.push('<span class="dd-crumb dd-crumb-view">' + _attrEnc('View: ' + m.viewName) + '</span>');
       const displayName = m.sourceDisplayName || m.sourceInternalName || col;
       const intSuffix = (m.sourceInternalName && m.sourceInternalName !== displayName)
-        ? ' <span style="opacity:.6;font-size:10px">[' + m.sourceInternalName.replace(/</g, '&lt;') + ']</span>' : '';
-      crumbs.push('<span class="dd-crumb dd-crumb-field">Field: ' + displayName.replace(/</g, '&lt;') + intSuffix + '</span>');
+        ? ' <span style="opacity:.6;font-size:10px">[' + _attrEnc(m.sourceInternalName) + ']</span>' : '';
+      crumbs.push('<span class="dd-crumb dd-crumb-field">Field: ' + _attrEnc(displayName) + intSuffix + '</span>');
       breadcrumbHtml = '<div class="dd-breadcrumb">'
         + crumbs.join('<span class="dd-arrow">&#x203A;</span>')
         + '</div>';
@@ -2732,9 +2739,10 @@ function _ddRenderCards(filterText) {
     card.innerHTML =
       '<div class="dd-card-header">'
       + '<span class="field-type-icon ' + ti.cls + '" style="font-size:11px;flex-shrink:0">' + ti.icon + '</span>'
-      + '<span class="dd-col-name">' + col.replace(/</g, '&lt;') + '</span>'
+      + '<span class="dd-col-name">' + _attrEnc(col) + '</span>'
       + aggBadge
       + '</div>'
+      + fieldDescHtml
       + '<div class="dd-card-lineage">' + breadcrumbHtml + '</div>'
       + '<div class="dd-card-footer"><span class="dd-footer-label">Appears in:&nbsp;</span>' + widgetsHtml + '</div>';
     frag.appendChild(card);
@@ -2747,10 +2755,12 @@ function _ddRenderCards(filterText) {
 
   body.innerHTML = '';
   body.appendChild(frag);
+  dlvTooltip.scanDOM(document);
 }
 
 function openDataDictionaryPopup() {
-  document.getElementById('dd-overlay') && document.getElementById('dd-overlay').remove();
+  const _ddExisting = document.getElementById('dd-overlay');
+  if (_ddExisting) _ddExisting.remove();
 
   const cols = DataLaVistaState.queryColumns || [];
 
