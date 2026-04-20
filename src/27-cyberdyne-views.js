@@ -110,32 +110,44 @@ validateAliasUniqueness(fields) {
         const siteUrl   = (t && t.siteUrl)    ? t.siteUrl    : (DataLaVistaState.spSiteUrl || '');
 
         const virtualCols = [];
-        const seenAliases = new Set();
+        const seenAliasMap = new Map(); // alias → { vcIndex, isSynthetic }
+        const _resolveAlias = (baseAlias, internalName) => {
+          const pascalInternal = toPascalCase(internalName) || internalName;
+          if (pascalInternal && pascalInternal !== baseAlias && !seenAliasMap.has(pascalInternal)) return pascalInternal;
+          let counter = 2;
+          while (seenAliasMap.has(baseAlias + '_' + counter)) counter++;
+          return baseAlias + '_' + counter;
+        };
         for (const field of baseFields) {
           const expanded = this.FieldExpander.expand(field, rawTableRef, { sourceType, siteUrl });
           for (const vc of expanded) {
-            // ── Fix 1: warn and rename instead of silently dropping ──────────
             let alias = vc.alias;
-            if (seenAliases.has(alias)) {
-              const pascalInternal = toPascalCase(vc.internalName) || vc.internalName;
-              if (pascalInternal && pascalInternal !== alias && !seenAliases.has(pascalInternal)) {
-                alias = pascalInternal;
+            if (seenAliasMap.has(alias)) {
+              const existing = seenAliasMap.get(alias);
+              if (!vc.isSynthetic && existing.isSynthetic) {
+                // Source field wins: retroactively rename the conflicting synthetic
+                const newAlias = _resolveAlias(alias, virtualCols[existing.vcIndex].internalName);
+                console.warn(
+                  `[CyberdynePipeline] _applyViewSQL: Source field "${alias}" conflicts with synthetic in view "${viewName}".` +
+                  ` Renaming synthetic (internalName: "${virtualCols[existing.vcIndex].internalName}") to "${newAlias}".`
+                );
+                virtualCols[existing.vcIndex] = { ...virtualCols[existing.vcIndex], alias: newAlias };
+                seenAliasMap.delete(alias);
+                seenAliasMap.set(newAlias, { vcIndex: existing.vcIndex, isSynthetic: true });
+                // alias stays unchanged — source field keeps its original name
               } else {
-                let counter = 2;
-                while (seenAliases.has(alias + '_' + counter)) counter++;
-                alias = alias + '_' + counter;
+                // Existing wins (or both synthetic): rename incoming
+                const newAlias = _resolveAlias(alias, vc.internalName);
+                console.warn(
+                  `[CyberdynePipeline] _applyViewSQL: Duplicate alias "${vc.alias}" in view "${viewName}"` +
+                  ` (internalName: "${vc.internalName}", parentField: "${vc.parentField}").` +
+                  ` Resolved to "${newAlias}" to avoid silent data loss.`
+                );
+                alias = newAlias;
               }
-              console.warn(
-                `[CyberdynePipeline] _applyViewSQL: Duplicate alias "${vc.alias}" in view "${viewName}"` +
-                ` (internalName: "${vc.internalName}", parentField: "${vc.parentField}").` +
-                ` Resolved to "${alias}" to avoid silent data loss.`
-              );
             }
-            seenAliases.add(alias);
-            // Shallow-clone vc only if the alias actually changed, to avoid
-            // mutating the FieldExpander's output object in place.
+            seenAliasMap.set(alias, { vcIndex: virtualCols.length, isSynthetic: vc.isSynthetic });
             virtualCols.push(alias !== vc.alias ? { ...vc, alias } : vc);
-            // ── End Fix 1 ────────────────────────────────────────────────────
           }
         }
         if (virtualCols.length === 0) return;
@@ -866,11 +878,20 @@ validateAliasUniqueness(fields) {
     },
 
     _expandGenericObject(field, outKey, rawCol) {
-      return [
-        this._vc   (outKey,          field.internalName, `DLV_DISPLAY(${rawCol})`,  'text',   'object', false, field.internalName),
+      const cols = [
+        this._vc   (outKey,          field.internalName, `DLV_DISPLAY(${rawCol})`, 'text',   'object', false, field.internalName),
         this._vc   (outKey + 'Id',   field.internalName, `DLV_ID_PROP(${rawCol})`, 'text',   'text',   true,  field.internalName),
-        this._vcRaw(outKey + 'Data', field.internalName, rawCol,                    'object', 'object', field.internalName),
       ];
+      // Expand each key found in the sample data
+      const reservedSuffixes = new Set(['Id', 'Data']);
+      for (const key of (field.objectKeys || [])) {
+        const keySuffix = toPascalCase(key) || key;
+        if (!keySuffix || reservedSuffixes.has(keySuffix)) continue;
+        reservedSuffixes.add(keySuffix);
+        cols.push(this._vc(outKey + keySuffix, field.internalName, `DLV_PROP(${rawCol}, '${key}')`, 'text', 'text', true, field.internalName));
+      }
+      cols.push(this._vcRaw(outKey + 'Data', field.internalName, rawCol, 'object', 'object', field.internalName));
+      return cols;
     },
 
     _expandArrayPrimitives(field, outKey, rawCol) {
@@ -882,30 +903,53 @@ validateAliasUniqueness(fields) {
     },
 
     _expandArrayObjects(field, outKey, rawCol) {
-      return [
-        this._vc   (outKey,           field.internalName, `DLV_JOIN(${rawCol}, '')`, 'text',   'lookup-multi', false, field.internalName),
+      const elementKeys      = field.elementKeys      || [];
+      const hasElementIds    = field.hasElementIds    || false;
+      const hasElementLabels = field.hasElementLabels || false;
+
+      const cols = [
+        this._vc   (outKey,           field.internalName, `DLV_JOIN(${rawCol}, '')`, 'text',   'object-multi', false, field.internalName),
         this._vc   (outKey + 'Count', field.internalName, `${rawCol}->length`,        'number', 'number',       true,  field.internalName),
-        this._vcRaw(outKey + 'Ids',   field.internalName, `DLV_IDS(${rawCol})`,       'array',  'array',        field.internalName),
-        this._vc   (outKey + 'Labels', field.internalName, `DLV_JOIN(${rawCol}, '')`, 'array',  'array',        true,  field.internalName),
-        this._vcRaw(outKey + 'Data',  field.internalName, rawCol,                     'array',  'array',        field.internalName),
       ];
+      if (hasElementIds)    cols.push(this._vcRaw(outKey + 'Ids',    field.internalName, `DLV_IDS(${rawCol})`,      'array', 'array', field.internalName));
+      if (hasElementLabels) cols.push(this._vc   (outKey + 'Labels', field.internalName, `DLV_JOIN(${rawCol}, '')`, 'array', 'array', true, field.internalName));
+
+      // Per-key synthetics — one array-of-values field per element key
+      const usedSuffixes = new Set(['Count', 'Data', 'Ids', 'Labels']);
+      for (const key of elementKeys) {
+        const keySuffix = toPascalCase(key) || key;
+        if (!keySuffix || usedSuffixes.has(keySuffix)) continue;
+        usedSuffixes.add(keySuffix);
+        cols.push(this._vc(outKey + keySuffix, field.internalName, `DLV_ARRAY_PROP(${rawCol}, '${key}')`, 'array', 'array', true, field.internalName));
+      }
+
+      cols.push(this._vcRaw(outKey + 'Data', field.internalName, rawCol, 'array', 'array', field.internalName));
+      return cols;
     },
 
     _expandDateField(field, outKey, rawCol) {
       // Use displayType to distinguish date-only vs datetime (not alias heuristic)
       const isDatetime = (field.displayType === 'datetime') || (field.type === 'datetime');
+      // When the alias already ends in "Date" (e.g. EventDate), keep that field as
+      // date-only and add a *DateTime synthetic instead of creating *DateDate.
+      const aliasEndsInDate = /date$/i.test(outKey);
       const nd = `DLV_NORMALIZE_DATE(${rawCol})`;
       const dp = (p) => `DLV_DATE_PART(${nd}, '${p}')`;
 
-      const mainExpr   = isDatetime ? nd : dp('date');
-      const mainDispTy = isDatetime ? 'datetime' : 'date';
+      const mainExpr   = (isDatetime && !aliasEndsInDate) ? nd        : dp('date');
+      const mainDispTy = (isDatetime && !aliasEndsInDate) ? 'datetime' : 'date';
 
       const cols = [
         this._vc(outKey, field.internalName, mainExpr, 'date', mainDispTy, false, field.internalName),
       ];
 
       if (isDatetime) {
-        cols.push(this._vc(outKey + 'Date', field.internalName, dp('date'), 'date', 'date', true, field.internalName));
+        if (aliasEndsInDate) {
+          // Alias already ends in "Date" — add DateTime synthetic with full value instead
+          cols.push(this._vc(outKey + 'DateTime', field.internalName, nd, 'date', 'datetime', true, field.internalName));
+        } else {
+          cols.push(this._vc(outKey + 'Date', field.internalName, dp('date'), 'date', 'date', true, field.internalName));
+        }
       }
       cols.push(this._vc(outKey + 'Time', field.internalName, dp('time'), 'date', 'date', true, field.internalName));
 

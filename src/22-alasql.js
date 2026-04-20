@@ -631,6 +631,14 @@ alasql.from.DLV_ARRAY_EXTRACT_ELEMENT = function(tableName, opts, cb, idx, query
         return ids.length > 0 ? ids : null;
       };
 
+      // ── DLV_ARRAY_PROP: extract one property from every element of an array-of-objects ──
+      alasql.fn.DLV_ARRAY_PROP = function(arr, key) {
+        if (!Array.isArray(arr)) return null;
+        const vals = arr.map(obj => (obj && typeof obj === 'object' ? obj[key] : undefined))
+                        .filter(v => v !== undefined && v !== null);
+        return vals.length > 0 ? vals : null;
+      };
+
       // ── DLV_JOIN: map array elements to a property and join with separator ('; ' by default)
       alasql.fn.DLV_JOIN = function(arr, prop, separator = '; ') {
         if (!Array.isArray(arr)) return null;
@@ -769,6 +777,14 @@ alasql.from.DLV_ARRAY_EXTRACT_ELEMENT = function(tableName, opts, cb, idx, query
           const mon = String(slashM[1]).padStart(2, '0');
           const day = String(slashM[2]).padStart(2, '0');
           return `${yr}-${mon}-${day}`;
+        }
+        // Long-form: "April 19, 2026" or "April 19,2026"
+        const LONG_MONTHS_ND = {january:1,february:2,march:3,april:4,may:5,june:6,july:7,august:8,september:9,october:10,november:11,december:12};
+        const lfM = str.match(/^([A-Za-z]+)\s+(\d{1,2}),\s*(\d{4})$/);
+        if (lfM) {
+          const mon = String(LONG_MONTHS_ND[lfM[1].toLowerCase()] || 1).padStart(2, '0');
+          const day = String(parseInt(lfM[2], 10)).padStart(2, '0');
+          return `${lfM[3]}-${mon}-${day}`;
         }
         // Unix epoch (10 digits)
         if (/^\d{10}$/.test(str)) {

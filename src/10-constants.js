@@ -30,18 +30,19 @@ const DataLaVistaCore = {
   // Field type icons for display in field lists, query builder, etc.
   FIELD_TYPE_ICONS: {
     'text':         { icon: '📝', cls: 'type-text' },      // data shown as text
-    'number':       { icon: '#️⃣', cls: 'type-number' },   // data shown as numbers
+    'number':       { icon: '＃', cls: 'type-number' },   // data shown as numbers
     'date':         { icon: '📅', cls: 'type-date' },      // data shown as date
     'datetime':     { icon: '🕒', cls: 'type-date' },      // data shown as datetime
     'boolean':      { icon: '✅', cls: 'type-bool' },      // data shown as true/false
-    'url':          { icon: '🔗', cls: 'type-url' },       // data shown as text or hyperlink
+    'url':          { icon: '🌐', cls: 'type-url' },       // data shown as text or hyperlink
     'user':         { icon: '👤', cls: 'type-user' },      // SP single user/person
     'user-multi':   { icon: '👥', cls: 'type-user' },      // SP multi user/person
     'lookup':       { icon: '🔍', cls: 'type-lookup' },    // SP single lookup / single taxonomy
     'lookup-multi': { icon: '🔍', cls: 'type-lookup' },    // SP multi lookup / multi taxonomy / choice-multi
-    'object':       { icon: '📦', cls: 'type-object' },    // single generic object
-    'array':        { icon: '🍱', cls: 'type-array' },     // array of primitives
-    'default':      { icon: '❓', cls: 'type-text' }       // unknown/unclassified
+    'object':       { icon: '🗂️', cls: 'type-object' },    // single generic object
+    'array':        { icon: '☷', cls: 'type-array' },     // array of primitives
+    'object-multi': { icon: '🗃️', cls: 'type-object' },  // array of objects (non-SharePoint)
+    'default':      { icon: '❔', cls: 'type-text' }       // unknown/unclassified
   },
 
   // Table/source type icons — SharePoint has sub-keys (list vs library); others are flat.

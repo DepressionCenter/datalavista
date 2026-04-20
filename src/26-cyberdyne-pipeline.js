@@ -40,7 +40,8 @@ const CyberdynePipeline = {
     excelCsv:    /^\d{1,2}\/\d{1,2}\/\d{2,4}$/,
     unixEpoch:   /^\d{10}$/,
     unixEpochMs: /^\d{13}$/,
-    scientific:  /^\d+\.?\d*[eE][+-]?\d+$/
+    scientific:  /^\d+\.?\d*[eE][+-]?\d+$/,
+    longForm:    /^(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},\s*\d{4}$/i,
   },
 
   /* ===== NULL / ERROR VALUES TO IGNORE IN TYPE DETECTION ===== */
@@ -72,6 +73,7 @@ const CyberdynePipeline = {
       // Unix epoch in scientific notation (e.g., 1.7116e+12 ms)
       return n > 9.46e11 && n < 9.99e12;
     }
+    if (this.DATE_PATTERNS.longForm.test(str)) return true;
     return false;
   },
 
@@ -160,7 +162,7 @@ const CyberdynePipeline = {
       datetime:         'datetime',
       array:            'array',
       'array-primitives': 'array',
-      'array-objects':  'lookup-multi',
+      'array-objects':  'object-multi',
       object:           'object',
       lookup:           'lookup',
       'lookup-multi':   'lookup-multi',
@@ -223,6 +225,7 @@ const CyberdynePipeline = {
   inferFieldTypes(rows) {
     if (!Array.isArray(rows) || rows.length === 0) return [];
     const firstRow = rows[0];
+    const sample = rows.slice(0, 25);
     return Object.keys(firstRow).map(name => {
       const type = this.guessFieldType(name, rows);
       const displayType = this.mapDisplayType(type);
@@ -234,6 +237,35 @@ const CyberdynePipeline = {
       else if (type === 'array' || type === 'array-primitives' || type === 'array-objects') dataType = 'array';
       else if (type === 'object') dataType = 'object';
       const alias = toPascalCase(name) || name;
+
+      // Collect nested keys for object and array-of-objects fields
+      let objectKeys, elementKeys, hasElementIds, hasElementLabels;
+      if (type === 'object') {
+        const keySet = new Set();
+        for (const row of sample) {
+          const val = row[name];
+          if (val && typeof val === 'object' && !Array.isArray(val)) {
+            for (const k of Object.keys(val)) keySet.add(k);
+          }
+        }
+        objectKeys = [...keySet];
+      } else if (type === 'array-objects') {
+        const keySet = new Set();
+        for (const row of sample) {
+          const val = row[name];
+          if (Array.isArray(val)) {
+            for (const elem of val) {
+              if (elem && typeof elem === 'object' && !Array.isArray(elem)) {
+                for (const k of Object.keys(elem)) keySet.add(k);
+              }
+            }
+          }
+        }
+        elementKeys = [...keySet];
+        hasElementIds    = elementKeys.some(k => /^(id|Id|ID|key|Key)$/.test(k));
+        hasElementLabels = elementKeys.some(k => /^(label|Label|title|Title|name|Name)$/.test(k));
+      }
+
       return {
         internalName:  name,
         displayName:   name,
@@ -246,7 +278,9 @@ const CyberdynePipeline = {
         displayType,
         displayFormat: null,
         derivedColumns: null,
-        required:      false
+        required:      false,
+        ...(objectKeys   !== undefined ? { objectKeys }                              : {}),
+        ...(elementKeys  !== undefined ? { elementKeys, hasElementIds, hasElementLabels } : {}),
       };
     });
   },
