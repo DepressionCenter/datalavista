@@ -24,6 +24,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
     // SHAREPOINT REST API ADAPTER
     // ============================================================
     // Rule 1: Use application/json instead of verbose
+    // All SharePoint fetches use direct fetch() — never routed through external CORS proxies.
     async function spFetch(url, dsName, _throttleRetries = 5) {
       const headers = { 'Accept': 'application/json' };
       if (DataLaVistaState.dataSources[dsName] && DataLaVistaState.dataSources[dsName].auth === 'token' && DataLaVistaState.dataSources[dsName].token) {

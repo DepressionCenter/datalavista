@@ -1994,6 +1994,11 @@ with this program. If not, see https://www.gnu.org/licenses/.
       flex-shrink: 0;
       min-height: 32px;
     }
+    
+    /* Allow [hidden] attribute to override display:flex on .widget-header */
+    .widget-header[hidden] {
+      display: none !important;
+    }
 
     .widget-title {
       font-weight: 600;

@@ -818,8 +818,9 @@ async function loadSharePointListsSource(siteUrl, dsName, newAuth='current', new
 // ============================================================
 
 // Fetch JSON from a URL trying multiple strategies.
-// Skips external proxies if the URL is on the same site as the current page
-// (or the detected SharePoint site), since proxies can't authenticate there.
+// Skips external proxies if the URL is on the same host as the current page,
+// on the same SharePoint tenant/site, or otherwise same-origin — proxies
+// cannot authenticate to internal servers and must not receive private data.
 async function fetchJSONWithFallbacks(url) {
   if (window.location.protocol === 'file:') {
     throw new Error(
@@ -834,8 +835,12 @@ async function fetchJSONWithFallbacks(url) {
     try {
       const target = new URL(url);
       if (target.origin === window.location.origin) return true;
+      if (target.hostname === window.location.hostname) return true;
       const spSite = typeof getSpSiteUrl === 'function' && getSpSiteUrl();
-      if (spSite && url.startsWith(spSite)) return true;
+      if (spSite) {
+        if (url.startsWith(spSite)) return true;
+        try { if (new URL(spSite).origin === target.origin) return true; } catch(_) {}
+      }
     } catch (e) {}
     return false;
   })();
@@ -866,6 +871,7 @@ async function fetchJSONWithFallbacks(url) {
 }
 
 // Fetch raw CSV text from a URL trying multiple strategies.
+// Skips external proxies for same-host, same-origin, and SharePoint tenant URLs (privacy).
 async function fetchCSVWithFallbacks(url) {
   const encodedUrl = encodeURIComponent(url);
 
@@ -873,8 +879,12 @@ async function fetchCSVWithFallbacks(url) {
     try {
       const target = new URL(url);
       if (target.origin === window.location.origin) return true;
+      if (target.hostname === window.location.hostname) return true;
       const spSite = typeof getSpSiteUrl === 'function' && getSpSiteUrl();
-      if (spSite && url.startsWith(spSite)) return true;
+      if (spSite) {
+        if (url.startsWith(spSite)) return true;
+        try { if (new URL(spSite).origin === target.origin) return true; } catch(_) {}
+      }
     } catch (e) {}
     return false;
   })();
@@ -893,7 +903,6 @@ async function fetchCSVWithFallbacks(url) {
   for (const s of strategies) {
     try {
       const text = await s.fn();
-      console.info(`[fetchCSVWithFallbacks] ✅ succeeded via: ${s.name} (${isSameOrigin ? 'same-origin' : 'cross-origin'})`);
       return text;
     } catch (err) {
       errors[s.name] = err.message;
@@ -902,7 +911,7 @@ async function fetchCSVWithFallbacks(url) {
   }
 
   const summary = Object.entries(errors).map(([k, v]) => `  [${k}] ${v}`).join('\n');
-  console.error('[fetchCSVWithFallbacks] All strategies failed:', summary);
+  console.warn('[fetchCSVWithFallbacks] All strategies failed:', summary);
   throw new Error('Unable to fetch file. Check the URL and try again.');
 }
 

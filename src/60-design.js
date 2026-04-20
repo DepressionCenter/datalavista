@@ -663,10 +663,15 @@ function rankSuggestions(rules, cols, meta) {
         const isChartWidget = ['bar', 'line', 'pie', 'scatter'].includes(w.type);
 		el.innerHTML = `<div class="widget-header" style="${titleHdrStyle}"><span class="widget-title" style="${titleSpanStyle}">${w.title || ''}</span>${actions}</div>
   <div class="widget-content${isChartWidget ? ' widget-content-chart' : ''}" id="wcontent-${w.id}">${getWidgetContentHTML(w)}</div><div class="widget-resize-handle"></div>`;
-		// Use .hidden class (display:none !important) — avoids .widget-header{display:flex} override
-		if (w.showTitle === false) {
-		  el.querySelector('.widget-header').classList.add('hidden');
-		}
+        // Context-aware title visibility
+        if (w.showTitle === false) {
+          const hdr = el.querySelector('.widget-header');
+          if (DataLaVistaState.activeTab === 'design') {
+            hdr.style.opacity = '0.3';
+          } else {
+            hdr.hidden = true;
+          }
+        }
         el.addEventListener('click', e => { if (!e.target.closest('button')) selectWidget(w.id); });
         // Drop fields from panel onto widget
         el.addEventListener('dragover', e => {
@@ -2243,7 +2248,20 @@ function _renderBarLineOptionsHTML(w, wid) {
         const titleEl = el.querySelector('.widget-title');
 
         if (prop === 'title' && titleEl) titleEl.textContent = value;
-        if (prop === 'showTitle' && hdr) hdr.classList.toggle('hidden', !value);
+        if (prop === 'showTitle' && hdr) {
+          if (value) {
+            hdr.hidden = false;
+            hdr.style.opacity = '';
+          } else {
+            if (DataLaVistaState.activeTab === 'design') {
+              hdr.hidden = false;
+              hdr.style.opacity = '0.3';
+            } else {
+              hdr.hidden = true;
+              hdr.style.opacity = '';
+            }
+          }
+        }
         if (prop === 'widthPct') el.style.width = value + '%';
         if (prop === 'heightVh') { el.style.height = value + 'vh'; if (DataLaVistaState.charts[wid]) DataLaVistaState.charts[wid].resize(); }
         if (prop === 'borderColor') el.style.borderColor = value;

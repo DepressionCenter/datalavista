@@ -2552,6 +2552,9 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           for (const [, nd] of nodes) {
             if (!nd.groupBy) nd.groupBy = [];
             const fieldAggs = nd.fieldAggs || {};
+            // Purge fields that now have an aggregate (may have been added in a previous pass)
+            nd.groupBy = nd.groupBy.filter(fa => !fieldAggs[fa]);
+            // Add non-aggregated selected fields not already present
             for (const fa of nd.selectedFields) {
               if (!fieldAggs[fa] && !nd.groupBy.includes(fa)) nd.groupBy.push(fa);
             }
