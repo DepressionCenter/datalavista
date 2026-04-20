@@ -315,63 +315,31 @@ function rankSuggestions(rules, cols, meta) {
       row.addEventListener('dragstart', e => {
         safeDragSet(e, { type: 'result-field', field: col, dataType: dt });
       });
+      const m = (/** @type {Record<string,any>} */ (DataLaVistaState.queryColumnMeta))[col];
+      if (m) {
+        const usedW = _ddGetWidgetsUsingField(col);
+        const parts = [];
+        if (m.sourceDataSource) parts.push('<div><strong>Data Source:</strong> ' + m.sourceDataSource + '</div>');
+        if (m.sourceTableName)  parts.push('<div><strong>Table:</strong> ' + m.sourceTableName + '</div>');
+        if (m.viewName)         parts.push('<div><strong>View:</strong> ' + m.viewName + '</div>');
+        const srcField = m.sourceDisplayName || m.sourceInternalName || col;
+        const intSuffix = m.sourceInternalName && m.sourceInternalName !== srcField ? ' [' + m.sourceInternalName + ']' : '';
+        parts.push('<div><strong>Source field:</strong> ' + srcField + intSuffix + '</div>');
+        if (m.agg) parts.push('<div><strong>Aggregate:</strong> ' + m.agg + '</div>');
+        if (usedW.length) {
+          let wNames = '';
+          for (let _wi = 0; _wi < usedW.length; _wi++) { wNames += (_wi ? ', ' : '') + (usedW[_wi].title || usedW[_wi].type); }
+          parts.push('<div><strong>Used in:</strong> ' + wNames + '</div>');
+        }
+        const tipHtml = '<div style="font-size:11px;line-height:1.9;min-width:180px">'
+          + '<div style="font-weight:700;margin-bottom:5px;font-size:12px;padding-bottom:4px;border-bottom:1px solid rgba(255,255,255,.25)">' + col + '</div>'
+          + parts.join('')
+          + '</div>';
+        dlvTooltip.attach(row, tipHtml, { html: true, placement: 'right', delay: 400 });
+      }
       secFields.appendChild(row);
     }
     body.appendChild(secFields);
-
-    // ── DATA DICTIONARY (only when QB-populated meta is available) ────────
-    const qcMeta = DataLaVistaState.queryColumnMeta || {};
-    if (Object.keys(qcMeta).length) {
-      const secDict = document.createElement('div');
-      secDict.className = 'qb-section';
-      const dictHdr = document.createElement('div');
-      dictHdr.className = 'qb-section-header';
-      dictHdr.style.cursor = 'pointer';
-      dictHdr.innerHTML = '<span>DATA DICTIONARY</span><span style="font-size:10px;font-weight:400">field lineage</span>';
-      secDict.appendChild(dictHdr);
-
-      const dictBody = document.createElement('div');
-      dictBody.style.cssText = 'padding:4px 8px;font-size:11px';
-
-      for (const col of cols) {
-        const m = qcMeta[col];
-        if (!m) continue;
-        const ti = DataLaVistaCore.FIELD_TYPE_ICONS[m.displayType] || DataLaVistaCore.FIELD_TYPE_ICONS.default;
-        const hasAgg = !!m.agg;
-        const hasSrcLabel = m.sourceDisplayName && m.sourceDisplayName !== col;
-        const hasInternal = m.sourceInternalName && m.sourceInternalName !== m.sourceDisplayName;
-
-        const tipParts = ['Output: ' + col];
-        if (hasAgg) tipParts.push('Aggregate: ' + m.agg);
-        tipParts.push('Source field: ' + m.sourceDisplayName + (hasInternal ? ' [' + m.sourceInternalName + ']' : ''));
-        tipParts.push('View: ' + m.viewName);
-        tipParts.push('Table: ' + m.sourceTableName);
-        if (m.sourceDataSource) tipParts.push('Data source: ' + m.sourceDataSource);
-
-        const row = document.createElement('div');
-        row.style.cssText = 'padding:3px 0;border-bottom:1px solid var(--border);line-height:1.4';
-        row.title = tipParts.join('\n');
-
-        const iconHtml  = '<span class="field-type-icon ' + ti.cls + '" style="font-size:10px">' + ti.icon + '</span>';
-        const aggHtml   = hasAgg
-          ? '<span style="font-size:9px;background:var(--accent);color:#fff;border-radius:3px;padding:0 3px;margin:0 3px">' + m.agg + '</span>'
-          : '';
-        const colHtml   = '<strong>' + col + '</strong>';
-        const srcLine   = hasSrcLabel
-          ? '<div style="color:var(--text-muted);margin-left:16px">&#x2190; ' + m.sourceDisplayName + (hasInternal ? ' <span style="opacity:.7">[' + m.sourceInternalName + ']</span>' : '') + '</div>'
-          : (hasInternal ? '<div style="color:var(--text-muted);margin-left:16px">&#x2190; <span style="opacity:.7">[' + m.sourceInternalName + ']</span></div>' : '');
-        const viewLine  = '<div style="color:var(--text-muted);margin-left:16px">&#x2190; ' + m.viewName + ' / ' + m.sourceTableName + '</div>';
-
-        row.innerHTML = iconHtml + aggHtml + colHtml + srcLine + viewLine;
-        dictBody.appendChild(row);
-      }
-
-      dictHdr.addEventListener('click', () => {
-        dictBody.style.display = dictBody.style.display === 'none' ? '' : 'none';
-      });
-      secDict.appendChild(dictBody);
-      body.appendChild(secDict);
-    }
   }
 
   /** Returns the active dataset for widget rendering.
@@ -2678,4 +2646,142 @@ function widgetUpdateYSeriesType(wid, yi, seriesType) {
   if (!w.seriesProps[yi]) return;
   w.seriesProps[yi].seriesType = seriesType || '';
   _widgetRefresh(wid);
+}
+
+// ============================================================
+// DATA DICTIONARY
+// ============================================================
+
+function _ddGetWidgetsUsingField(fieldName) {
+  const widgets = (DataLaVistaState.design && DataLaVistaState.design.widgets) || [];
+  return widgets.filter(function(w) {
+    const inFields  = (w.fields  || []).includes(fieldName);
+    const inX       = w.xField === fieldName;
+    const inY       = (w.yFields || []).includes(fieldName);
+    const inSeries  = (w.seriesProps || []).some(function(s) { return s.field === fieldName; });
+    const inFilters = (w.filters || []).some(function(f) { return f.field === fieldName; });
+    return inFields || inX || inY || inSeries || inFilters;
+  });
+}
+
+function _ddFilterCards(text) {
+  _ddRenderCards(text);
+}
+
+function _ddRenderCards(filterText) {
+  const body = document.getElementById('dd-body');
+  if (!body) return;
+
+  const qcMeta = /** @type {Record<string,any>} */ (DataLaVistaState.queryColumnMeta);
+  const cols   = DataLaVistaState.queryColumns;
+  const lower  = (filterText || '').toLowerCase().trim();
+
+  if (!cols.length) {
+    body.innerHTML = '<div style="padding:24px;text-align:center;color:var(--text-secondary)">Run a query first to populate the data dictionary.</div>';
+    return;
+  }
+
+  const frag = document.createDocumentFragment();
+  let count = 0;
+
+  for (let i = 0; i < cols.length; i++) {
+    const col = cols[i];
+    const m = qcMeta[col];
+
+    if (lower) {
+      const haystack = [col, m && m.sourceDisplayName, m && m.sourceInternalName,
+        m && m.viewName, m && m.sourceTableName, m && m.sourceDataSource]
+        .filter(Boolean).join(' ').toLowerCase();
+      if (!haystack.includes(lower)) continue;
+    }
+
+    count++;
+    const dt = sniffType(col);
+    const ti = DataLaVistaCore.FIELD_TYPE_ICONS[dt] || DataLaVistaCore.FIELD_TYPE_ICONS.default;
+    const usedWidgets = _ddGetWidgetsUsingField(col);
+
+    const widgetsHtml = usedWidgets.length
+      ? usedWidgets.map(function(w) {
+          return '<span class="dd-widget-chip">' + (w.title || w.type).replace(/</g, '&lt;') + '</span>';
+        }).join('')
+      : '<span class="dd-no-widgets">Not used in any widget yet</span>';
+
+    const aggBadge = m && m.agg
+      ? '<span class="dd-agg-badge">' + m.agg + '</span>'
+      : '';
+
+    let breadcrumbHtml = '';
+    if (m) {
+      const crumbs = [];
+      if (m.sourceDataSource) crumbs.push('<span class="dd-crumb dd-crumb-ds">Data Source: ' + m.sourceDataSource.replace(/</g, '&lt;') + '</span>');
+      if (m.sourceTableName)  crumbs.push('<span class="dd-crumb dd-crumb-table">Table: ' + m.sourceTableName.replace(/</g, '&lt;') + '</span>');
+      if (m.viewName)         crumbs.push('<span class="dd-crumb dd-crumb-view">View: ' + m.viewName.replace(/</g, '&lt;') + '</span>');
+      const displayName = m.sourceDisplayName || m.sourceInternalName || col;
+      const intSuffix = (m.sourceInternalName && m.sourceInternalName !== displayName)
+        ? ' <span style="opacity:.6;font-size:10px">[' + m.sourceInternalName.replace(/</g, '&lt;') + ']</span>' : '';
+      crumbs.push('<span class="dd-crumb dd-crumb-field">Field: ' + displayName.replace(/</g, '&lt;') + intSuffix + '</span>');
+      breadcrumbHtml = '<div class="dd-breadcrumb">'
+        + crumbs.join('<span class="dd-arrow">&#x203A;</span>')
+        + '</div>';
+    } else {
+      breadcrumbHtml = '<div style="font-size:11px;color:var(--text-secondary)">No lineage information available (direct SQL or raw column).</div>';
+    }
+
+    const card = document.createElement('div');
+    card.className = 'dd-card';
+    card.innerHTML =
+      '<div class="dd-card-header">'
+      + '<span class="field-type-icon ' + ti.cls + '" style="font-size:11px;flex-shrink:0">' + ti.icon + '</span>'
+      + '<span class="dd-col-name">' + col.replace(/</g, '&lt;') + '</span>'
+      + aggBadge
+      + '</div>'
+      + '<div class="dd-card-lineage">' + breadcrumbHtml + '</div>'
+      + '<div class="dd-card-footer"><span class="dd-footer-label">Appears in:&nbsp;</span>' + widgetsHtml + '</div>';
+    frag.appendChild(card);
+  }
+
+  if (!count) {
+    body.innerHTML = '<div style="padding:24px;text-align:center;color:var(--text-secondary)">No fields match your search.</div>';
+    return;
+  }
+
+  body.innerHTML = '';
+  body.appendChild(frag);
+}
+
+function openDataDictionaryPopup() {
+  document.getElementById('dd-overlay') && document.getElementById('dd-overlay').remove();
+
+  const cols = DataLaVistaState.queryColumns || [];
+
+  const overlay = document.createElement('div');
+  overlay.id = 'dd-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:flex-start;justify-content:center;padding:40px 20px;overflow-y:auto';
+  overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
+
+  const dialog = document.createElement('div');
+  dialog.style.cssText = 'background:var(--surface);border-radius:var(--radius-lg);box-shadow:var(--shadow-lg);width:780px;max-width:calc(100vw - 40px);display:flex;flex-direction:column;animation:popIn 200ms ease;max-height:calc(100vh - 100px)';
+
+  const searchRow = cols.length
+    ? '<div style="padding:12px 20px 0">'
+      + '<input id="dd-search" type="text" class="form-input" placeholder="Search fields, tables, data sources..." '
+      + 'style="width:100%" oninput="_ddFilterCards(this.value)" />'
+      + '</div>'
+    : '';
+
+  dialog.innerHTML =
+    '<div class="popup-header">'
+    + '<div><h2 style="font-size:16px;font-weight:600;margin:0 0 2px">Data Dictionary</h2>'
+    + '<div style="font-size:11px;color:var(--text-secondary)">Field sources and widget usage — read left to right</div></div>'
+    + '<button class="btn btn-ghost btn-icon" onclick="document.getElementById(\'dd-overlay\').remove()">&#x2715;</button>'
+    + '</div>'
+    + searchRow
+    + '<div id="dd-body" style="padding:16px 20px;overflow-y:auto;flex:1;min-height:100px"></div>'
+    + '<div class="popup-footer">'
+    + '<button class="btn btn-primary btn-sm" onclick="document.getElementById(\'dd-overlay\').remove()">Close</button>'
+    + '</div>';
+
+  overlay.appendChild(dialog);
+  document.body.appendChild(overlay);
+  _ddRenderCards('');
 }

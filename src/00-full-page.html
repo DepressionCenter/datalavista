@@ -639,6 +639,94 @@ with this program. If not, see https://www.gnu.org/licenses/.
       font-size: 13px;
     }
 
+    /* ── Data Dictionary popup ───────────────────────────────────── */
+    .dd-card {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px 14px;
+      margin-bottom: 8px;
+      background: var(--bg);
+    }
+    .dd-card:last-child { margin-bottom: 0; }
+    .dd-card-header {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 8px;
+      flex-wrap: wrap;
+    }
+    .dd-col-name {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+      word-break: break-word;
+    }
+    .dd-agg-badge {
+      font-size: 9px;
+      font-weight: 700;
+      background: var(--primary);
+      color: #fff;
+      border-radius: 3px;
+      padding: 1px 5px;
+      white-space: nowrap;
+    }
+    .dd-card-lineage { margin-bottom: 8px; }
+    .dd-breadcrumb {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 4px;
+    }
+    .dd-crumb {
+      display: inline-flex;
+      align-items: center;
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 10px;
+      white-space: nowrap;
+      max-width: 240px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .dd-crumb-ds    { background: #e8f0fe; color: #1558d6; }
+    .dd-crumb-table { background: #fce8e6; color: #a50e0e; }
+    .dd-crumb-view  { background: #e6f4ea; color: #0d652d; }
+    .dd-crumb-field { background: #fef7e0; color: #7b5e00; }
+    .dd-arrow {
+      font-size: 14px;
+      color: var(--text-disabled);
+      user-select: none;
+      flex-shrink: 0;
+    }
+    .dd-card-footer {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 4px;
+    }
+    .dd-footer-label {
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--text-disabled);
+      text-transform: uppercase;
+      letter-spacing: .3px;
+      white-space: nowrap;
+    }
+    .dd-widget-chip {
+      font-size: 10px;
+      background: var(--primary-ultralight);
+      color: var(--primary);
+      border: 1px solid var(--primary-light);
+      border-radius: 10px;
+      padding: 1px 7px;
+      white-space: nowrap;
+    }
+    .dd-no-widgets {
+      font-size: 10px;
+      color: var(--text-disabled);
+      font-style: italic;
+    }
+
     .btn-danger {
       background: var(--error);
       color: white;
@@ -3322,6 +3410,8 @@ with this program. If not, see https://www.gnu.org/licenses/.
         <span class="tb-tab-sep">›</span>
         <button id="toolbar-reportMode-button-4" class="btn btn-primary btn-sm" onclick="shareLiveReport()" title="Copy live report link to clipboard">📨 Share</button>
       </div>
+      <div class="toolbar-sep"></div>
+      <button id="toolbar-button-datadict" class="btn btn-ghost btn-sm btn-help" onclick="openDataDictionaryPopup()" title="Data Dictionary">📖</button>
       <div class="toolbar-sep"></div>
       <a href="https://teamdynamix.umich.edu/TDClient/210/DepressionCenter/KB/ArticleDet?ID=15179" target="_blank" title="Help and Documentation"><button id="toolbar-button-help" class="btn btn-ghost btn-sm btn-help" title="Help">?</button></a>
     </div>
