@@ -755,10 +755,10 @@ alasql.from.DLV_ARRAY_EXTRACT_ELEMENT = function(tableName, opts, cb, idx, query
         }
         // Already ISO date: 2026-01-15
         if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
-        // Already ISO datetime without T: 2026-01-15 14:30:00
-        if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(str)) {
-          return str.endsWith(' 00:00:00') ? str.replace(' 00:00:00', '') : str;
-        }
+        // ISO datetime without T: "2026-01-15 14:30:00" (pandas/numpy/datetime variants)
+        // Handles optional fractional seconds and optional timezone offset (+00:00 / -05:00 / Z)
+        const isoSpaceM = str.match(/^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2})(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})?$/);
+        if (isoSpaceM) { const datePart = isoSpaceM[1]; const timePart = isoSpaceM[2]; return timePart === '00:00:00' ? datePart : `${datePart} ${timePart}`; }
         // Oracle: 15-JAN-2026 or 15-JAN-26
         const ORACLE_MONTHS = {JAN:1,FEB:2,MAR:3,APR:4,MAY:5,JUN:6,JUL:7,AUG:8,SEP:9,OCT:10,NOV:11,DEC:12};
         const oracleM = str.match(/^(\d{2})-([A-Z]{3})-(\d{2,4})$/i);
