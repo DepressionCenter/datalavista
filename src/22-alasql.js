@@ -747,11 +747,11 @@ alasql.from.DLV_ARRAY_EXTRACT_ELEMENT = function(tableName, opts, cb, idx, query
       alasql.fn.DLV_NORMALIZE_DATE = function(val) {
         if (val === null || val === undefined || val === '') return val;
         const str = String(val).trim();
-        // ISO with T separator: 2026-01-15T14:30:00Z or 2026-01-15T00:00:00
-        if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(str)) {
-          let d = str.replace('T', ' ').replace('Z', '').replace(/\.\d+$/, '');
-          if (d.endsWith(' 00:00:00')) d = d.replace(' 00:00:00', '');
-          return d;
+        // ISO with T separator: 2026-01-15T14:30:00Z / 2026-01-15T00:00:00.000 / 2026-01-15T14:30:00+05:00
+        const isoTM = str.match(/^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2}:\d{2})(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})?/);
+        if (isoTM) {
+          const datePart = isoTM[1]; const timePart = isoTM[2];
+          return timePart === '00:00:00' ? datePart : `${datePart} ${timePart}`;
         }
         // Already ISO date: 2026-01-15
         if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
