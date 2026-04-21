@@ -223,49 +223,109 @@ function rankSuggestions(rules, cols, meta) {
   }
 
   function updateDashboardTitleProp(prop, value) {
-    if (prop === 'showDashboardTitle') DataLaVistaState.design.showDashboardTitle = value;
-    else if (prop === 'title') {
+    if (prop === 'showDashboardTitle') {
+      DataLaVistaState.design.showDashboardTitle = value;
+    } else if (prop === 'title') {
       DataLaVistaState.design.title = value;
       const inp = document.getElementById('title-input');
       if (inp && inp.value !== value) inp.value = value;
     } else if (prop === 'dashboardTitleTooltip') {
       DataLaVistaState.design.dashboardTitleTooltip = value;
       updateDashboardTitleTooltipIcon();
+    } else if (prop === 'titleTemplate') {
+      DataLaVistaState.design.titleTemplate = value;
+    } else if (prop === 'interactionMode') {
+      DataLaVistaState.design.interactionMode = value;
+    } else if (prop === 'themePaletteColor') {
+      // value = { index, color }
+      if (!DataLaVistaState.design.theme) DataLaVistaState.design.theme = { palette: [], fontFamily: '', fontSize: null, backgroundColor: '' };
+      while (DataLaVistaState.design.theme.palette.length <= value.index) DataLaVistaState.design.theme.palette.push('');
+      DataLaVistaState.design.theme.palette[value.index] = value.color;
+    } else if (prop === 'themePaletteReset') {
+      if (DataLaVistaState.design.theme) DataLaVistaState.design.theme.palette = [];
+    } else if (prop === 'themeFontFamily') {
+      if (!DataLaVistaState.design.theme) DataLaVistaState.design.theme = { palette: [], fontFamily: '', fontSize: null, backgroundColor: '' };
+      DataLaVistaState.design.theme.fontFamily = value;
+    } else if (prop === 'themeBackgroundColor') {
+      if (!DataLaVistaState.design.theme) DataLaVistaState.design.theme = { palette: [], fontFamily: '', fontSize: null, backgroundColor: '' };
+      DataLaVistaState.design.theme.backgroundColor = value;
     }
-    // Re-render the props panel to reflect the checkbox live
     renderDashboardTitleProperties();
   }
 
   function renderDashboardTitleProperties() {
     const section = document.getElementById('props-section');
     if (!section) return;
-    const show = DataLaVistaState.design.showDashboardTitle !== false;
-    const tip  = (DataLaVistaState.design.dashboardTitleTooltip || '').replace(/"/g, '&quot;');
-    const title = (DataLaVistaState.design.title || '').replace(/"/g, '&quot;');
-    section.innerHTML = `
-      <div class="adv-node-section">
-        <div class="adv-node-section-hdr">DASHBOARD TITLE</div>
-        <div class="props-row">
-          <label>Show dashboard title</label>
-          <input type="checkbox" ${show ? 'checked' : ''}
-            onchange="updateDashboardTitleProp('showDashboardTitle',this.checked)"/>
-        </div>
-      </div>
-      <div class="adv-node-section">
-        <div class="adv-node-section-hdr">TITLE TOOLTIP</div>
-        <div style="font-size:11px;color:var(--text-secondary);margin-bottom:6px;padding:0 2px">
-          Optional HTML tooltip shown as an ℹ️ icon next to the title in preview/live mode.
-          JavaScript is not allowed.
-        </div>
-        <div class="props-row" style="flex-direction:column;align-items:flex-start">
-          <label style="margin-bottom:4px">Tooltip HTML</label>
-          <textarea class="form-input" rows="6" style="width:100%;font-size:11px;font-family:monospace"
-            placeholder="<b>About this dashboard:</b><br>Enter description here..."
-            onblur="updateDashboardTitleProp('dashboardTitleTooltip',this.value)">${(DataLaVistaState.design.dashboardTitleTooltip || '').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</textarea>
-        </div>
-      </div>
-    `;
-    // Deselect any widget
+    const show    = DataLaVistaState.design.showDashboardTitle !== false;
+    const intMode = DataLaVistaState.design.interactionMode || 'cross-filter';
+    const palette = (DataLaVistaState.design.theme && DataLaVistaState.design.theme.palette) || [];
+    const fontFam = (DataLaVistaState.design.theme && DataLaVistaState.design.theme.fontFamily) || '';
+    const bgColor = (DataLaVistaState.design.theme && DataLaVistaState.design.theme.backgroundColor) || '';
+    const titleTpl = (DataLaVistaState.design.titleTemplate || '').replace(/"/g, '&quot;');
+
+    // Build palette swatch row (8 slots)
+    const paletteSlots = [0,1,2,3,4,5,6,7].map(i => {
+      const c = palette[i] || '#0078d4';
+      return '<input type="color" value="' + c + '" title="Color ' + (i+1) + '" style="width:24px;height:24px;padding:1px;border:1px solid #ccc;border-radius:3px;cursor:pointer"' +
+        ' onchange="updateDashboardTitleProp(\'themePaletteColor\',{index:' + i + ',color:this.value})">';
+    }).join('');
+
+    section.innerHTML = [
+      '<div class="adv-node-section">',
+      '  <div class="adv-node-section-hdr">DASHBOARD TITLE</div>',
+      '  <div class="props-row">',
+      '    <label>Show title bar</label>',
+      '    <input type="checkbox" ' + (show ? 'checked' : '') + ' onchange="updateDashboardTitleProp(\'showDashboardTitle\',this.checked)"/>',
+      '  </div>',
+      '  <div class="props-row" style="flex-direction:column;align-items:flex-start;gap:4px">',
+      '    <label>Title template</label>',
+      '    <input class="form-input" style="width:100%" value="' + titleTpl + '"',
+      '      placeholder="My Report — use {{FIRST(FieldName)}} for live values"',
+      '      onblur="updateDashboardTitleProp(\'titleTemplate\',this.value)">',
+      '    <div style="font-size:10px;color:var(--text-secondary)">Use <code>{{FieldName}}</code> or <code>{{FIRST(FieldName)}}</code> to embed live field values in the title.</div>',
+      '  </div>',
+      '</div>',
+      '<div class="adv-node-section">',
+      '  <div class="adv-node-section-hdr">TITLE TOOLTIP</div>',
+      '  <div style="font-size:11px;color:var(--text-secondary);margin-bottom:6px;padding:0 2px">Optional HTML shown as ℹ️ next to the title. JavaScript is not allowed.</div>',
+      '  <div class="props-row" style="flex-direction:column;align-items:flex-start">',
+      '    <label style="margin-bottom:4px">Tooltip HTML</label>',
+      '    <textarea class="form-input" rows="5" style="width:100%;font-size:11px;font-family:monospace"',
+      '      placeholder="<b>About this dashboard:</b><br>..."',
+      '      onblur="updateDashboardTitleProp(\'dashboardTitleTooltip\',this.value)">' + (DataLaVistaState.design.dashboardTitleTooltip || '').replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</textarea>',
+      '  </div>',
+      '</div>',
+      '<div class="adv-node-section">',
+      '  <div class="adv-node-section-hdr">REPORT SETTINGS</div>',
+      '  <div class="props-row">',
+      '    <label>Chart interaction</label>',
+      '    <select class="form-input" style="width:140px" onchange="updateDashboardTitleProp(\'interactionMode\',this.value)">',
+      '      <option value="cross-filter"    ' + (intMode==='cross-filter'    ? 'selected' : '') + '>Cross-filter</option>',
+      '      <option value="cross-highlight" ' + (intMode==='cross-highlight' ? 'selected' : '') + '>Cross-highlight</option>',
+      '      <option value="none"            ' + (intMode==='none'            ? 'selected' : '') + '>None</option>',
+      '    </select>',
+      '  </div>',
+      '  <div class="props-row" style="flex-direction:column;align-items:flex-start;gap:6px">',
+      '    <div style="display:flex;align-items:center;justify-content:space-between;width:100%">',
+      '      <label>Color palette</label>',
+      '      <button class="btn-sm" onclick="updateDashboardTitleProp(\'themePaletteReset\',null)" title="Reset to default palette" style="font-size:10px;padding:1px 6px">Reset</button>',
+      '    </div>',
+      '    <div style="display:flex;gap:4px;flex-wrap:wrap">' + paletteSlots + '</div>',
+      '    <div style="font-size:10px;color:var(--text-secondary)">Overrides default series colors for all charts. Reset to use widget-level colors.</div>',
+      '  </div>',
+      '  <div class="props-row">',
+      '    <label>Canvas background</label>',
+      '    <input type="color" value="' + (bgColor || '#f5f5f5') + '" style="width:36px;height:24px;padding:1px;border:1px solid #ccc;border-radius:3px;cursor:pointer"',
+      '      onchange="updateDashboardTitleProp(\'themeBackgroundColor\',this.value)">',
+      '  </div>',
+      '  <div class="props-row">',
+      '    <label>Font family</label>',
+      '    <input class="form-input" style="width:160px" value="' + fontFam.replace(/"/g,'&quot;') + '" placeholder="e.g. Segoe UI, sans-serif"',
+      '      onblur="updateDashboardTitleProp(\'themeFontFamily\',this.value)">',
+      '  </div>',
+      '</div>'
+    ].join('\n');
+
     document.querySelectorAll('.widget').forEach(w => w.classList.remove('selected'));
     DataLaVistaState.currentWidgetId = null;
   }
@@ -763,18 +823,20 @@ function rankSuggestions(rules, cols, meta) {
         // Helper: aggregate for series at index i
         const _getAgg = (i) => (seriesProps[i] || {}).agg || '';
 
-        let xField = '', yFields = [];
+        let dims = /** @type {string[]} */ ([]), yFields = /** @type {string[]} */ ([]);
         let cols;
         if (w.type === 'table') {
           // For table, seriesProps[i].field is the column — but respect w.fields order
           const tableFields = seriesProps.length ? seriesProps.map(s => s.field).filter(Boolean) : (w.fields || []);
           cols = tableFields.filter(f => _inCols(f) && (!fromSrc || true) && (fromSrc || (base && base.length && Object.prototype.hasOwnProperty.call(base[0], f))));
         } else if (_isChartType) {
-          xField  = (w.xField && _inCols(w.xField)) ? w.xField : '';
+          // dimensions[] is the new multi-dim array; fall back to xField for old configs
+          const rawDims = /** @type {string[]} */ ((Array.isArray(w.dimensions) && w.dimensions.length) ? w.dimensions : (w.xField ? [w.xField] : []));
+          dims    = rawDims.filter(d => d && _inCols(d));
           yFields = seriesProps.length
             ? seriesProps.map(s => s.field).filter(f => f && _inCols(f))
             : ((Array.isArray(w.yFields) && w.yFields.length) ? w.yFields.filter(f => _inCols(f)) : (w.yField && _inCols(w.yField) ? [w.yField] : []));
-          cols    = [xField, ...yFields].filter(Boolean);
+          cols    = [...dims, ...yFields].filter(Boolean);
         } else if (w.type === 'kpi') {
           cols = (seriesProps.length
             ? seriesProps.slice(0,1).map(s => s.field).filter(Boolean)
@@ -790,8 +852,9 @@ function rankSuggestions(rules, cols, meta) {
         const needsDistinct = !anyAgg && DataLaVistaCore.DISTINCT_WIDGET_IDS.has(w.type);
 
         let selParts;
-        if (_isChartType && xField) {
-          const xPart = `[${xField}]`;
+        if (_isChartType && dims.length) {
+          // All dimensions go into SELECT (multi-dim support); yFields follow with __dlvy_N aliases
+          const dimParts = dims.map(d => `[${d}]`);
           const yParts = yFields.map((yf, yi) => {
             const agg     = _getAgg(yi);
             const spEntry = seriesProps[yi] || {};
@@ -815,7 +878,7 @@ function rankSuggestions(rules, cols, meta) {
             if (sqlOp === 'COUNT_DISTINCT') return `COUNT(DISTINCT CASE WHEN ${caseWhen} THEN [${yf}] ELSE NULL END) AS [${alias}]`;
             return `${sqlOp}(CASE WHEN ${caseWhen} THEN [${yf}] ELSE NULL END) AS [${alias}]`;
           });
-          selParts = [xPart, ...yParts];
+          selParts = [...dimParts, ...yParts];
         } else {
           // table / kpi — use seriesProps for agg; alias stays as field name for table compat
           selParts = cols.map((col, i) => {
@@ -833,7 +896,8 @@ function rankSuggestions(rules, cols, meta) {
 
         let groupParts;
         if (_isChartType && anyAgg) {
-          groupParts = xField ? [`[${xField}]`] : [];
+          // All dimensions go into GROUP BY; non-aggregated Y fields also group
+          groupParts = dims.map(d => `[${d}]`);
           yFields.forEach((yf, yi) => {
             if (!_isVirtCount(yf) && !_getAgg(yi)) groupParts.push(`[${yf}]`);
           });
@@ -997,380 +1061,367 @@ function rankSuggestions(rules, cols, meta) {
     ];
   }
 
-function _buildChartOption(w, chartData) {
-  if (!chartData || !chartData.length) return null;
-  const allCols = Object.keys(chartData[0]);
-  const xField  = w.xField || allCols[0] || '';
+// ── CHART COLORS ─────────────────────────────────────────────────────────────
+// Reads report-level theme palette first, falls back to widget fillColor + defaults.
+function _getChartColors(w) {
+  var p = DataLaVistaState.design && DataLaVistaState.design.theme && DataLaVistaState.design.theme.palette;
+  if (p && p.length) return [w.fillColor || p[0]].concat(p.slice(1));
+  return [w.fillColor || '#0078d4', '#e9950d', '#107c10', '#d13438', '#8764b8', '#038387', '#ff8c00', '#e3008c', '#00b7c3'];
+}
 
-  const yFields = (Array.isArray(w.yFields) && w.yFields.length)
-    ? w.yFields
-    : (w.yField ? [w.yField] : (allCols.slice(1) || []));
+// ── INLINE TREND LINE (index-based, for bar/line charts) ──────────────────────
+// Returns a trend-line series using inline data (not dataset), suitable for
+// appending alongside dataset-based series.
+function _buildIndexTrendSeries(rows, yAlias, yField, label, color) {
+  var vals = rows.map(function(r) { return parseFloat(r[yAlias] !== undefined ? r[yAlias] : r[yField]) || 0; });
+  var n    = vals.length;
+  if (n < 2) return null;
+  var sumX  = (n * (n - 1)) / 2;
+  var sumY  = 0, sumXY = 0;
+  var sumX2 = (n * (n - 1) * (2 * n - 1)) / 6;
+  for (var i = 0; i < n; i++) { sumY += vals[i]; sumXY += i * vals[i]; }
+  var denom     = n * sumX2 - sumX * sumX;
+  var trendData = [];
+  if (!denom) {
+    var avg = sumY / n;
+    for (var j = 0; j < n; j++) trendData.push(avg);
+  } else {
+    var slope     = (n * sumXY - sumX * sumY) / denom;
+    var intercept = (sumY - slope * sumX) / n;
+    for (var k = 0; k < n; k++) trendData.push(parseFloat((slope * k + intercept).toFixed(6)));
+  }
+  return {
+    name      : label + ' trend',
+    type      : 'line',
+    data      : trendData,
+    smooth    : false,
+    symbol    : 'none',
+    lineStyle : { type: 'dashed', color: color, width: 2, opacity: 0.8 },
+    itemStyle : { color: color },
+    zlevel    : 10
+  };
+}
 
-  const colors = [
-    w.fillColor || '#0078d4',
-    '#e9950d','#107c10','#d13438','#8764b8',
-    '#038387','#0078d4','#ff8c00','#e3008c','#00b7c3'
-  ];
+// ── DATASET OPTION BUILDER (bar / line / pie) ────────────────────────────────
+// Standard ECharts 6 dataset + encode pattern. Rows are pre-aggregated by AlaSQL.
+// Y-field aliases (__dlvy_N) from buildWidgetSQL are the encode targets.
+function _buildDatasetOption(w, rows) {
+  var sp   = _getSeriesProps(w);
+  var dims = (Array.isArray(w.dimensions) && w.dimensions.length) ? w.dimensions : (w.xField ? [w.xField] : []);
+  var xDim = dims[0] || '';
+  var colors = _getChartColors(w);
 
-  const stacked       = !!w.stacked;
-  const showTrendLine = !!w.showTrendLine;
-  const seriesProps   = _getSeriesProps(w);
-
-  // ── BAR / LINE ────────────────────────────────────────────────────────────
-  if (w.type === 'bar' || w.type === 'line') {
-    var barSeries = [];
-
-    for (var bi = 0; bi < yFields.length; bi++) {
-      var byf   = yFields[bi];
-      var bkey  = '__dlvy_' + bi;  // alias emitted by buildWidgetSQL
-      var bsp   = seriesProps[bi] || {};
-      var bst   = bsp.seriesType || w.type;
-      var bclr  = bsp.color || colors[bi % colors.length];
-      // Read from alias if present (aggregated / filtered series), else raw field
-      var bget  = function(r, key, field) { return r[key] !== undefined ? r[key] : r[field]; };
-      var bs  = {
-        name      : bsp.label || byf,
-        type      : bst,
-        data      : chartData.map(function(r) { return parseFloat(bget(r, bkey, byf)) || 0; }),
-        itemStyle : { color: bclr, opacity: bsp.opacity != null ? bsp.opacity : 1 }
-      };
-      if (bst === 'line') {
-        bs.smooth = bsp.smooth != null ? !!bsp.smooth : true;
-        if (bsp.lineWidth != null) bs.lineStyle = { width: bsp.lineWidth };
-      }
-      if (stacked) bs.stack = 'total';
-      barSeries.push(bs);
-
-      if (showTrendLine) {
-        var bvals  = chartData.map(function(r) { return parseFloat(bget(r, bkey, byf)) || 0; });
-        var bn     = bvals.length;
-        var bsumX  = (bn * (bn - 1)) / 2;
-        var bsumY  = 0;
-        var bsumXY = 0;
-        var bsumX2 = (bn * (bn - 1) * (2 * bn - 1)) / 6;
-        for (var bti = 0; bti < bn; bti++) {
-          bsumY  += bvals[bti];
-          bsumXY += bti * bvals[bti];
-        }
-        var bdenom     = bn * bsumX2 - bsumX * bsumX;
-        var btrendData = [];
-        if (!bdenom || bn < 2) {
-          for (var bti2 = 0; bti2 < bn; bti2++) {
-            btrendData.push(bn > 0 ? bsumY / bn : 0);
-          }
-        } else {
-          var bslope     = (bn * bsumXY - bsumX * bsumY) / bdenom;
-          var bintercept = (bsumY - bslope * bsumX) / bn;
-          for (var bti3 = 0; bti3 < bn; bti3++) {
-            btrendData.push(parseFloat((bslope * bti3 + bintercept).toFixed(6)));
-          }
-        }
-        barSeries.push({
-          name      : byf + ' trend',
-          type      : 'line',
-          data      : btrendData,
-          smooth    : false,
-          symbol    : 'none',
-          lineStyle : { type: 'dashed', color: colors[bi % colors.length], width: 2, opacity: 0.8 },
-          itemStyle : { color: colors[bi % colors.length] },
-          zlevel    : 10
-        });
-      }
-    }
-
-    var barHasLegend = yFields.length > 1 || showTrendLine;
+  // Pie with single Y: use dataset + encode for clean data binding
+  if (w.type === 'pie' && sp.length <= 1) {
     return {
-      tooltip : { trigger: 'axis' },
-      legend  : barHasLegend ? { bottom: 0, type: 'scroll', textStyle: { fontSize: 11 } } : undefined,
-      xAxis   : { type: 'category', data: chartData.map(function(r) { return r[xField]; }), axisLabel: { rotate: 30, fontSize: 11 } },
-      yAxis   : { type: 'value' },
-      series  : barSeries,
-      grid    : { left: 40, right: 20, top: 20, bottom: barHasLegend ? 80 : 60 }
+      dataset : { source: rows },
+      tooltip : { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
+      series  : [{ type: 'pie', encode: { itemName: xDim, value: '__dlvy_0' }, radius: ['30%', '65%'], label: { fontSize: 11 } }]
     };
   }
 
-  // ── PIE ───────────────────────────────────────────────────────────────────
-  if (w.type === 'pie') {
-    var pieGet = function(r, i, field) { var k = '__dlvy_' + i; return r[k] !== undefined ? r[k] : r[field]; };
-    if (yFields.length === 1) {
-      return {
-        tooltip : { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
-        series  : [{
-          type   : 'pie',
-          data   : chartData.map(function(r) {
-            return { name: String(r[xField] != null ? r[xField] : ''), value: parseFloat(pieGet(r, 0, yFields[0])) || 0 };
-          }),
-          radius : ['30%', '65%'],
-          label  : { fontSize: 11 }
-        }]
-      };
-    }
-    // Multiple Y fields: polar rose (stacked polar bar) — far more readable than side-by-side pies
-    var categories = chartData.map(function(r) { return String(r[xField] != null ? r[xField] : ''); });
+  // Pie with multiple Y fields: polar rose — polar bar doesn't support dataset in ECharts 6, use inline data
+  if (w.type === 'pie' && sp.length > 1) {
+    var categories = rows.map(function(r) { return String(r[xDim] != null ? r[xDim] : ''); });
     return {
       tooltip  : { trigger: 'axis', axisPointer: { type: 'cross' } },
       legend   : { show: true, bottom: 0 },
       polar    : { radius: ['15%', '75%'] },
       angleAxis: { type: 'category', data: categories, startAngle: 90 },
       radiusAxis: { type: 'value' },
-      series   : yFields.map(function(pyf, pi) {
+      series   : sp.map(function(spe, pi) {
+        var yf   = spe.field;
+        var bkey = '__dlvy_' + pi;
         return {
-          name             : pyf,
+          name             : spe.label || yf,
           type             : 'bar',
           coordinateSystem : 'polar',
           stack            : 'total',
-          data             : chartData.map(function(r) { return parseFloat(pieGet(r, pi, pyf)) || 0; })
+          data             : rows.map(function(r) { return parseFloat(r[bkey] !== undefined ? r[bkey] : r[yf]) || 0; })
         };
       })
     };
   }
 
-  // ── SCATTER / BUBBLE ──────────────────────────────────────────────────────
-  if (w.type === 'scatter') {
-    var szField   = w.bubbleSizeField  || '';
-    var clrField  = w.bubbleColorField || '';
-    var hasBubble = szField  !== '';
-    var hasClrFld = clrField !== '';
+  // Bar / Line — dataset + encode with dual-axis and trend line support
+  var seriesList   = [];
+  var hasRightAxis = sp.some(function(s) { return s.axisSide === 'right'; });
 
-    // Bubble size scale
-    var sizeVals = [];
-    var maxSz    = 1;
+  for (var i = 0; i < sp.length; i++) {
+    var spe   = sp[i];
+    var alias = '__dlvy_' + i;
+    var st    = spe.seriesType || w.type;
+    var color = spe.color || colors[i % colors.length];
+    var s = /** @type {any} */ ({
+      name      : spe.label || spe.field,
+      type      : st,
+      encode    : { x: xDim, y: alias },
+      itemStyle : { color: color, opacity: spe.opacity != null ? spe.opacity : 1 }
+    });
+    if (st === 'line') {
+      s.smooth = spe.smooth != null ? !!spe.smooth : true;
+      if (spe.lineWidth != null) s.lineStyle = { width: spe.lineWidth };
+    }
+    if (w.stacked) s.stack = 'total';
+    if (spe.axisSide === 'right') s.yAxisIndex = 1;
+    seriesList.push(s);
+
+    if (w.showTrendLine) {
+      var trend = _buildIndexTrendSeries(rows, alias, spe.field, spe.label || spe.field, color);
+      if (trend) seriesList.push(trend);
+    }
+  }
+
+  var yAxis    = hasRightAxis ? [{ type: 'value' }, { type: 'value', position: 'right' }] : { type: 'value' };
+  var hasLegend = sp.length > 1 || !!w.showTrendLine;
+  return {
+    dataset : { source: rows },
+    tooltip : { trigger: 'axis' },
+    legend  : hasLegend ? { bottom: 0, type: 'scroll', textStyle: { fontSize: 11 } } : undefined,
+    xAxis   : { type: 'category', axisLabel: { rotate: 30, fontSize: 11 } },
+    yAxis   : yAxis,
+    series  : seriesList,
+    grid    : { left: 40, right: hasRightAxis ? 60 : 20, top: 20, bottom: hasLegend ? 80 : 60 }
+  };
+}
+
+// ── SCATTER / BUBBLE option builder ──────────────────────────────────────────
+// Uses dataset + encode. Bubble size and color dimensions stay as named columns.
+// symbolSize function reads raw field from dataset row. visualMap refs by field name.
+function _buildScatterOption(w, rows, sp) {
+  if (!sp) sp = _getSeriesProps(w);
+  var dims     = (Array.isArray(w.dimensions) && w.dimensions.length) ? w.dimensions : (w.xField ? [w.xField] : []);
+  var xDim     = dims[0] || '';
+  var colors   = _getChartColors(w);
+  var szField  = (w.typeConfig && w.typeConfig.bubbleSizeField)  || w.bubbleSizeField  || '';
+  var clrField = (w.typeConfig && w.typeConfig.bubbleColorField) || w.bubbleColorField || '';
+  var hasBubble = szField  !== '';
+  var hasClrFld = clrField !== '';
+
+  // Pre-compute bubble size scale for normalization
+  var maxSz = 1;
+  if (hasBubble) {
+    for (var si = 0; si < rows.length; si++) {
+      var sv = Math.abs(parseFloat(rows[si][szField]) || 0);
+      if (sv > maxSz) maxSz = sv;
+    }
+  }
+
+  // Pre-compute color field range for visualMap
+  var minC = 0, maxC = 1;
+  if (hasClrFld) {
+    var clrVals = rows.map(function(r) { return parseFloat(r[clrField]) || 0; });
+    if (clrVals.length) {
+      minC = maxC = clrVals[0];
+      for (var ci = 1; ci < clrVals.length; ci++) {
+        if (clrVals[ci] < minC) minC = clrVals[ci];
+        if (clrVals[ci] > maxC) maxC = clrVals[ci];
+      }
+    }
+  }
+
+  var seriesList = [];
+  var capturedMaxSz = maxSz;
+
+  for (var i = 0; i < sp.length; i++) {
+    var spe   = sp[i];
+    var alias = '__dlvy_' + i;
+    var color = spe.color || colors[i % colors.length];
+    var encode = { x: xDim, y: alias };
+    var scSeries = /** @type {any} */ ({
+      name      : spe.label || spe.field,
+      type      : 'scatter',
+      encode    : encode,
+      itemStyle : hasClrFld ? undefined : { color: color, opacity: 0.75 }
+    });
     if (hasBubble) {
-      for (var svi = 0; svi < chartData.length; svi++) {
-        var sv = Math.abs(parseFloat(chartData[svi][szField]) || 0);
-        sizeVals.push(sv);
-        if (sv > maxSz) maxSz = sv;
-      }
-    }
-
-    // Color field values for visualMap range
-    var clrVals = [];
-    var minC = 0;
-    var maxC = 1;
-    if (hasClrFld) {
-      for (var cvi = 0; cvi < chartData.length; cvi++) {
-        var cv = parseFloat(chartData[cvi][clrField]) || 0;
-        clrVals.push(cv);
-      }
-      if (clrVals.length) {
-        minC = clrVals[0];
-        maxC = clrVals[0];
-        for (var cvi2 = 1; cvi2 < clrVals.length; cvi2++) {
-          if (clrVals[cvi2] < minC) minC = clrVals[cvi2];
-          if (clrVals[cvi2] > maxC) maxC = clrVals[cvi2];
-        }
-      }
-    }
-
-    var scatterSeries = [];
-
-    for (var sci = 0; sci < yFields.length; sci++) {
-      var scyf    = yFields[sci];
-      var scData  = [];
-      for (var sdi = 0; sdi < chartData.length; sdi++) {
-        var xv = parseFloat(chartData[sdi][xField])  || 0;
-        var yv = parseFloat(chartData[sdi][scyf])    || 0;
-        var szv = hasBubble  ? (sizeVals[sdi] || 0)                        : 0;
-        var cv2  = hasClrFld ? (parseFloat(chartData[sdi][clrField]) || 0) : 0;
-        if (hasBubble || hasClrFld) {
-          scData.push([xv, yv, szv, cv2]);
-        } else {
-          scData.push([xv, yv]);
-        }
-      }
-
-      var scSeries = {
-        name      : scyf,
-        type      : 'scatter',
-        data      : scData,
-        itemStyle : { color: colors[sci % colors.length], opacity: 0.75 }
+      var capturedSzField = szField;
+      var capturedMax     = capturedMaxSz;
+      scSeries.symbolSize = function(data) {
+        return Math.max(6, Math.sqrt(Math.abs(parseFloat(data[capturedSzField]) || 0) / capturedMax) * 60);
       };
+    } else {
+      scSeries.symbolSize = 8;
+    }
+    seriesList.push(scSeries);
 
-      if (hasBubble) {
-        var scMaxSz = maxSz;
-        scSeries.symbolSize = function(d) {
-          return Math.max(6, Math.sqrt(Math.abs(d[2]) / scMaxSz) * 60);
-        };
-      } else {
-        scSeries.symbolSize = 8;
-      }
-
-      scatterSeries.push(scSeries);
-
-      if (showTrendLine) {
-        var sxs  = [];
-        var sys2 = [];
-        for (var sti2 = 0; sti2 < chartData.length; sti2++) {
-          sxs.push(parseFloat(chartData[sti2][xField]) || 0);
-          sys2.push(parseFloat(chartData[sti2][scyf])  || 0);
+    if (w.showTrendLine) {
+      // Scatter trend: actual x/y regression (not index-based)
+      var xVals = rows.map(function(r) { return parseFloat(r[xDim]) || 0; });
+      var yVals = rows.map(function(r) { var k = alias; return parseFloat(r[k] !== undefined ? r[k] : r[spe.field]) || 0; });
+      var n = xVals.length;
+      if (n >= 2) {
+        var ssumX = 0, ssumY = 0, ssumXY = 0, ssumX2 = 0;
+        for (var ti = 0; ti < n; ti++) {
+          ssumX += xVals[ti]; ssumY += yVals[ti];
+          ssumXY += xVals[ti] * yVals[ti]; ssumX2 += xVals[ti] * xVals[ti];
         }
-        var sn = sxs.length;
-        if (sn >= 2) {
-          var ssumX = 0, ssumY = 0, ssumXY = 0, ssumX2 = 0;
-          for (var sti3 = 0; sti3 < sn; sti3++) {
-            ssumX  += sxs[sti3];
-            ssumY  += sys2[sti3];
-            ssumXY += sxs[sti3] * sys2[sti3];
-            ssumX2 += sxs[sti3] * sxs[sti3];
-          }
-          var sdenom = sn * ssumX2 - ssumX * ssumX;
-          if (sdenom) {
-            var sslope     = (sn * ssumXY - ssumX * ssumY) / sdenom;
-            var sintercept = (ssumY - sslope * ssumX) / sn;
-            var sminX = sxs[0];
-            var smaxX = sxs[0];
-            for (var smi = 1; smi < sn; smi++) {
-              if (sxs[smi] < sminX) sminX = sxs[smi];
-              if (sxs[smi] > smaxX) smaxX = sxs[smi];
-            }
-            scatterSeries.push({
-              name      : scyf + ' trend',
-              type      : 'line',
-              data      : [
-                [sminX, parseFloat((sslope * sminX + sintercept).toFixed(6))],
-                [smaxX, parseFloat((sslope * smaxX + sintercept).toFixed(6))]
-              ],
-              smooth    : false,
-              symbol    : 'none',
-              lineStyle : { type: 'dashed', color: colors[sci % colors.length], width: 2, opacity: 0.8 },
-              itemStyle : { color: colors[sci % colors.length] }
-            });
-          }
+        var sdenom = n * ssumX2 - ssumX * ssumX;
+        if (sdenom) {
+          var sslope     = (n * ssumXY - ssumX * ssumY) / sdenom;
+          var sintercept = (ssumY - sslope * ssumX) / n;
+          var sminX = Math.min.apply(null, xVals);
+          var smaxX = Math.max.apply(null, xVals);
+          seriesList.push({
+            name      : (spe.label || spe.field) + ' trend',
+            type      : 'line',
+            data      : [[sminX, parseFloat((sslope * sminX + sintercept).toFixed(6))], [smaxX, parseFloat((sslope * smaxX + sintercept).toFixed(6))]],
+            smooth    : false, symbol: 'none',
+            lineStyle : { type: 'dashed', color: color, width: 2, opacity: 0.8 },
+            itemStyle : { color: color }
+          });
         }
       }
     }
+  }
 
-    // Remove per-series itemStyle colors when visualMap controls coloring
-    if (hasClrFld) {
-      for (var vsi = 0; vsi < scatterSeries.length; vsi++) {
-        if (scatterSeries[vsi].type === 'scatter') {
-          delete scatterSeries[vsi].itemStyle;
-        }
-      }
-    }
+  var hasLegend = sp.length > 1 || !!w.showTrendLine;
+  var option = /** @type {any} */ ({
+    dataset : { source: rows },
+    tooltip : { trigger: 'item' },
+    legend  : hasLegend ? { bottom: 0, textStyle: { fontSize: 11 } } : undefined,
+    xAxis   : { type: 'value', name: xDim, nameLocation: 'middle', nameGap: 28 },
+    yAxis   : { type: 'value' },
+    series  : seriesList,
+    grid    : { left: 50, right: hasClrFld ? 80 : 20, top: 20, bottom: hasLegend ? 60 : 40 }
+  });
 
-    var scHasLegend = yFields.length > 1 || showTrendLine;
-    var scOption = {
-      tooltip : { trigger: 'item' },
-      legend  : scHasLegend ? { bottom: 0, textStyle: { fontSize: 11 } } : undefined,
-      xAxis   : { type: 'value', name: xField, nameLocation: 'middle', nameGap: 28 },
-      yAxis   : { type: 'value' },
-      series  : scatterSeries,
-      grid    : { left: 50, right: hasClrFld ? 80 : 20, top: 20, bottom: scHasLegend ? 60 : 40 }
+  if (hasClrFld) {
+    option.visualMap = {
+      type      : 'continuous',
+      min       : minC,
+      max       : maxC,
+      text      : [String(maxC), String(minC)],
+      dimension : clrField,
+      right     : 0,
+      top       : 'middle',
+      inRange   : { color: ['#91c7ae', '#d48265', '#ca8622'] },
+      textStyle : { fontSize: 10 },
+      itemWidth : 14
     };
+  }
+  return option;
+}
 
-    if (hasClrFld) {
-      var vmDimension = hasBubble ? 3 : 2;
-      scOption.visualMap = {
-        type      : 'continuous',
-        min       : minC,
-        max       : maxC,
-        text      : [String(maxC), String(minC)],
-        dimension : vmDimension,
-        right     : 0,
-        top       : 'middle',
-        inRange   : { color: ['#91c7ae', '#d48265', '#ca8622'] },
-        textStyle : { fontSize: 10 },
-        itemWidth : 14
+// ── VIOLIN (via @echarts-x/custom-violin) ────────────────────────────────────
+// xField/dimensions[0] = category grouping; seriesProps[0].field = numeric value
+// Groups raw rows by category then passes arrays to the violin series.
+function _buildViolinOption(w, rows, sp) {
+  if (!sp) sp = _getSeriesProps(w);
+  var colors  = _getChartColors(w);
+  var dims    = (Array.isArray(w.dimensions) && w.dimensions.length) ? w.dimensions : (w.xField ? [w.xField] : []);
+  var xDim    = dims[0] || '';
+  var yField  = (sp[0] && sp[0].field) || (Array.isArray(w.yFields) && w.yFields[0]) || '';
+  var violinGroups = /** @type {Record<string,number[]>} */ ({});
+  for (var i = 0; i < rows.length; i++) {
+    var r    = rows[i];
+    var cat  = String(r[xDim] != null ? r[xDim] : '');
+    var bkey = '__dlvy_0';
+    var val  = parseFloat(r[bkey] !== undefined ? r[bkey] : r[yField]);
+    if (!violinGroups[cat]) violinGroups[cat] = [];
+    if (!isNaN(val)) violinGroups[cat].push(val);
+  }
+  var cats = Object.keys(violinGroups);
+  return {
+    tooltip : { trigger: 'item' },
+    xAxis   : { type: 'category', data: cats, axisLabel: { rotate: 30, fontSize: 11 } },
+    yAxis   : { type: 'value' },
+    grid    : { left: 50, right: 20, top: 20, bottom: 60 },
+    series  : [{ type: 'violin', itemStyle: { color: colors[0] }, data: cats.map(function(c) { return { name: c, value: violinGroups[c] }; }) }]
+  };
+}
+
+// ── SLEEP STAGES (via @echarts-x/custom-bar-range) ────────────────────────────
+// dimensions[0]/xField = start; yFields[0] = end time; yFields[1] = stage label
+function _buildSleepStagesOption(w, rows) {
+  var dims        = (Array.isArray(w.dimensions) && w.dimensions.length) ? w.dimensions : (w.xField ? [w.xField] : []);
+  var xDim        = dims[0] || '';
+  var yFields     = (Array.isArray(w.yFields) && w.yFields.length) ? w.yFields : [];
+  var ssEndField  = yFields.length > 1 ? yFields[0] : xDim;
+  var ssStageField = yFields.length > 1 ? yFields[1] : (yFields[0] || '');
+  var ssStages = /** @type {string[]} */ ([]), ssSeen = /** @type {Record<string,boolean>} */ ({});
+  for (var i = 0; i < rows.length; i++) {
+    var ssv = String(rows[i][ssStageField] || '');
+    if (ssv && !ssSeen[ssv]) { ssStages.push(ssv); ssSeen[ssv] = true; }
+  }
+  return {
+    tooltip : { trigger: 'item' },
+    xAxis   : { type: 'category', data: rows.map(function(r) { return String(r[xDim] || ''); }), axisLabel: { rotate: 30, fontSize: 11 } },
+    yAxis   : { type: 'category', data: ssStages },
+    grid    : { left: 90, right: 20, top: 20, bottom: 60 },
+    series  : [{ type: 'bar-range', data: rows.map(function(r) { return [String(r[xDim] || ''), String(r[ssEndField] || ''), String(r[ssStageField] || '')]; }) }]
+  };
+}
+
+// ── AGP TIME IN RANGE (stacked bar, 0–100%) ───────────────────────────────────
+// dimensions[0]/xField = label; yFields = [very_high, high, target, low, very_low]
+function _buildAgpTirOption(w, rows, sp) {
+  if (!sp) sp = _getSeriesProps(w);
+  var dims     = (Array.isArray(w.dimensions) && w.dimensions.length) ? w.dimensions : (w.xField ? [w.xField] : []);
+  var xDim     = dims[0] || '';
+  var yFields  = (Array.isArray(w.yFields) && w.yFields.length) ? w.yFields : [];
+  var tirColors = ['#FF8C00', '#FFA500', '#008000', '#FF0000', '#8B0000'];
+  var tirLabels = ['Very High (>250 mg/dL)', 'High (181–250 mg/dL)', 'Target (70–180 mg/dL)', 'Low (54–69 mg/dL)', 'Very Low (<54 mg/dL)'];
+  var tirRow   = rows[0] || {};
+  return {
+    tooltip : { trigger: 'item', formatter: '{a}: {c}%' },
+    grid    : { left: '35%', right: '35%', top: 20, bottom: 40 },
+    xAxis   : { type: 'category', data: [xDim ? String(tirRow[xDim] || 'TIR') : 'TIR'], show: false },
+    yAxis   : { type: 'value', max: 100, axisLabel: { formatter: '{value}%' } },
+    series  : yFields.map(function(field, i) {
+      var bkey = '__dlvy_' + i;
+      var val  = parseFloat(tirRow[bkey] !== undefined ? tirRow[bkey] : tirRow[field]) || 0;
+      return {
+        name      : (sp[i] || {}).label || tirLabels[i] || field,
+        type      : 'bar',
+        stack     : 'total',
+        itemStyle : { color: (sp[i] || {}).color || tirColors[i % tirColors.length] },
+        data      : [val]
       };
-    }
+    })
+  };
+}
 
-    return scOption;
+// ── AGP GLUCOSE OVERLAY (percentile band + median line) ───────────────────────
+// dimensions[0]/xField = time labels; yFields = [p25, median, p75]
+function _buildAgpOverlayOption(w, rows, sp) {
+  if (!sp) sp = _getSeriesProps(w);
+  var dims     = (Array.isArray(w.dimensions) && w.dimensions.length) ? w.dimensions : (w.xField ? [w.xField] : []);
+  var xDim     = dims[0] || '';
+  var yFields  = (Array.isArray(w.yFields) && w.yFields.length) ? w.yFields : [];
+  var aoGet    = function(r, i) { var k = '__dlvy_' + i; return r[k] !== undefined ? r[k] : r[yFields[i]]; };
+  var times    = rows.map(function(r) { return r[xDim]; });
+  var p25      = rows.map(function(r) { return parseFloat(aoGet(r, 0)) || 0; });
+  var med      = rows.map(function(r) { return parseFloat(aoGet(r, 1)) || 0; });
+  var p75      = rows.map(function(r) { return parseFloat(aoGet(r, 2)) || 0; });
+  var band     = p75.map(function(v, i) { return v - p25[i]; });
+  var bandColor = (sp[0] || {}).color || '#4682B4';
+  var medColor  = (sp[1] || {}).color || '#000080';
+  return {
+    tooltip : { trigger: 'axis' },
+    xAxis   : { type: 'category', boundaryGap: false, data: times },
+    yAxis   : { type: 'value', name: 'Glucose (mg/dL)' },
+    grid    : { left: 60, right: 20, top: 20, bottom: 40 },
+    series  : [
+      { name: 'Base 25th', type: 'line', stack: 'agp-band', lineStyle: { opacity: 0 }, symbol: 'none', data: p25 },
+      { name: (sp[0] || {}).label || '25th–75th Percentile', type: 'line', stack: 'agp-band', lineStyle: { opacity: 0 }, symbol: 'none', areaStyle: { color: bandColor, opacity: 0.5 }, data: band },
+      { name: (sp[1] || {}).label || 'Median', type: 'line', symbol: 'none', lineStyle: { color: medColor, width: 3 }, data: med }
+    ]
+  };
+}
+
+// ── CHART OPTION DISPATCHER ───────────────────────────────────────────────────
+// Routes to the appropriate option builder based on the widget type registry.
+// Standard ECharts types with supportsDataset=true go through _buildDatasetOption.
+// Types with optionBuilder defined call that named function directly.
+function _buildChartOption(w, rows) {
+  if (!rows || !rows.length) return null;
+  var wtDef = DataLaVistaCore.WIDGET_TYPES.find(function(t) { return t.id === w.type; });
+  if (!wtDef) return null;
+  if (wtDef.optionBuilder && typeof (/** @type {any} */ (window))[wtDef.optionBuilder] === 'function') {
+    return (/** @type {any} */ (window))[wtDef.optionBuilder](w, rows, _getSeriesProps(w));
   }
-
-  // ── VIOLIN (via @echarts-x/custom-violin) ────────────────────────────────
-  // xField = category grouping; yFields[0] = numeric measurement value
-  if (w.type === 'violin') {
-    var violinGroups = /** @type {Record<string,number[]>} */ ({});
-    for (var vi = 0; vi < chartData.length; vi++) {
-      var vr = /** @type {any} */ (chartData[vi]);
-      var vcat = String(vr[xField] != null ? vr[xField] : '');
-      if (!violinGroups[vcat]) violinGroups[vcat] = [];
-      var vbkey = '__dlvy_0';
-      var vval = parseFloat(vr[vbkey] !== undefined ? vr[vbkey] : vr[yFields[0]]);
-      if (!isNaN(vval)) violinGroups[vcat].push(vval);
-    }
-    var violinCats = Object.keys(violinGroups);
-    return {
-      tooltip: { trigger: 'item' },
-      xAxis: { type: 'category', data: violinCats, axisLabel: { rotate: 30, fontSize: 11 } },
-      yAxis: { type: 'value' },
-      grid: { left: 50, right: 20, top: 20, bottom: 60 },
-      series: [{ type: 'violin', itemStyle: { color: colors[0] }, data: violinCats.map(function(cat) { return { name: cat, value: violinGroups[cat] }; }) }]
-    };
-  }
-
-  // ── SLEEP STAGES (via @echarts-x/custom-bar-range) ────────────────────────
-  // xField = start; yFields[0] = end time; yFields[1] = stage label
-  if (w.type === 'sleep_stages') {
-    var ssEndField   = yFields.length > 1 ? yFields[0] : xField;
-    var ssStageField = yFields.length > 1 ? yFields[1] : (yFields[0] || '');
-    var ssStages = /** @type {string[]} */ ([]);
-    var ssSeen = /** @type {Record<string,boolean>} */ ({});
-    for (var si = 0; si < chartData.length; si++) {
-      var ssv = String((/** @type {any} */ (chartData[si]))[ssStageField] || '');
-      if (ssv && !ssSeen[ssv]) { ssStages.push(ssv); ssSeen[ssv] = true; }
-    }
-    var sscd = /** @type {any[]} */ (chartData);
-    return {
-      tooltip: { trigger: 'item' },
-      xAxis: { type: 'category', data: sscd.map(function(r) { return String(r[xField] || ''); }), axisLabel: { rotate: 30, fontSize: 11 } },
-      yAxis: { type: 'category', data: ssStages },
-      grid: { left: 90, right: 20, top: 20, bottom: 60 },
-      series: [{ type: 'bar-range', data: sscd.map(function(r) { return [String(r[xField] || ''), String(r[ssEndField] || ''), String(r[ssStageField] || '')]; }) }]
-    };
-  }
-
-  // ── AGP TIME IN RANGE (stacked bar, 0–100%) ────────────────────────────────
-  // xField = label; yFields = [very_high, high, target, low, very_low] percentages
-  if (w.type === 'agp_tir') {
-    var tirColors  = ['#FF8C00', '#FFA500', '#008000', '#FF0000', '#8B0000'];
-    var tirLabels  = ['Very High (>250 mg/dL)', 'High (181–250 mg/dL)', 'Target (70–180 mg/dL)', 'Low (54–69 mg/dL)', 'Very Low (<54 mg/dL)'];
-    var tirRow     = /** @type {any} */ (chartData[0] || {});
-    return {
-      tooltip: { trigger: 'item', formatter: '{a}: {c}%' },
-      grid: { left: '35%', right: '35%', top: 20, bottom: 40 },
-      xAxis: { type: 'category', data: [xField ? String(tirRow[xField] || 'TIR') : 'TIR'], show: false },
-      yAxis: { type: 'value', max: 100, axisLabel: { formatter: '{value}%' } },
-      series: yFields.map(/** @param {string} field @param {number} i */ function(field, i) {
-        var bkey = '__dlvy_' + i;
-        var val  = parseFloat(tirRow[bkey] !== undefined ? tirRow[bkey] : tirRow[field]) || 0;
-        return {
-          name:      (seriesProps[i] || {}).label || tirLabels[i] || field,
-          type:      'bar',
-          stack:     'total',
-          itemStyle: { color: (seriesProps[i] || {}).color || tirColors[i % tirColors.length] },
-          data:      [val]
-        };
-      })
-    };
-  }
-
-  // ── AGP GLUCOSE OVERLAY (percentile band + median line) ───────────────────
-  // xField = time labels; yFields = [p25, median, p75]
-  if (w.type === 'agp_overlay') {
-    var aocd = /** @type {any[]} */ (chartData);
-    var aoGet = /** @param {any} r @param {number} i */ function(r, i) { var k = '__dlvy_' + i; return r[k] !== undefined ? r[k] : r[yFields[i]]; };
-    var aoTimes  = aocd.map(function(r) { return r[xField]; });
-    var aoP25    = aocd.map(function(r) { return parseFloat(aoGet(r, 0)) || 0; });
-    var aoMed    = aocd.map(function(r) { return parseFloat(aoGet(r, 1)) || 0; });
-    var aoP75    = aocd.map(function(r) { return parseFloat(aoGet(r, 2)) || 0; });
-    var aoBand   = aoP75.map(function(v, i) { return v - aoP25[i]; });
-    var bandColor  = (seriesProps[0] || {}).color || '#4682B4';
-    var medColor   = (seriesProps[1] || {}).color || '#000080';
-    return {
-      tooltip: { trigger: 'axis' },
-      xAxis: { type: 'category', boundaryGap: false, data: aoTimes },
-      yAxis: { type: 'value', name: 'Glucose (mg/dL)' },
-      grid: { left: 60, right: 20, top: 20, bottom: 40 },
-      series: [
-        { name: 'Base 25th',      type: 'line', stack: 'agp-band', lineStyle: { opacity: 0 }, symbol: 'none', data: aoP25 },
-        { name: (seriesProps[0] || {}).label || '25th–75th Percentile', type: 'line', stack: 'agp-band', lineStyle: { opacity: 0 }, symbol: 'none', areaStyle: { color: bandColor, opacity: 0.5 }, data: aoBand },
-        { name: (seriesProps[1] || {}).label || 'Median', type: 'line', symbol: 'none', lineStyle: { color: medColor, width: 3 }, data: aoMed }
-      ]
-    };
-  }
-
+  if (wtDef.supportsDataset) return _buildDatasetOption(w, rows);
   return null;
 }
 
@@ -1399,13 +1450,17 @@ function _buildChartOption(w, chartData) {
   }
   (/** @type {any} */ (option)).backgroundColor = w.chartBackgroundColor || 'transparent';
   chart.setOption(option);
-  // Cross-widget click filter
+  // Cross-widget click: filter or highlight depending on interactionMode
   chart.on('click', (params) => {
     if (params.componentType !== 'series') return;
-    const filterField = w.xField;
-    let filterValue = params.name; // works for bar/line/pie
+    const dims = (Array.isArray(w.dimensions) && w.dimensions.length) ? w.dimensions : (w.xField ? [w.xField] : []);
+    const filterField = dims[0];
+    let filterValue = params.name;
     if (w.type === 'scatter' && Array.isArray(params.data)) filterValue = String(params.data[0]);
-    if (filterField && filterValue != null) applyDrillFilter(filterField, String(filterValue));
+    if (!filterField || filterValue == null) return;
+    const mode = w.interactionMode || (DataLaVistaState.design && DataLaVistaState.design.interactionMode) || 'cross-filter';
+    if      (mode === 'cross-filter')    applyDrillFilter(filterField, String(filterValue));
+    else if (mode === 'cross-highlight') _applyDrillHighlight(filterField, String(filterValue));
   });
 }
 
@@ -2129,13 +2184,20 @@ function _renderBarLineOptionsHTML(w, wid) {
           <div class="adv-node-section">
             <div class="adv-node-section-hdr">GENERAL</div>
             <div class="props-row"><label>Title</label>
-              <input type="text" class="form-input" value="${w.title.replace(/"/g,'&quot;')}" oninput="updateWidgetProp('${wid}','title',this.value)"/></div>
+              <input type="text" class="form-input" value="${w.title.replace(/"/g,'&quot;')}" oninput="updateWidgetProp('${wid}','title',this.value)"/>
+              <div id="dlv-title-template-hint-${wid}" style="font-size:10px;color:var(--text-secondary,#605e5c);font-style:italic;margin-top:2px">${w.title && w.title.includes('{{') ? '→ ' + resolveTitleTemplate(w.title) : ''}</div></div>
             <div class="props-row"><label>Show title</label>
               <input type="checkbox" ${w.showTitle!==false?'checked':''} onchange="updateWidgetProp('${wid}','showTitle',this.checked)"/></div>
             ${_showHdrsRow}
             <div class="props-row"><label>Type</label>
               <select class="form-input" onchange="changeWidgetType('${wid}',this.value)">
                 ${_wtypeOpts}
+              </select></div>
+            <div class="props-row"><label>Interaction</label>
+              <select class="form-input" onchange="updateWidgetProp('${wid}','interactionMode',this.value)">
+                ${['','cross-filter','cross-highlight','none'].map(v =>
+                  `<option value="${v}"${(w.interactionMode||'')=== v?'selected':''}>${v||'(inherit report)'}</option>`
+                ).join('')}
               </select></div>
             <div class="props-row"><label>Width %</label>
               <input type="number" class="form-input" min="10" max="100" value="${w.widthPct}" oninput="updateWidgetProp('${wid}','widthPct',+this.value)"/></div>
@@ -2208,7 +2270,7 @@ function _renderBarLineOptionsHTML(w, wid) {
               <span>FIELDS</span>
             </div>
 						 
-            ${isChart ? fieldRow('X', w.xField, `updateWidgetProp('${wid}','xField',this.value);renderWidgetProperties('${wid}')`, 0)
+            ${isChart ? fieldRow('X', (Array.isArray(w.dimensions) && w.dimensions.length) ? w.dimensions[0] : (w.xField || ''), `updateWidgetProp('${wid}','dimensions',[this.value]);renderWidgetProperties('${wid}')`, 0)
           + `<div class="adv-drop-zone" style="margin-top:2px;margin-bottom:4px;text-align:center;padding:4px;font-size:11px" ondragover="event.preventDefault();this.classList.add('drag-over')" ondragleave="this.classList.remove('drag-over')" ondrop="_wpDropFieldToSection('${wid}','x',event)">Drop to set X field</div>`
           + '<div class="adv-node-section-hdr" style="margin-top:6px"><span>Y FIELDS</span>'
 						 
@@ -2294,14 +2356,33 @@ function _renderBarLineOptionsHTML(w, wid) {
       function updateWidgetProp(wid, prop, value) {
         const w = DataLaVistaState.design.widgets.find(x => x.id === wid);
         if (!w) return;
-        w[prop] = value;
+
+        // dimensions: keep xField in sync for legacy compat
+        if (prop === 'dimensions') {
+          w.dimensions = Array.isArray(value) ? value : [value];
+          w.xField = w.dimensions[0] || '';
+        } else if (['kpiMetricFontSize','kpiLabelFontSize','kpiLabelOverride',
+                    'bubbleSizeField','bubbleColorField',
+                    'showHeaders','headersBackgroundColor','headersFontSize','headersFontColor'].includes(prop)) {
+          if (!w.typeConfig) w.typeConfig = {};
+          w.typeConfig[prop] = value;
+          w[prop] = value; // legacy compat
+        } else {
+          w[prop] = value;
+        }
+
         // Live-update element
         const el = document.getElementById('widget-' + wid);
         if (!el) return;
         const hdr = el.querySelector('.widget-header');
         const titleEl = el.querySelector('.widget-title');
 
-        if (prop === 'title' && titleEl) titleEl.textContent = value;
+        if (prop === 'title') {
+          if (titleEl) titleEl.textContent = resolveTitleTemplate(value);
+          // Update hint in properties panel
+          const hintEl = document.getElementById('dlv-title-template-hint-' + wid);
+          if (hintEl) hintEl.textContent = value && value.includes('{{') ? '→ ' + resolveTitleTemplate(value) : '';
+        }
         if (prop === 'showTitle' && hdr) {
           if (value) {
             hdr.hidden = false;
@@ -2330,10 +2411,10 @@ function _renderBarLineOptionsHTML(w, wid) {
         // Table-specific: re-render for header style / visibility changes
         if (['showHeaders','headersBackgroundColor','headersFontSize','headersFontColor','fields'].includes(prop) && w.type === 'table')
           el.querySelector('.widget-content').innerHTML = renderTableContent(w);
-        if (['xField', 'yField', 'yFields', 'aggregation', 'fieldAggs', 'fillColor', 'fields',
-             'stacked', 'showTrendLine', 'ySeriesProps', 'bubbleSizeField', 'bubbleColorField',
+        if (['xField', 'dimensions', 'yField', 'yFields', 'aggregation', 'fieldAggs', 'fillColor', 'fields',
+             'stacked', 'showTrendLine', 'ySeriesProps', 'seriesProps', 'bubbleSizeField', 'bubbleColorField',
              'chartBackgroundColor'].includes(prop) && isEChartsWidget(w.type)) renderChart(w);
-        if (['xField', 'yField', 'aggregation', 'fieldAggs', 'fillColor', 'fields',
+        if (['xField', 'dimensions', 'yField', 'aggregation', 'fieldAggs', 'fillColor', 'fields',
              'kpiMetricFontSize', 'kpiLabelFontSize', 'kpiLabelOverride'].includes(prop) && w.type === 'kpi')
           el.querySelector('.widget-content').innerHTML = renderKPIContent(w);
       }
@@ -2592,6 +2673,27 @@ function _renderBarLineOptionsHTML(w, wid) {
       }
 
       // ============================================================
+      // DYNAMIC TITLE TEMPLATE RESOLUTION
+      // ============================================================
+
+      /**
+       * Resolve {{FIRST(FieldName)}} or {{FieldName}} tokens against [dlv_active].
+       * No caching — AlaSQL FIRST() is microseconds. Re-resolves on every render,
+       * so titles stay live after filter changes.
+       */
+      function resolveTitleTemplate(template) {
+        if (!template || !template.includes('{{')) return template || '';
+        if (!(alasql.tables && alasql.tables['dlv_active'])) return template;
+        return template.replace(/\{\{(?:FIRST\()?([^})]+)\)?\}\}/g, function(match, field) {
+          field = field.trim();
+          try {
+            const rows = alasql('SELECT FIRST([' + field + ']) AS val FROM [dlv_active]');
+            return (rows && rows[0] && rows[0].val != null) ? String(rows[0].val) : match;
+          } catch(_) { return match; }
+        });
+      }
+
+      // ============================================================
       // CROSS-WIDGET DRILL FILTER (click-to-filter)
       // ============================================================
 
@@ -2622,6 +2724,34 @@ function _renderBarLineOptionsHTML(w, wid) {
         _refreshPreviewCanvasWidgets();
       }
 
+      /**
+       * Highlight matching data points across all connected charts without re-querying.
+       * Uses ECharts dispatchAction('highlight') keyed on the dimension value name.
+       * Does NOT modify [dlv_active] — purely visual. Mode: 'cross-highlight'.
+       */
+      function _applyDrillHighlight(field, value) {
+        DataLaVistaState.drillHighlight = { field: field, value: value };
+        for (const chartId of Object.keys(DataLaVistaState.charts)) {
+          const chart = DataLaVistaState.charts[chartId];
+          const wid   = chartId.replace(/^prev_/, '');
+          const w     = (DataLaVistaState.design.widgets || []).find(function(x) { return x.id === wid; });
+          if (!w) continue;
+          const dims  = (Array.isArray(w.dimensions) && w.dimensions.length) ? w.dimensions : (w.xField ? [w.xField] : []);
+          if (!dims.includes(field)) continue;
+          try { chart.dispatchAction({ type: 'highlight', name: String(value) }); } catch(e) {}
+        }
+        _renderAllDrillChips();
+      }
+
+      /** Clear all cross-highlights on every chart instance. */
+      function _clearDrillHighlight() {
+        DataLaVistaState.drillHighlight = null;
+        for (const chart of Object.values(DataLaVistaState.charts)) {
+          try { chart.dispatchAction({ type: 'downplay' }); } catch(e) {}
+        }
+        _renderAllDrillChips();
+      }
+
       /** Rebuild [dlv_active] using combined previewFilters + drillFilters. */
       function _rebuildActiveView() {
         if (!(alasql.tables && alasql.tables['dlv_results'])) return;
@@ -2642,11 +2772,12 @@ function _renderBarLineOptionsHTML(w, wid) {
       function _renderDrillChipsIn(barId) {
         const bar = document.getElementById(barId);
         if (!bar) return;
-        // Remove stale drill chips
         bar.querySelectorAll('.dlv-drill-chip').forEach(el => el.remove());
-        const drills = Object.entries(DataLaVistaState.drillFilters || {});
-        if (!drills.length) return;
+        const drills    = Object.entries(DataLaVistaState.drillFilters || {});
+        const highlight = DataLaVistaState.drillHighlight;
+        if (!drills.length && !highlight) return;
         bar.classList.remove('hidden');
+        // Drill filter chips (🔍 blue)
         for (const [field, value] of drills) {
           const chip = document.createElement('div');
           chip.className = 'filter-pill dlv-drill-chip';
@@ -2661,7 +2792,21 @@ function _renderBarLineOptionsHTML(w, wid) {
             + `<button class="btn btn-ghost btn-sm btn-icon" style="padding:0 2px;font-size:10px" title="Clear drill filter for ${safeField}" onclick="clearDrillFilter('${escField}')">✕</button>`;
           bar.appendChild(chip);
         }
-        // Show "clear all" if >1 drill
+        // Highlight chip (👁 amber) — no re-query, purely visual
+        if (highlight) {
+          const chip = document.createElement('div');
+          chip.className = 'filter-pill dlv-drill-chip';
+          chip.style.cssText = 'display:flex;align-items:center;gap:5px;background:#fff4ce;border:1px solid #ffb900;padding:4px 8px;border-radius:var(--radius,4px)';
+          const safeField = highlight.field.replace(/</g,'&lt;').replace(/>/g,'&gt;');
+          const safeValue = String(highlight.value).replace(/</g,'&lt;').replace(/>/g,'&gt;');
+          chip.innerHTML = `<span style="font-size:10px">👁</span>`
+            + `<span style="font-size:12px;font-weight:600;color:#8a6914">${safeField}</span>`
+            + `<span style="font-size:11px;color:var(--text-secondary)">=</span>`
+            + `<span style="font-size:11px;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${safeValue}">${safeValue}</span>`
+            + `<button class="btn btn-ghost btn-sm btn-icon" style="padding:0 2px;font-size:10px" title="Clear highlight" onclick="_clearDrillHighlight()">✕</button>`;
+          bar.appendChild(chip);
+        }
+        // "Clear all" only for multiple drill filters
         if (drills.length > 1) {
           const clearAll = document.createElement('button');
           clearAll.className = 'btn btn-ghost btn-sm dlv-drill-chip';

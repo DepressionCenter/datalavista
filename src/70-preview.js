@@ -121,7 +121,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           const titleSpanStyle = `font-size:${w.titleFontSize||14}px;color:${w.titleFontColor||'#323130'}`;
           el.style.cssText = `width:${w.widthPct}%;height:${w.heightVh}vh;min-height:120px;border-color:${w.borderColor};border-width:${w.borderSize}px;background:${w.widgetBackgroundColor||'#fefefe'}`;
           el.innerHTML = `
-            <div class="widget-header${w.showTitle === false ? ' hidden' : ''}" style="${titleHdrStyle}"><span class="widget-title" style="${titleSpanStyle}">${w.title}</span></div>
+            <div class="widget-header${w.showTitle === false ? ' hidden' : ''}" style="${titleHdrStyle}"><span class="widget-title" style="${titleSpanStyle}">${resolveTitleTemplate(w.title)}</span></div>
             <div class="widget-content${isEChartsWidget(w.type) ? ' widget-content-chart' : ''}" id="prev-wcontent-${w.id}">
               ${getPrevWidgetContent(w)}
             </div>
@@ -134,6 +134,14 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
             if (isEChartsWidget(w.type)) {
               renderPreviewChart(w);
             }
+          }
+          // Connect all preview charts for cross-tooltip sync
+          const _ec = /** @type {any} */ (window.echarts);
+          if (_ec && _ec.connect) {
+            const previewCharts = Object.entries(DataLaVistaState.charts)
+              .filter(([id]) => id.startsWith('prev_'))
+              .map(([, c]) => c);
+            if (previewCharts.length > 1) _ec.connect(previewCharts);
           }
         });
       }
@@ -183,13 +191,17 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
   }
   (/** @type {any} */ (option)).backgroundColor = w.chartBackgroundColor || 'transparent';
   chart.setOption(option);
-  // Cross-widget click filter
+  // Cross-widget click: filter or highlight depending on interactionMode
   chart.on('click', (params) => {
     if (params.componentType !== 'series') return;
-    const filterField = w.xField;
+    const dims = (Array.isArray(w.dimensions) && w.dimensions.length) ? w.dimensions : (w.xField ? [w.xField] : []);
+    const filterField = dims[0];
     let filterValue = params.name;
     if (w.type === 'scatter' && Array.isArray(params.data)) filterValue = String(params.data[0]);
-    if (filterField && filterValue != null) applyDrillFilter(filterField, String(filterValue));
+    if (!filterField || filterValue == null) return;
+    const mode = w.interactionMode || (DataLaVistaState.design && DataLaVistaState.design.interactionMode) || 'cross-filter';
+    if      (mode === 'cross-filter')    applyDrillFilter(filterField, String(filterValue));
+    else if (mode === 'cross-highlight') _applyDrillHighlight(filterField, String(filterValue));
   });
 }
 

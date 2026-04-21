@@ -234,18 +234,19 @@ function buildConfig() {
     }
   }
  
-  const cleanWidgets = (DataLaVistaState.design.widgets || []).map(w => ({
+  const cleanWidgets = (DataLaVistaState.design.widgets || []).map(/** @param {any} w */ w => ({
     id: w.id,
     type: w.type,
     title: w.title || '',
     showTitle: w.showTitle !== false,
-    showHeaders: w.showHeaders !== false,
     widthPct: w.widthPct || 48,
     heightVh: w.heightVh || 33,
-    fields: Array.isArray(w.fields) ? [...w.fields] : [],
-    xField: w.xField || '',
-    yField: w.yField || '',
+    // Unified dimension model — dimensions[0] is the primary axis (replaces xField)
+    dimensions: Array.isArray(w.dimensions) && w.dimensions.length ? [...w.dimensions] : (w.xField ? [w.xField] : []),
+    // Keep xField/yFields for backward compat with older tooling reading the JSON
+    xField: (Array.isArray(w.dimensions) && w.dimensions[0]) || w.xField || '',
     yFields: Array.isArray(w.yFields) ? [...w.yFields] : [],
+    fields: Array.isArray(w.fields) ? [...w.fields] : [],
     aggregation: w.aggregation || '',
     fillColor: w.fillColor || '#0078d4',
     borderColor: w.borderColor || '#edebe9',
@@ -255,16 +256,28 @@ function buildConfig() {
     titleBackgroundColor: w.titleBackgroundColor || '#fefefe',
     titleFontSize: w.titleFontSize || 14,
     titleFontColor: w.titleFontColor || '#323130',
-    headersBackgroundColor: w.headersBackgroundColor || '#f3f2f1',
-    headersFontSize: w.headersFontSize || 12,
-    headersFontColor: w.headersFontColor || '#323130',
     fontSize: w.fontSize || 13,
     fontColor: w.fontColor || '#323130',
-    kpiMetricFontSize: w.kpiMetricFontSize || 36,
-    kpiLabelFontSize: w.kpiLabelFontSize || 13,
-    kpiLabelOverride: w.kpiLabelOverride || '',
     stacked: !!w.stacked,
     showTrendLine: !!w.showTrendLine,
+    // Per-widget interaction override — undefined means inherit report-level setting
+    ...(w.interactionMode ? { interactionMode: w.interactionMode } : {}),
+    // typeConfig: namespaces type-specific props cleanly
+    typeConfig: Object.assign(
+      {},
+      w.typeConfig || {},
+      w.type === 'kpi'     ? { kpiMetricFontSize: (w.typeConfig && w.typeConfig.kpiMetricFontSize) || w.kpiMetricFontSize || 36,
+                               kpiLabelFontSize:  (w.typeConfig && w.typeConfig.kpiLabelFontSize)  || w.kpiLabelFontSize  || 13,
+                               kpiLabelOverride:  (w.typeConfig && w.typeConfig.kpiLabelOverride)  || w.kpiLabelOverride  || '' } : {},
+      w.type === 'scatter' ? { bubbleSizeField:  (w.typeConfig && w.typeConfig.bubbleSizeField)  || w.bubbleSizeField  || '',
+                               bubbleColorField: (w.typeConfig && w.typeConfig.bubbleColorField) || w.bubbleColorField || '' } : {},
+      w.type === 'text'    ? { textContent: (w.typeConfig && w.typeConfig.textContent) || w.textContent || '',
+                               imageUrl:    (w.typeConfig && w.typeConfig.imageUrl)    || w.imageUrl    || '' } : {},
+      w.type === 'table'   ? { showHeaders:            (w.typeConfig && w.typeConfig.showHeaders)            ?? (w.showHeaders            !== false),
+                               headersBackgroundColor: (w.typeConfig && w.typeConfig.headersBackgroundColor) || w.headersBackgroundColor || '#f3f2f1',
+                               headersFontSize:        (w.typeConfig && w.typeConfig.headersFontSize)        || w.headersFontSize        || 12,
+                               headersFontColor:       (w.typeConfig && w.typeConfig.headersFontColor)       || w.headersFontColor       || '#323130' } : {}
+    ),
     seriesProps: (Array.isArray(w.seriesProps) ? w.seriesProps : []).map(sp => ({
       field:      sp.field      || '',
       agg:        sp.agg        || '',
@@ -287,10 +300,6 @@ function buildConfig() {
         return out;
       })
     })),
-    bubbleSizeField: w.bubbleSizeField || '',
-    bubbleColorField: w.bubbleColorField || '',
-    textContent: w.textContent || '',
-    imageUrl: w.imageUrl || '',
     fieldAggs: Object.assign({}, w.fieldAggs || {}),
     conditions: (w.conditions || []).map(c => ({
       conj:       c.conj       || 'AND',
@@ -319,8 +328,16 @@ function buildConfig() {
     title: DataLaVistaState.design.title || '',
     showDashboardTitle: DataLaVistaState.design.showDashboardTitle !== false,
     dashboardTitleTooltip: DataLaVistaState.design.dashboardTitleTooltip || '',
+    titleTemplate: DataLaVistaState.design.titleTemplate || '',
+    interactionMode: DataLaVistaState.design.interactionMode || 'cross-filter',
+    theme: {
+      palette:         (DataLaVistaState.design.theme && DataLaVistaState.design.theme.palette)         || [],
+      fontFamily:      (DataLaVistaState.design.theme && DataLaVistaState.design.theme.fontFamily)      || '',
+      fontSize:        (DataLaVistaState.design.theme && DataLaVistaState.design.theme.fontSize)        || null,
+      backgroundColor: (DataLaVistaState.design.theme && DataLaVistaState.design.theme.backgroundColor) || ''
+    },
     widgets: cleanWidgets,
-    filters: (DataLaVistaState.design.filters || []).map(f => ({
+    filters: (DataLaVistaState.design.filters || []).map(/** @param {any} f */ f => ({
       field: f.field || '',
       label: f.label || f.field || '',
       position: f.position || 'bar'
@@ -331,7 +348,7 @@ function buildConfig() {
   // Collect all SQL text: main query + every widget's generated SQL
   // TODO: DEBUG: This probably shoulnd't take widget SQL into account since it always uses the materialized view. Only state.sql should be used.
   const _allSqlParts = [DataLaVistaState.sql || ''];
-  for (const w of DataLaVistaState.design.widgets || []) {
+  for (const w of /** @type {any[]} */ (DataLaVistaState.design.widgets || [])) {
     const wsql = generateWidgetSQL(w, '_results');
     if (wsql) _allSqlParts.push(wsql);
   }
@@ -373,7 +390,7 @@ function buildConfig() {
  
   return {
     _license: 'This file is part of DataLaVista™. This is a configuration script for a report designed in DataLaVista™. Copyright © 2026 The Regents of the University of Michigan. This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version. This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details. You should have received a copy of the GNU General Public License along with this program. If not, see https://www.gnu.org/licenses.',
-    _min_version: 0.5,
+    _min_version: 0.6,
     activeTab: (DataLaVistaState.reportMode === 'view') ? 'dashboardPreview' : 'design',
     advancedQB: DataLaVistaState.advancedQB || {},
     currentWidgetId: DataLaVistaState.currentWidgetId || null,
@@ -451,11 +468,45 @@ async function loadConfig(cfg) {
     title: loadedDesign.title || 'DataLaVista Report',
     showDashboardTitle: loadedDesign.showDashboardTitle !== false,
     dashboardTitleTooltip: loadedDesign.dashboardTitleTooltip || '',
+    titleTemplate: loadedDesign.titleTemplate || '',
+    interactionMode: loadedDesign.interactionMode || 'cross-filter',
+    theme: {
+      palette:         (loadedDesign.theme && loadedDesign.theme.palette)         || [],
+      fontFamily:      (loadedDesign.theme && loadedDesign.theme.fontFamily)      || '',
+      fontSize:        (loadedDesign.theme && loadedDesign.theme.fontSize)        || null,
+      backgroundColor: (loadedDesign.theme && loadedDesign.theme.backgroundColor) || ''
+    },
     widgets: loadedDesign.widgets || [],
     filters: loadedDesign.filters || []
   };
-  // Migrate legacy single-yField to yFields array + backfill new widget defaults
-  for (const w of DataLaVistaState.design.widgets) {
+  // Migrate and backfill widget schema fields
+  for (const w of /** @type {any[]} */ (DataLaVistaState.design.widgets)) {
+    // dimensions[] — new multi-dim array; derive from xField for old configs
+    if (!Array.isArray(w.dimensions) || !w.dimensions.length) {
+      w.dimensions = w.xField ? [w.xField] : [];
+    }
+    // typeConfig — namespace for type-specific props; read both old top-level and new typeConfig
+    if (!w.typeConfig || typeof w.typeConfig !== 'object') w.typeConfig = {};
+    if (w.type === 'kpi') {
+      w.typeConfig.kpiMetricFontSize = w.typeConfig.kpiMetricFontSize ?? w.kpiMetricFontSize ?? 36;
+      w.typeConfig.kpiLabelFontSize  = w.typeConfig.kpiLabelFontSize  ?? w.kpiLabelFontSize  ?? 13;
+      w.typeConfig.kpiLabelOverride  = w.typeConfig.kpiLabelOverride  ?? w.kpiLabelOverride  ?? '';
+    }
+    if (w.type === 'scatter') {
+      w.typeConfig.bubbleSizeField  = w.typeConfig.bubbleSizeField  ?? w.bubbleSizeField  ?? '';
+      w.typeConfig.bubbleColorField = w.typeConfig.bubbleColorField ?? w.bubbleColorField ?? '';
+    }
+    if (w.type === 'text') {
+      w.typeConfig.textContent = w.typeConfig.textContent ?? w.textContent ?? '';
+      w.typeConfig.imageUrl    = w.typeConfig.imageUrl    ?? w.imageUrl    ?? '';
+    }
+    if (w.type === 'table') {
+      w.typeConfig.showHeaders            = w.typeConfig.showHeaders            ?? (w.showHeaders !== false);
+      w.typeConfig.headersBackgroundColor = w.typeConfig.headersBackgroundColor ?? w.headersBackgroundColor ?? '#f3f2f1';
+      w.typeConfig.headersFontSize        = w.typeConfig.headersFontSize        ?? w.headersFontSize        ?? 12;
+      w.typeConfig.headersFontColor       = w.typeConfig.headersFontColor       ?? w.headersFontColor       ?? '#323130';
+    }
+
     if (!Array.isArray(w.yFields))        w.yFields = w.yField ? [w.yField] : [];
     if (w.stacked          == null)       w.stacked = false;
     if (w.showTrendLine    == null)       w.showTrendLine = false;

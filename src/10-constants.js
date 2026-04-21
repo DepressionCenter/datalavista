@@ -234,27 +234,35 @@ SKIP_FIELDS: new Set([
   "xd_Signature"
 ]),
 
-  // Widget types — single source of truth. category: 'builtin'=non-chart | 'echarts'=standard ECharts | 'echarts-custom'=ECharts custom series | 'custom'=fully custom render.
+  // Widget types — single source of truth.
+  // category: 'builtin'=non-chart | 'echarts'=standard ECharts | 'echarts-custom'=ECharts custom series | 'custom'=fully custom render
+  // usesECharts:       renders via echarts.init()
+  // supportsDataset:   uses ECharts dataset+encode pattern (false for echarts-custom — their series don't support it)
+  // supportsInteraction: participates in cross-filter / cross-highlight
+  // optionBuilder:     fn name string → returns full ECharts option object (overrides generic dataset path)
+  // seriesBuilder:     fn name string → returns partial series config merged into generic series object
+  // sqlBuilder:        fn name string → returns { sql, fromSrc } (overrides standard buildWidgetSQL path)
+  // htmlRenderer:      fn name string → returns HTML string (for category:'custom' non-ECharts types)
+  // dimensionLabels:   labels for each dimension slot shown in properties panel
+  // seriesLabel:       label for the series/Y-fields section in properties panel
   WIDGET_TYPES: [
-    { id: 'table',        label: 'Table',               icon: '⊞',  category: 'builtin',       defaultTitle: 'Data Table'           },
-    { id: 'bar',          label: 'Bar',                 icon: '▐',  category: 'echarts',        defaultTitle: 'Bar Chart'            },
-    { id: 'line',         label: 'Line',                icon: '〰',  category: 'echarts',        defaultTitle: 'Line Chart'           },
-    { id: 'pie',          label: 'Pie',                 icon: '◕',  category: 'echarts',        defaultTitle: 'Pie Chart'            },
-    { id: 'scatter',      label: 'Scatter',             icon: '⁘',  category: 'echarts',        defaultTitle: 'Scatter Plot'         },
-    { id: 'violin',       label: 'Violin',              icon: '🎻',  category: 'echarts-custom', defaultTitle: 'Violin Plot'          },
-    { id: 'sleep_stages', label: 'Sleep Stages',        icon: '😴',  category: 'echarts-custom', defaultTitle: 'Sleep Stages'         },
-    { id: 'agp_tir',      label: 'AGP Time in Range',   icon: '📊',  category: 'custom',         defaultTitle: 'AGP Time in Range'    },
-    { id: 'agp_overlay',  label: 'AGP Glucose Overlay', icon: '🌊',  category: 'custom',         defaultTitle: 'AGP Glucose Overlay'  },
-    { id: 'kpi',          label: 'KPI',                 icon: '🔢',  category: 'builtin',       defaultTitle: 'KPI'                  },
-    { id: 'text',         label: 'Text',                icon: 'T',   category: 'builtin',       defaultTitle: 'Text'                 },
-    { id: 'placeholder',  label: 'Blank',               icon: '□',  category: 'builtin',       defaultTitle: ''                     },
-  ],
+    { id: 'table',        label: 'Table',               icon: '▦',  category: 'builtin',       defaultTitle: 'Data Table',          usesECharts: false, supportsDataset: false, supportsInteraction: true,  optionBuilder: null,                  seriesBuilder: null,               sqlBuilder: null,               htmlRenderer: null, dimensionLabels: [],          seriesLabel: 'Columns'    },
+    { id: 'bar',          label: 'Bar',                 icon: '▮',  category: 'echarts',        defaultTitle: 'Bar Chart',           usesECharts: true,  supportsDataset: true,  supportsInteraction: true,  optionBuilder: null,                  seriesBuilder: null,               sqlBuilder: null,               htmlRenderer: null, dimensionLabels: ['X Axis'], seriesLabel: 'Y Values'   },
+    { id: 'line',         label: 'Line',                icon: '∿',  category: 'echarts',        defaultTitle: 'Line Chart',          usesECharts: true,  supportsDataset: true,  supportsInteraction: true,  optionBuilder: null,                  seriesBuilder: null,               sqlBuilder: null,               htmlRenderer: null, dimensionLabels: ['X Axis'], seriesLabel: 'Y Values'   },
+    { id: 'pie',          label: 'Pie',                 icon: '◕',  category: 'echarts',        defaultTitle: 'Pie Chart',           usesECharts: true,  supportsDataset: true,  supportsInteraction: true,  optionBuilder: null,                  seriesBuilder: null,               sqlBuilder: null,               htmlRenderer: null, dimensionLabels: ['Label'],  seriesLabel: 'Values'     },
+    { id: 'scatter',      label: 'Scatter',             icon: '⁙',  category: 'echarts',        defaultTitle: 'Scatter Plot',        usesECharts: true,  supportsDataset: true,  supportsInteraction: true,  optionBuilder: '_buildScatterOption', seriesBuilder: null,               sqlBuilder: null,               htmlRenderer: null, dimensionLabels: ['X Axis'], seriesLabel: 'Y Values'   },
+    { id: 'violin',       label: 'Violin',              icon: '⧖',  category: 'echarts-custom', defaultTitle: 'Violin Plot',         usesECharts: true,  supportsDataset: false, supportsInteraction: false, optionBuilder: '_buildViolinOption',  seriesBuilder: null,               sqlBuilder: null,               htmlRenderer: null, dimensionLabels: ['Group'],  seriesLabel: 'Values'     },
+    { id: 'sleep_stages', label: 'Sleep Stages',        icon: '☾',  category: 'echarts-custom', defaultTitle: 'Sleep Stages',        usesECharts: true,  supportsDataset: false, supportsInteraction: false, optionBuilder: '_buildSleepStagesOption', seriesBuilder: null,            sqlBuilder: null,               htmlRenderer: null, dimensionLabels: ['Start'],  seriesLabel: 'Fields'     },
+    { id: 'agp_tir',      label: 'AGP Time in Range',   icon: '▤',  category: 'custom',         defaultTitle: 'AGP Time in Range',   usesECharts: true,  supportsDataset: false, supportsInteraction: false, optionBuilder: '_buildAgpTirOption',  seriesBuilder: null,               sqlBuilder: null,               htmlRenderer: null, dimensionLabels: ['Label'],  seriesLabel: 'Ranges'     },
+    { id: 'agp_overlay',  label: 'AGP Glucose Overlay', icon: '≋',  category: 'custom',         defaultTitle: 'AGP Glucose Overlay', usesECharts: true,  supportsDataset: false, supportsInteraction: false, optionBuilder: '_buildAgpOverlayOption', seriesBuilder: null,            sqlBuilder: null,               htmlRenderer: null, dimensionLabels: ['Time'],   seriesLabel: 'Percentiles'},
+    { id: 'kpi',          label: 'KPI',                 icon: '★',  category: 'builtin',       defaultTitle: 'KPI',                 usesECharts: false, supportsDataset: false, supportsInteraction: false, optionBuilder: null,                  seriesBuilder: null,               sqlBuilder: null,               htmlRenderer: null, dimensionLabels: [],          seriesLabel: 'Metric'     },
+    { id: 'text',         label: 'Text',                icon: 'T',   category: 'builtin',       defaultTitle: 'Text',                usesECharts: false, supportsDataset: false, supportsInteraction: false, optionBuilder: null,                  seriesBuilder: null,               sqlBuilder: null,               htmlRenderer: null, dimensionLabels: [],          seriesLabel: ''           },
+    { id: 'placeholder',  label: 'Blank',               icon: '⬚',  category: 'builtin',       defaultTitle: '',                    usesECharts: false, supportsDataset: false, supportsInteraction: false, optionBuilder: null,                  seriesBuilder: null,               sqlBuilder: null,               htmlRenderer: null, dimensionLabels: [],          seriesLabel: ''           },
+  ], // TODO: Add vertical container later with icon: ⊟ or ⧈ or ☰
 
-  // IDs of widget types that render via an ECharts instance (chart container + renderChart)
-  ECHARTS_WIDGET_IDS: new Set(['bar','line','pie','scatter','violin','sleep_stages','agp_tir','agp_overlay']),
-
-  // Standard built-in ECharts chart types (subset of ECHARTS_WIDGET_IDS — handled by core _buildChartOption paths)
-  BUILTIN_CHART_IDS: new Set(['bar','line','pie','scatter']),
+  // Computed from WIDGET_TYPES — no manual drift possible
+  get ECHARTS_WIDGET_IDS()  { return new Set(this.WIDGET_TYPES.filter(t => t.usesECharts).map(t => t.id)); },
+  get BUILTIN_CHART_IDS()   { return new Set(this.WIDGET_TYPES.filter(t => t.category === 'echarts').map(t => t.id)); },
 
   // Widget types where SELECT DISTINCT is applied when no aggregation is present
   DISTINCT_WIDGET_IDS: new Set(['table','bar','line','pie'])
@@ -297,7 +305,10 @@ const DataLaVistaState = {
     showDashboardTitle: true,   // whether the title bar is visible in preview/report mode
     dashboardTitleTooltip: '',  // optional HTML tooltip (sanitized) shown via info icon next to title
     widgets: [],     // widget objects
-    filters: []      // { field, label, position }  — preview filter bar chips
+    filters: [],     // { field, label, position }  — preview filter bar chips
+    interactionMode: /** @type {'cross-filter'|'cross-highlight'|'none'} */ ('cross-filter'), // report-level default
+    theme: /** @type {{palette:string[], fontFamily:string, fontSize:number|null, backgroundColor:string}} */ ({ palette: [], fontFamily: '', fontSize: null, backgroundColor: '' }),
+    titleTemplate: ''  // dashboard title — may contain {{FIRST(field)}} tokens
   },
   currentWidgetId: null,
   previewFilters: {},  // field -> value
@@ -312,6 +323,7 @@ const DataLaVistaState = {
   reportUrl: null, // if ?report=<url> param is provided, this holds the URL of the report being edited
   relationships: [], // auto-detected and manual relationships: [{ id, source, childTableKey, childField, parentTableKey, parentField, joinType, spLookupField }]
   drillFilters: {},  // cross-widget click filters: { fieldName: value } — rebuilt on every chart/table click
+  drillHighlight: null, // cross-highlight state: { field, value } — no re-query, pure ECharts dispatchAction
   FiscalYearStartMonth: 7,  // 1=Jan … 12=Dec; month when the fiscal year starts (default: 7 = July)
   _initialized: false
 }; // End dlvRawState
