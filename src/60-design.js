@@ -346,24 +346,14 @@ function rankSuggestions(rules, cols, meta) {
   }
 
       // ============================================================
-      // WIDGET TYPES
+      // WIDGET TYPES — defined in DataLaVistaCore.WIDGET_TYPES (10-constants.js)
       // ============================================================
-      const WIDGET_TYPES = [
-        { id: 'table', label: 'Table', icon: '⊞' },
-        { id: 'bar', label: 'Bar', icon: '▐' },
-        { id: 'line', label: 'Line', icon: '〰' },
-        { id: 'pie', label: 'Pie', icon: '◕' },
-        { id: 'scatter', label: 'Scatter', icon: '⁘' },
-        { id: 'kpi', label: 'KPI', icon: '🔢' },
-        { id: 'text', label: 'Text', icon: 'T' },
-        { id: 'placeholder', label: 'Blank', icon: '□' },
-      ];
 
       function initToolbox() {
         const grid = document.getElementById('widget-types-grid');
         if(grid) {
             grid.innerHTML = '';
-            for (const wt of WIDGET_TYPES) {
+            for (const wt of DataLaVistaCore.WIDGET_TYPES) {
               const btn = document.createElement('div');
               btn.className = 'widget-type-btn';
               btn.draggable = true;
@@ -455,7 +445,7 @@ function rankSuggestions(rules, cols, meta) {
           return { yField: fb, yFields: fb ? [fb] : [], yAgg: '' };
         })();
         // Build initial seriesProps — one entry per Y field for charts, one per column for table/KPI
-        const _isChartWidget = ['bar','line','pie','scatter'].includes(widgetType);
+        const _isChartWidget = isEChartsWidget(widgetType);
         // Candidate columns: prefer the dropped table's own field aliases, fall back to queryColumns.
         const _candidates = (() => {
           const t = tableName && DataLaVistaState.tables[tableName];
@@ -559,8 +549,8 @@ function rankSuggestions(rules, cols, meta) {
       }
 
       function getDefaultTitle(type) {
-        const map = { table: 'Data Table', bar: 'Bar Chart', line: 'Line Chart', pie: 'Pie Chart', scatter: 'Scatter Plot', kpi: 'KPI', text: 'Text', placeholder: '' };
-        return map[type] || 'Widget';
+        const wt = DataLaVistaCore.WIDGET_TYPES.find(function(x) { return x.id === type; });
+        return wt ? wt.defaultTitle : 'Widget';
       }
 
       // ============================================================
@@ -571,11 +561,11 @@ function rankSuggestions(rules, cols, meta) {
         if (w.type === 'placeholder') return '';
         if (w.type === 'kpi') return renderKPIContent(w);
         if (w.type === 'table') return renderTableContent(w);
-        if (['bar', 'line', 'pie', 'scatter'].includes(w.type)) return `<div id="chart-${w.id}" style="width:100%;height:100%;min-height:200px"></div>`;
+        if (isEChartsWidget(w.type)) return `<div id="chart-${w.id}" style="width:100%;height:100%;min-height:200px"></div>`;
         return '';
       }
-	  
-	  
+
+
       function renderDesignCanvas() {
         const canvas = document.getElementById('canvas-drop-zone');
         const hint = document.getElementById('canvas-empty-hint');
@@ -603,7 +593,7 @@ function rankSuggestions(rules, cols, meta) {
         // Render charts after DOM
         requestAnimationFrame(() => {
           for (const w of DataLaVistaState.design.widgets) {
-            if (['bar', 'line', 'pie', 'scatter'].includes(w.type)) {
+            if (isEChartsWidget(w.type)) {
               renderChart(w);
             }
           }
@@ -623,7 +613,7 @@ function rankSuggestions(rules, cols, meta) {
 
         const titleHdrStyle   = `background:${w.titleBackgroundColor||'#fefefe'}`;
         const titleSpanStyle  = `font-size:${w.titleFontSize||14}px;color:${w.titleFontColor||'#323130'}`;
-        const isChartWidget = ['bar', 'line', 'pie', 'scatter'].includes(w.type);
+        const isChartWidget = isEChartsWidget(w.type);
 		el.innerHTML = `<div class="widget-header" style="${titleHdrStyle}"><span class="widget-title" style="${titleSpanStyle}">${w.title || ''}</span>${actions}</div>
   <div class="widget-content${isChartWidget ? ' widget-content-chart' : ''}" id="wcontent-${w.id}">${getWidgetContentHTML(w)}</div><div class="widget-resize-handle"></div>`;
         // Context-aware title visibility
@@ -654,7 +644,7 @@ function rankSuggestions(rules, cols, meta) {
         if (w.type === 'placeholder') return '';
         if (w.type === 'kpi') return renderKPIContent(w);
         if (w.type === 'table') return renderTableContent(w);
-        if (['bar', 'line', 'pie', 'scatter'].includes(w.type)) return `<div id="chart-${w.id}" style="width:100%;height:100%;min-height:200px"></div>`;
+        if (isEChartsWidget(w.type)) return `<div id="chart-${w.id}" style="width:100%;height:100%;min-height:200px"></div>`;
         return '';
       }
 
@@ -702,7 +692,7 @@ function rankSuggestions(rules, cols, meta) {
           }
         }
         // Legacy migration: reconstruct from ySeriesProps (index-keyed) + fieldAggs (field-keyed)
-        const _isChart = ['bar','line','pie','scatter'].includes(w.type);
+        const _isChart = isEChartsWidget(w.type);
         if (_isChart) {
           const yfs = (Array.isArray(w.yFields) && w.yFields.length)
             ? w.yFields : (w.yField ? [w.yField] : []);
@@ -760,7 +750,7 @@ function rankSuggestions(rules, cols, meta) {
         const _isVirtCount = (f) => f === '__dlv_count__';
         const _inCols = (f) => _isVirtCount(f) || !availCols || availCols.has(f);
 
-        const _isChartType = ['bar', 'line', 'pie', 'scatter'].includes(w.type);
+        const _isChartType = isEChartsWidget(w.type);
 
         // seriesProps is the unified source of truth (replaces both fieldAggs and ySeriesProps).
         // Fall back to reconstructing from legacy fieldAggs + ySeriesProps for old configs
@@ -797,7 +787,7 @@ function rankSuggestions(rules, cols, meta) {
         const anyAgg       = _isChartType
           ? yFields.some((yf, i) => _isVirtCount(yf) || _getAgg(i))
           : cols.some((col, i) => _isVirtCount(col) || _getAgg(i));
-        const needsDistinct = !anyAgg && ['table', 'bar', 'line', 'pie'].includes(w.type);
+        const needsDistinct = !anyAgg && DataLaVistaCore.DISTINCT_WIDGET_IDS.has(w.type);
 
         let selParts;
         if (_isChartType && xField) {
@@ -880,17 +870,17 @@ function rankSuggestions(rules, cols, meta) {
         const conditions = (w.conditions || []).filter(c => c.field);
         const sorts      = (w.sorts     || []).filter(s => s.field);
 
-        if (w.type !== 'table' && w.type !== 'kpi' && !['bar','line','pie','scatter'].includes(w.type)) return base;
+        if (w.type !== 'table' && w.type !== 'kpi' && !isEChartsWidget(w.type)) return base;
 
         const built = buildWidgetSQL(w);
         if (!built) return base;
 
         const { sql } = built;
 
-        const _isChart2 = ['bar','line','pie','scatter'].includes(w.type);
+        const _isChart2 = isEChartsWidget(w.type);
         const sp2 = _getSeriesProps(w);
         const anyAgg = sp2.some(s => s.agg);
-        const needsDistinct = !anyAgg && ['table','bar','line','pie'].includes(w.type);
+        const needsDistinct = !anyAgg && DataLaVistaCore.DISTINCT_WIDGET_IDS.has(w.type);
 
         // Check if we have any relevant fields at all
         const hasCols = _isChart2
@@ -1288,6 +1278,99 @@ function _buildChartOption(w, chartData) {
     return scOption;
   }
 
+  // ── VIOLIN (via @echarts-x/custom-violin) ────────────────────────────────
+  // xField = category grouping; yFields[0] = numeric measurement value
+  if (w.type === 'violin') {
+    var violinGroups = /** @type {Record<string,number[]>} */ ({});
+    for (var vi = 0; vi < chartData.length; vi++) {
+      var vr = /** @type {any} */ (chartData[vi]);
+      var vcat = String(vr[xField] != null ? vr[xField] : '');
+      if (!violinGroups[vcat]) violinGroups[vcat] = [];
+      var vbkey = '__dlvy_0';
+      var vval = parseFloat(vr[vbkey] !== undefined ? vr[vbkey] : vr[yFields[0]]);
+      if (!isNaN(vval)) violinGroups[vcat].push(vval);
+    }
+    var violinCats = Object.keys(violinGroups);
+    return {
+      tooltip: { trigger: 'item' },
+      xAxis: { type: 'category', data: violinCats, axisLabel: { rotate: 30, fontSize: 11 } },
+      yAxis: { type: 'value' },
+      grid: { left: 50, right: 20, top: 20, bottom: 60 },
+      series: [{ type: 'violin', itemStyle: { color: colors[0] }, data: violinCats.map(function(cat) { return { name: cat, value: violinGroups[cat] }; }) }]
+    };
+  }
+
+  // ── SLEEP STAGES (via @echarts-x/custom-bar-range) ────────────────────────
+  // xField = start; yFields[0] = end time; yFields[1] = stage label
+  if (w.type === 'sleep_stages') {
+    var ssEndField   = yFields.length > 1 ? yFields[0] : xField;
+    var ssStageField = yFields.length > 1 ? yFields[1] : (yFields[0] || '');
+    var ssStages = /** @type {string[]} */ ([]);
+    var ssSeen = /** @type {Record<string,boolean>} */ ({});
+    for (var si = 0; si < chartData.length; si++) {
+      var ssv = String((/** @type {any} */ (chartData[si]))[ssStageField] || '');
+      if (ssv && !ssSeen[ssv]) { ssStages.push(ssv); ssSeen[ssv] = true; }
+    }
+    var sscd = /** @type {any[]} */ (chartData);
+    return {
+      tooltip: { trigger: 'item' },
+      xAxis: { type: 'category', data: sscd.map(function(r) { return String(r[xField] || ''); }), axisLabel: { rotate: 30, fontSize: 11 } },
+      yAxis: { type: 'category', data: ssStages },
+      grid: { left: 90, right: 20, top: 20, bottom: 60 },
+      series: [{ type: 'bar-range', data: sscd.map(function(r) { return [String(r[xField] || ''), String(r[ssEndField] || ''), String(r[ssStageField] || '')]; }) }]
+    };
+  }
+
+  // ── AGP TIME IN RANGE (stacked bar, 0–100%) ────────────────────────────────
+  // xField = label; yFields = [very_high, high, target, low, very_low] percentages
+  if (w.type === 'agp_tir') {
+    var tirColors  = ['#FF8C00', '#FFA500', '#008000', '#FF0000', '#8B0000'];
+    var tirLabels  = ['Very High (>250 mg/dL)', 'High (181–250 mg/dL)', 'Target (70–180 mg/dL)', 'Low (54–69 mg/dL)', 'Very Low (<54 mg/dL)'];
+    var tirRow     = /** @type {any} */ (chartData[0] || {});
+    return {
+      tooltip: { trigger: 'item', formatter: '{a}: {c}%' },
+      grid: { left: '35%', right: '35%', top: 20, bottom: 40 },
+      xAxis: { type: 'category', data: [xField ? String(tirRow[xField] || 'TIR') : 'TIR'], show: false },
+      yAxis: { type: 'value', max: 100, axisLabel: { formatter: '{value}%' } },
+      series: yFields.map(/** @param {string} field @param {number} i */ function(field, i) {
+        var bkey = '__dlvy_' + i;
+        var val  = parseFloat(tirRow[bkey] !== undefined ? tirRow[bkey] : tirRow[field]) || 0;
+        return {
+          name:      (seriesProps[i] || {}).label || tirLabels[i] || field,
+          type:      'bar',
+          stack:     'total',
+          itemStyle: { color: (seriesProps[i] || {}).color || tirColors[i % tirColors.length] },
+          data:      [val]
+        };
+      })
+    };
+  }
+
+  // ── AGP GLUCOSE OVERLAY (percentile band + median line) ───────────────────
+  // xField = time labels; yFields = [p25, median, p75]
+  if (w.type === 'agp_overlay') {
+    var aocd = /** @type {any[]} */ (chartData);
+    var aoGet = /** @param {any} r @param {number} i */ function(r, i) { var k = '__dlvy_' + i; return r[k] !== undefined ? r[k] : r[yFields[i]]; };
+    var aoTimes  = aocd.map(function(r) { return r[xField]; });
+    var aoP25    = aocd.map(function(r) { return parseFloat(aoGet(r, 0)) || 0; });
+    var aoMed    = aocd.map(function(r) { return parseFloat(aoGet(r, 1)) || 0; });
+    var aoP75    = aocd.map(function(r) { return parseFloat(aoGet(r, 2)) || 0; });
+    var aoBand   = aoP75.map(function(v, i) { return v - aoP25[i]; });
+    var bandColor  = (seriesProps[0] || {}).color || '#4682B4';
+    var medColor   = (seriesProps[1] || {}).color || '#000080';
+    return {
+      tooltip: { trigger: 'axis' },
+      xAxis: { type: 'category', boundaryGap: false, data: aoTimes },
+      yAxis: { type: 'value', name: 'Glucose (mg/dL)' },
+      grid: { left: 60, right: 20, top: 20, bottom: 40 },
+      series: [
+        { name: 'Base 25th',      type: 'line', stack: 'agp-band', lineStyle: { opacity: 0 }, symbol: 'none', data: aoP25 },
+        { name: (seriesProps[0] || {}).label || '25th–75th Percentile', type: 'line', stack: 'agp-band', lineStyle: { opacity: 0 }, symbol: 'none', areaStyle: { color: bandColor, opacity: 0.5 }, data: aoBand },
+        { name: (seriesProps[1] || {}).label || 'Median', type: 'line', symbol: 'none', lineStyle: { color: medColor, width: 3 }, data: aoMed }
+      ]
+    };
+  }
+
   return null;
 }
 
@@ -1314,7 +1397,7 @@ function _buildChartOption(w, chartData) {
     chart.setOption({ backgroundColor: w.chartBackgroundColor || 'transparent', title: { text: 'No data', left: 'center', top: 'middle', textStyle: { color: '#a19f9d', fontSize: 13 } } });
     return;
   }
-  option.backgroundColor = w.chartBackgroundColor || 'transparent';
+  (/** @type {any} */ (option)).backgroundColor = w.chartBackgroundColor || 'transparent';
   chart.setOption(option);
   // Cross-widget click filter
   chart.on('click', (params) => {
@@ -1924,8 +2007,10 @@ function _renderBarLineOptionsHTML(w, wid) {
         const w = DataLaVistaState.design.widgets.find(x => x.id === wid);
         if (!w) return;
         const section = document.getElementById('props-section');
+        if (!section) return;
+        const _wa = /** @type {any} */ (w); // type cast: widgets[] is inferred as never[] at the state declaration
 
-        const isChart = ['bar', 'line', 'pie', 'scatter'].includes(w.type);
+        const isChart = isEChartsWidget(w.type);
         const isKPI   = w.type === 'kpi';
         const isTable = w.type === 'table';
         const isText  = w.type === 'text';
@@ -2033,6 +2118,13 @@ function _renderBarLineOptionsHTML(w, wid) {
           return `<div style="font-size:11px;color:var(--text-disabled);padding:2px 0">Auto: ${nonAggCols.join(', ')}</div>`;
         };
 
+        const _wtypeOpts = DataLaVistaCore.WIDGET_TYPES.map(function(t) {
+          return '<option value="' + t.id + '"' + (t.id === _wa.type ? ' selected' : '') + '>' + t.label + '</option>';
+        }).join('');
+        const _showHdrsRow = isTable
+          ? '<div class="props-row"><label>Show headers</label>'
+            + '<input type="checkbox" ' + (_wa.showHeaders!==false?'checked':'') + ' onchange="updateWidgetProp(\'' + wid + '\',\'showHeaders\',this.checked)"/></div>'
+          : '';
         section.innerHTML = `
           <div class="adv-node-section">
             <div class="adv-node-section-hdr">GENERAL</div>
@@ -2040,11 +2132,10 @@ function _renderBarLineOptionsHTML(w, wid) {
               <input type="text" class="form-input" value="${w.title.replace(/"/g,'&quot;')}" oninput="updateWidgetProp('${wid}','title',this.value)"/></div>
             <div class="props-row"><label>Show title</label>
               <input type="checkbox" ${w.showTitle!==false?'checked':''} onchange="updateWidgetProp('${wid}','showTitle',this.checked)"/></div>
-            ${isTable ? `<div class="props-row"><label>Show headers</label>
-              <input type="checkbox" ${w.showHeaders!==false?'checked':''} onchange="updateWidgetProp('${wid}','showHeaders',this.checked)"/></div>` : ''}
+            ${_showHdrsRow}
             <div class="props-row"><label>Type</label>
               <select class="form-input" onchange="changeWidgetType('${wid}',this.value)">
-                ${WIDGET_TYPES.map(t=>`<option value="${t.id}" ${t.id===w.type?'selected':''}>${t.label}</option>`).join('')}
+                ${_wtypeOpts}
               </select></div>
             <div class="props-row"><label>Width %</label>
               <input type="number" class="form-input" min="10" max="100" value="${w.widthPct}" oninput="updateWidgetProp('${wid}','widthPct',+this.value)"/></div>
@@ -2241,7 +2332,7 @@ function _renderBarLineOptionsHTML(w, wid) {
           el.querySelector('.widget-content').innerHTML = renderTableContent(w);
         if (['xField', 'yField', 'yFields', 'aggregation', 'fieldAggs', 'fillColor', 'fields',
              'stacked', 'showTrendLine', 'ySeriesProps', 'bubbleSizeField', 'bubbleColorField',
-             'chartBackgroundColor'].includes(prop) && ['bar', 'line', 'pie', 'scatter'].includes(w.type)) renderChart(w);
+             'chartBackgroundColor'].includes(prop) && isEChartsWidget(w.type)) renderChart(w);
         if (['xField', 'yField', 'aggregation', 'fieldAggs', 'fillColor', 'fields',
              'kpiMetricFontSize', 'kpiLabelFontSize', 'kpiLabelOverride'].includes(prop) && w.type === 'kpi')
           el.querySelector('.widget-content').innerHTML = renderKPIContent(w);
@@ -2250,8 +2341,8 @@ function _renderBarLineOptionsHTML(w, wid) {
       function changeWidgetType(wid, newType) {
         const w = DataLaVistaState.design.widgets.find(x => x.id === wid);
         if (!w) return;
-        const prevIsChart = ['bar','line','pie','scatter'].includes(w.type);
-        const newIsChart  = ['bar','line','pie','scatter'].includes(newType);
+        const prevIsChart = isEChartsWidget(w.type);
+        const newIsChart  = isEChartsWidget(newType);
         w.type = newType;
 
         // Switching chart → table/kpi: chart seriesProps are stale for a table/kpi
@@ -2313,7 +2404,7 @@ function _renderBarLineOptionsHTML(w, wid) {
         if (!field) return;
         const w = DataLaVistaState.design.widgets.find(x => x.id === wid);
         if (!w) return;
-        const isChart = ['bar', 'line', 'pie', 'scatter'].includes(w.type);
+        const isChart = isEChartsWidget(w.type);
         const isKPI   = w.type === 'kpi';
         if (isChart) {
           // Add to Y fields with default agg (none for numbers, COUNT for others)
@@ -2358,7 +2449,7 @@ function _renderBarLineOptionsHTML(w, wid) {
         const el = document.getElementById('wcontent-' + wid);
         if (!el) return;
         el.innerHTML = getWidgetContentHTML(w);
-        if (['bar', 'line', 'pie', 'scatter'].includes(w.type)) requestAnimationFrame(() => renderChart(w));
+        if (isEChartsWidget(w.type)) requestAnimationFrame(() => renderChart(w));
       }
 
       // ============================================================
@@ -2592,7 +2683,7 @@ function _renderBarLineOptionsHTML(w, wid) {
           const content = el.querySelector('.widget-content');
           if (!content) return;
           content.innerHTML = getPrevWidgetContent(w);
-          if (['bar', 'line', 'pie', 'scatter'].includes(w.type)) {
+          if (isEChartsWidget(w.type)) {
             requestAnimationFrame(() => renderPreviewChart(w));
           }
         });

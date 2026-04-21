@@ -232,10 +232,39 @@ SKIP_FIELDS: new Set([
   "odata.type",
   "xd_ProgID",
   "xd_Signature"
-])
+]),
 
-  
+  // Widget types — single source of truth. category: 'builtin'=non-chart | 'echarts'=standard ECharts | 'echarts-custom'=ECharts custom series | 'custom'=fully custom render.
+  WIDGET_TYPES: [
+    { id: 'table',        label: 'Table',               icon: '⊞',  category: 'builtin',       defaultTitle: 'Data Table'           },
+    { id: 'bar',          label: 'Bar',                 icon: '▐',  category: 'echarts',        defaultTitle: 'Bar Chart'            },
+    { id: 'line',         label: 'Line',                icon: '〰',  category: 'echarts',        defaultTitle: 'Line Chart'           },
+    { id: 'pie',          label: 'Pie',                 icon: '◕',  category: 'echarts',        defaultTitle: 'Pie Chart'            },
+    { id: 'scatter',      label: 'Scatter',             icon: '⁘',  category: 'echarts',        defaultTitle: 'Scatter Plot'         },
+    { id: 'violin',       label: 'Violin',              icon: '🎻',  category: 'echarts-custom', defaultTitle: 'Violin Plot'          },
+    { id: 'sleep_stages', label: 'Sleep Stages',        icon: '😴',  category: 'echarts-custom', defaultTitle: 'Sleep Stages'         },
+    { id: 'agp_tir',      label: 'AGP Time in Range',   icon: '📊',  category: 'custom',         defaultTitle: 'AGP Time in Range'    },
+    { id: 'agp_overlay',  label: 'AGP Glucose Overlay', icon: '🌊',  category: 'custom',         defaultTitle: 'AGP Glucose Overlay'  },
+    { id: 'kpi',          label: 'KPI',                 icon: '🔢',  category: 'builtin',       defaultTitle: 'KPI'                  },
+    { id: 'text',         label: 'Text',                icon: 'T',   category: 'builtin',       defaultTitle: 'Text'                 },
+    { id: 'placeholder',  label: 'Blank',               icon: '□',  category: 'builtin',       defaultTitle: ''                     },
+  ],
+
+  // IDs of widget types that render via an ECharts instance (chart container + renderChart)
+  ECHARTS_WIDGET_IDS: new Set(['bar','line','pie','scatter','violin','sleep_stages','agp_tir','agp_overlay']),
+
+  // Standard built-in ECharts chart types (subset of ECHARTS_WIDGET_IDS — handled by core _buildChartOption paths)
+  BUILTIN_CHART_IDS: new Set(['bar','line','pie','scatter']),
+
+  // Widget types where SELECT DISTINCT is applied when no aggregation is present
+  DISTINCT_WIDGET_IDS: new Set(['table','bar','line','pie'])
+
 } // End DataLaVistaCore
+
+/** Returns true if the widget type renders using an ECharts instance. @param {string} type */
+function isEChartsWidget(type) {
+  return DataLaVistaCore.ECHARTS_WIDGET_IDS.has(type);
+}
 
 
 /* ===== STATE ===== */

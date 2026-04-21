@@ -59,7 +59,7 @@ function generateWidgetSQL(w, tableRef = '_results') {
     return `SELECT ${cols} FROM ${q}${where}`;
   }
 
-  if (['bar', 'line', 'pie'].includes(w.type)) {
+  if (isEChartsWidget(w.type) && w.type !== 'scatter') {
   const xField = w.xField;
   const yFields = (Array.isArray(w.yFields) && w.yFields.length) ? w.yFields : (w.yField ? [w.yField] : []);
   if (!xField) return `SELECT * FROM ${q}${where}`;
@@ -480,7 +480,7 @@ async function loadConfig(cfg) {
     // Populate seriesProps (unified source of truth).
     // New configs have it saved directly; legacy configs need reconstruction.
     if (!Array.isArray(w.seriesProps) || !w.seriesProps.length) {
-      const _isChartW = ['bar','line','pie','scatter'].includes(w.type);
+      const _isChartW = isEChartsWidget(w.type);
       if (_isChartW) {
         const _yfs = (Array.isArray(w.yFields) && w.yFields.length) ? w.yFields : (w.yField ? [w.yField] : []);
         w.seriesProps = _yfs.map((yf, yi) => {

@@ -122,7 +122,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           el.style.cssText = `width:${w.widthPct}%;height:${w.heightVh}vh;min-height:120px;border-color:${w.borderColor};border-width:${w.borderSize}px;background:${w.widgetBackgroundColor||'#fefefe'}`;
           el.innerHTML = `
             <div class="widget-header${w.showTitle === false ? ' hidden' : ''}" style="${titleHdrStyle}"><span class="widget-title" style="${titleSpanStyle}">${w.title}</span></div>
-            <div class="widget-content${['bar','line','pie','scatter'].includes(w.type) ? ' widget-content-chart' : ''}" id="prev-wcontent-${w.id}">
+            <div class="widget-content${isEChartsWidget(w.type) ? ' widget-content-chart' : ''}" id="prev-wcontent-${w.id}">
               ${getPrevWidgetContent(w)}
             </div>
           `;
@@ -131,7 +131,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 
         requestAnimationFrame(() => {
           for (const w of DataLaVistaState.design.widgets) {
-            if (['bar', 'line', 'pie', 'scatter'].includes(w.type)) {
+            if (isEChartsWidget(w.type)) {
               renderPreviewChart(w);
             }
           }
@@ -145,7 +145,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         if (w.type === 'placeholder') return '';
         if (w.type === 'kpi') return renderPrevKPI(w);
         if (w.type === 'table') return renderPrevTable(w);
-        if (['bar', 'line', 'pie', 'scatter'].includes(w.type)) return `<div id="prevchart-${w.id}" style="width:100%;height:100%;min-height:200px"></div>`;
+        if (isEChartsWidget(w.type)) return `<div id="prevchart-${w.id}" style="width:100%;height:100%;min-height:200px"></div>`;
         return '';
       }
 
@@ -181,7 +181,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
     chart.setOption({ backgroundColor: w.chartBackgroundColor || 'transparent', title: { text: 'No data', left: 'center', top: 'middle', textStyle: { color: '#a19f9d', fontSize: 13 } } });
     return;
   }
-  option.backgroundColor = w.chartBackgroundColor || 'transparent';
+  (/** @type {any} */ (option)).backgroundColor = w.chartBackgroundColor || 'transparent';
   chart.setOption(option);
   // Cross-widget click filter
   chart.on('click', (params) => {
@@ -222,7 +222,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           if (!w) return;
           const content = el.querySelector('.widget-content');
           content.innerHTML = getPrevWidgetContent(w);
-          if (['bar', 'line', 'pie', 'scatter'].includes(w.type)) {
+          if (isEChartsWidget(w.type)) {
             requestAnimationFrame(() => renderPreviewChart(w));
           }
         });
