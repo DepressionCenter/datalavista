@@ -238,8 +238,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         _renderAllDrillChips,
         _renderDrillChipsIn,
         resolveTitleTemplate,
-        scoreRule,
-        rankSuggestions,
         sanitizeHTML,
         renderDashboardTitleProperties,
         updateDashboardTitleProp,
@@ -269,5 +267,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         widgetAddSort,
         widgetUpdateSort,
         widgetRemoveSort,
+        applyDlvEChartsTheme,
         init
       };
