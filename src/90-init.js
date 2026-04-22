@@ -126,20 +126,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       if(document.getElementById('toolbar-tab-reportMode')) document.getElementById('toolbar-tab-reportMode').classList.add('hidden');
     } else{return;}
   }
-
-
-  // Register a DataLaVista ECharts theme that reads from the report-level theme settings.
-// Called at startup and re-called after theme changes to apply font/color settings.
-function applyDlvEChartsTheme() {
-  const echarts = /** @type {any} */ ((/** @type {any} */ (window)).echarts);
-  if (!echarts) return;
-  const t = (DataLaVistaState.design && DataLaVistaState.design.theme) || {};
-  echarts.registerTheme('dlv', {
-    color: (t.palette && t.palette.length) ? t.palette : undefined,
-    textStyle: t.fontFamily ? { fontFamily: t.fontFamily } : undefined,
-    backgroundColor: t.backgroundColor || 'transparent'
-  });
-}
   
   // Guard: call init() automatically if it was never called (e.g. SiteAssets/lazy mode).
   function ensureInit() {
@@ -218,7 +204,6 @@ function applyDlvEChartsTheme() {
           if (window._cmEditor) window._cmEditor.setValue('-- Connect to a data source and drag a table into the query builder\n-- or write your SQL here directly\nSELECT \'DataLaVista\'');
         }
 
-    applyDlvEChartsTheme();
 
     if (DataLaVistaState.reportMode === 'view') {
         /* *** DATALAVISTA REPORT VIEW MODE *** */
