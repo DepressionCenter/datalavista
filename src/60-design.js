@@ -443,6 +443,11 @@ function rankSuggestions(rules, cols, meta) {
         event.currentTarget.classList.remove('drag-over');
         const data = safeDragParse(event);
         if (!data) return;
+        if (data.type === 'existing-widget') {
+          // Un-parent widget from container → back to canvas
+          _removeWidgetFromContainer(data.widgetId);
+          return;
+        }
         if (data.type === 'widget-type') {
           if (data.widgetType === 'table') {
             addWidgetToCanvas('table', null, data.table);
@@ -554,10 +559,15 @@ function rankSuggestions(rules, cols, meta) {
           id,
           type: widgetType,
           title: getDefaultTitle(widgetType),
-          showTitle: true,
+          showTitle: (widgetType === 'placeholder' || widgetType === 'container') ? false : true,
           showHeaders: true,
           widthPct: 45,
           heightVh: 30,
+          parentContainerId: null,
+          minHeightVh: 30,
+          containerGap: 8,
+          containerPadding: 8,
+          containerAlign: 'top',
           fields: _initFields,
           xField: (fields && fields.length > 0) ? fields[0] : DataLaVistaState.queryColumns[0] || '',
           yField: _smartY.yField,  // legacy compat
@@ -617,14 +627,65 @@ function rankSuggestions(rules, cols, meta) {
       // DESIGN CANVAS RENDERING
       // ============================================================
       function getWidgetContentHTML(w) {
-        if (w.type === 'text') return `<div class="text-widget" style="font-size:${w.fontSize}px;color:${w.fontColor}">${w.textContent}</div>`;
+        if (w.type === 'text') return '<div class="text-widget" style="font-size:' + w.fontSize + 'px;color:' + w.fontColor + '">' + w.textContent + '</div>';
         if (w.type === 'placeholder') return '';
+        if (w.type === 'container') return renderContainerContent(w);
         if (w.type === 'kpi') return renderKPIContent(w);
         if (w.type === 'table') return renderTableContent(w);
-        if (isEChartsWidget(w.type)) return `<div id="chart-${w.id}" style="width:100%;height:100%;min-height:200px"></div>`;
+        if (isEChartsWidget(w.type)) return '<div id="chart-' + w.id + '" style="width:100%;height:100%;min-height:200px"></div>';
         return '';
       }
 
+
+      /** Renders a placeholder drop-hint inside a container in design mode. */
+      function renderContainerContent(w) {
+        var children = DataLaVistaState.design.widgets.filter(function(cw) { return cw.parentContainerId === w.id; });
+        if (!children.length) {
+          return '<div style="padding:16px;text-align:center;color:var(--text-disabled);font-size:12px;border:1px dashed var(--border);border-radius:4px;margin:4px">'
+            + 'Drag widgets here to add them to this container'
+            + '</div>';
+        }
+        // Children are rendered by renderDesignCanvas; return empty string here so they are not double-rendered
+        return '';
+      }
+
+      /** Renders container children in preview mode. */
+      function renderPrevContainerContent(w) {
+        var children = DataLaVistaState.design.widgets.filter(function(cw) { return cw.parentContainerId === w.id; });
+        if (!children.length) return '';
+        var html = '';
+        for (var _pci = 0; _pci < children.length; _pci++) {
+          var cw = children[_pci];
+          var titleHdrStyle  = 'background:' + (cw.titleBackgroundColor || '#fefefe');
+          var titleSpanStyle = 'font-size:' + (cw.titleFontSize || 14) + 'px;color:' + (cw.titleFontColor || '#323130');
+          var isHidden = (cw.showTitle === false) ? ' hidden' : '';
+          var isChart  = isEChartsWidget(cw.type);
+          html += '<div class="widget" style="width:100%;height:' + cw.heightVh + 'vh;min-height:80px;border-color:' + cw.borderColor + ';border-width:' + cw.borderSize + 'px;background:' + (cw.widgetBackgroundColor || '#fefefe') + '">';
+          html += '<div class="widget-header' + isHidden + '" style="' + titleHdrStyle + '"><span class="widget-title" style="' + titleSpanStyle + '">' + cw.title + '</span></div>';
+          html += '<div class="widget-content' + (isChart ? ' widget-content-chart' : '') + '" id="prev-wcontent-' + cw.id + '">' + getPrevWidgetContent(cw) + '</div>';
+          html += '</div>';
+        }
+        return html;
+      }
+
+      /** Move an existing widget into a container. Prevents container nesting. */
+      function _dropWidgetIntoContainer(widgetId, containerId) {
+        if (widgetId === containerId) return;
+        var dragged = DataLaVistaState.design.widgets.find(function(x) { return x.id === widgetId; });
+        if (!dragged || dragged.type === 'container') return; // no nesting
+        dragged.parentContainerId = containerId;
+        renderDesignCanvas();
+        selectWidget(widgetId);
+      }
+
+      /** Remove a widget from its container (un-parent to canvas). */
+      function _removeWidgetFromContainer(widgetId) {
+        var w = DataLaVistaState.design.widgets.find(function(x) { return x.id === widgetId; });
+        if (!w) return;
+        w.parentContainerId = null;
+        renderDesignCanvas();
+        selectWidget(widgetId);
+      }
 
       function renderDesignCanvas() {
         const canvas = document.getElementById('canvas-drop-zone');
@@ -646,8 +707,19 @@ function rankSuggestions(rules, cols, meta) {
         hint.style.display = 'none';
 
         for (const w of DataLaVistaState.design.widgets) {
+          // Only render top-level widgets here; children are injected into their container below
+          if (w.parentContainerId) continue;
           const el = createWidgetElement(w);
           canvas.appendChild(el);
+        }
+
+        // Inject child widgets into their containers
+        for (const w of DataLaVistaState.design.widgets) {
+          if (!w.parentContainerId) continue;
+          const containerContent = document.getElementById('wcontent-' + w.parentContainerId);
+          if (!containerContent) continue;
+          const childEl = createWidgetElement(w);
+          containerContent.appendChild(childEl);
         }
 
         // Render charts after DOM
@@ -664,18 +736,47 @@ function rankSuggestions(rules, cols, meta) {
         const el = document.createElement('div');
         el.className = 'widget';
         el.id = 'widget-' + w.id;
-        el.style.cssText = `width:${w.widthPct}%;height:${w.heightVh}vh;min-height:120px;border-color:${w.borderColor};border-width:${w.borderSize}px;background:${w.widgetBackgroundColor||'#fefefe'}`;
 
-        const actions = `<div class="widget-actions">
-      <button class="btn btn-ghost btn-icon btn-sm" onclick="moveWidget('${w.id}', -1)" title="Move left">←</button>
-      <button class="btn btn-ghost btn-icon btn-sm" onclick="moveWidget('${w.id}', 1)" title="Move right">→</button>
-      <button class="btn btn-danger btn-icon btn-sm" onclick="deleteWidget('${w.id}')" title="Delete">✕</button></div>`;
+        // Width: children always 100%; top-level use widthPct
+        var widthValue;
+        if (w.parentContainerId) {
+          widthValue = '100%';
+        } else {
+          widthValue = w.widthPct + '%';
+        }
+        // Height: containers use min-height + auto; others use fixed heightVh
+        var heightStyle;
+        if (w.type === 'container') {
+          heightStyle = 'min-height:' + (w.minHeightVh || 30) + 'vh;height:auto';
+        } else {
+          heightStyle = 'height:' + w.heightVh + 'vh';
+        }
+        el.style.cssText = 'width:' + widthValue + ';' + heightStyle + ';min-height:120px;border-color:' + w.borderColor + ';border-width:' + w.borderSize + 'px;background:' + (w.widgetBackgroundColor || '#fefefe');
 
-        const titleHdrStyle   = `background:${w.titleBackgroundColor||'#fefefe'}`;
-        const titleSpanStyle  = `font-size:${w.titleFontSize||14}px;color:${w.titleFontColor||'#323130'}`;
+        const actions = '<div class="widget-actions">'
+          + '<button class="btn btn-ghost btn-icon btn-sm" onclick="moveWidget(\'' + w.id + '\', -1)" title="Move left">\u2190</button>'
+          + '<button class="btn btn-ghost btn-icon btn-sm" onclick="moveWidget(\'' + w.id + '\', 1)" title="Move right">\u2192</button>'
+          + '<button class="btn btn-danger btn-icon btn-sm" onclick="deleteWidget(\'' + w.id + '\')" title="Delete">\u2715</button>'
+          + '</div>';
+
+        const titleHdrStyle  = 'background:' + (w.titleBackgroundColor || '#fefefe');
+        const titleSpanStyle = 'font-size:' + (w.titleFontSize || 14) + 'px;color:' + (w.titleFontColor || '#323130');
         const isChartWidget = isEChartsWidget(w.type);
-		el.innerHTML = `<div class="widget-header" style="${titleHdrStyle}"><span class="widget-title" style="${titleSpanStyle}">${w.title || ''}</span>${actions}</div>
-  <div class="widget-content${isChartWidget ? ' widget-content-chart' : ''}" id="wcontent-${w.id}">${getWidgetContentHTML(w)}</div><div class="widget-resize-handle"></div>`;
+        var contentClass = 'widget-content';
+        if (isChartWidget) { contentClass += ' widget-content-chart'; }
+
+        // Container content gets flex column styling
+        var contentStyle = '';
+        if (w.type === 'container') {
+          var alignMap = { 'top': 'flex-start', 'space-between': 'space-between', 'stretch': 'stretch' };
+          var justifyVal = alignMap[w.containerAlign || 'top'] || 'flex-start';
+          contentStyle = ' style="display:flex;flex-direction:column;gap:' + (w.containerGap || 8) + 'px;padding:' + (w.containerPadding || 8) + 'px;justify-content:' + justifyVal + ';flex-wrap:wrap;height:auto;overflow:visible"';
+        }
+
+        el.innerHTML = '<div class="widget-header" style="' + titleHdrStyle + '"><span class="widget-title" style="' + titleSpanStyle + '">' + (w.title || '') + '</span>' + actions + '</div>'
+          + '<div class="' + contentClass + '" id="wcontent-' + w.id + '"' + contentStyle + '>' + getWidgetContentHTML(w) + '</div>'
+          + '<div class="widget-resize-handle"></div>';
+
         // Context-aware title visibility
         if (w.showTitle === false) {
           const hdr = el.querySelector('.widget-header');
@@ -686,13 +787,35 @@ function rankSuggestions(rules, cols, meta) {
           }
         }
         el.addEventListener('click', e => { if (!e.target.closest('button')) selectWidget(w.id); });
-        // Drop fields from panel onto widget
+        // Drop fields from panel onto widget (non-container)
         el.addEventListener('dragover', e => {
-          // Only accept panel-field drags, not internal widget-props reorders
           if (!_wPropsDrag.type) { e.preventDefault(); el.classList.add('drag-over'); }
         });
         el.addEventListener('dragleave', () => el.classList.remove('drag-over'));
-        el.addEventListener('drop', e => { e.stopPropagation(); el.classList.remove('drag-over'); if (!_wPropsDrag.type) onDropFieldToWidget(w.id, e); });
+        el.addEventListener('drop', e => {
+          e.stopPropagation();
+          el.classList.remove('drag-over');
+          if (!_wPropsDrag.type) {
+            var _dd = safeDragParse(e);
+            if (_dd && _dd.type === 'existing-widget') {
+              // Drop existing widget into this widget — only containers accept this
+              if (w.type === 'container') {
+                _dropWidgetIntoContainer(_dd.widgetId, w.id);
+              }
+            } else {
+              onDropFieldToWidget(w.id, e);
+            }
+          }
+        });
+        // Widget header drag — for reparenting to containers
+        const hdrEl = el.querySelector('.widget-header');
+        if (hdrEl) {
+          hdrEl.setAttribute('draggable', 'true');
+          hdrEl.addEventListener('dragstart', e => {
+            safeDragSet(e, { type: 'existing-widget', widgetId: w.id });
+            e.stopPropagation();
+          });
+        }
         // Resize handle
         const rh = el.querySelector('.widget-resize-handle');
         rh.addEventListener('mousedown', e => startWidgetResize(e, w.id, el));
@@ -700,11 +823,12 @@ function rankSuggestions(rules, cols, meta) {
       }
 
       function getWidgetContentHTML(w) {
-        if (w.type === 'text') return `<div class="text-widget" style="font-size:${w.fontSize}px;color:${w.fontColor}">${w.textContent}</div>`;
+        if (w.type === 'text') return '<div class="text-widget" style="font-size:' + w.fontSize + 'px;color:' + w.fontColor + '">' + w.textContent + '</div>';
         if (w.type === 'placeholder') return '';
+        if (w.type === 'container') return renderContainerContent(w);
         if (w.type === 'kpi') return renderKPIContent(w);
         if (w.type === 'table') return renderTableContent(w);
-        if (isEChartsWidget(w.type)) return `<div id="chart-${w.id}" style="width:100%;height:100%;min-height:200px"></div>`;
+        if (isEChartsWidget(w.type)) return '<div id="chart-' + w.id + '" style="width:100%;height:100%;min-height:200px"></div>';
         return '';
       }
 
@@ -1482,10 +1606,17 @@ function _buildChartOption(w, rows) {
 
         const onMove = mv => {
           const dx = mv.clientX - startX, dy = mv.clientY - startY;
-          w.widthPct = Math.max(20, Math.min(100, ((startW + dx) / containerW) * 100));
-          w.heightVh = Math.max(10, (startH + dy) / window.innerHeight * 100);
-          el.style.width = w.widthPct + '%';
-          el.style.height = w.heightVh + 'vh';
+          if (!w.parentContainerId) {
+            w.widthPct = Math.max(20, Math.min(100, ((startW + dx) / containerW) * 100));
+            el.style.width = w.widthPct + '%';
+          }
+          if (w.type === 'container') {
+            w.minHeightVh = Math.max(10, (startH + dy) / window.innerHeight * 100);
+            el.style.minHeight = w.minHeightVh + 'vh';
+          } else {
+            w.heightVh = Math.max(10, (startH + dy) / window.innerHeight * 100);
+            el.style.height = w.heightVh + 'vh';
+          }
           if (DataLaVistaState.charts[wid]) DataLaVistaState.charts[wid].resize();
         };
         const onUp = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp); };
@@ -1501,6 +1632,13 @@ function _buildChartOption(w, rows) {
       }
 
       function deleteWidget(wid) {
+        var deletedW = DataLaVistaState.design.widgets.find(w => w.id === wid);
+        // If deleting a container, orphan its children back to canvas
+        if (deletedW && deletedW.type === 'container') {
+          DataLaVistaState.design.widgets.forEach(function(cw) {
+            if (cw.parentContainerId === wid) { cw.parentContainerId = null; }
+          });
+        }
         DataLaVistaState.design.widgets = DataLaVistaState.design.widgets.filter(w => w.id !== wid);
         if (DataLaVistaState.charts[wid]) { try { DataLaVistaState.charts[wid].dispose(); } catch (e) { } delete DataLaVistaState.charts[wid]; }
         if (DataLaVistaState._chartROs && DataLaVistaState._chartROs[wid]) { try { DataLaVistaState._chartROs[wid].disconnect(); } catch(e) {} delete DataLaVistaState._chartROs[wid]; }
@@ -2058,6 +2196,16 @@ function _renderBarLineOptionsHTML(w, wid) {
         updateWidgetContent(wid);
       }
 
+      /** Build <option> HTML for a field-selector dropdown. No ternary in backtick. */
+      function _fieldRowColOpts(cols, selectedVal) {
+        var opts = '';
+        for (var _frci = 0; _frci < cols.length; _frci++) {
+          var _frcSel = (cols[_frci] === selectedVal) ? ' selected' : '';
+          opts += '<option value="' + cols[_frci] + '"' + _frcSel + '>' + cols[_frci] + '</option>';
+        }
+        return opts;
+      }
+
       function renderWidgetProperties(wid) {
         const w = DataLaVistaState.design.widgets.find(x => x.id === wid);
         if (!w) return;
@@ -2069,7 +2217,8 @@ function _renderBarLineOptionsHTML(w, wid) {
         const isKPI   = w.type === 'kpi';
         const isTable = w.type === 'table';
         const isText  = w.type === 'text';
-        const isData  = isChart || isKPI || isTable;
+        const isContainer = w.type === 'container';
+        const isData  = !isContainer && (isChart || isKPI || isTable);
 
         const cols       = DataLaVistaState.queryColumns;
         const enrichedCols = cols.map(alias => {
@@ -2100,7 +2249,7 @@ function _renderBarLineOptionsHTML(w, wid) {
               <span class="field-type-icon ${ti.cls}">${ti.icon}</span>
               <span style="font-size:11px;color:var(--text-disabled);flex-shrink:0;min-width:16px">${roleLabel}</span>
               <select class="form-input" style="flex:1;height:22px;font-size:11px" onchange="${onChangeExpr}">
-                ${cols.map(c => `<option value="${c}" ${c === fieldVal ? 'selected' : ''}>${c}</option>`).join('')}
+                ${_fieldRowColOpts(cols, fieldVal)}
               </select>
               ${gearBtn}
               <button class="adv-agg-btn${agg ? ' has-agg' : ''}" title="${agg || 'No aggregate'}"
@@ -2180,12 +2329,48 @@ function _renderBarLineOptionsHTML(w, wid) {
           ? '<div class="props-row"><label>Show headers</label>'
             + '<input type="checkbox" ' + (_wa.showHeaders!==false?'checked':'') + ' onchange="updateWidgetProp(\'' + wid + '\',\'showHeaders\',this.checked)"/></div>'
           : '';
+        const _titleHint = (w.title && w.title.includes('{{')) ? ('→ ' + resolveTitleTemplate(w.title)) : '';
+        var _interactionVals = ['','cross-filter','cross-highlight','none'];
+        var _interactionLabels = ['(inherit report)','cross-filter','cross-highlight','none'];
+        var _interactionOpts = '';
+        for (var _ivi = 0; _ivi < _interactionVals.length; _ivi++) {
+          var _ivSel = ((w.interactionMode || '') === _interactionVals[_ivi]) ? ' selected' : '';
+          _interactionOpts += '<option value="' + _interactionVals[_ivi] + '"' + _ivSel + '>' + _interactionLabels[_ivi] + '</option>';
+        }
+        // Width row: hidden for container children
+        var _widthRow = w.parentContainerId
+          ? ''
+          : '<div class="props-row"><label>Width %</label><input type="number" class="form-input" min="10" max="100" value="' + w.widthPct + '" oninput="updateWidgetProp(\'' + wid + '\',\'widthPct\',+this.value)"/></div>';
+        // Height row: containers use minHeightVh, others use heightVh
+        var _heightRow;
+        if (w.type === 'container') {
+          _heightRow = '<div class="props-row"><label>Min Height vh</label><input type="number" class="form-input" min="5" max="200" value="' + (w.minHeightVh || 30) + '" oninput="updateWidgetProp(\'' + wid + '\',\'minHeightVh\',+this.value)"/></div>';
+        } else {
+          _heightRow = '<div class="props-row"><label>Height vh</label><input type="number" class="form-input" min="5" max="100" value="' + w.heightVh + '" oninput="updateWidgetProp(\'' + wid + '\',\'heightVh\',+this.value)"/></div>';
+        }
+        // Container-specific layout section
+        var _containerSection = '';
+        if (w.type === 'container') {
+          var _alignOpts = '';
+          var _alignVals = ['top','space-between','stretch'];
+          for (var _aai = 0; _aai < _alignVals.length; _aai++) {
+            var _aaSel = ((w.containerAlign || 'top') === _alignVals[_aai]) ? ' selected' : '';
+            _alignOpts += '<option value="' + _alignVals[_aai] + '"' + _aaSel + '>' + _alignVals[_aai] + '</option>';
+          }
+          _containerSection = '<div class="adv-node-section">'
+            + '<div class="adv-node-section-hdr">CONTAINER LAYOUT</div>'
+            + '<div class="props-row"><label>Gap (px)</label><input type="number" class="form-input" min="0" max="64" value="' + (w.containerGap != null ? w.containerGap : 8) + '" oninput="updateWidgetProp(\'' + wid + '\',\'containerGap\',+this.value)"/></div>'
+            + '<div class="props-row"><label>Padding (px)</label><input type="number" class="form-input" min="0" max="64" value="' + (w.containerPadding != null ? w.containerPadding : 8) + '" oninput="updateWidgetProp(\'' + wid + '\',\'containerPadding\',+this.value)"/></div>'
+            + '<div class="props-row"><label>Align</label><select class="form-input" onchange="updateWidgetProp(\'' + wid + '\',\'containerAlign\',this.value)">' + _alignOpts + '</select></div>'
+            + '<div style="font-size:11px;color:var(--text-secondary);padding:4px 0">Drag widget headers into this container. Drag out onto canvas to un-parent.</div>'
+            + '</div>';
+        }
         section.innerHTML = `
           <div class="adv-node-section">
             <div class="adv-node-section-hdr">GENERAL</div>
             <div class="props-row"><label>Title</label>
               <input type="text" class="form-input" value="${w.title.replace(/"/g,'&quot;')}" oninput="updateWidgetProp('${wid}','title',this.value)"/>
-              <div id="dlv-title-template-hint-${wid}" style="font-size:10px;color:var(--text-secondary,#605e5c);font-style:italic;margin-top:2px">${w.title && w.title.includes('{{') ? '→ ' + resolveTitleTemplate(w.title) : ''}</div></div>
+              <div id="dlv-title-template-hint-${wid}" style="font-size:10px;color:var(--text-secondary,#605e5c);font-style:italic;margin-top:2px">${_titleHint}</div></div>
             <div class="props-row"><label>Show title</label>
               <input type="checkbox" ${w.showTitle!==false?'checked':''} onchange="updateWidgetProp('${wid}','showTitle',this.checked)"/></div>
             ${_showHdrsRow}
@@ -2195,15 +2380,13 @@ function _renderBarLineOptionsHTML(w, wid) {
               </select></div>
             <div class="props-row"><label>Interaction</label>
               <select class="form-input" onchange="updateWidgetProp('${wid}','interactionMode',this.value)">
-                ${['','cross-filter','cross-highlight','none'].map(v =>
-                  `<option value="${v}"${(w.interactionMode||'')=== v?'selected':''}>${v||'(inherit report)'}</option>`
-                ).join('')}
+                ${_interactionOpts}
               </select></div>
-            <div class="props-row"><label>Width %</label>
-              <input type="number" class="form-input" min="10" max="100" value="${w.widthPct}" oninput="updateWidgetProp('${wid}','widthPct',+this.value)"/></div>
-            <div class="props-row"><label>Height vh</label>
-              <input type="number" class="form-input" min="5" max="100" value="${w.heightVh}" oninput="updateWidgetProp('${wid}','heightVh',+this.value)"/></div>
+            ${_widthRow}
+            ${_heightRow}
           </div>
+
+          ${_containerSection}
 
           <div class="adv-node-section">
             <div class="adv-node-section-hdr">APPEARANCE</div>
@@ -2399,6 +2582,20 @@ function _renderBarLineOptionsHTML(w, wid) {
         }
         if (prop === 'widthPct') el.style.width = value + '%';
         if (prop === 'heightVh') { el.style.height = value + 'vh'; if (DataLaVistaState.charts[wid]) DataLaVistaState.charts[wid].resize(); }
+        if (prop === 'minHeightVh') { el.style.minHeight = value + 'vh'; }
+        if (prop === 'containerGap' || prop === 'containerPadding' || prop === 'containerAlign') {
+          var cContent = el.querySelector('.widget-content');
+          if (cContent) {
+            var w2 = DataLaVistaState.design.widgets.find(function(x) { return x.id === wid; });
+            if (w2) {
+              var alignMap2 = { 'top': 'flex-start', 'space-between': 'space-between', 'stretch': 'stretch' };
+              var justifyVal2 = alignMap2[w2.containerAlign || 'top'] || 'flex-start';
+              cContent.style.gap = (w2.containerGap || 8) + 'px';
+              cContent.style.padding = (w2.containerPadding || 8) + 'px';
+              cContent.style.justifyContent = justifyVal2;
+            }
+          }
+        }
         if (prop === 'borderColor') el.style.borderColor = value;
         if (prop === 'borderSize') el.style.borderWidth = value + 'px';
         if (prop === 'widgetBackgroundColor') el.style.background = value;

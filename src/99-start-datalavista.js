@@ -21,25 +21,11 @@ You should have received a copy of the GNU General Public License along
 with this program. If not, see <https://www.gnu.org/licenses/>.
 ================================================================ */
 
-// Register a DataLaVista ECharts theme that reads from the report-level theme settings.
-// Called at startup and re-called after theme changes to apply font/color settings.
-function applyDlvEChartsTheme() {
-  const echarts = /** @type {any} */ ((/** @type {any} */ (window)).echarts);
-  if (!echarts) return;
-  const t = (DataLaVistaState.design && DataLaVistaState.design.theme) || {};
-  echarts.registerTheme('dlv', {
-    color: (t.palette && t.palette.length) ? t.palette : undefined,
-    textStyle: t.fontFamily ? { fontFamily: t.fontFamily } : undefined,
-    backgroundColor: t.backgroundColor || 'transparent'
-  });
-} // TODO: Move this to init()
-
 // Self-init
 (function startDataLaVista() {
     console.log("*** Starting DataLaVista™ ***");
     try {
       init();
-      applyDlvEChartsTheme();
     } catch (e) {
       console.error('DataLaVista init crashed:', e);
     }

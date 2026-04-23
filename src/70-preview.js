@@ -115,18 +115,42 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         }
 
         for (const w of DataLaVistaState.design.widgets) {
+          if (w.parentContainerId) continue; // rendered inside container
           const el = document.createElement('div');
           el.className = 'widget';
           const titleHdrStyle  = `background:${w.titleBackgroundColor||'#fefefe'}`;
           const titleSpanStyle = `font-size:${w.titleFontSize||14}px;color:${w.titleFontColor||'#323130'}`;
-          el.style.cssText = `width:${w.widthPct}%;height:${w.heightVh}vh;min-height:120px;border-color:${w.borderColor};border-width:${w.borderSize}px;background:${w.widgetBackgroundColor||'#fefefe'}`;
-          el.innerHTML = `
-            <div class="widget-header${w.showTitle === false ? ' hidden' : ''}" style="${titleHdrStyle}"><span class="widget-title" style="${titleSpanStyle}">${resolveTitleTemplate(w.title)}</span></div>
-            <div class="widget-content${isEChartsWidget(w.type) ? ' widget-content-chart' : ''}" id="prev-wcontent-${w.id}">
-              ${getPrevWidgetContent(w)}
-            </div>
-          `;
+          var _prevHeightStyle = (w.type === 'container') ? ('min-height:' + (w.minHeightVh || 30) + 'vh;height:auto') : (w.heightVh + 'vh');
+          var _prevWidthStyle  = w.widthPct + '%';
+          el.style.cssText = 'width:' + _prevWidthStyle + ';' + (_prevHeightStyle.indexOf('min-height') === 0 ? _prevHeightStyle : 'height:' + _prevHeightStyle) + ';min-height:120px;border-color:' + w.borderColor + ';border-width:' + w.borderSize + 'px;background:' + (w.widgetBackgroundColor||'#fefefe');
+          var _prevContentStyle = '';
+          if (w.type === 'container') {
+            var _alignMapP = { 'top': 'flex-start', 'space-between': 'space-between', 'stretch': 'stretch' };
+            var _justifyP = _alignMapP[w.containerAlign || 'top'] || 'flex-start';
+            _prevContentStyle = ' style="display:flex;flex-direction:column;gap:' + (w.containerGap || 8) + 'px;padding:' + (w.containerPadding || 8) + 'px;justify-content:' + _justifyP + ';height:auto;overflow:visible"';
+          }
+          el.innerHTML = '<div class="widget-header' + (w.showTitle === false ? ' hidden' : '') + '" style="' + titleHdrStyle + '"><span class="widget-title" style="' + titleSpanStyle + '">' + resolveTitleTemplate(w.title) + '</span></div>'
+            + '<div class="widget-content' + (isEChartsWidget(w.type) ? ' widget-content-chart' : '') + '" id="prev-wcontent-' + w.id + '"' + _prevContentStyle + '>'
+            + getPrevWidgetContent(w)
+            + '</div>';
           canvas.appendChild(el);
+        }
+
+        // Inject children into their containers
+        for (const w of DataLaVistaState.design.widgets) {
+          if (!w.parentContainerId) continue;
+          var _pContEl = document.getElementById('prev-wcontent-' + w.parentContainerId);
+          if (!_pContEl) continue;
+          var _childEl = document.createElement('div');
+          _childEl.className = 'widget';
+          var _cTitleHdrStyle  = 'background:' + (w.titleBackgroundColor || '#fefefe');
+          var _cTitleSpanStyle = 'font-size:' + (w.titleFontSize || 14) + 'px;color:' + (w.titleFontColor || '#323130');
+          _childEl.style.cssText = 'width:100%;height:' + w.heightVh + 'vh;min-height:80px;border-color:' + w.borderColor + ';border-width:' + w.borderSize + 'px;background:' + (w.widgetBackgroundColor || '#fefefe');
+          _childEl.innerHTML = '<div class="widget-header' + (w.showTitle === false ? ' hidden' : '') + '" style="' + _cTitleHdrStyle + '"><span class="widget-title" style="' + _cTitleSpanStyle + '">' + resolveTitleTemplate(w.title) + '</span></div>'
+            + '<div class="widget-content' + (isEChartsWidget(w.type) ? ' widget-content-chart' : '') + '" id="prev-wcontent-' + w.id + '">'
+            + getPrevWidgetContent(w)
+            + '</div>';
+          _pContEl.appendChild(_childEl);
         }
 
         requestAnimationFrame(() => {
@@ -149,11 +173,12 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       function getPrevWidgetContent(w) {
         // Note: text widgets don't have their html sanitized with sanitizeHTML() since they're meant to allow basic formatting via HTML tags.
         // If this becomes a problem, we can add a separate "allowHTML" flag to widget properties and sanitize conditionally.
-        if (w.type === 'text') return `<div class="text-widget" style="font-size:${w.fontSize}px;color:${w.fontColor}">${w.textContent}</div>`;
+        if (w.type === 'text') return '<div class="text-widget" style="font-size:' + w.fontSize + 'px;color:' + w.fontColor + '">' + w.textContent + '</div>';
         if (w.type === 'placeholder') return '';
+        if (w.type === 'container') return renderPrevContainerContent(w);
         if (w.type === 'kpi') return renderPrevKPI(w);
         if (w.type === 'table') return renderPrevTable(w);
-        if (isEChartsWidget(w.type)) return `<div id="prevchart-${w.id}" style="width:100%;height:100%;min-height:200px"></div>`;
+        if (isEChartsWidget(w.type)) return '<div id="prevchart-' + w.id + '" style="width:100%;height:100%;min-height:200px"></div>';
         return '';
       }
 

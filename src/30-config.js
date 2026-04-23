@@ -25,7 +25,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 // ============================================================
 function generateWidgetSQL(w, tableRef = '_results') {
   const q = `[${tableRef}]`;
-  if (w.type === 'text' || w.type === 'placeholder') return null;
+  if (w.type === 'text' || w.type === 'placeholder' || w.type === 'container') return null;
 
   const whereParts = [];
   if (w.filters && w.filters.length) {
@@ -66,10 +66,11 @@ function generateWidgetSQL(w, tableRef = '_results') {
   if (!yFields.length) return `SELECT [${xField}] FROM ${q}${where}`;
   const agg = (w.aggregation || '').toUpperCase();
   if (!agg || agg === 'NONE') {
-    return `SELECT [${xField}], ${yFields.map(f=>`[${f}]`).join(', ')} FROM ${q}${where}`;
+    var _ywrapNoAgg = yFields.map(function(f) { return '[' + f + ']'; }).join(', ');
+    return 'SELECT [' + xField + '], ' + _ywrapNoAgg + ' FROM ' + q + where;
   }
   const yExprs = yFields.map(f =>
-    agg === 'COUNT' ? `COUNT(*) AS [${f}]` : `${agg}([${f}]) AS [${f}]`
+    agg === 'COUNT' ? 'COUNT(*) AS [' + f + ']' : agg + '([' + f + ']) AS [' + f + ']'
   ).join(', ');
   return `SELECT [${xField}], ${yExprs} FROM ${q}${where} GROUP BY [${xField}]`;
 }
@@ -321,7 +322,12 @@ function buildConfig() {
       value: f.value !== undefined ? f.value : '',
       position: f.position || 'widget'
     })),
-    widgetSql: (() => { try { return buildWidgetSQL(w)?.sql || null; } catch(_) { return null; } })()
+    widgetSql: (() => { try { return buildWidgetSQL(w)?.sql || null; } catch(_) { return null; } })(),
+    parentContainerId: w.parentContainerId || null,
+    minHeightVh: w.minHeightVh != null ? w.minHeightVh : 30,
+    containerGap: w.containerGap != null ? w.containerGap : 8,
+    containerPadding: w.containerPadding != null ? w.containerPadding : 8,
+    containerAlign: w.containerAlign || 'top'
   }));
  
   const cleanDesign = {
@@ -574,6 +580,20 @@ async function loadConfig(cfg) {
       value: c.value != null ? c.value : ''
     }));
     if (!w.sorts)                         w.sorts = [];
+    // Container / layout fields
+    if (w.parentContainerId === undefined) w.parentContainerId = null;
+    if (w.minHeightVh      == null)       w.minHeightVh      = w.heightVh || 30;
+    if (w.containerGap     == null)       w.containerGap     = 8;
+    if (w.containerPadding == null)       w.containerPadding = 8;
+    if (w.containerAlign   == null)       w.containerAlign   = 'top';
+    // placeholder and container default showTitle to false
+    if (w.showTitle == null) {
+      if (w.type === 'placeholder' || w.type === 'container') {
+        w.showTitle = false;
+      } else {
+        w.showTitle = true;
+      }
+    }
   }
   DataLaVistaState.previewFilters = cfg.previewFilters || {};
   // Normalize legacy tab name ('previewData' was renamed to 'dataPreview')

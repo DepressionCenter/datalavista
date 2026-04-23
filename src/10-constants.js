@@ -258,7 +258,8 @@ SKIP_FIELDS: new Set([
     { id: 'kpi',          label: 'KPI',                 icon: '★',  category: 'builtin',       defaultTitle: 'KPI',                 usesECharts: false, supportsDataset: false, supportsInteraction: false, optionBuilder: null,                  seriesBuilder: null,               sqlBuilder: null,               htmlRenderer: null, dimensionLabels: [],          seriesLabel: 'Metric'     },
     { id: 'text',         label: 'Text',                icon: 'T',   category: 'builtin',       defaultTitle: 'Text',                usesECharts: false, supportsDataset: false, supportsInteraction: false, optionBuilder: null,                  seriesBuilder: null,               sqlBuilder: null,               htmlRenderer: null, dimensionLabels: [],          seriesLabel: ''           },
     { id: 'placeholder',  label: 'Blank',               icon: '⬚',  category: 'builtin',       defaultTitle: '',                    usesECharts: false, supportsDataset: false, supportsInteraction: false, optionBuilder: null,                  seriesBuilder: null,               sqlBuilder: null,               htmlRenderer: null, dimensionLabels: [],          seriesLabel: ''           },
-  ], // TODO: Add vertical container later with icon: ⊟ or ⧈ or ☰
+    { id: 'container',    label: 'Container',           icon: '⊟',  category: 'layout',        defaultTitle: 'Container',           usesECharts: false, supportsDataset: false, supportsInteraction: false, optionBuilder: null,                  seriesBuilder: null,               sqlBuilder: null,               htmlRenderer: null, dimensionLabels: [],          seriesLabel: ''           },
+  ], // End WIDGET_TYPES
 
   // Computed from WIDGET_TYPES — no manual drift possible
   get ECHARTS_WIDGET_IDS()  { return new Set(this.WIDGET_TYPES.filter(t => t.usesECharts).map(t => t.id)); },
@@ -502,16 +503,18 @@ function getArrayScalarOps(scalarType) {
  * Ops with a .group property are wrapped in <optgroup> elements.
  */
 function renderOpsOptions(ops, selectedVal) {
-  let html = '';
-  let currentGroup = null;
-  for (const o of ops) {
-    const grp = o.group || null;
+  var html = '';
+  var currentGroup = null;
+  for (var _roi = 0; _roi < ops.length; _roi++) {
+    var o = ops[_roi];
+    var grp = o.group || null;
     if (grp !== currentGroup) {
       if (currentGroup !== null) html += '</optgroup>';
-      if (grp !== null) html += `<optgroup label="${grp}">`;
+      if (grp !== null) html += '<optgroup label="' + grp + '">';
       currentGroup = grp;
     }
-    html += `<option value="${o.val}" ${o.val === selectedVal ? 'selected' : ''}>${o.label}</option>`;
+    var sel = (o.val === selectedVal) ? ' selected' : '';
+    html += '<option value="' + o.val + '"' + sel + '>' + o.label + '</option>';
   }
   if (currentGroup !== null) html += '</optgroup>';
   return html;
