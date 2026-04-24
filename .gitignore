@@ -9,11 +9,15 @@
 .claudeignore
 .gemini/
 .copilot/
+.continue
+GEMINI.md
 CLAUDE.md
 
 # Ignore temporary files
 *.tmp
 WIP.html
+.esbuild/
+src/_gen/
 
 # Ignore environment variable files
 .env
