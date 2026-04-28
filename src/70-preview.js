@@ -94,10 +94,11 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
             const values = ['(All)', ..._flatVals];
             const wrap = document.createElement('div');
             wrap.className = 'filter-chip';
-            wrap.innerHTML = `<span style="font-size:11px;font-weight:600">${filter.label}:</span>
-        <select class="filter-chip-select" onchange="applyPreviewFilterAndRender('${filter.field}', this.value)">
-          ${values.map(v => `<option>${v}</option>`).join('')}
-        </select>`;
+            var _optHtml = '';
+            for (var _oi = 0; _oi < values.length; _oi++) { _optHtml += '<option>' + values[_oi] + '</option>'; }
+            wrap.innerHTML = '<span style="font-size:11px;font-weight:600">' + filter.label + ':</span>'
+              + '<select class="filter-chip-select" onchange="applyPreviewFilterAndRender(\'' + filter.field + '\', this.value)">'
+              + _optHtml + '</select>';
             filterBar.appendChild(wrap);
           }
         } else filterBar.classList.add('hidden');
@@ -122,7 +123,10 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           const titleSpanStyle = `font-size:${w.titleFontSize||14}px;color:${w.titleFontColor||'#323130'}`;
           var _prevHeightStyle = (w.type === 'container') ? ('min-height:' + (w.minHeightVh || 30) + 'vh;height:auto') : (w.heightVh + 'vh');
           var _prevWidthStyle  = w.widthPct + '%';
-          el.style.cssText = 'width:' + _prevWidthStyle + ';' + (_prevHeightStyle.indexOf('min-height') === 0 ? _prevHeightStyle : 'height:' + _prevHeightStyle) + ';min-height:120px;border-color:' + w.borderColor + ';border-width:' + w.borderSize + 'px;background:' + (w.widgetBackgroundColor||'#fefefe');
+          var _isContainerP = (w.type === 'container');
+          var _minHtP = _isContainerP ? '' : ';min-height:120px';
+          var _ovfP   = _isContainerP ? ';overflow:visible' : '';
+          el.style.cssText = 'width:' + _prevWidthStyle + ';' + (_prevHeightStyle.indexOf('min-height') === 0 ? _prevHeightStyle : 'height:' + _prevHeightStyle) + _minHtP + ';border-color:' + w.borderColor + ';border-width:' + w.borderSize + 'px;background:' + (w.widgetBackgroundColor||'transparent') + _ovfP;
           var _prevContentStyle = '';
           if (w.type === 'container') {
             var _alignMapP = { 'top': 'flex-start', 'space-between': 'space-between', 'stretch': 'stretch' };
@@ -175,7 +179,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         // If this becomes a problem, we can add a separate "allowHTML" flag to widget properties and sanitize conditionally.
         if (w.type === 'text') return '<div class="text-widget" style="font-size:' + w.fontSize + 'px;color:' + w.fontColor + '">' + w.textContent + '</div>';
         if (w.type === 'placeholder') return '';
-        if (w.type === 'container') return renderPrevContainerContent(w);
+        if (w.type === 'container') return ''; // children injected by renderPreviewTab's second loop
         if (w.type === 'kpi') return renderPrevKPI(w);
         if (w.type === 'table') return renderPrevTable(w);
         if (isEChartsWidget(w.type)) return '<div id="prevchart-' + w.id + '" style="width:100%;height:100%;min-height:200px"></div>';
@@ -252,17 +256,16 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 
         DataLaVistaState.design.previewFilteredData = null;
 
-        // Re-render each widget
-        const canvas = document.getElementById('preview-canvas');
-        canvas.querySelectorAll('.widget').forEach((el, i) => {
-          const w = DataLaVistaState.design.widgets[i];
-          if (!w) return;
-          const content = el.querySelector('.widget-content');
-          content.innerHTML = getPrevWidgetContent(w);
-          if (isEChartsWidget(w.type)) {
+        // Re-render each widget by ID (skip containers — their layout is unchanged; children update below)
+        for (const w of DataLaVistaState.design.widgets) {
+          if (/** @type {any} */ (w).type === 'container') continue;
+          const contentEl = document.getElementById('prev-wcontent-' + /** @type {any} */ (w).id);
+          if (!contentEl) continue;
+          contentEl.innerHTML = getPrevWidgetContent(w);
+          if (isEChartsWidget(/** @type {any} */ (w).type)) {
             requestAnimationFrame(() => renderPreviewChart(w));
           }
-        });
+        }
       }
 
       // Lets users download the full query results as CSV, even if the preview only shows top 20 rows. If results aren't available in AlaSQL, try to run the query and populate [dlv_results] first.
@@ -284,7 +287,13 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         }
         if (!results || !results.length) { toast('No data to export', 'warning'); return; }
         const cols = Object.keys(results[0]);
-        const csv = [cols.join(','), ...results.map(r => cols.map(c => { const v = r[c]; return typeof v === 'string' && (v.includes(',') || v.includes('"') || v.includes('\n')) ? `"${v.replace(/"/g, '""')}"` : v ?? ''; }).join(','))].join('\n');
+        const csv = [cols.join(','), ...(/** @type {any[]} */ (results)).map(r => cols.map(c => {
+          var v = r[c];
+          if (typeof v === 'string' && (v.includes(',') || v.includes('"') || v.includes('\n'))) {
+            return '"' + v.replace(/"/g, '""') + '"';
+          }
+          return v != null ? v : '';
+        }).join(','))].join('\n');
         if(DataLaVistaState.design.title) {
           downloadText(csv, DataLaVistaState.design.title + '.csv', 'text/csv');
         } else {

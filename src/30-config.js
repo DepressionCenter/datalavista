@@ -252,7 +252,7 @@ function buildConfig() {
     fillColor: w.fillColor || '#0078d4',
     borderColor: w.borderColor || '#edebe9',
     borderSize: w.borderSize != null ? w.borderSize : 1,
-    widgetBackgroundColor: w.widgetBackgroundColor || '#fefefe',
+    widgetBackgroundColor: w.widgetBackgroundColor ?? '#fefefe',
     chartBackgroundColor: w.chartBackgroundColor || '#fefefe',
     titleBackgroundColor: w.titleBackgroundColor || '#fefefe',
     titleFontSize: w.titleFontSize || 14,
@@ -396,7 +396,7 @@ function buildConfig() {
  
   return {
     _license: 'This file is part of DataLaVista™. This is a configuration script for a report designed in DataLaVista™. Copyright © 2026 The Regents of the University of Michigan. This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version. This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details. You should have received a copy of the GNU General Public License along with this program. If not, see https://www.gnu.org/licenses.',
-    _min_version: 0.6,
+    _min_version: 0.5,
     activeTab: (DataLaVistaState.reportMode === 'view') ? 'dashboardPreview' : 'design',
     advancedQB: DataLaVistaState.advancedQB || {},
     currentWidgetId: DataLaVistaState.currentWidgetId || null,

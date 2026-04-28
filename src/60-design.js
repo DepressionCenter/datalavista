@@ -1,4 +1,4 @@
-/* ============================================================
+﻿/* ============================================================
 This file is part of DataLaVista™
 60-design.js: Design canvas, widget rendering, data transforms, and widget properties.
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
@@ -578,7 +578,7 @@ function rankSuggestions(rules, cols, meta) {
           conditions: [],
           sorts: [],
           fillColor: '#0078d4',
-          widgetBackgroundColor: '#fefefe',
+          widgetBackgroundColor: widgetType === 'container' ? '' : '#fefefe',
           chartBackgroundColor: '#fefefe',
           titleBackgroundColor: '#fefefe',
           titleFontSize: 14,
@@ -587,7 +587,7 @@ function rankSuggestions(rules, cols, meta) {
           headersFontSize: 12,
           headersFontColor: '#323130',
           borderColor: '#edebe9',
-          borderSize: 1,
+          borderSize: widgetType === 'container' ? 0 : 1,
           fontSize: 13,
           fontColor: '#323130',
           kpiMetricFontSize: 36,
@@ -649,26 +649,7 @@ function rankSuggestions(rules, cols, meta) {
         return '';
       }
 
-      /** Renders container children in preview mode. */
-      function renderPrevContainerContent(w) {
-        var children = DataLaVistaState.design.widgets.filter(function(cw) { return cw.parentContainerId === w.id; });
-        if (!children.length) return '';
-        var html = '';
-        for (var _pci = 0; _pci < children.length; _pci++) {
-          var cw = children[_pci];
-          var titleHdrStyle  = 'background:' + (cw.titleBackgroundColor || '#fefefe');
-          var titleSpanStyle = 'font-size:' + (cw.titleFontSize || 14) + 'px;color:' + (cw.titleFontColor || '#323130');
-          var isHidden = (cw.showTitle === false) ? ' hidden' : '';
-          var isChart  = isEChartsWidget(cw.type);
-          html += '<div class="widget" style="width:100%;height:' + cw.heightVh + 'vh;min-height:80px;border-color:' + cw.borderColor + ';border-width:' + cw.borderSize + 'px;background:' + (cw.widgetBackgroundColor || '#fefefe') + '">';
-          html += '<div class="widget-header' + isHidden + '" style="' + titleHdrStyle + '"><span class="widget-title" style="' + titleSpanStyle + '">' + cw.title + '</span></div>';
-          html += '<div class="widget-content' + (isChart ? ' widget-content-chart' : '') + '" id="prev-wcontent-' + cw.id + '">' + getPrevWidgetContent(cw) + '</div>';
-          html += '</div>';
-        }
-        return html;
-      }
-
-      /** Move an existing widget into a container. Prevents container nesting. */
+/** Move an existing widget into a container. Prevents container nesting. */
       function _dropWidgetIntoContainer(widgetId, containerId) {
         if (widgetId === containerId) return;
         var dragged = DataLaVistaState.design.widgets.find(function(x) { return x.id === widgetId; });
@@ -751,7 +732,10 @@ function rankSuggestions(rules, cols, meta) {
         } else {
           heightStyle = 'height:' + w.heightVh + 'vh';
         }
-        el.style.cssText = 'width:' + widthValue + ';' + heightStyle + ';min-height:120px;border-color:' + w.borderColor + ';border-width:' + w.borderSize + 'px;background:' + (w.widgetBackgroundColor || '#fefefe');
+        var _isContainerEl = (w.type === 'container');
+        var _minHtEl = _isContainerEl ? '' : ';min-height:120px';
+        var _ovfEl   = _isContainerEl ? ';overflow:visible' : '';
+        el.style.cssText = 'width:' + widthValue + ';' + heightStyle + _minHtEl + ';border-color:' + w.borderColor + ';border-width:' + w.borderSize + 'px;background:' + (w.widgetBackgroundColor || 'transparent') + _ovfEl;
 
         const actions = '<div class="widget-actions">'
           + '<button class="btn btn-ghost btn-icon btn-sm" onclick="moveWidget(\'' + w.id + '\', -1)" title="Move left">\u2190</button>'
@@ -888,9 +872,9 @@ function rankSuggestions(rules, cols, meta) {
               label:      legacy.label      || '',
               color:      legacy.color      || '',
               seriesType: legacy.seriesType || '',
-              lineWidth:  legacy.lineWidth  ?? null,
-              opacity:    legacy.opacity    ?? null,
-              smooth:     legacy.smooth     ?? null,
+              lineWidth:  legacy.lineWidth  != null ? legacy.lineWidth  : null,
+              opacity:    legacy.opacity    != null ? legacy.opacity    : null,
+              smooth:     legacy.smooth     != null ? legacy.smooth     : null,
               axisSide:   legacy.axisSide   || '',
               conditions: (legacy.conditions || []).map(c => Object.assign({}, c))
             };
@@ -1104,14 +1088,14 @@ function rankSuggestions(rules, cols, meta) {
           const sp = _getSeriesProps(w);
           const fieldAgg = (sp[0] || {}).agg || '';
           if (fieldAgg) {
-            value = kpiData[0][field] ?? '—';
+            value = kpiData[0][field] != null ? kpiData[0][field] : '—';
           } else {
             const agg = w.aggregation || 'SUM';
             const vals = kpiData.map(r => parseFloat(r[field]) || 0);
             if (agg === 'COUNT') value = kpiData.length;
             else if (agg === 'SUM') value = vals.reduce((a, b) => a + b, 0).toLocaleString();
             else if (agg === 'AVG') value = vals.length ? (vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(2) : '—';
-            else value = kpiData[0][field] ?? '—';
+            else value = kpiData[0][field] != null ? kpiData[0][field] : '—';
           }
         }
         const metricSize  = w.kpiMetricFontSize || 36;
@@ -1131,17 +1115,25 @@ function rankSuggestions(rules, cols, meta) {
         if (!cols.length) return '<div class="text-muted text-sm" style="padding:12px">No fields selected — add columns in the properties panel</div>';
         const hdrStyle = `background:${w.headersBackgroundColor||'#f3f2f1'};font-size:${w.headersFontSize||12}px;color:${w.headersFontColor||'#323130'}`;
         const _sp = _getSeriesProps(w);
-        const thHtml = cols.map(c => {
-          const sp = _sp.find(s => s.field === c);
-          const label = (sp && sp.label) ? sp.label : c === '__dlv_count__' ? '✦ Count' : c;
-          return `<th style="${hdrStyle}">${label}</th>`;
-        }).join('');
+        var thHtml = '';
+        for (var _thi = 0; _thi < cols.length; _thi++) {
+          var _thc = cols[_thi];
+          var _thsp = null;
+          for (var _spj = 0; _spj < _sp.length; _spj++) { if (_sp[_spj].field === _thc) { _thsp = _sp[_spj]; break; } }
+          var _thlabel;
+          if (_thsp && _thsp.label) { _thlabel = _thsp.label; }
+          else if (_thc === '__dlv_count__') { _thlabel = '✦ Count'; }
+          else { _thlabel = _thc; }
+          thHtml += '<th style="' + hdrStyle + '">' + _thlabel + '</th>';
+        }
         const theadHtml = w.showHeaders === false ? '' : `<thead><tr>${thHtml}</tr></thead>`;
         const drillField = cols[0];
         let html = `<div style="overflow:auto;max-height:100%"><table class="widget-table">${theadHtml}<tbody>`;
         for (const row of tableData) {
-          const drillVal = String(row[drillField] ?? '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
-          html += `<tr style="cursor:pointer" title="Click to filter by ${drillField}" onclick="applyDrillFilter('${drillField.replace(/'/g,"\\'")}','${drillVal}')">`;
+          var _drillRaw = row[drillField] != null ? row[drillField] : '';
+          const drillVal = String(_drillRaw).replace(/'/g, "\\'").replace(/"/g, '&quot;');
+          var _drillFieldEsc = drillField.replace(/'/g, "\\'");
+          html += '<tr style="cursor:pointer" title="Click to filter by ' + drillField + '" onclick="applyDrillFilter(\'' + _drillFieldEsc + '\',\'' + drillVal + '\')">';
           html += cols.map(c => '<td>' + (row[c] != null ? row[c] : '') + '</td>').join('');
           html += '</tr>';
         }
@@ -2033,67 +2025,81 @@ function _renderBarLineOptionsHTML(w, wid) {
           </span>`;
         };
 
-        _s.renderBody = () => {
-          const lineOpts = isLineType();
-          const condRows = renderConditionRows(
+        _s.renderBody = function() {
+          var lineOpts = isLineType();
+          var condRows = renderConditionRows(
             local.conditions, enrichedSeriesCols,
             (ci, v) => `_dlvSeries.condUpdate(${ci},'conj',${v})`,
             (ci, v) => `_dlvSeries.condUpdate(${ci},'field',${v})`,
             (ci, v) => `_dlvSeries.condUpdate(${ci},'op',${v})`,
             (ci, v) => `_dlvSeries.condUpdate(${ci},'value',${v})`,
             (ci)    => `_dlvSeries.condRemove(${ci})`,
-            null,   // rowAttrs
+            null,
             (ci, v) => `_dlvSeries.condUpdate(${ci},'value2',${v})`,
             (ci, v) => `_dlvSeries.condUpdate(${ci},'elementKey',${v})`
           );
-
-          return `<div class="popup-body" style="padding-top:0;gap:10px">
-            <div class="adv-node-section">
-              <div class="adv-node-section-hdr">GENERAL</div>
-              <div class="props-row"><label>Display label</label>
-                <input type="text" class="form-input" value="${local.label.replace(/"/g,'&quot;')}"
-                  oninput="_dlvSeries.prop('label',this.value)" placeholder="${fieldName}"/></div>
-            </div>
-            <div class="adv-node-section">
-              <div class="adv-node-section-hdr">APPEARANCE</div>
-              <div class="props-row"><label>Color</label>
-                <div class="color-input-wrap">
-                  <input type="color" value="${local.color||'#0078d4'}"
-                    oninput="_dlvSeries.prop('color',this.value);this.nextElementSibling.value=this.value"/>
-                  <input type="text" class="form-input" value="${local.color||''}"
-                    oninput="_dlvSeries.prop('color',this.value);this.previousElementSibling.value=this.value||'#000000'" placeholder="(palette)"/>
-                </div></div>
-              ${lineOpts ? `<div class="props-row"><label>Line width</label>
-                <input type="number" class="form-input" min="1" max="10" style="width:60px"
-                  value="${local.lineWidth}" oninput="_dlvSeries.prop('lineWidth',+this.value)"/></div>` : ''}
-              <div class="props-row"><label>Opacity</label>
-                <input type="number" class="form-input" min="0" max="1" step="0.05" style="width:60px"
-                  value="${local.opacity}" oninput="_dlvSeries.prop('opacity',+this.value)"/></div>
-              ${lineOpts ? `<div class="props-row"><label>Smooth</label>
-                <input type="checkbox" ${local.smooth?'checked':''}
-                  onchange="_dlvSeries.prop('smooth',this.checked)"/></div>` : ''}
-            </div>
-            <div class="adv-node-section">
-              <div class="adv-node-section-hdr">
-                <span>FILTER CONDITIONS</span>
-                <button class="btn btn-ghost btn-sm" onclick="_dlvSeries.condAdd()">+ Add</button>
-              </div>
-              <div id="series-cond-rows">${condRows}</div>
-            </div>
-            <div class="adv-node-section">
-              <div class="adv-node-section-hdr">SERIES TYPE</div>
-              <div class="props-row"><label>Type</label>
-                <select class="form-input" onchange="_dlvSeries.prop('seriesType',this.value);_dlvSeries.rerender()">
-                  <option value="" ${!local.seriesType?'selected':''}>auto</option>
-                  <option value="bar" ${local.seriesType==='bar'?'selected':''}>bar</option>
-                  <option value="line" ${local.seriesType==='line'?'selected':''}>line</option>
-                </select></div>
-            </div>
-          </div>
-          <div class="popup-footer" style="justify-content:space-between">
-            <button class="btn btn-ghost btn-sm" onclick="_dlvSeries.clearAll()">Clear All</button>
-            <button class="btn btn-primary btn-sm" onclick="_dlvSeries.apply()">Apply</button>
-          </div>`;
+          var _lineWidthHTML = '';
+          if (lineOpts) {
+            _lineWidthHTML = '<div class="props-row"><label>Line width</label>'
+              + '<input type="number" class="form-input" min="1" max="10" style="width:60px"'
+              + ' value="' + local.lineWidth + '" oninput="_dlvSeries.prop(\'lineWidth\',+this.value)"/></div>';
+          }
+          var _smoothHTML = '';
+          if (lineOpts) {
+            var _smoothChecked = local.smooth ? 'checked' : '';
+            _smoothHTML = '<div class="props-row"><label>Smooth</label>'
+              + '<input type="checkbox" ' + _smoothChecked
+              + ' onchange="_dlvSeries.prop(\'smooth\',this.checked)"/></div>';
+          }
+          var _stAutoSel  = !local.seriesType ? 'selected' : '';
+          var _stBarSel   = local.seriesType === 'bar'  ? 'selected' : '';
+          var _stLineSel  = local.seriesType === 'line' ? 'selected' : '';
+          var _localLabelEsc = local.label.replace(/"/g, '&quot;');
+          var _localColor    = local.color || '#0078d4';
+          var _localColorTxt = local.color || '';
+          return '<div class="popup-body" style="padding-top:0;gap:10px">'
+            + '<div class="adv-node-section">'
+            + '<div class="adv-node-section-hdr">GENERAL</div>'
+            + '<div class="props-row"><label>Display label</label>'
+            + '<input type="text" class="form-input" value="' + _localLabelEsc + '"'
+            + ' oninput="_dlvSeries.prop(\'label\',this.value)" placeholder="' + fieldName + '"/></div>'
+            + '</div>'
+            + '<div class="adv-node-section">'
+            + '<div class="adv-node-section-hdr">APPEARANCE</div>'
+            + '<div class="props-row"><label>Color</label>'
+            + '<div class="color-input-wrap">'
+            + '<input type="color" value="' + _localColor + '"'
+            + ' oninput="_dlvSeries.prop(\'color\',this.value);this.nextElementSibling.value=this.value"/>'
+            + '<input type="text" class="form-input" value="' + _localColorTxt + '"'
+            + ' oninput="_dlvSeries.prop(\'color\',this.value);this.previousElementSibling.value=this.value||\'#000000\'" placeholder="(palette)"/>'
+            + '</div></div>'
+            + _lineWidthHTML
+            + '<div class="props-row"><label>Opacity</label>'
+            + '<input type="number" class="form-input" min="0" max="1" step="0.05" style="width:60px"'
+            + ' value="' + local.opacity + '" oninput="_dlvSeries.prop(\'opacity\',+this.value)"/></div>'
+            + _smoothHTML
+            + '</div>'
+            + '<div class="adv-node-section">'
+            + '<div class="adv-node-section-hdr">'
+            + '<span>FILTER CONDITIONS</span>'
+            + '<button class="btn btn-ghost btn-sm" onclick="_dlvSeries.condAdd()">+ Add</button>'
+            + '</div>'
+            + '<div id="series-cond-rows">' + condRows + '</div>'
+            + '</div>'
+            + '<div class="adv-node-section">'
+            + '<div class="adv-node-section-hdr">SERIES TYPE</div>'
+            + '<div class="props-row"><label>Type</label>'
+            + '<select class="form-input" onchange="_dlvSeries.prop(\'seriesType\',this.value);_dlvSeries.rerender()">'
+            + '<option value="" ' + _stAutoSel + '>auto</option>'
+            + '<option value="bar" ' + _stBarSel + '>bar</option>'
+            + '<option value="line" ' + _stLineSel + '>line</option>'
+            + '</select></div>'
+            + '</div>'
+            + '</div>'
+            + '<div class="popup-footer" style="justify-content:space-between">'
+            + '<button class="btn btn-ghost btn-sm" onclick="_dlvSeries.clearAll()">Clear All</button>'
+            + '<button class="btn btn-primary btn-sm" onclick="_dlvSeries.apply()">Apply</button>'
+            + '</div>';
         };
 
         // Build overlay
@@ -2240,21 +2246,23 @@ function _renderBarLineOptionsHTML(w, wid) {
           const ti  = DataLaVistaCore.FIELD_TYPE_ICONS[dt] || DataLaVistaCore.FIELD_TYPE_ICONS.default;
           const agg = (w.fieldAggs || {})[fieldVal] || '';
           const escapedFv = (fieldVal || '').replace(/'/g, "\\'");
-          const gearBtn = gearIdx != null
-            ? `<button class="btn btn-ghost btn-sm btn-icon" style="padding:0 4px" title="Field properties"
-                 onclick="event.stopPropagation();openWidgetFieldAdvProps('${wid}','${escapedFv}',${gearIdx},'x')">⚙️</button>`
-            : '';
-          return `
-            <div class="adv-field-row selected">
-              <span class="field-type-icon ${ti.cls}">${ti.icon}</span>
-              <span style="font-size:11px;color:var(--text-disabled);flex-shrink:0;min-width:16px">${roleLabel}</span>
-              <select class="form-input" style="flex:1;height:22px;font-size:11px" onchange="${onChangeExpr}">
-                ${_fieldRowColOpts(cols, fieldVal)}
-              </select>
-              ${gearBtn}
-              <button class="adv-agg-btn${agg ? ' has-agg' : ''}" title="${agg || 'No aggregate'}"
-                onclick="event.stopPropagation();showWidgetFieldAggPopup('${wid}','${escapedFv}',this)">${agg ? getAggIcon(agg) : '∑'}</button>
-            </div>`;
+          var _frGearBtn = '';
+          if (gearIdx != null) {
+            _frGearBtn = '<button class="btn btn-ghost btn-sm btn-icon" style="padding:0 4px" title="Field properties"'
+              + ' onclick="event.stopPropagation();openWidgetFieldAdvProps(\'' + wid + '\',\'' + escapedFv + '\',' + gearIdx + ',\'x\')">⚙️</button>';
+          }
+          var _frAggClass = agg ? ' has-agg' : '';
+          var _frAggIcon  = agg ? getAggIcon(agg) : '∑';
+          return '<div class="adv-field-row selected">'
+            + '<span class="field-type-icon ' + ti.cls + '">' + ti.icon + '</span>'
+            + '<span style="font-size:11px;color:var(--text-disabled);flex-shrink:0;min-width:16px">' + roleLabel + '</span>'
+            + '<select class="form-input" style="flex:1;height:22px;font-size:11px" onchange="' + onChangeExpr + '">'
+            + _fieldRowColOpts(cols, fieldVal)
+            + '</select>'
+            + _frGearBtn
+            + '<button class="adv-agg-btn' + _frAggClass + '" title="' + (agg || 'No aggregate') + '"'
+            + ' onclick="event.stopPropagation();showWidgetFieldAggPopup(\'' + wid + '\',\'' + escapedFv + '\',this)">' + _frAggIcon + '</button>'
+            + '</div>';
         };
 
         // ── Table column row: drag handle + type-icon + label/name + ⚙️ + ∑ + remove ──
@@ -2263,23 +2271,24 @@ function _renderBarLineOptionsHTML(w, wid) {
           const ti  = DataLaVistaCore.FIELD_TYPE_ICONS[dt] || DataLaVistaCore.FIELD_TYPE_ICONS.default;
           const agg = (_wsp[idx] || {}).agg || '';
           const sp  = _wsp[idx] || {};
-          const displayLabel = sp.label || (fieldName === '__dlv_count__' ? '✦ Count' : fieldName);
+          var _tfLabel = sp.label || (fieldName === '__dlv_count__' ? '✦ Count' : fieldName);
           const escapedFn = fieldName.replace(/'/g, "\\'");
-          return `
-            <div class="adv-field-row selected" draggable="true"
-              ondragstart="_wpDragStart('field','${wid}',${idx},event)"
-              ondragover="_wpDragOver(event)"
-              ondragleave="_wpDragLeave(event)"
-              ondrop="_wpDrop('field','${wid}',${idx},event)">
-              <span style="cursor:grab;padding:0 4px;color:var(--text-disabled)" title="Drag to reorder">⠿</span>
-              <span class="field-type-icon ${ti.cls}">${ti.icon}</span>
-              <span class="field-name" style="flex:1" title="${escapedFn}">${displayLabel}</span>
-              <button class="btn btn-ghost btn-sm btn-icon" style="padding:0 4px" title="Field properties"
-                onclick="event.stopPropagation();openWidgetFieldAdvProps('${wid}','${escapedFn}',${idx},'field')">⚙️</button>
-              <button class="adv-agg-btn${agg ? ' has-agg' : ''}" title="${agg || 'No aggregate'}"
-                onclick="event.stopPropagation();showWidgetFieldAggPopup('${wid}','${escapedFn}',this,${idx})">${agg ? getAggIcon(agg) : '∑'}</button>
-              <button class="btn btn-ghost btn-sm btn-icon" style="padding:0 4px" onclick="removeWidgetField('${wid}',${idx})">✕</button>
-            </div>`;
+          var _tfAggClass = agg ? ' has-agg' : '';
+          var _tfAggIcon  = agg ? getAggIcon(agg) : '∑';
+          return '<div class="adv-field-row selected" draggable="true"'
+            + ' ondragstart="_wpDragStart(\'field\',\'' + wid + '\',' + idx + ',event)"'
+            + ' ondragover="_wpDragOver(event)"'
+            + ' ondragleave="_wpDragLeave(event)"'
+            + ' ondrop="_wpDrop(\'field\',\'' + wid + '\',' + idx + ',event)">'
+            + '<span style="cursor:grab;padding:0 4px;color:var(--text-disabled)" title="Drag to reorder">⠿</span>'
+            + '<span class="field-type-icon ' + ti.cls + '">' + ti.icon + '</span>'
+            + '<span class="field-name" style="flex:1" title="' + escapedFn + '">' + _tfLabel + '</span>'
+            + '<button class="btn btn-ghost btn-sm btn-icon" style="padding:0 4px" title="Field properties"'
+            + ' onclick="event.stopPropagation();openWidgetFieldAdvProps(\'' + wid + '\',\'' + escapedFn + '\',' + idx + ',\'field\')">⚙️</button>'
+            + '<button class="adv-agg-btn' + _tfAggClass + '" title="' + (agg || 'No aggregate') + '"'
+            + ' onclick="event.stopPropagation();showWidgetFieldAggPopup(\'' + wid + '\',\'' + escapedFn + '\',this,' + idx + ')">' + _tfAggIcon + '</button>'
+            + '<button class="btn btn-ghost btn-sm btn-icon" style="padding:0 4px" onclick="removeWidgetField(\'' + wid + '\',' + idx + ')">✕</button>'
+            + '</div>';
         };
 
         // ── Filter conditions ────────────────────────────────────────────
@@ -2365,174 +2374,187 @@ function _renderBarLineOptionsHTML(w, wid) {
             + '<div style="font-size:11px;color:var(--text-secondary);padding:4px 0">Drag widget headers into this container. Drag out onto canvas to un-parent.</div>'
             + '</div>';
         }
-        section.innerHTML = `
-          <div class="adv-node-section">
-            <div class="adv-node-section-hdr">GENERAL</div>
-            <div class="props-row"><label>Title</label>
-              <input type="text" class="form-input" value="${w.title.replace(/"/g,'&quot;')}" oninput="updateWidgetProp('${wid}','title',this.value)"/>
-              <div id="dlv-title-template-hint-${wid}" style="font-size:10px;color:var(--text-secondary,#605e5c);font-style:italic;margin-top:2px">${_titleHint}</div></div>
-            <div class="props-row"><label>Show title</label>
-              <input type="checkbox" ${w.showTitle!==false?'checked':''} onchange="updateWidgetProp('${wid}','showTitle',this.checked)"/></div>
-            ${_showHdrsRow}
-            <div class="props-row"><label>Type</label>
-              <select class="form-input" onchange="changeWidgetType('${wid}',this.value)">
-                ${_wtypeOpts}
-              </select></div>
-            <div class="props-row"><label>Interaction</label>
-              <select class="form-input" onchange="updateWidgetProp('${wid}','interactionMode',this.value)">
-                ${_interactionOpts}
-              </select></div>
-            ${_widthRow}
-            ${_heightRow}
-          </div>
-
-          ${_containerSection}
-
-          <div class="adv-node-section">
-            <div class="adv-node-section-hdr">APPEARANCE</div>
-            <div class="props-row"><label>Widget bg</label>
-              <div class="color-input-wrap">
-                <input type="color" value="${w.widgetBackgroundColor||'#fefefe'}" oninput="updateWidgetProp('${wid}','widgetBackgroundColor',this.value)"/>
-                <input type="text" class="form-input" value="${w.widgetBackgroundColor||'#fefefe'}" oninput="updateWidgetProp('${wid}','widgetBackgroundColor',this.value)"/>
-              </div></div>
-            <div class="props-row"><label>Title bg</label>
-              <div class="color-input-wrap">
-                <input type="color" value="${w.titleBackgroundColor||'#fefefe'}" oninput="updateWidgetProp('${wid}','titleBackgroundColor',this.value)"/>
-                <input type="text" class="form-input" value="${w.titleBackgroundColor||'#fefefe'}" oninput="updateWidgetProp('${wid}','titleBackgroundColor',this.value)"/>
-              </div></div>
-            <div class="props-row"><label>Title font</label>
-              <div class="color-input-wrap">
-                <input type="number" class="form-input" min="8" max="48" value="${w.titleFontSize||12}" oninput="updateWidgetProp('${wid}','titleFontSize',+this.value)" style="width:50px" title="Title font size"/>
-                <input type="color" value="${w.titleFontColor||'#323130'}" oninput="updateWidgetProp('${wid}','titleFontColor',this.value)" title="Title font color"/>
-                <input type="text" class="form-input" value="${w.titleFontColor||'#323130'}" oninput="updateWidgetProp('${wid}','titleFontColor',this.value)"/>
-              </div></div>
-            <div class="props-row"><label>Fill/Accent</label>
-              <div class="color-input-wrap">
-                <input type="color" value="${w.fillColor}" oninput="updateWidgetProp('${wid}','fillColor',this.value)"/>
-                <input type="text" class="form-input" value="${w.fillColor}" oninput="updateWidgetProp('${wid}','fillColor',this.value)"/>
-              </div></div>
-            <div class="props-row"><label>Border</label>
-              <div class="color-input-wrap">
-                <input type="color" value="${w.borderColor}" oninput="updateWidgetProp('${wid}','borderColor',this.value)"/>
-                <input type="number" class="form-input" value="${w.borderSize}" min="0" max="10" oninput="updateWidgetProp('${wid}','borderSize',+this.value)" style="width:50px"/>
-              </div></div>
-            ${isChart ? `<div class="props-row"><label>Chart bg</label>
-              <div class="color-input-wrap">
-                <input type="color" value="${w.chartBackgroundColor||'#fefefe'}" oninput="updateWidgetProp('${wid}','chartBackgroundColor',this.value)"/>
-                <input type="text" class="form-input" value="${w.chartBackgroundColor||'#fefefe'}" oninput="updateWidgetProp('${wid}','chartBackgroundColor',this.value)"/>
-              </div></div>` : ''}
-            ${isTable ? `
-            <div class="props-row"><label>Header bg</label>
-              <div class="color-input-wrap">
-                <input type="color" value="${w.headersBackgroundColor||'#f3f2f1'}" oninput="updateWidgetProp('${wid}','headersBackgroundColor',this.value)"/>
-                <input type="text" class="form-input" value="${w.headersBackgroundColor||'#f3f2f1'}" oninput="updateWidgetProp('${wid}','headersBackgroundColor',this.value)"/>
-              </div></div>
-            <div class="props-row"><label>Header font</label>
-              <div class="color-input-wrap">
-                <input type="number" class="form-input" min="8" max="32" value="${w.headersFontSize||12}" oninput="updateWidgetProp('${wid}','headersFontSize',+this.value)" style="width:50px" title="Header font size"/>
-                <input type="color" value="${w.headersFontColor||'#323130'}" oninput="updateWidgetProp('${wid}','headersFontColor',this.value)" title="Header font color"/>
-                <input type="text" class="form-input" value="${w.headersFontColor||'#323130'}" oninput="updateWidgetProp('${wid}','headersFontColor',this.value)"/>
-              </div></div>
-            ` : ''}
-            ${isText ? `
-            <div class="props-row"><label>Font size</label>
-              <input type="number" class="form-input" min="8" max="72" value="${w.fontSize}" oninput="updateWidgetProp('${wid}','fontSize',+this.value)"/></div>
-            <div class="props-row"><label>Font color</label>
-              <div class="color-input-wrap">
-                <input type="color" value="${w.fontColor}" oninput="updateWidgetProp('${wid}','fontColor',this.value)"/>
-                <input type="text" class="form-input" value="${w.fontColor}" oninput="updateWidgetProp('${wid}','fontColor',this.value)"/>
-              </div></div>
-            <div class="props-row" style="flex-direction:column;align-items:flex-start"><label>Content</label>
-              <textarea class="form-input" rows="4" oninput="updateWidgetProp('${wid}','textContent',this.value)">${w.textContent}</textarea></div>
-            ` : ''}
-          </div>
-
-          ${isData ? `
-          <div class="adv-node-section">
-            <div class="adv-node-section-hdr">
-              <span>FIELDS</span>
-            </div>
-						 
-            ${isChart ? fieldRow('X', (Array.isArray(w.dimensions) && w.dimensions.length) ? w.dimensions[0] : (w.xField || ''), `updateWidgetProp('${wid}','dimensions',[this.value]);renderWidgetProperties('${wid}')`, 0)
-          + `<div class="adv-drop-zone" style="margin-top:2px;margin-bottom:4px;text-align:center;padding:4px;font-size:11px" ondragover="event.preventDefault();this.classList.add('drag-over')" ondragleave="this.classList.remove('drag-over')" ondrop="_wpDropFieldToSection('${wid}','x',event)">Drop to set X field</div>`
-          + '<div class="adv-node-section-hdr" style="margin-top:6px"><span>Y FIELDS</span>'
-						 
-          + '<button class="btn btn-ghost btn-sm" onclick="widgetAddYField(\'' + wid + '\')">+ Add</button></div>'
-          + _renderYFieldsHTML(w, wid, cols)
-          + `<div class="adv-drop-zone" style="margin-top:4px;text-align:center;padding:4px;font-size:11px" ondragover="event.preventDefault();this.classList.add('drag-over')" ondragleave="this.classList.remove('drag-over')" ondrop="_wpDropFieldToSection('${wid}','y',event)">Drop to add Y field</div>`
-          + _renderBarLineOptionsHTML(w, wid)
-          + _renderScatterOptionsHTML(w, wid, cols)
-        : ''}
-							 
-											  
-																																																													   
-																				
-																	   
-																								   
-					 
-																																
-																																															
-																			   
-																	   
-						   
-																												 
-	   
-	   
-            ${isKPI ? fieldRow('', w.fields[0] || cols[0] || '', `updateWidgetProp('${wid}','fields',[this.value]);renderWidgetProperties('${wid}')`)
-              + `<div class="adv-node-section-hdr" style="margin-top:8px"><span>KPI DISPLAY</span></div>
-              <div class="props-row"><label>Metric size</label>
-                <input type="number" class="form-input" min="8" max="120" value="${w.kpiMetricFontSize||36}" oninput="updateWidgetProp('${wid}','kpiMetricFontSize',+this.value)" style="width:60px"/></div>
-              <div class="props-row"><label>Label size</label>
-                <input type="number" class="form-input" min="8" max="48" value="${w.kpiLabelFontSize||13}" oninput="updateWidgetProp('${wid}','kpiLabelFontSize',+this.value)" style="width:60px"/></div>
-              <div class="props-row"><label>Label text</label>
-                <input type="text" class="form-input" value="${(w.kpiLabelOverride||'').replace(/"/g,'&quot;')}" placeholder="${(w.fields[0]||'field name').replace(/"/g,'&quot;')}" oninput="updateWidgetProp('${wid}','kpiLabelOverride',this.value)"/></div>`
-            : ''}
-            ${isTable ? (w.fields.length
-                ? w.fields.map((f,i) => tableFieldRow(f,i)).join('')
-                : `<div style="font-size:11px;color:var(--text-disabled);padding:4px 0">Drop fields from the left panel</div>`) : ''}
-            ${isTable ? `
-            <div class="adv-drop-zone" style="margin-top:4px;text-align:center;padding:5px;font-size:11px"
-              ondragover="event.preventDefault();this.classList.add('drag-over')"
-              ondragleave="this.classList.remove('drag-over')"
-              ondrop="onDropFieldToWidget('${wid}',event)">Drop field to add column</div>
-            ` : ''}
-          </div>
-
-          <div class="adv-node-section">
-            <div class="adv-node-section-hdr">
-              <span>FILTER CONDITIONS</span>
-              <button class="btn btn-ghost btn-sm" onclick="widgetAddCond('${wid}')">+ Add</button>
-            </div>
-            <div>${renderConditions()}</div>
-            <div class="adv-drop-zone" style="margin-top:4px;text-align:center;padding:4px;font-size:11px"
-              ondragover="event.preventDefault();this.classList.add('drag-over')"
-              ondragleave="this.classList.remove('drag-over')"
-              ondrop="_wpDropFieldToSection('${wid}','cond',event)">Drop to add filter</div>
-          </div>
-
-          <div class="adv-node-section">
-            <div class="adv-node-section-hdr">
-              <span>SORT ORDER</span>
-              <button class="btn btn-ghost btn-sm" onclick="widgetAddSort('${wid}')">+ Add</button>
-            </div>
-            <div>${renderSorts()}</div>
-            <div class="adv-drop-zone" style="margin-top:4px;text-align:center;padding:4px;font-size:11px"
-              ondragover="event.preventDefault();this.classList.add('drag-over')"
-              ondragleave="this.classList.remove('drag-over')"
-              ondrop="_wpDropFieldToSection('${wid}','sort',event)">Drop to add sort</div>
-          </div>
-
-          <div class="adv-node-section">
-            <div class="adv-node-section-hdr"><span>GROUP BY</span></div>
-            <div>${renderGroupBy()}</div>
-          </div>
-
-          <div style="display:flex;justify-content:flex-end;padding:4px 0 8px">
-            <button class="btn btn-ghost btn-sm" aria-label="Peek at SQL Code"
-              onclick="peekWidgetSQL('${wid}',this)">📜</button>
-          </div>
-          ` : ''}
-        `;
+        // Pre-compute conditional HTML blocks (no nested backtick or ternary in template)
+        var _showTitleChecked = (w.showTitle !== false) ? 'checked' : '';
+        var _wTitleEsc   = w.title.replace(/"/g, '&quot;');
+        var _wWidgetBg              = w.widgetBackgroundColor || '#fefefe';
+        var _wWidgetBgText          = w.widgetBackgroundColor || '';
+        var _wWidgetBgIsTransparent = !w.widgetBackgroundColor;
+        var _wTitleBg    = w.titleBackgroundColor  || '#fefefe';
+        var _wTitleFs    = w.titleFontSize || 12;
+        var _wTitleFc    = w.titleFontColor || '#323130';
+        var _wFillColor  = w.fillColor;
+        var _wBorderColor = w.borderColor;
+        var _wBorderSize  = w.borderSize;
+        var _chartBgRowHTML = '';
+        if (isChart) {
+          var _cbc = w.chartBackgroundColor || '#fefefe';
+          _chartBgRowHTML = '<div class="props-row"><label>Chart bg</label>'
+            + '<div class="color-input-wrap">'
+            + '<input type="color" value="' + _cbc + '" oninput="updateWidgetProp(\'' + wid + '\',\'chartBackgroundColor\',this.value)"/>'
+            + '<input type="text" class="form-input" value="' + _cbc + '" oninput="updateWidgetProp(\'' + wid + '\',\'chartBackgroundColor\',this.value)"/>'
+            + '</div></div>';
+        }
+        var _tableHeaderRowsHTML = '';
+        if (isTable) {
+          var _hbc = w.headersBackgroundColor || '#f3f2f1';
+          var _hfs = w.headersFontSize || 12;
+          var _hfc = w.headersFontColor || '#323130';
+          _tableHeaderRowsHTML = '<div class="props-row"><label>Header bg</label>'
+            + '<div class="color-input-wrap">'
+            + '<input type="color" value="' + _hbc + '" oninput="updateWidgetProp(\'' + wid + '\',\'headersBackgroundColor\',this.value)"/>'
+            + '<input type="text" class="form-input" value="' + _hbc + '" oninput="updateWidgetProp(\'' + wid + '\',\'headersBackgroundColor\',this.value)"/>'
+            + '</div></div>'
+            + '<div class="props-row"><label>Header font</label>'
+            + '<div class="color-input-wrap">'
+            + '<input type="number" class="form-input" min="8" max="32" value="' + _hfs + '" oninput="updateWidgetProp(\'' + wid + '\',\'headersFontSize\',+this.value)" style="width:50px" title="Header font size"/>'
+            + '<input type="color" value="' + _hfc + '" oninput="updateWidgetProp(\'' + wid + '\',\'headersFontColor\',this.value)" title="Header font color"/>'
+            + '<input type="text" class="form-input" value="' + _hfc + '" oninput="updateWidgetProp(\'' + wid + '\',\'headersFontColor\',this.value)"/>'
+            + '</div></div>';
+        }
+        var _textPropsHTML = '';
+        if (isText) {
+          _textPropsHTML = '<div class="props-row"><label>Font size</label>'
+            + '<input type="number" class="form-input" min="8" max="72" value="' + w.fontSize + '" oninput="updateWidgetProp(\'' + wid + '\',\'fontSize\',+this.value)"/></div>'
+            + '<div class="props-row"><label>Font color</label>'
+            + '<div class="color-input-wrap">'
+            + '<input type="color" value="' + w.fontColor + '" oninput="updateWidgetProp(\'' + wid + '\',\'fontColor\',this.value)"/>'
+            + '<input type="text" class="form-input" value="' + w.fontColor + '" oninput="updateWidgetProp(\'' + wid + '\',\'fontColor\',this.value)"/>'
+            + '</div></div>'
+            + '<div class="props-row" style="flex-direction:column;align-items:flex-start"><label>Content</label>'
+            + '<textarea class="form-input" rows="4" oninput="updateWidgetProp(\'' + wid + '\',\'textContent\',this.value)">' + w.textContent + '</textarea></div>';
+        }
+        var _dataSectionHTML = '';
+        if (isData) {
+          var _chartFieldsHTML = '';
+          if (isChart) {
+            var _xFVal = (Array.isArray(w.dimensions) && w.dimensions.length) ? w.dimensions[0] : (w.xField || '');
+            _chartFieldsHTML = fieldRow('X', _xFVal, "updateWidgetProp('" + wid + "','dimensions',[this.value]);renderWidgetProperties('" + wid + "')", 0)
+              + '<div class="adv-drop-zone" style="margin-top:2px;margin-bottom:4px;text-align:center;padding:4px;font-size:11px"'
+              + ' ondragover="event.preventDefault();this.classList.add(\'drag-over\')" ondragleave="this.classList.remove(\'drag-over\')"'
+              + ' ondrop="_wpDropFieldToSection(\'' + wid + '\',\'x\',event)">Drop to set X field</div>'
+              + '<div class="adv-node-section-hdr" style="margin-top:6px"><span>Y FIELDS</span>'
+              + '<button class="btn btn-ghost btn-sm" onclick="widgetAddYField(\'' + wid + '\')">+ Add</button></div>'
+              + _renderYFieldsHTML(w, wid, cols)
+              + '<div class="adv-drop-zone" style="margin-top:4px;text-align:center;padding:4px;font-size:11px"'
+              + ' ondragover="event.preventDefault();this.classList.add(\'drag-over\')" ondragleave="this.classList.remove(\'drag-over\')"'
+              + ' ondrop="_wpDropFieldToSection(\'' + wid + '\',\'y\',event)">Drop to add Y field</div>'
+              + _renderBarLineOptionsHTML(w, wid)
+              + _renderScatterOptionsHTML(w, wid, cols);
+          }
+          var _kpiFieldsHTML = '';
+          if (isKPI) {
+            var _kpiLabelEsc = (w.kpiLabelOverride || '').replace(/"/g, '&quot;');
+            var _kpiPlaceholderEsc = (w.fields[0] || 'field name').replace(/"/g, '&quot;');
+            _kpiFieldsHTML = fieldRow('', w.fields[0] || cols[0] || '', "updateWidgetProp('" + wid + "','fields',[this.value]);renderWidgetProperties('" + wid + "')")
+              + '<div class="adv-node-section-hdr" style="margin-top:8px"><span>KPI DISPLAY</span></div>'
+              + '<div class="props-row"><label>Metric size</label>'
+              + '<input type="number" class="form-input" min="8" max="120" value="' + (w.kpiMetricFontSize || 36) + '" oninput="updateWidgetProp(\'' + wid + '\',\'kpiMetricFontSize\',+this.value)" style="width:60px"/></div>'
+              + '<div class="props-row"><label>Label size</label>'
+              + '<input type="number" class="form-input" min="8" max="48" value="' + (w.kpiLabelFontSize || 13) + '" oninput="updateWidgetProp(\'' + wid + '\',\'kpiLabelFontSize\',+this.value)" style="width:60px"/></div>'
+              + '<div class="props-row"><label>Label text</label>'
+              + '<input type="text" class="form-input" value="' + _kpiLabelEsc + '" placeholder="' + _kpiPlaceholderEsc + '" oninput="updateWidgetProp(\'' + wid + '\',\'kpiLabelOverride\',this.value)"/></div>';
+          }
+          var _tableFieldsHTML = '';
+          if (isTable) {
+            if (w.fields.length) {
+              for (var _tfi = 0; _tfi < w.fields.length; _tfi++) {
+                _tableFieldsHTML += tableFieldRow(w.fields[_tfi], _tfi);
+              }
+            } else {
+              _tableFieldsHTML = '<div style="font-size:11px;color:var(--text-disabled);padding:4px 0">Drop fields from the left panel</div>';
+            }
+          }
+          var _tableDropZoneHTML = '';
+          if (isTable) {
+            _tableDropZoneHTML = '<div class="adv-drop-zone" style="margin-top:4px;text-align:center;padding:5px;font-size:11px"'
+              + ' ondragover="event.preventDefault();this.classList.add(\'drag-over\')"'
+              + ' ondragleave="this.classList.remove(\'drag-over\')"'
+              + ' ondrop="onDropFieldToWidget(\'' + wid + '\',event)">Drop field to add column</div>';
+          }
+          _dataSectionHTML = '<div class="adv-node-section">'
+            + '<div class="adv-node-section-hdr"><span>FIELDS</span></div>'
+            + _chartFieldsHTML
+            + _kpiFieldsHTML
+            + _tableFieldsHTML
+            + _tableDropZoneHTML
+            + '</div>'
+            + '<div class="adv-node-section">'
+            + '<div class="adv-node-section-hdr"><span>FILTER CONDITIONS</span>'
+            + '<button class="btn btn-ghost btn-sm" onclick="widgetAddCond(\'' + wid + '\')">+ Add</button></div>'
+            + '<div>' + renderConditions() + '</div>'
+            + '<div class="adv-drop-zone" style="margin-top:4px;text-align:center;padding:4px;font-size:11px"'
+            + ' ondragover="event.preventDefault();this.classList.add(\'drag-over\')"'
+            + ' ondragleave="this.classList.remove(\'drag-over\')"'
+            + ' ondrop="_wpDropFieldToSection(\'' + wid + '\',\'cond\',event)">Drop to add filter</div>'
+            + '</div>'
+            + '<div class="adv-node-section">'
+            + '<div class="adv-node-section-hdr"><span>SORT ORDER</span>'
+            + '<button class="btn btn-ghost btn-sm" onclick="widgetAddSort(\'' + wid + '\')">+ Add</button></div>'
+            + '<div>' + renderSorts() + '</div>'
+            + '<div class="adv-drop-zone" style="margin-top:4px;text-align:center;padding:4px;font-size:11px"'
+            + ' ondragover="event.preventDefault();this.classList.add(\'drag-over\')"'
+            + ' ondragleave="this.classList.remove(\'drag-over\')"'
+            + ' ondrop="_wpDropFieldToSection(\'' + wid + '\',\'sort\',event)">Drop to add sort</div>'
+            + '</div>'
+            + '<div class="adv-node-section">'
+            + '<div class="adv-node-section-hdr"><span>GROUP BY</span></div>'
+            + '<div>' + renderGroupBy() + '</div>'
+            + '</div>'
+            + '<div style="display:flex;justify-content:flex-end;padding:4px 0 8px">'
+            + '<button class="btn btn-ghost btn-sm" aria-label="Peek at SQL Code" onclick="peekWidgetSQL(\'' + wid + '\',this)">📜</button>'
+            + '</div>';
+        }
+        section.innerHTML = '<div class="adv-node-section">'
+          + '<div class="adv-node-section-hdr">GENERAL</div>'
+          + '<div class="props-row"><label>Title</label>'
+          + '<input type="text" class="form-input" value="' + _wTitleEsc + '" oninput="updateWidgetProp(\'' + wid + '\',\'title\',this.value)"/>'
+          + '<div id="dlv-title-template-hint-' + wid + '" style="font-size:10px;color:var(--text-secondary,#605e5c);font-style:italic;margin-top:2px">' + _titleHint + '</div></div>'
+          + '<div class="props-row"><label>Show title</label>'
+          + '<input type="checkbox" ' + _showTitleChecked + ' onchange="updateWidgetProp(\'' + wid + '\',\'showTitle\',this.checked)"/></div>'
+          + _showHdrsRow
+          + '<div class="props-row"><label>Type</label>'
+          + '<select class="form-input" onchange="changeWidgetType(\'' + wid + '\',this.value)">' + _wtypeOpts + '</select></div>'
+          + '<div class="props-row"><label>Interaction</label>'
+          + '<select class="form-input" onchange="updateWidgetProp(\'' + wid + '\',\'interactionMode\',this.value)">' + _interactionOpts + '</select></div>'
+          + _widthRow
+          + _heightRow
+          + '</div>'
+          + _containerSection
+          + '<div class="adv-node-section">'
+          + '<div class="adv-node-section-hdr">APPEARANCE</div>'
+          + '<div class="props-row"><label>Widget bg</label>'
+          + '<div class="color-input-wrap">'
+          + (_wWidgetBgIsTransparent ? '' : '<input type="color" value="' + _wWidgetBg + '" oninput="updateWidgetProp(\'' + wid + '\',\'widgetBackgroundColor\',this.value)"/>')
+          + '<input type="text" class="form-input" value="' + _wWidgetBgText + '" placeholder="transparent" oninput="updateWidgetProp(\'' + wid + '\',\'widgetBackgroundColor\',this.value)"/>'
+          + '<button type="button" title="Set transparent" style="padding:0 4px;line-height:1;cursor:pointer" onclick="updateWidgetProp(\'' + wid + '\',\'widgetBackgroundColor\',\'\')">×</button>'
+          + '</div></div>'
+          + '<div class="props-row"><label>Title bg</label>'
+          + '<div class="color-input-wrap">'
+          + '<input type="color" value="' + _wTitleBg + '" oninput="updateWidgetProp(\'' + wid + '\',\'titleBackgroundColor\',this.value)"/>'
+          + '<input type="text" class="form-input" value="' + _wTitleBg + '" oninput="updateWidgetProp(\'' + wid + '\',\'titleBackgroundColor\',this.value)"/>'
+          + '</div></div>'
+          + '<div class="props-row"><label>Title font</label>'
+          + '<div class="color-input-wrap">'
+          + '<input type="number" class="form-input" min="8" max="48" value="' + _wTitleFs + '" oninput="updateWidgetProp(\'' + wid + '\',\'titleFontSize\',+this.value)" style="width:50px" title="Title font size"/>'
+          + '<input type="color" value="' + _wTitleFc + '" oninput="updateWidgetProp(\'' + wid + '\',\'titleFontColor\',this.value)" title="Title font color"/>'
+          + '<input type="text" class="form-input" value="' + _wTitleFc + '" oninput="updateWidgetProp(\'' + wid + '\',\'titleFontColor\',this.value)"/>'
+          + '</div></div>'
+          + '<div class="props-row"><label>Fill/Accent</label>'
+          + '<div class="color-input-wrap">'
+          + '<input type="color" value="' + _wFillColor + '" oninput="updateWidgetProp(\'' + wid + '\',\'fillColor\',this.value)"/>'
+          + '<input type="text" class="form-input" value="' + _wFillColor + '" oninput="updateWidgetProp(\'' + wid + '\',\'fillColor\',this.value)"/>'
+          + '</div></div>'
+          + '<div class="props-row"><label>Border</label>'
+          + '<div class="color-input-wrap">'
+          + '<input type="color" value="' + _wBorderColor + '" oninput="updateWidgetProp(\'' + wid + '\',\'borderColor\',this.value)"/>'
+          + '<input type="number" class="form-input" value="' + _wBorderSize + '" min="0" max="10" oninput="updateWidgetProp(\'' + wid + '\',\'borderSize\',+this.value)" style="width:50px"/>'
+          + '</div></div>'
+          + _chartBgRowHTML
+          + _tableHeaderRowsHTML
+          + _textPropsHTML
+          + '</div>'
+          + _dataSectionHTML;
       }
 
 
@@ -2598,7 +2620,7 @@ function _renderBarLineOptionsHTML(w, wid) {
         }
         if (prop === 'borderColor') el.style.borderColor = value;
         if (prop === 'borderSize') el.style.borderWidth = value + 'px';
-        if (prop === 'widgetBackgroundColor') el.style.background = value;
+        if (prop === 'widgetBackgroundColor') el.style.background = value || 'transparent';
         if (prop === 'titleBackgroundColor' && hdr) hdr.style.background = value;
         if (prop === 'titleFontSize' && titleEl instanceof HTMLElement) titleEl.style.fontSize = value + 'px';
         if (prop === 'titleFontColor' && titleEl instanceof HTMLElement) titleEl.style.color = value;
@@ -2744,7 +2766,8 @@ function _renderBarLineOptionsHTML(w, wid) {
         }
 
         DataLaVistaState.design.filters.forEach(f => {
-          const fieldType = sniffType(f.field);
+          var _f = /** @type {*} */ (f);
+          const fieldType = sniffType(_f.field);
           const isBoolean = fieldType === 'boolean';
           const isDate    = fieldType === 'date';
 
@@ -2754,19 +2777,22 @@ function _renderBarLineOptionsHTML(w, wid) {
 
           const lbl = document.createElement('span');
           lbl.style.cssText = 'font-size:12px;font-weight:600';
-          lbl.innerText = f.label || f.field;
+          lbl.innerText = _f.label || _f.field;
 
+          var _pf = /** @type {*} */ (DataLaVistaState.previewFilters);
           let input;
           if (isBoolean) {
             input = document.createElement('select');
             input.className = 'form-input';
             input.style.cssText = 'height:24px;padding:0 24px 0 6px';
-            input.innerHTML = `<option value="(All)">(All)</option>
-              <option value="true"  ${DataLaVistaState.previewFilters[f.field]==='true'  ?'selected':''}>True</option>
-              <option value="false" ${DataLaVistaState.previewFilters[f.field]==='false' ?'selected':''}>False</option>`;
+            var _boolTrueSel  = _pf[_f.field] === 'true'  ? 'selected' : '';
+            var _boolFalseSel = _pf[_f.field] === 'false' ? 'selected' : '';
+            input.innerHTML = '<option value="(All)">(All)</option>'
+              + '<option value="true" '  + _boolTrueSel  + '>True</option>'
+              + '<option value="false" ' + _boolFalseSel + '>False</option>';
             input.onchange = (e) => {
-              if (e.target.value === '(All)') delete DataLaVistaState.previewFilters[f.field];
-              else DataLaVistaState.previewFilters[f.field] = e.target.value;
+              if (e.target.value === '(All)') delete _pf[_f.field];
+              else _pf[_f.field] = e.target.value;
               refreshWidgets();
             };
           } else if (isDate) {
@@ -2774,21 +2800,21 @@ function _renderBarLineOptionsHTML(w, wid) {
             input.type = 'date';
             input.className = 'form-input';
             input.style.cssText = 'height:24px;padding:0 4px';
-            input.value = DataLaVistaState.previewFilters[f.field] || '';
+            input.value = _pf[_f.field] || '';
             input.onchange = (e) => {
-              if (!e.target.value) delete DataLaVistaState.previewFilters[f.field];
-              else DataLaVistaState.previewFilters[f.field] = e.target.value;
+              if (!e.target.value) delete _pf[_f.field];
+              else _pf[_f.field] = e.target.value;
               refreshWidgets();
             };
           } else {
             let uniqueVals = [];
-            const _tk = findTableKeyForAlias(f.field);
+            const _tk = findTableKeyForAlias(_f.field);
             const _fMeta = _tk && DataLaVistaState.tables[_tk]
-              ? DataLaVistaState.tables[_tk].fields.find(x => x.alias === f.field)
+              ? DataLaVistaState.tables[_tk].fields.find(x => x.alias === _f.field)
               : null;
             const _isLookupField = _fMeta && _fMeta.displayType === 'lookup';
             if (alasql.tables && alasql.tables['dlv_results']) {
-              const rawVals = alasql('SELECT * FROM [dlv_results]').map(r => r[f.field]).filter(v => v !== null && v !== undefined);
+              const rawVals = alasql('SELECT * FROM [dlv_results]').map(r => r[_f.field]).filter(v => v !== null && v !== undefined);
               if (_isLookupField) {
                 // Lookup fields store semicolon-separated text — split and deduplicate
                 const allParts = [];
@@ -2806,12 +2832,16 @@ function _renderBarLineOptionsHTML(w, wid) {
             input = document.createElement('select');
             input.className = 'form-input';
             input.style.cssText = 'height:24px;padding:0 24px 0 6px';
-            input.innerHTML = `<option value="(All)">(All)</option>` +
-              uniqueVals.map(v => `<option value="${v}">${v}</option>`).join('');
-            input.value = DataLaVistaState.previewFilters[f.field] || '(All)';
+            var _uOpts = '<option value="(All)">(All)</option>';
+            for (var _ui = 0; _ui < uniqueVals.length; _ui++) {
+              var _uv = uniqueVals[_ui];
+              _uOpts += '<option value="' + _uv + '">' + _uv + '</option>';
+            }
+            input.innerHTML = _uOpts;
+            input.value = _pf[_f.field] || '(All)';
             input.onchange = (e) => {
-              if (e.target.value === '(All)') delete DataLaVistaState.previewFilters[f.field];
-              else DataLaVistaState.previewFilters[f.field] = e.target.value;
+              if (e.target.value === '(All)') delete _pf[_f.field];
+              else _pf[_f.field] = e.target.value;
               refreshWidgets();
             };
           }
@@ -2819,7 +2849,7 @@ function _renderBarLineOptionsHTML(w, wid) {
           const del = document.createElement('span');
           del.innerHTML = '✕';
           del.style.cssText = 'cursor:pointer;font-size:10px';
-          del.onclick = () => removeFilterFromBar(f.field);
+          del.onclick = () => removeFilterFromBar(_f.field);
 
           wrap.appendChild(lbl); wrap.appendChild(input); wrap.appendChild(del);
           bar.appendChild(wrap);
@@ -3016,19 +3046,16 @@ function _renderBarLineOptionsHTML(w, wid) {
 
       /** Re-render preview canvas widgets in-place after a drill filter change. */
       function _refreshPreviewCanvasWidgets() {
-        const canvas = document.getElementById('preview-canvas');
-        if (!canvas || !canvas.querySelector('.widget')) return;
-        const widgetEls = canvas.querySelectorAll('.widget');
-        DataLaVistaState.design.widgets.forEach((w, i) => {
-          const el = widgetEls[i];
-          if (!el) return;
-          const content = el.querySelector('.widget-content');
-          if (!content) return;
-          content.innerHTML = getPrevWidgetContent(w);
+        if (!document.getElementById('preview-canvas')) return;
+        for (const w of DataLaVistaState.design.widgets) {
+          if (w.type === 'container') continue;
+          const contentEl = document.getElementById('prev-wcontent-' + w.id);
+          if (!contentEl) continue;
+          contentEl.innerHTML = getPrevWidgetContent(w);
           if (isEChartsWidget(w.type)) {
             requestAnimationFrame(() => renderPreviewChart(w));
           }
-        });
+        }
       }
 
       function widgetAddYField(wid, field) {
