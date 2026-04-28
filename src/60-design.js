@@ -232,8 +232,6 @@ function rankSuggestions(rules, cols, meta) {
     } else if (prop === 'dashboardTitleTooltip') {
       DataLaVistaState.design.dashboardTitleTooltip = value;
       updateDashboardTitleTooltipIcon();
-    } else if (prop === 'titleTemplate') {
-      DataLaVistaState.design.titleTemplate = value;
     } else if (prop === 'interactionMode') {
       DataLaVistaState.design.interactionMode = value;
     } else if (prop === 'themePaletteColor') {
@@ -241,16 +239,42 @@ function rankSuggestions(rules, cols, meta) {
       if (!DataLaVistaState.design.theme) DataLaVistaState.design.theme = { palette: [], fontFamily: '', fontSize: null, backgroundColor: '' };
       while (DataLaVistaState.design.theme.palette.length <= value.index) DataLaVistaState.design.theme.palette.push('');
       DataLaVistaState.design.theme.palette[value.index] = value.color;
+      DataLaVistaState.design.widgets.forEach(function(w) { if (isEChartsWidget(w.type)) updateWidgetContent(w.id); });
     } else if (prop === 'themePaletteReset') {
       if (DataLaVistaState.design.theme) DataLaVistaState.design.theme.palette = [];
+      DataLaVistaState.design.widgets.forEach(function(w) { if (isEChartsWidget(w.type)) updateWidgetContent(w.id); });
     } else if (prop === 'themeFontFamily') {
       if (!DataLaVistaState.design.theme) DataLaVistaState.design.theme = { palette: [], fontFamily: '', fontSize: null, backgroundColor: '' };
       DataLaVistaState.design.theme.fontFamily = value;
+      DataLaVistaState.design.widgets.forEach(function(w) { if (isEChartsWidget(w.type)) updateWidgetContent(w.id); });
     } else if (prop === 'themeBackgroundColor') {
       if (!DataLaVistaState.design.theme) DataLaVistaState.design.theme = { palette: [], fontFamily: '', fontSize: null, backgroundColor: '' };
       DataLaVistaState.design.theme.backgroundColor = value;
+      var _bgEl = document.getElementById('canvas-drop-zone');
+      if (_bgEl) _bgEl.style.background = value || '';
+      var _pcEl = document.getElementById('preview-canvas');
+      if (_pcEl) _pcEl.style.background = value || '';
     }
     renderDashboardTitleProperties();
+  }
+
+  function insertTitleToken(/** @type {DragEvent} */ event) {
+    event.preventDefault();
+    const data = safeDragParse(event);
+    if (!data) return;
+    const field = data.field || data.alias;
+    if (!field) return;
+    const inp = /** @type {HTMLInputElement|null} */ (document.getElementById('title-input'));
+    const propInp = /** @type {HTMLInputElement|null} */ (event.target instanceof HTMLInputElement ? event.target : null);
+    const target = propInp || inp;
+    if (!target) return;
+    const token = '{{FIRST(' + field + ')}}';
+    const start = target.selectionStart || 0;
+    const end = target.selectionEnd || 0;
+    target.value = target.value.slice(0, start) + token + target.value.slice(end);
+    target.setSelectionRange(start + token.length, start + token.length);
+    updateDashboardTitleProp('title', target.value);
+    if (inp && inp !== target) inp.value = target.value;
   }
 
   function renderDashboardTitleProperties() {
@@ -261,7 +285,7 @@ function rankSuggestions(rules, cols, meta) {
     const palette = (DataLaVistaState.design.theme && DataLaVistaState.design.theme.palette) || [];
     const fontFam = (DataLaVistaState.design.theme && DataLaVistaState.design.theme.fontFamily) || '';
     const bgColor = (DataLaVistaState.design.theme && DataLaVistaState.design.theme.backgroundColor) || '';
-    const titleTpl = (DataLaVistaState.design.titleTemplate || '').replace(/"/g, '&quot;');
+    const titleTpl = (DataLaVistaState.design.title || '').replace(/"/g, '&quot;');
 
     // Build palette swatch row (8 slots)
     const paletteSlots = [0,1,2,3,4,5,6,7].map(i => {
@@ -278,11 +302,17 @@ function rankSuggestions(rules, cols, meta) {
       '    <input type="checkbox" ' + (show ? 'checked' : '') + ' onchange="updateDashboardTitleProp(\'showDashboardTitle\',this.checked)"/>',
       '  </div>',
       '  <div class="props-row" style="flex-direction:column;align-items:flex-start;gap:4px">',
-      '    <label>Title template</label>',
+      '    <label>Title</label>',
       '    <input class="form-input" style="width:100%" value="' + titleTpl + '"',
-      '      placeholder="My Report — use {{FIRST(FieldName)}} for live values"',
-      '      onblur="updateDashboardTitleProp(\'titleTemplate\',this.value)">',
-      '    <div style="font-size:10px;color:var(--text-secondary)">Use <code>{{FieldName}}</code> or <code>{{FIRST(FieldName)}}</code> to embed live field values in the title.</div>',
+      '      placeholder="DataLaVista Report"',
+      '      ondragover="event.preventDefault()"',
+      '      ondrop="insertTitleToken(event)"',
+      '      oninput="DataLaVistaState.design.title=this.value"',
+      '      onblur="updateDashboardTitleProp(\'title\',this.value)">',
+      '    <div style="font-size:10px;color:var(--text-secondary)">Drop a field to embed <code>{{FIRST(Field)}}</code>. Supports any aggregate: <code>{{SUM(Field)}}</code>, <code>{{COUNT(Field)}}</code>, etc.</div>',
+      (DataLaVistaState.design.title && DataLaVistaState.design.title.includes('{{'))
+        ? '    <div style="font-size:10px;color:var(--accent)">→ ' + resolveTitleTemplate(DataLaVistaState.design.title) + '</div>'
+        : '',
       '  </div>',
       '</div>',
       '<div class="adv-node-section">',
@@ -490,7 +520,7 @@ function rankSuggestions(rules, cols, meta) {
         renderFilterBar();
       }
 
-      function addWidgetToCanvas(widgetType, fields, tableName) {
+      function addWidgetToCanvas(widgetType, fields, tableName, containerId) {
         const id = 'w_' + Date.now();
 
         // Smart default Y field for chart widgets
@@ -563,7 +593,7 @@ function rankSuggestions(rules, cols, meta) {
           showHeaders: true,
           widthPct: 45,
           heightVh: 30,
-          parentContainerId: null,
+          parentContainerId: containerId || null,
           minHeightVh: 30,
           containerGap: 8,
           containerPadding: 8,
@@ -672,6 +702,9 @@ function rankSuggestions(rules, cols, meta) {
         const canvas = document.getElementById('canvas-drop-zone');
         const hint = document.getElementById('canvas-empty-hint');
 
+        // Apply canvas background from theme
+        if (canvas) canvas.style.background = (DataLaVistaState.design.theme && DataLaVistaState.design.theme.backgroundColor) || '';
+
         // Remove existing widgets (but not hint or drop zone controls)
         canvas.querySelectorAll('.widget').forEach(w => w.remove());
 
@@ -683,6 +716,7 @@ function rankSuggestions(rules, cols, meta) {
 
         if (!DataLaVistaState.design.widgets.length) {
           hint.style.display = 'flex';
+          if (!DataLaVistaState.currentWidgetId) renderDashboardTitleProperties();
           return;
         }
         hint.style.display = 'none';
@@ -711,6 +745,8 @@ function rankSuggestions(rules, cols, meta) {
             }
           }
         });
+
+        if (!DataLaVistaState.currentWidgetId) renderDashboardTitleProperties();
       }
 
       function createWidgetElement(w) {
@@ -770,13 +806,24 @@ function rankSuggestions(rules, cols, meta) {
             hdr.hidden = true;
           }
         }
-        el.addEventListener('click', e => { if (!e.target.closest('button')) selectWidget(w.id); });
+        el.addEventListener('click', function(e) {
+          if (!e.target.closest('button')) {
+            // Child widget inside a container: stop bubble so container's handler doesn't fire
+            if (w.parentContainerId) { e.stopPropagation(); }
+            // Container widget: only select if click didn't originate from an inner child widget
+            if (w.type === 'container') {
+              var _innerWidget = e.target.closest('.widget');
+              if (_innerWidget && _innerWidget !== el) return;
+            }
+            selectWidget(w.id);
+          }
+        });
         // Drop fields from panel onto widget (non-container)
         el.addEventListener('dragover', e => {
           if (!_wPropsDrag.type) { e.preventDefault(); el.classList.add('drag-over'); }
         });
         el.addEventListener('dragleave', () => el.classList.remove('drag-over'));
-        el.addEventListener('drop', e => {
+        el.addEventListener('drop', function(e) {
           e.stopPropagation();
           el.classList.remove('drag-over');
           if (!_wPropsDrag.type) {
@@ -786,6 +833,12 @@ function rankSuggestions(rules, cols, meta) {
               if (w.type === 'container') {
                 _dropWidgetIntoContainer(_dd.widgetId, w.id);
               }
+            } else if (_dd && _dd.type === 'widget-type' && w.type === 'container') {
+              // Drop new widget type from toolbox directly into container
+              addWidgetToCanvas(_dd.widgetType, null, null, w.id);
+            } else if (_dd && _dd.type === 'table' && w.type === 'container') {
+              // Drop table from panel directly into container
+              addWidgetToCanvas('table', null, _dd.table, w.id);
             } else {
               onDropFieldToWidget(w.id, e);
             }
@@ -1128,12 +1181,16 @@ function rankSuggestions(rules, cols, meta) {
         }
         const theadHtml = w.showHeaders === false ? '' : `<thead><tr>${thHtml}</tr></thead>`;
         const drillField = cols[0];
+        const _tblMode = (w.interactionMode) || (DataLaVistaState.design && DataLaVistaState.design.interactionMode) || 'cross-filter';
         let html = `<div style="overflow:auto;max-height:100%"><table class="widget-table">${theadHtml}<tbody>`;
         for (const row of tableData) {
           var _drillRaw = row[drillField] != null ? row[drillField] : '';
           const drillVal = String(_drillRaw).replace(/'/g, "\\'").replace(/"/g, '&quot;');
           var _drillFieldEsc = drillField.replace(/'/g, "\\'");
-          html += '<tr style="cursor:pointer" title="Click to filter by ' + drillField + '" onclick="applyDrillFilter(\'' + _drillFieldEsc + '\',\'' + drillVal + '\')">';
+          var _tblClickFn = _tblMode === 'cross-highlight'
+            ? '_applyDrillHighlight(\'' + _drillFieldEsc + '\',\'' + drillVal + '\')'
+            : 'applyDrillFilter(\'' + _drillFieldEsc + '\',\'' + drillVal + '\')';
+          html += '<tr style="cursor:pointer" title="Click to ' + (_tblMode === 'cross-highlight' ? 'highlight' : 'filter') + ' by ' + drillField + '" onclick="' + _tblClickFn + '">';
           html += cols.map(c => '<td>' + (row[c] != null ? row[c] : '') + '</td>').join('');
           html += '</tr>';
         }
@@ -1232,7 +1289,7 @@ function _buildDatasetOption(w, rows) {
     return {
       dataset : { source: rows },
       tooltip : { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
-      series  : [{ type: 'pie', encode: { itemName: xDim, value: '__dlvy_0' }, radius: ['30%', '65%'], label: { fontSize: 11 } }]
+      series  : [{ type: 'pie', encode: { itemName: xDim, value: '__dlvy_0' }, radius: ['30%', '65%'], label: { fontSize: 11 }, blur: { itemStyle: { opacity: 0.15 } } }]
     };
   }
 
@@ -1253,7 +1310,8 @@ function _buildDatasetOption(w, rows) {
           type             : 'bar',
           coordinateSystem : 'polar',
           stack            : 'total',
-          data             : rows.map(function(r) { return parseFloat(r[bkey] !== undefined ? r[bkey] : r[yf]) || 0; })
+          data             : rows.map(function(r) { return parseFloat(r[bkey] !== undefined ? r[bkey] : r[yf]) || 0; }),
+          blur             : { itemStyle: { opacity: 0.15 } }
         };
       })
     };
@@ -1272,7 +1330,8 @@ function _buildDatasetOption(w, rows) {
       name      : spe.label || spe.field,
       type      : st,
       encode    : { x: xDim, y: alias },
-      itemStyle : { color: color, opacity: spe.opacity != null ? spe.opacity : 1 }
+      itemStyle : { color: color, opacity: spe.opacity != null ? spe.opacity : 1 },
+      blur      : { itemStyle: { opacity: 0.15 }, lineStyle: { opacity: 0.15 } }
     });
     if (st === 'line') {
       s.smooth = spe.smooth != null ? !!spe.smooth : true;
@@ -1575,8 +1634,16 @@ function _buildChartOption(w, rows) {
     if (w.type === 'scatter' && Array.isArray(params.data)) filterValue = String(params.data[0]);
     if (!filterField || filterValue == null) return;
     const mode = w.interactionMode || (DataLaVistaState.design && DataLaVistaState.design.interactionMode) || 'cross-filter';
-    if      (mode === 'cross-filter')    applyDrillFilter(filterField, String(filterValue));
-    else if (mode === 'cross-highlight') _applyDrillHighlight(filterField, String(filterValue));
+    if (mode === 'cross-filter') {
+      applyDrillFilter(filterField, String(filterValue));
+    } else if (mode === 'cross-highlight') {
+      const _hl = DataLaVistaState.drillHighlight;
+      if (_hl && _hl.field === filterField && String(_hl.value) === String(filterValue)) {
+        _clearDrillHighlight();
+      } else {
+        _applyDrillHighlight(filterField, String(filterValue));
+      }
+    }
   });
 }
 
@@ -1637,7 +1704,7 @@ function _buildChartOption(w, rows) {
         document.getElementById('widget-' + wid)?.remove();
         if (DataLaVistaState.currentWidgetId === wid) {
           DataLaVistaState.currentWidgetId = null;
-          document.getElementById('props-section').innerHTML = '<div class="props-empty">Click a widget to edit its properties</div>';
+          renderDashboardTitleProperties();
         }
         if (!DataLaVistaState.design.widgets.length) document.getElementById('canvas-empty-hint').style.display = 'flex';
       }
@@ -2744,12 +2811,15 @@ function _renderBarLineOptionsHTML(w, wid) {
       }
 
       function updateWidgetContent(wid) {
-        const w = DataLaVistaState.design.widgets.find(x => x.id === wid);
+        var w = DataLaVistaState.design.widgets.find(function(x) { return x.id === wid; });
         if (!w) return;
-        const el = document.getElementById('wcontent-' + wid);
+        // Containers hold child widget DOM nodes directly; never wipe their innerHTML.
+        // Child widgets are updated individually by subsequent iterations of the caller loop.
+        if (w.type === 'container') return;
+        var el = document.getElementById('wcontent-' + wid);
         if (!el) return;
         el.innerHTML = getWidgetContentHTML(w);
-        if (isEChartsWidget(w.type)) requestAnimationFrame(() => renderChart(w));
+        if (isEChartsWidget(w.type)) requestAnimationFrame(function() { renderChart(w); });
       }
 
       // ============================================================
@@ -2911,10 +2981,11 @@ function _renderBarLineOptionsHTML(w, wid) {
       function resolveTitleTemplate(template) {
         if (!template || !template.includes('{{')) return template || '';
         if (!(alasql.tables && alasql.tables['dlv_active'])) return template;
-        return template.replace(/\{\{(?:FIRST\()?([^})]+)\)?\}\}/g, function(match, field) {
+        return template.replace(/\{\{(?:([A-Za-z_]+)\()?([^})]+)\)?\}\}/g, function(/** @type {string} */ match, /** @type {string|undefined} */ agg, /** @type {string} */ field) {
+          agg = (agg || 'FIRST').toUpperCase();
           field = field.trim();
           try {
-            const rows = alasql('SELECT FIRST([' + field + ']) AS val FROM [dlv_active]');
+            const rows = alasql('SELECT ' + agg + '([' + field + ']) AS val FROM [dlv_active]');
             return (rows && rows[0] && rows[0].val != null) ? String(rows[0].val) : match;
           } catch(_) { return match; }
         });

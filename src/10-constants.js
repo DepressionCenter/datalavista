@@ -308,8 +308,7 @@ const DataLaVistaState = {
     widgets: [],     // widget objects
     filters: [],     // { field, label, position }  — preview filter bar chips
     interactionMode: /** @type {'cross-filter'|'cross-highlight'|'none'} */ ('cross-filter'), // report-level default
-    theme: /** @type {{palette:string[], fontFamily:string, fontSize:number|null, backgroundColor:string}} */ ({ palette: [], fontFamily: '', fontSize: null, backgroundColor: '' }),
-    titleTemplate: ''  // dashboard title — may contain {{FIRST(field)}} tokens
+    theme: /** @type {{palette:string[], fontFamily:string, fontSize:number|null, backgroundColor:string}} */ ({ palette: [], fontFamily: '', fontSize: null, backgroundColor: '' })
   },
   currentWidgetId: null,
   previewFilters: {},  // field -> value

@@ -280,6 +280,11 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         document.getElementById('title-input')?.addEventListener('focus', () => {
           renderDashboardTitleProperties();
         });
+
+        // Escape clears active cross-highlight
+        document.addEventListener('keydown', (e) => {
+          if (e.key === 'Escape' && DataLaVistaState.drillHighlight) _clearDrillHighlight();
+        });
         
         // If a report URL was provided with reportMode=Edit, populate config-url and load it into the designer
         if (reportParam && reportParam.trim() !== '') {

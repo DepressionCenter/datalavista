@@ -238,6 +238,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         _renderAllDrillChips,
         _renderDrillChipsIn,
         resolveTitleTemplate,
+        insertTitleToken,
         sanitizeHTML,
         renderDashboardTitleProperties,
         updateDashboardTitleProp,

@@ -334,7 +334,6 @@ function buildConfig() {
     title: DataLaVistaState.design.title || '',
     showDashboardTitle: DataLaVistaState.design.showDashboardTitle !== false,
     dashboardTitleTooltip: DataLaVistaState.design.dashboardTitleTooltip || '',
-    titleTemplate: DataLaVistaState.design.titleTemplate || '',
     interactionMode: DataLaVistaState.design.interactionMode || 'cross-filter',
     theme: {
       palette:         (DataLaVistaState.design.theme && DataLaVistaState.design.theme.palette)         || [],
@@ -471,10 +470,9 @@ async function loadConfig(cfg) {
   DataLaVistaState.dataSources = cfg.dataSources || {};
   const loadedDesign = cfg.design || {};
   DataLaVistaState.design = {
-    title: loadedDesign.title || 'DataLaVista Report',
+    title: loadedDesign.title || '',
     showDashboardTitle: loadedDesign.showDashboardTitle !== false,
     dashboardTitleTooltip: loadedDesign.dashboardTitleTooltip || '',
-    titleTemplate: loadedDesign.titleTemplate || '',
     interactionMode: loadedDesign.interactionMode || 'cross-filter',
     theme: {
       palette:         (loadedDesign.theme && loadedDesign.theme.palette)         || [],

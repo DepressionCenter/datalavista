@@ -3546,8 +3546,11 @@ with this program. If not, see https://www.gnu.org/licenses/.
         <div id="design-main">
           <div id="title-bar">
             <span class="bar-label">Title</span>
-            <input type="text" id="title-input" placeholder="Enter report title..."
-              oninput="DataLaVistaState.design.title=this.value" />
+            <input type="text" id="title-input" placeholder="Enter report title… or drop a field"
+              oninput="DataLaVistaState.design.title=this.value"
+              onblur="updateDashboardTitleProp('title',this.value)"
+              ondragover="event.preventDefault()"
+              ondrop="insertTitleToken(event)" />
           </div>
           <div id="filter-bar">
             <span class="bar-label">Filters</span>
@@ -3559,7 +3562,8 @@ with this program. If not, see https://www.gnu.org/licenses/.
           </div>
           <div id="canvas-wrap">
             <div id="canvas-drop-zone" ondragover="onCanvasDragOver(event)" ondragleave="onCanvasDragLeave(event)"
-              ondrop="onDropToCanvas(event)">
+              ondrop="onDropToCanvas(event)"
+              onclick="if(event.target===this){renderDashboardTitleProperties();if(DataLaVistaState.drillHighlight)_clearDrillHighlight();}">
               <div id="canvas-empty-hint">
                 <div class="hint-icon">📊</div>
                 <div>Drag widget types or fields onto the canvas</div>
@@ -3604,7 +3608,7 @@ with this program. If not, see https://www.gnu.org/licenses/.
         <div id="preview-title-bar" class="hidden"></div>
         <div id="preview-filter-bar" class="hidden"></div>
         <div id="preview-canvas-wrap">
-          <div id="preview-canvas">
+          <div id="preview-canvas" onclick="if(event.target===this&&DataLaVistaState.drillHighlight)_clearDrillHighlight()">
             <div class="text-muted text-sm" style="padding:20px">Switch to Preview after designing your report to see
               the live result</div>
           </div>

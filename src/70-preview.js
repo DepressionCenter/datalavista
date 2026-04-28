@@ -53,7 +53,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           document.getElementById('preview-toolbar').classList.add('hidden');
         }
         const titleBarEl = document.getElementById('preview-title-bar');
-        const titleText  = DataLaVistaState.design.title || 'DataLaVista Report';
+        const titleText  = resolveTitleTemplate(DataLaVistaState.design.title || '') || 'DataLaVista Report';
         const titleTip   = DataLaVistaState.design.dashboardTitleTooltip || '';
 
         if (DataLaVistaState.design.showDashboardTitle === false) {
@@ -108,6 +108,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 
         // Canvas
         const canvas = document.getElementById('preview-canvas');
+        if (canvas) canvas.style.background = (DataLaVistaState.design.theme && DataLaVistaState.design.theme.backgroundColor) || '';
         canvas.innerHTML = '';
 
         // Destroy old preview charts
