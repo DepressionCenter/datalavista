@@ -74,7 +74,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       if (t === 'lookupmulti') return 'lookup-multi';
       if (t === 'choice') return 'choice';
       if (t === 'multichoice') return 'choice-multi';
-      if (t.startsWith('bool') || t === 'yesno' || t === 'yes/no') return 'boolean';
+      if (t.startsWith('bool') || t === 'yesno' || t === 'yes/no' || t === 'attachments') return 'boolean';
       if (t === 'number' || t === 'currency' || t === 'integer' || t === 'counter' || t === 'autoid' || t === 'float' || t === 'decimal' || t === 'bigint') return 'number';
       if (t === 'datetime') return 'datetime';
       if (t === 'date') return 'date';

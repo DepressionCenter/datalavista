@@ -522,9 +522,9 @@ SKIP_FIELDS: new Set([
     { id: 'pie',          label: 'Pie',                 icon: '◕',  category: 'echarts',        defaultTitle: 'Pie Chart',           usesECharts: true,  supportsDataset: true,  supportsInteraction: true,  optionBuilder: null,                  seriesBuilder: null,               sqlBuilder: null,               htmlRenderer: null, dimensionLabels: ['Label'],  seriesLabel: 'Values'     },
     { id: 'scatter',      label: 'Scatter',             icon: '⁙',  category: 'echarts',        defaultTitle: 'Scatter Plot',        usesECharts: true,  supportsDataset: true,  supportsInteraction: true,  optionBuilder: '_buildScatterOption', seriesBuilder: null,               sqlBuilder: null,               htmlRenderer: null, dimensionLabels: ['X Axis'], seriesLabel: 'Y Values'   },
     { id: 'violin',       label: 'Violin',              icon: '⧖',  category: 'echarts-custom', defaultTitle: 'Violin Plot',         usesECharts: true,  supportsDataset: false, supportsInteraction: false, optionBuilder: '_buildViolinOption',  seriesBuilder: null,               sqlBuilder: null,               htmlRenderer: null, dimensionLabels: ['Group'],  seriesLabel: 'Values'     },
-    { id: 'sleep_stages', label: 'Sleep Stages',        icon: '☾',  category: 'echarts-custom', defaultTitle: 'Sleep Stages',        usesECharts: true,  supportsDataset: false, supportsInteraction: false, optionBuilder: '_buildSleepStagesOption', seriesBuilder: null,            sqlBuilder: null,               htmlRenderer: null, dimensionLabels: ['Start'],  seriesLabel: 'Fields'     },
-    { id: 'agp_tir',      label: 'AGP Time in Range',   icon: '▤',  category: 'custom',         defaultTitle: 'AGP Time in Range',   usesECharts: true,  supportsDataset: false, supportsInteraction: false, optionBuilder: '_buildAgpTirOption',  seriesBuilder: null,               sqlBuilder: null,               htmlRenderer: null, dimensionLabels: ['Label'],  seriesLabel: 'Ranges'     },
-    { id: 'agp_overlay',  label: 'AGP Glucose Overlay', icon: '≋',  category: 'custom',         defaultTitle: 'AGP Glucose Overlay', usesECharts: true,  supportsDataset: false, supportsInteraction: false, optionBuilder: '_buildAgpOverlayOption', seriesBuilder: null,            sqlBuilder: null,               htmlRenderer: null, dimensionLabels: ['Time'],   seriesLabel: 'Percentiles'},
+    // { id: 'sleep_stages', label: 'Sleep Stages',        icon: '☾',  category: 'echarts-custom', defaultTitle: 'Sleep Stages',        usesECharts: true,  supportsDataset: false, supportsInteraction: false, optionBuilder: '_buildSleepStagesOption', seriesBuilder: null,            sqlBuilder: null,               htmlRenderer: null, dimensionLabels: ['Start'],  seriesLabel: 'Fields'     },
+    // { id: 'agp_tir',      label: 'AGP Time in Range',   icon: '▤',  category: 'custom',         defaultTitle: 'AGP Time in Range',   usesECharts: true,  supportsDataset: false, supportsInteraction: false, optionBuilder: '_buildAgpTirOption',  seriesBuilder: null,               sqlBuilder: null,               htmlRenderer: null, dimensionLabels: ['X Axis'], seriesLabel: 'Glucose'    },
+    // { id: 'agp_overlay',  label: 'AGP Glucose Overlay', icon: '≋',  category: 'custom',         defaultTitle: 'AGP Glucose Overlay', usesECharts: true,  supportsDataset: false, supportsInteraction: false, optionBuilder: '_buildAgpOverlayOption', seriesBuilder: null,            sqlBuilder: null,               htmlRenderer: null, dimensionLabels: ['X Axis'], seriesLabel: 'Glucose'    },
     { id: 'kpi',          label: 'KPI',                 icon: '★',  category: 'builtin',       defaultTitle: 'KPI',                 usesECharts: false, supportsDataset: false, supportsInteraction: false, optionBuilder: null,                  seriesBuilder: null,               sqlBuilder: null,               htmlRenderer: null, dimensionLabels: [],          seriesLabel: 'Metric'     },
     { id: 'text',         label: 'Text',                icon: 'T',   category: 'builtin',       defaultTitle: 'Text',                usesECharts: false, supportsDataset: false, supportsInteraction: false, optionBuilder: null,                  seriesBuilder: null,               sqlBuilder: null,               htmlRenderer: null, dimensionLabels: [],          seriesLabel: ''           },
     { id: 'placeholder',  label: 'Blank',               icon: '⬚',  category: 'builtin',       defaultTitle: '',                    usesECharts: false, supportsDataset: false, supportsInteraction: false, optionBuilder: null,                  seriesBuilder: null,               sqlBuilder: null,               htmlRenderer: null, dimensionLabels: [],          seriesLabel: ''           },
@@ -4179,7 +4179,7 @@ _buildFileStack(siteUrl, serverRelUrl) {
       if (t === 'lookupmulti') return 'lookup-multi';
       if (t === 'choice') return 'choice';
       if (t === 'multichoice') return 'choice-multi';
-      if (t.startsWith('bool') || t === 'yesno' || t === 'yes/no') return 'boolean';
+      if (t.startsWith('bool') || t === 'yesno' || t === 'yes/no' || t === 'attachments') return 'boolean';
       if (t === 'number' || t === 'currency' || t === 'integer' || t === 'counter' || t === 'autoid' || t === 'float' || t === 'decimal' || t === 'bigint') return 'number';
       if (t === 'datetime') return 'datetime';
       if (t === 'date') return 'date';
@@ -12897,17 +12897,9 @@ function rankSuggestions(rules, cols, meta) {
     if (!section) return;
     const show    = DataLaVistaState.design.showDashboardTitle !== false;
     const intMode = DataLaVistaState.design.interactionMode || 'cross-filter';
-    const palette = (DataLaVistaState.design.theme && DataLaVistaState.design.theme.palette) || [];
     const fontFam = (DataLaVistaState.design.theme && DataLaVistaState.design.theme.fontFamily) || '';
     const bgColor = (DataLaVistaState.design.theme && DataLaVistaState.design.theme.backgroundColor) || '';
     const titleTpl = (DataLaVistaState.design.title || '').replace(/"/g, '&quot;');
-
-    // Build palette swatch row (8 slots)
-    const paletteSlots = [0,1,2,3,4,5,6,7].map(i => {
-      const c = palette[i] || '#0078d4';
-      return '<input type="color" value="' + c + '" title="Color ' + (i+1) + '" style="width:24px;height:24px;padding:1px;border:1px solid #ccc;border-radius:3px;cursor:pointer"' +
-        ' onchange="updateDashboardTitleProp(\'themePaletteColor\',{index:' + i + ',color:this.value})">';
-    }).join('');
 
     section.innerHTML = [
       '<div class="adv-node-section">',
@@ -12949,14 +12941,6 @@ function rankSuggestions(rules, cols, meta) {
       '      <option value="cross-highlight" ' + (intMode==='cross-highlight' ? 'selected' : '') + '>Cross-highlight</option>',
       '      <option value="none"            ' + (intMode==='none'            ? 'selected' : '') + '>None</option>',
       '    </select>',
-      '  </div>',
-      '  <div class="props-row" style="flex-direction:column;align-items:flex-start;gap:6px">',
-      '    <div style="display:flex;align-items:center;justify-content:space-between;width:100%">',
-      '      <label>Color palette</label>',
-      '      <button class="btn-sm" onclick="updateDashboardTitleProp(\'themePaletteReset\',null)" title="Reset to default palette" style="font-size:10px;padding:1px 6px">Reset</button>',
-      '    </div>',
-      '    <div style="display:flex;gap:4px;flex-wrap:wrap">' + paletteSlots + '</div>',
-      '    <div style="font-size:10px;color:var(--text-secondary)">Overrides default series colors for all charts. Reset to use widget-level colors.</div>',
       '  </div>',
       '  <div class="props-row">',
       '    <label>Canvas background</label>',
@@ -13096,6 +13080,17 @@ function rankSuggestions(rules, cols, meta) {
         if (data.type === 'widget-type') {
           if (data.widgetType === 'table') {
             addWidgetToCanvas('table', null, data.table);
+          } else if (data.widgetType === 'pie') {
+            const _qcP = /** @type {string[]} */ (DataLaVistaState.queryColumns);
+            const _xPie = _qcP.find(c => /(type|status)$/i.test(c))
+              || _qcP.find(c => /year$/i.test(c))
+              || _qcP.find(c => sniffType(c) === 'boolean')
+              || _qcP.find(c => sniffType(c) === 'user')
+              || _qcP.find(c => sniffType(c) === 'lookup')
+              || _qcP.find(c => sniffType(c) === 'date')
+              || _qcP.find(c => sniffType(c) === 'text' && !/^title$/i.test(c))
+              || _qcP[0] || '';
+            addWidgetToCanvas('pie', [_xPie, '__dlv_count__'], null);
           } else {
             addWidgetToCanvas(data.widgetType, null, null);
           }
@@ -13104,13 +13099,22 @@ function rankSuggestions(rules, cols, meta) {
 
         if(data.type === 'result-field' || data.type === 'field') {
           switch (data.dataType) {
-            case 'number':
-              addWidgetToCanvas('bar', [...(DataLaVistaState.queryColumns.filter(c => c !== data.field && sniffType(c) === 'text')[0] || data.field), data.field], null);
+            case 'number': {
+              const _qcN = /** @type {string[]} */ (DataLaVistaState.queryColumns);
+              const _xBar = _qcN.find(c => c !== data.field && /year$/i.test(c))
+                || _qcN.find(c => c !== data.field && /(type|status)$/i.test(c))
+                || _qcN.find(c => c !== data.field && sniffType(c) === 'boolean')
+                || _qcN.find(c => c !== data.field && sniffType(c) === 'text' && !/^title$/i.test(c))
+                || _qcN.find(c => c !== data.field && sniffType(c) === 'date')
+                || _qcN.find(c => c !== data.field)
+                || data.field;
+              addWidgetToCanvas('bar', [_xBar, data.field], null);
               break;
+            }
             case 'date':
               addWidgetToCanvas('line', [data.field, ...DataLaVistaState.queryColumns.filter(c => c !== data.field && sniffType(c) === 'number')], null); break;
             case 'boolean':
-              addWidgetToCanvas('pie', [data.field, ...DataLaVistaState.queryColumns.filter(c => c !== data.field && sniffType(c) === 'number')], null); break;
+              addWidgetToCanvas('pie', [data.field, '__dlv_count__'], null); break;
             default:
               addWidgetToCanvas('table', [data.field], null);
           }
@@ -13140,7 +13144,14 @@ function rankSuggestions(rules, cols, meta) {
 
         // Smart default Y field for chart widgets
         const _smartY = (() => {
-          if (fields && fields.length > 1) return { yField: fields[1], yFields: [fields[1]], yAgg: '' };
+          if (fields && fields.length > 1) {
+            const _yf = fields[1];
+            const _yAgg = _yf === '__dlv_count__' ? ''
+              : (/^id$/i.test(_yf) || /Id$/.test(_yf)) ? 'COUNT_DISTINCT'
+              : sniffType(_yf) === 'number' ? 'SUM'
+              : '';
+            return { yField: _yf, yFields: [_yf], yAgg: _yAgg };
+          }
           const qcols = DataLaVistaState.queryColumns;
           // 1. ID/Id field → COUNT DISTINCT
           const idCol = qcols.find(c => /^(id|ID|Id)$/i.test(c));
@@ -13152,7 +13163,7 @@ function rankSuggestions(rules, cols, meta) {
           const dateCol = qcols.find(c => sniffType(c) === 'date');
           if (dateCol) return { yField: dateCol, yFields: [dateCol], yAgg: 'MAX' };
           const fb = qcols[1] || qcols[0] || '';
-          return { yField: fb, yFields: fb ? [fb] : [], yAgg: '' };
+          return { yField: fb, yFields: fb ? [fb] : [], yAgg: 'COUNT_DISTINCT' };
         })();
         // Build initial seriesProps — one entry per Y field for charts, one per column for table/KPI
         const _isChartWidget = isEChartsWidget(widgetType);
@@ -13165,7 +13176,11 @@ function rankSuggestions(rules, cols, meta) {
         })();
         const _initFields = fields || (() => {
           if (!_candidates.length) return [];
-          if (widgetType === 'kpi') return [_candidates[0]];
+          if (widgetType === 'kpi') {
+            const _kpiNum = _candidates.find(c => sniffType(c) === 'number');
+            const _kpiId  = _candidates.find(c => /^id$/i.test(c));
+            return [(_kpiNum || _kpiId || _candidates[0])];
+          }
           if (widgetType === 'table') {
             // Pick one meaningful default field rather than dumping all columns.
             // Priority: ID/Id → Title/Name/Label → first text field → first field.
@@ -13185,8 +13200,10 @@ function rankSuggestions(rules, cols, meta) {
             axisSide: '', conditions: []
           }));
         } else if (widgetType === 'kpi') {
+          const _kpiDefaultAgg = (_initFields[0] && /^id$/i.test(_initFields[0])) ? 'COUNT_DISTINCT'
+            : (sniffType(_initFields[0] || '') === 'number') ? 'SUM' : 'COUNT_DISTINCT';
           _initSeriesProps = _initFields.slice(0,1).map(f => ({
-            field: f, agg: 'SUM', label: '', color: '',
+            field: f, agg: _kpiDefaultAgg, label: '', color: '',
             seriesType: '', lineWidth: null, opacity: null, smooth: null,
             axisSide: '', conditions: []
           }));
@@ -13214,7 +13231,12 @@ function rankSuggestions(rules, cols, meta) {
           containerPadding: 8,
           containerAlign: 'top',
           fields: _initFields,
-          xField: (fields && fields.length > 0) ? fields[0] : DataLaVistaState.queryColumns[0] || '',
+          xField: (fields && fields.length > 0) ? fields[0] : (() => {
+            const _qc = DataLaVistaState.queryColumns;
+            return _qc.find(c => sniffType(c) === 'date')
+                || _qc.find(c => sniffType(c) === 'text' && !/^title$/i.test(c))
+                || _qc[0] || '';
+          })(),
           yField: _smartY.yField,  // legacy compat
           yFields: _smartY.yFields,
           aggregation: '',
@@ -13774,15 +13796,15 @@ function rankSuggestions(rules, cols, meta) {
 
 
       function renderTableContent(w) {
-        const tableData = buildWidgetData(w);
+        var tableData = buildWidgetData(w);
         if (!tableData || !tableData.length) {
           return '<div class="text-muted text-sm" style="padding:12px">No data — run a query first</div>';
         }
-        const allCols = Object.keys(tableData[0]);
-        const cols = w.fields.filter(f => allCols.includes(f));
+        var allCols = Object.keys(tableData[0]);
+        var cols = w.fields.filter(function(/** @type {string} */ f) { return allCols.includes(f); });
         if (!cols.length) return '<div class="text-muted text-sm" style="padding:12px">No fields selected — add columns in the properties panel</div>';
-        const hdrStyle = `background:${w.headersBackgroundColor||'#f3f2f1'};font-size:${w.headersFontSize||12}px;color:${w.headersFontColor||'#323130'}`;
-        const _sp = _getSeriesProps(w);
+        var hdrStyle = 'background:' + (w.headersBackgroundColor || '#f3f2f1') + ';font-size:' + (w.headersFontSize || 12) + 'px;color:' + (w.headersFontColor || '#323130');
+        var _sp = _getSeriesProps(w);
         var thHtml = '';
         for (var _thi = 0; _thi < cols.length; _thi++) {
           var _thc = cols[_thi];
@@ -13794,19 +13816,35 @@ function rankSuggestions(rules, cols, meta) {
           else { _thlabel = _thc; }
           thHtml += '<th style="' + hdrStyle + '">' + _thlabel + '</th>';
         }
-        const theadHtml = w.showHeaders === false ? '' : `<thead><tr>${thHtml}</tr></thead>`;
-        const drillField = cols[0];
-        const _tblMode = (w.interactionMode) || (DataLaVistaState.design && DataLaVistaState.design.interactionMode) || 'cross-filter';
-        let html = `<div style="overflow:auto;max-height:100%"><table class="widget-table">${theadHtml}<tbody>`;
-        for (const row of tableData) {
-          var _drillRaw = row[drillField] != null ? row[drillField] : '';
-          const drillVal = String(_drillRaw).replace(/'/g, "\\'").replace(/"/g, '&quot;');
-          var _drillFieldEsc = drillField.replace(/'/g, "\\'");
-          var _tblClickFn = _tblMode === 'cross-highlight'
-            ? '_applyDrillHighlight(\'' + _drillFieldEsc + '\',\'' + drillVal + '\')'
-            : 'applyDrillFilter(\'' + _drillFieldEsc + '\',\'' + drillVal + '\')';
-          html += '<tr style="cursor:pointer" title="Click to ' + (_tblMode === 'cross-highlight' ? 'highlight' : 'filter') + ' by ' + drillField + '" onclick="' + _tblClickFn + '">';
-          html += cols.map(c => '<td>' + (row[c] != null ? row[c] : '') + '</td>').join('');
+        var theadHtml = w.showHeaders === false ? '' : '<thead><tr>' + thHtml + '</tr></thead>';
+        var _tblMode = (w.interactionMode) || (DataLaVistaState.design && DataLaVistaState.design.interactionMode) || 'cross-filter';
+        var _hl = /** @type {any} */ (DataLaVistaState.drillHighlight);
+        var html = '<div style="overflow:auto;max-height:100%"><table class="widget-table">' + theadHtml + '<tbody>';
+        for (var _tri = 0; _tri < tableData.length; _tri++) {
+          var _trow = tableData[_tri];
+          // Row highlight: yellow background if drillHighlight matches any displayed column
+          var _isHlRow = false;
+          if (_hl) {
+            for (var _hci = 0; _hci < cols.length; _hci++) {
+              if (cols[_hci] === _hl.field && _trow[cols[_hci]] != null && String(_trow[cols[_hci]]) === String(_hl.value)) {
+                _isHlRow = true; break;
+              }
+            }
+          }
+          html += _isHlRow ? '<tr style="background:#fff4ce">' : '<tr>';
+          // Each cell is individually clickable using its own column + value
+          for (var _tci = 0; _tci < cols.length; _tci++) {
+            var _col = cols[_tci];
+            var _cellRaw = _trow[_col] != null ? _trow[_col] : '';
+            var _cellStr = String(_cellRaw);
+            var _cellEsc = _cellStr.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+            var _colEsc  = _col.replace(/'/g, "\\'");
+            var _cellFn = _tblMode === 'cross-highlight'
+              ? '_applyDrillHighlight(\'' + _colEsc + '\',\'' + _cellEsc + '\')'
+              : 'applyDrillFilter(\'' + _colEsc + '\',\'' + _cellEsc + '\')';
+            var _cellAction = _tblMode === 'cross-highlight' ? 'highlight' : 'filter';
+            html += '<td style="cursor:pointer" title="Click to ' + _cellAction + ' by ' + _col + '" onclick="' + _cellFn + '">' + _cellStr + '</td>';
+          }
           html += '</tr>';
         }
         html += '</tbody></table></div>';
@@ -13903,8 +13941,15 @@ function _buildDatasetOption(w, rows) {
   if (w.type === 'pie' && sp.length <= 1) {
     return {
       dataset : { source: rows },
-      tooltip : { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
-      series  : [{ type: 'pie', encode: { itemName: xDim, value: '__dlvy_0' }, radius: ['30%', '65%'], label: { fontSize: 11 }, blur: { itemStyle: { opacity: 0.15 } } }]
+      tooltip : { trigger: 'item', formatter: /** @param {any} p */ function(p) {
+        var raw = p.data ? p.data[xDim] : p.name;
+        var name = raw == null ? '' : typeof raw === 'object'
+          ? (raw.Title || raw.title || raw.name || raw.Name || raw.label || raw.Label || String(raw))
+          : String(raw);
+        var val = p.data && p.data['__dlvy_0'] != null ? p.data['__dlvy_0'] : '';
+        return name + ': ' + val + ' (' + p.percent.toFixed(1) + '%)';
+      } },
+      series  : [{ type: 'pie', encode: { itemName: xDim, value: '__dlvy_0' }, radius: ['30%', '65%'], label: { fontSize: 11 }, emphasis: { focus: 'self' }, blur: { itemStyle: { opacity: 0.15 } } }]
     };
   }
 
@@ -13926,6 +13971,7 @@ function _buildDatasetOption(w, rows) {
           coordinateSystem : 'polar',
           stack            : 'total',
           data             : rows.map(function(r) { return parseFloat(r[bkey] !== undefined ? r[bkey] : r[yf]) || 0; }),
+          emphasis         : { focus: 'self' },
           blur             : { itemStyle: { opacity: 0.15 } }
         };
       })
@@ -13946,6 +13992,7 @@ function _buildDatasetOption(w, rows) {
       type      : st,
       encode    : { x: xDim, y: alias },
       itemStyle : { color: color, opacity: spe.opacity != null ? spe.opacity : 1 },
+      emphasis  : { focus: 'self' },
       blur      : { itemStyle: { opacity: 0.15 }, lineStyle: { opacity: 0.15 } }
     });
     if (st === 'line') {
@@ -13968,7 +14015,7 @@ function _buildDatasetOption(w, rows) {
     dataset : { source: rows },
     tooltip : { trigger: 'axis' },
     legend  : hasLegend ? { bottom: 0, type: 'scroll', textStyle: { fontSize: 11 } } : undefined,
-    xAxis   : { type: 'category', axisLabel: { rotate: 30, fontSize: 11 } },
+    xAxis   : { type: 'category', axisLabel: { rotate: 45, fontSize: 11, hideOverlap: true, overflow: 'truncate', width: 100 } },
     yAxis   : yAxis,
     series  : seriesList,
     grid    : { left: 40, right: hasRightAxis ? 60 : 20, top: 20, bottom: hasLegend ? 80 : 60 }
@@ -14121,84 +14168,6 @@ function _buildViolinOption(w, rows, sp) {
   };
 }
 
-// ── SLEEP STAGES (via @echarts-x/custom-bar-range) ────────────────────────────
-// dimensions[0]/xField = start; yFields[0] = end time; yFields[1] = stage label
-function _buildSleepStagesOption(w, rows) {
-  var dims        = (Array.isArray(w.dimensions) && w.dimensions.length) ? w.dimensions : (w.xField ? [w.xField] : []);
-  var xDim        = dims[0] || '';
-  var yFields     = (Array.isArray(w.yFields) && w.yFields.length) ? w.yFields : [];
-  var ssEndField  = yFields.length > 1 ? yFields[0] : xDim;
-  var ssStageField = yFields.length > 1 ? yFields[1] : (yFields[0] || '');
-  var ssStages = /** @type {string[]} */ ([]), ssSeen = /** @type {Record<string,boolean>} */ ({});
-  for (var i = 0; i < rows.length; i++) {
-    var ssv = String(rows[i][ssStageField] || '');
-    if (ssv && !ssSeen[ssv]) { ssStages.push(ssv); ssSeen[ssv] = true; }
-  }
-  return {
-    tooltip : { trigger: 'item' },
-    xAxis   : { type: 'category', data: rows.map(function(r) { return String(r[xDim] || ''); }), axisLabel: { rotate: 30, fontSize: 11 } },
-    yAxis   : { type: 'category', data: ssStages },
-    grid    : { left: 90, right: 20, top: 20, bottom: 60 },
-    series  : [{ type: 'bar-range', data: rows.map(function(r) { return [String(r[xDim] || ''), String(r[ssEndField] || ''), String(r[ssStageField] || '')]; }) }]
-  };
-}
-
-// ── AGP TIME IN RANGE (stacked bar, 0–100%) ───────────────────────────────────
-// dimensions[0]/xField = label; yFields = [very_high, high, target, low, very_low]
-function _buildAgpTirOption(w, rows, sp) {
-  if (!sp) sp = _getSeriesProps(w);
-  var dims     = (Array.isArray(w.dimensions) && w.dimensions.length) ? w.dimensions : (w.xField ? [w.xField] : []);
-  var xDim     = dims[0] || '';
-  var yFields  = (Array.isArray(w.yFields) && w.yFields.length) ? w.yFields : [];
-  var tirColors = ['#FF8C00', '#FFA500', '#008000', '#FF0000', '#8B0000'];
-  var tirLabels = ['Very High (>250 mg/dL)', 'High (181–250 mg/dL)', 'Target (70–180 mg/dL)', 'Low (54–69 mg/dL)', 'Very Low (<54 mg/dL)'];
-  var tirRow   = rows[0] || {};
-  return {
-    tooltip : { trigger: 'item', formatter: '{a}: {c}%' },
-    grid    : { left: '35%', right: '35%', top: 20, bottom: 40 },
-    xAxis   : { type: 'category', data: [xDim ? String(tirRow[xDim] || 'TIR') : 'TIR'], show: false },
-    yAxis   : { type: 'value', max: 100, axisLabel: { formatter: '{value}%' } },
-    series  : yFields.map(function(field, i) {
-      var bkey = '__dlvy_' + i;
-      var val  = parseFloat(tirRow[bkey] !== undefined ? tirRow[bkey] : tirRow[field]) || 0;
-      return {
-        name      : (sp[i] || {}).label || tirLabels[i] || field,
-        type      : 'bar',
-        stack     : 'total',
-        itemStyle : { color: (sp[i] || {}).color || tirColors[i % tirColors.length] },
-        data      : [val]
-      };
-    })
-  };
-}
-
-// ── AGP GLUCOSE OVERLAY (percentile band + median line) ───────────────────────
-// dimensions[0]/xField = time labels; yFields = [p25, median, p75]
-function _buildAgpOverlayOption(w, rows, sp) {
-  if (!sp) sp = _getSeriesProps(w);
-  var dims     = (Array.isArray(w.dimensions) && w.dimensions.length) ? w.dimensions : (w.xField ? [w.xField] : []);
-  var xDim     = dims[0] || '';
-  var yFields  = (Array.isArray(w.yFields) && w.yFields.length) ? w.yFields : [];
-  var aoGet    = function(r, i) { var k = '__dlvy_' + i; return r[k] !== undefined ? r[k] : r[yFields[i]]; };
-  var times    = rows.map(function(r) { return r[xDim]; });
-  var p25      = rows.map(function(r) { return parseFloat(aoGet(r, 0)) || 0; });
-  var med      = rows.map(function(r) { return parseFloat(aoGet(r, 1)) || 0; });
-  var p75      = rows.map(function(r) { return parseFloat(aoGet(r, 2)) || 0; });
-  var band     = p75.map(function(v, i) { return v - p25[i]; });
-  var bandColor = (sp[0] || {}).color || '#4682B4';
-  var medColor  = (sp[1] || {}).color || '#000080';
-  return {
-    tooltip : { trigger: 'axis' },
-    xAxis   : { type: 'category', boundaryGap: false, data: times },
-    yAxis   : { type: 'value', name: 'Glucose (mg/dL)' },
-    grid    : { left: 60, right: 20, top: 20, bottom: 40 },
-    series  : [
-      { name: 'Base 25th', type: 'line', stack: 'agp-band', lineStyle: { opacity: 0 }, symbol: 'none', data: p25 },
-      { name: (sp[0] || {}).label || '25th–75th Percentile', type: 'line', stack: 'agp-band', lineStyle: { opacity: 0 }, symbol: 'none', areaStyle: { color: bandColor, opacity: 0.5 }, data: band },
-      { name: (sp[1] || {}).label || 'Median', type: 'line', symbol: 'none', lineStyle: { color: medColor, width: 3 }, data: med }
-    ]
-  };
-}
 
 // ── CHART OPTION DISPATCHER ───────────────────────────────────────────────────
 // Routes to the appropriate option builder based on the widget type registry.
@@ -15028,16 +14997,20 @@ function _renderBarLineOptionsHTML(w, wid) {
           var _ivSel = ((w.interactionMode || '') === _interactionVals[_ivi]) ? ' selected' : '';
           _interactionOpts += '<option value="' + _interactionVals[_ivi] + '"' + _ivSel + '>' + _interactionLabels[_ivi] + '</option>';
         }
+        var _wtDef = (/** @type {any[]} */ (DataLaVistaCore.WIDGET_TYPES)).find(function(t) { return t.id === _wa.type; });
+        var _interactionRow = (_wtDef && _wtDef.supportsInteraction)
+          ? '<div class="props-row"><label>Interaction</label><select class="form-input" onchange="updateWidgetProp(\'' + wid + '\',\'interactionMode\',this.value)">' + _interactionOpts + '</select></div>'
+          : '';
         // Width row: hidden for container children
         var _widthRow = w.parentContainerId
           ? ''
-          : '<div class="props-row"><label>Width %</label><input type="number" class="form-input" min="10" max="100" value="' + w.widthPct + '" oninput="updateWidgetProp(\'' + wid + '\',\'widthPct\',+this.value)"/></div>';
+          : '<div class="props-row"><label>Width %</label><input type="number" class="form-input" min="10" max="100" step="0.25" value="' + w.widthPct + '" oninput="updateWidgetProp(\'' + wid + '\',\'widthPct\',Math.round(+this.value*4)/4)"/></div>';
         // Height row: containers use minHeightVh, others use heightVh
         var _heightRow;
         if (w.type === 'container') {
-          _heightRow = '<div class="props-row"><label>Min Height vh</label><input type="number" class="form-input" min="5" max="200" value="' + (w.minHeightVh || 30) + '" oninput="updateWidgetProp(\'' + wid + '\',\'minHeightVh\',+this.value)"/></div>';
+          _heightRow = '<div class="props-row"><label>Min Height vh</label><input type="number" class="form-input" min="5" max="200" step="0.25" value="' + (w.minHeightVh || 30) + '" oninput="updateWidgetProp(\'' + wid + '\',\'minHeightVh\',Math.round(+this.value*4)/4)"/></div>';
         } else {
-          _heightRow = '<div class="props-row"><label>Height vh</label><input type="number" class="form-input" min="5" max="100" value="' + w.heightVh + '" oninput="updateWidgetProp(\'' + wid + '\',\'heightVh\',+this.value)"/></div>';
+          _heightRow = '<div class="props-row"><label>Height vh</label><input type="number" class="form-input" min="5" max="100" step="0.25" value="' + w.heightVh + '" oninput="updateWidgetProp(\'' + wid + '\',\'heightVh\',Math.round(+this.value*4)/4)"/></div>';
         }
         // Container-specific layout section
         var _containerSection = '';
@@ -15104,7 +15077,7 @@ function _renderBarLineOptionsHTML(w, wid) {
             + '<input type="text" class="form-input" value="' + w.fontColor + '" oninput="updateWidgetProp(\'' + wid + '\',\'fontColor\',this.value)"/>'
             + '</div></div>'
             + '<div class="props-row" style="flex-direction:column;align-items:flex-start"><label>Content</label>'
-            + '<textarea class="form-input" rows="4" oninput="updateWidgetProp(\'' + wid + '\',\'textContent\',this.value)">' + w.textContent + '</textarea></div>';
+            + '<textarea class="form-input" rows="4" onblur="updateWidgetProp(\'' + wid + '\',\'textContent\',this.value)">' + w.textContent + '</textarea></div>';
         }
         var _dataSectionHTML = '';
         if (isData) {
@@ -15190,15 +15163,14 @@ function _renderBarLineOptionsHTML(w, wid) {
         section.innerHTML = '<div class="adv-node-section">'
           + '<div class="adv-node-section-hdr">GENERAL</div>'
           + '<div class="props-row"><label>Title</label>'
-          + '<input type="text" class="form-input" value="' + _wTitleEsc + '" oninput="updateWidgetProp(\'' + wid + '\',\'title\',this.value)"/>'
+          + '<input type="text" class="form-input" value="' + _wTitleEsc + '" onblur="updateWidgetProp(\'' + wid + '\',\'title\',this.value)"/>'
           + '<div id="dlv-title-template-hint-' + wid + '" style="font-size:10px;color:var(--text-secondary,#605e5c);font-style:italic;margin-top:2px">' + _titleHint + '</div></div>'
           + '<div class="props-row"><label>Show title</label>'
           + '<input type="checkbox" ' + _showTitleChecked + ' onchange="updateWidgetProp(\'' + wid + '\',\'showTitle\',this.checked)"/></div>'
           + _showHdrsRow
           + '<div class="props-row"><label>Type</label>'
           + '<select class="form-input" onchange="changeWidgetType(\'' + wid + '\',this.value)">' + _wtypeOpts + '</select></div>'
-          + '<div class="props-row"><label>Interaction</label>'
-          + '<select class="form-input" onchange="updateWidgetProp(\'' + wid + '\',\'interactionMode\',this.value)">' + _interactionOpts + '</select></div>'
+          + _interactionRow
           + _widthRow
           + _heightRow
           + '</div>'
@@ -15642,17 +15614,50 @@ function _renderBarLineOptionsHTML(w, wid) {
        * Uses ECharts dispatchAction('highlight') keyed on the dimension value name.
        * Does NOT modify [dlv_active] — purely visual. Mode: 'cross-highlight'.
        */
-      function _applyDrillHighlight(field, value) {
-        DataLaVistaState.drillHighlight = { field: field, value: value };
-        for (const chartId of Object.keys(DataLaVistaState.charts)) {
-          const chart = DataLaVistaState.charts[chartId];
-          const wid   = chartId.replace(/^prev_/, '');
-          const w     = (DataLaVistaState.design.widgets || []).find(function(x) { return x.id === wid; });
-          if (!w) continue;
-          const dims  = (Array.isArray(w.dimensions) && w.dimensions.length) ? w.dimensions : (w.xField ? [w.xField] : []);
-          if (!dims.includes(field)) continue;
-          try { chart.dispatchAction({ type: 'highlight', name: String(value) }); } catch(e) {}
+      function _refreshTableWidgets() {
+        for (var _rtwi = 0; _rtwi < DataLaVistaState.design.widgets.length; _rtwi++) {
+          var _rtwW = /** @type {any} */ (DataLaVistaState.design.widgets[_rtwi]);
+          if (_rtwW.type !== 'table') continue;
+          var _rtwDe = document.getElementById('wcontent-' + _rtwW.id);
+          if (_rtwDe) _rtwDe.innerHTML = renderTableContent(_rtwW);
+          var _rtwPr = document.getElementById('prev-wcontent-' + _rtwW.id);
+          if (_rtwPr) _rtwPr.innerHTML = renderTableContent(_rtwW);
         }
+      }
+
+      function _applyDrillHighlight(/** @type {string} */ field, /** @type {string} */ value) {
+        (/** @type {any} */ (DataLaVistaState)).drillHighlight = { field: field, value: value };
+        var strVal = String(value);
+        var _hlCharts = /** @type {any} */ (DataLaVistaState.charts);
+        for (var _hlCId of Object.keys(_hlCharts)) {
+          var _hlChart = _hlCharts[_hlCId];
+          var _hlWid   = _hlCId.replace(/^prev_/, '');
+          var _hlW     = /** @type {any} */ ((DataLaVistaState.design.widgets || []).find(function(x) { return (/** @type {any} */ (x)).id === _hlWid; }));
+          if (!_hlW) continue;
+          var _hlDims  = (Array.isArray(_hlW.dimensions) && _hlW.dimensions.length) ? _hlW.dimensions : (_hlW.xField ? [_hlW.xField] : []);
+          if (!_hlDims.includes(field)) continue;
+          if (_hlW.type === 'pie') {
+            try { _hlChart.dispatchAction({ type: 'highlight', name: strVal }); } catch(e) {}
+          } else {
+            try {
+              var _hlRows = buildWidgetData(_hlW);
+              var _hlXDim = _hlDims[0];
+              var _hlSp   = _getSeriesProps(_hlW);
+              var _hlIdx  = -1;
+              if (_hlRows) {
+                for (var _hlRi = 0; _hlRi < _hlRows.length; _hlRi++) {
+                  if (String(_hlRows[_hlRi][_hlXDim]) === strVal) { _hlIdx = _hlRi; break; }
+                }
+              }
+              if (_hlIdx >= 0) {
+                for (var _hlSi = 0; _hlSi < _hlSp.length; _hlSi++) {
+                  _hlChart.dispatchAction({ type: 'highlight', seriesIndex: _hlSi, dataIndex: _hlIdx });
+                }
+              }
+            } catch(e) {}
+          }
+        }
+        _refreshTableWidgets();
         _renderAllDrillChips();
       }
 
@@ -15662,6 +15667,7 @@ function _renderBarLineOptionsHTML(w, wid) {
         for (const chart of Object.values(DataLaVistaState.charts)) {
           try { chart.dispatchAction({ type: 'downplay' }); } catch(e) {}
         }
+        _refreshTableWidgets();
         _renderAllDrillChips();
       }
 
@@ -16954,12 +16960,9 @@ function openDataDictionaryPopup() {
         widgetUpdateSort,
         widgetRemoveSort,
         applyDlvEChartsTheme,
-        _buildAgpOverlayOption,
-        _buildAgpTirOption,
         _buildDatasetOption,
         _buildIndexTrendSeries,
         _buildScatterOption,
-        _buildSleepStagesOption,
         _buildViolinOption,
         _buildChartOption,
         _getChartColors,
