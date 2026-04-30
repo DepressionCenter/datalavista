@@ -313,5 +313,21 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         widgetReorderField,
         widgetReorderSort,
         widgetReorderYField,
+        _toggleLookupExpand,
+        _toggleLookupChild,
+        _setLookupChildAgg,
+        _advShowMoreFields,
+        _advShowLessFields,
+        ensureInit,
         init
       };
+
+      // Expose all dlv entries + key state objects as window globals so that
+      // inline onclick/oninput/onchange attributes on dynamically-generated HTML
+      // can call them. Direct assignment (not closure) so SharePoint cannot break
+      // the reference by touching window.dlv after the shim runs.
+      const _w = /** @type {any} */ (window);
+      for (const [k, v] of Object.entries(_w.dlv)) {
+        if (!Object.prototype.hasOwnProperty.call(_w, k)) _w[k] = v;
+      }
+      if (!_w.DataLaVistaState) _w.DataLaVistaState = DataLaVistaState;

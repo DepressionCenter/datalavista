@@ -5,7 +5,7 @@
 #  Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 #  Created: 2026-03-24
 #  Last Modified: 2026-04-27
-#  Summary: Generates datalavista.js, DataLaVista.html, DataLaVista-nojs.html, DataLaVista-dev.html.
+#  Summary: Generates datalavista.js, DataLaVista.html, DataLaVista-nojs.html.
 #  Notes: See README file for documentation and full license information.
 #  Website: https://github.com/DepressionCenter/datalavista
 #  
@@ -31,6 +31,26 @@ LICENSE_TEXT=$(sed "s/{GIT_HASH}/$GIT_HASH/g" "$SRC/license-template.txt")
 
 # Collect JS source files in sort order
 JS_FILES=$(ls "$SRC"/[0-9][0-9]-*.js | sort)
+
+# ── Helper: get or download esbuild ───────────────────────────────────────────
+ESBUILD_VERSION="0.28.0"
+ESBUILD_CACHE="$HOME/.cache/datalavista-build/esbuild"
+
+get_esbuild() {
+  if command -v esbuild >/dev/null 2>&1; then echo "esbuild"; return; fi
+  if [ -x "$ESBUILD_CACHE" ]; then echo "$ESBUILD_CACHE"; return; fi
+  echo "  Downloading esbuild v${ESBUILD_VERSION}..." >&2
+  mkdir -p "$(dirname "$ESBUILD_CACHE")"
+  curl -fsSL "https://registry.npmjs.org/@esbuild/linux-x64/-/linux-x64-${ESBUILD_VERSION}.tgz" -o /tmp/esbuild.tgz
+  mkdir -p /tmp/esbuild-extract
+  tar -xzf /tmp/esbuild.tgz -C /tmp/esbuild-extract
+  EXTRACTED_BIN=$(find /tmp/esbuild-extract -name 'esbuild' -type f | head -1)
+  cp "$EXTRACTED_BIN" "$ESBUILD_CACHE"
+  chmod +x "$ESBUILD_CACHE"
+  rm -rf /tmp/esbuild.tgz /tmp/esbuild-extract
+  echo "$ESBUILD_CACHE"
+}
+ESBUILD=$(get_esbuild)
 
 # ── Helper: strip first block comment (/* */ or <!-- -->) from a file ────────
 # Usage: strip_license <filepath> <js|html>
@@ -85,10 +105,6 @@ strip_license "$SRC/00-full-page.html" "html" > /tmp/dlv_clean_template.html
 # ── 1. Build datalavista.js ──────────────────────────────────────────────────
 echo "Building datalavista.js..."
 {
-  echo "/* ============================================================"
-  printf '%s\n' "$LICENSE_TEXT"
-  echo "================================================================ */"
-  echo ""
   echo "(() => {"
   echo "  'use strict';"
   for f in $JS_FILES; do
@@ -98,51 +114,39 @@ echo "Building datalavista.js..."
   done
   echo ""
   echo "})();"
+} > /tmp/dlv_js_body.js
+
+"$ESBUILD" /tmp/dlv_js_body.js \
+  --bundle=false --platform=browser \
+  --minify-whitespace --minify-syntax \
+  --log-level=error > /tmp/dlv_js_minified.js
+
+{
+  echo "/* ============================================================"
+  printf '%s\n' "$LICENSE_TEXT"
+  echo "================================================================ */"
   echo ""
-  echo "// Backward-compat shim: re-expose all dlv methods as globals so"
-  echo "// onclick=\"foo()\" HTML attributes continue to work."
-  echo "if (window.dlv) {"
-  echo "  for (const [k, v] of Object.entries(window.dlv)) {"
-  echo "    if (typeof v === 'function' && !Object.prototype.hasOwnProperty.call(window, k)) {"
-  echo "      window[k] = (...a) => window.dlv[k](...a);"
-  echo "    }"
-  echo "  }"
-  echo "}"
+  cat /tmp/dlv_js_minified.js
 } > datalavista.js
 echo "  -> datalavista.js ($(wc -l < datalavista.js) lines)"
 
 # ── 2. Build DataLaVista-nojs.html ─────────────────────────────────────────
 echo "Building DataLaVista-nojs.html..."
-echo '  <script src="datalavista.js"></script>' > /tmp/dlv_snippet.txt
-replace_placeholder /tmp/dlv_clean_template.html /tmp/dlv_snippet.txt DataLaVista-nojs.html
+cp /tmp/dlv_clean_template.html DataLaVista-nojs.html
 prepend_html_license DataLaVista-nojs.html
 echo "  -> DataLaVista-nojs.html"
 
-# ── 3. Build DataLaVista-dev.html ────────────────────────────────────────────
-echo "Building DataLaVista-dev.html..."
-{
-  for f in $JS_FILES; do
-    echo "  <script src=\"$f\"></script>"
-  done
-} > /tmp/dlv_snippet.txt
-replace_placeholder /tmp/dlv_clean_template.html /tmp/dlv_snippet.txt DataLaVista-dev.html
-prepend_html_license DataLaVista-dev.html
-echo "  -> DataLaVista-dev.html"
-
-# ── 4. Build DataLaVista.html (inline) ──────────────────────────────────────
+# ── 3. Build DataLaVista.html (inline) ──────────────────────────────────────
 echo "Building DataLaVista.html (inline)..."
 {
   echo "  <script>"
-  for f in $JS_FILES; do
-    strip_license "$f" "js"
-    echo ""
-  done
+  cat /tmp/dlv_js_minified.js
   echo "  </script>"
 } > /tmp/dlv_snippet.txt
 replace_placeholder /tmp/dlv_clean_template.html /tmp/dlv_snippet.txt DataLaVista.html
 prepend_html_license DataLaVista.html
 echo "  -> DataLaVista.html"
 
-rm -f /tmp/dlv_snippet.txt /tmp/dlv_clean_template.html
+rm -f /tmp/dlv_snippet.txt /tmp/dlv_clean_template.html /tmp/dlv_js_body.js /tmp/dlv_js_minified.js
 echo ""
 echo "Build completed at $(date '+%Y-%m-%d %I:%M:%S %p')."

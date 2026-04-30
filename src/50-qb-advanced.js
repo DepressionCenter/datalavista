@@ -299,6 +299,9 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       let _advOptsFieldsExpanded = false; // track expand/collapse of fields list in options panel
       let _expandedLookupFields = {};    // { nodeId: Set<fieldAlias> } — which lookup fields are expanded
 
+      function _advShowMoreFields(/** @type {string} */ id) { _advOptsFieldsExpanded = true;  renderAdvOptionsPanel('node', id); }
+      function _advShowLessFields(/** @type {string} */ id) { _advOptsFieldsExpanded = false; renderAdvOptionsPanel('node', id); }
+
       function renderAdvancedQB() {
         const canvas = document.getElementById('qb-canvas');
         // Remove existing nodes (not SVG)
@@ -1501,10 +1504,10 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
             if (fields.length > FIELDS_COLLAPSED_COUNT) {
               if (_advOptsFieldsExpanded) {
                 html += `<button class="btn btn-ghost btn-sm" style="width:100%;margin-top:4px;font-size:10px"
-                  onclick="_advOptsFieldsExpanded=false; renderAdvOptionsPanel('node','${id}')">▲ Show less</button>`;
+                  onclick="_advShowLessFields('${id}')">▲ Show less</button>`;
               } else {
                 html += `<button class="btn btn-ghost btn-sm" style="width:100%;margin-top:4px;font-size:10px"
-                  onclick="_advOptsFieldsExpanded=true; renderAdvOptionsPanel('node','${id}')">▼ Show ${extra} more</button>`;
+                  onclick="_advShowMoreFields('${id}')">▼ Show ${extra} more</button>`;
               }
             }
             return html;

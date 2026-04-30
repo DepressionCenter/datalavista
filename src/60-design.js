@@ -476,6 +476,23 @@ function rankSuggestions(rules, cols, meta) {
               || _qcP.find(c => sniffType(c) === 'text' && !/^title$/i.test(c))
               || _qcP[0] || '';
             addWidgetToCanvas('pie', [_xPie, '__dlv_count__'], null);
+          } else if (data.widgetType === 'bar') {
+            const _qcB = /** @type {string[]} */ (DataLaVistaState.queryColumns);
+            const _xBar = _qcB.find(c => /(type|status)$/i.test(c))
+              || _qcB.find(c => /year$/i.test(c))
+              || _qcB.find(c => sniffType(c) === 'boolean')
+              || _qcB.find(c => sniffType(c) === 'text' && !/^title$/i.test(c))
+              || _qcB.find(c => sniffType(c) === 'date')
+              || _qcB[0] || '';
+            addWidgetToCanvas('bar', [_xBar], null);
+          } else if (data.widgetType === 'line') {
+            const _qcL = /** @type {string[]} */ (DataLaVistaState.queryColumns);
+            const _xLine = _qcL.find(c => sniffType(c) === 'date')
+              || _qcL.find(c => /year$/i.test(c))
+              || _qcL.find(c => /(type|status)$/i.test(c))
+              || _qcL.find(c => sniffType(c) === 'text' && !/^title$/i.test(c))
+              || _qcL[0] || '';
+            addWidgetToCanvas('line', [_xLine], null);
           } else {
             addWidgetToCanvas(data.widgetType, null, null);
           }
@@ -617,8 +634,17 @@ function rankSuggestions(rules, cols, meta) {
           containerAlign: 'top',
           fields: _initFields,
           xField: (fields && fields.length > 0) ? fields[0] : (() => {
-            const _qc = DataLaVistaState.queryColumns;
-            return _qc.find(c => sniffType(c) === 'date')
+            const _qc = /** @type {string[]} */ (DataLaVistaState.queryColumns);
+            if (widgetType === 'line' || widgetType === 'area') {
+              return _qc.find(c => sniffType(c) === 'date')
+                  || _qc.find(c => /year$/i.test(c))
+                  || _qc.find(c => /(type|status)$/i.test(c))
+                  || _qc.find(c => sniffType(c) === 'text' && !/^title$/i.test(c))
+                  || _qc[0] || '';
+            }
+            return _qc.find(c => /(type|status)$/i.test(c))
+                || _qc.find(c => /year$/i.test(c))
+                || _qc.find(c => sniffType(c) === 'date')
                 || _qc.find(c => sniffType(c) === 'text' && !/^title$/i.test(c))
                 || _qc[0] || '';
           })(),
@@ -3252,7 +3278,18 @@ function _ddRenderCards(filterText) {
     let breadcrumbHtml = '';
     if (m) {
       const crumbs = [];
-      if (m.sourceDataSource) crumbs.push('<span class="dd-crumb dd-crumb-ds">' + _attrEnc('Data Source: ' + m.sourceDataSource) + '</span>');
+      if (m.sourceDataSource) {
+        const _dsObj = /** @type {any} */ (DataLaVistaState.dataSources)?.[m.sourceDataSource] || {};
+        const _tObj  = /** @type {any} */ (DataLaVistaState.tables)?.[m.sourceTableKey]  || {};
+        const _dsLabel = _dsObj.siteTitle || m.sourceDataSource;
+        const _dsDesc  = _dsObj.description || _tObj.description || '';
+        const _dsUrl   = _tObj.siteUrl || (!_tObj.isFileUpload && _tObj.url) || '';
+        const _dsTip   = _dsDesc ? ' data-dlv-tip="' + _attrEnc(_dsDesc) + '"' : '';
+        const _dsInner = _dsUrl
+          ? '<a href="' + _attrEnc(_dsUrl) + '" target="_blank" style="color:inherit;text-decoration:underline dotted">' + _attrEnc(_dsLabel) + '</a>'
+          : _attrEnc(_dsLabel);
+        crumbs.push('<span class="dd-crumb dd-crumb-ds"' + _dsTip + '>Data Source: ' + _dsInner + '</span>');
+      }
       if (m.sourceTableName) {
         const tableDesc = m.sourceTableDescription
           ? ' data-dlv-tip="' + _attrEnc(m.sourceTableDescription) + '"'
@@ -3295,6 +3332,103 @@ function _ddRenderCards(filterText) {
   dlvTooltip.scanDOM(document);
 }
 
+function _ddDownloadCSV() {
+  var cols = DataLaVistaState.queryColumns || [];
+  if (!cols.length) { toast('Run a query first to populate the data dictionary.', 'warning'); return; }
+
+  var qcMeta = DataLaVistaState.queryColumnMeta || {};
+
+  // Build alias -> raw field def map from all loaded tables
+  var fieldDefMap = {};
+  var tableObjs = DataLaVistaState.tables || {};
+  for (var tkey in tableObjs) {
+    var tbl = tableObjs[tkey];
+    var tblFields = (tbl && tbl.fields) ? tbl.fields : [];
+    for (var fi = 0; fi < tblFields.length; fi++) {
+      var fd = tblFields[fi];
+      if (fd && fd.alias && !fieldDefMap[fd.alias]) { fieldDefMap[fd.alias] = fd; }
+    }
+  }
+
+  var headers = [
+    'Alias (Query Column)',
+    'Data Type',
+    'Aggregation',
+    'Display Name',
+    'Internal Name',
+    'Data Source',
+    'Table/List',
+    'Table Description',
+    'View',
+    'Field Description',
+    'Lookup List',
+    'Lookup Field',
+    'Lookup Web URL',
+    'Is Lookup Raw',
+    'Is Auto ID',
+    'Used In Widgets',
+    'Lineage'
+  ];
+
+  function _csvCell(v) {
+    var s = (v == null) ? '' : String(v);
+    if (s.indexOf(',') !== -1 || s.indexOf('"') !== -1 || s.indexOf('\n') !== -1) {
+      return '"' + s.replace(/"/g, '""') + '"';
+    }
+    return s;
+  }
+
+  var rows = [headers.map(_csvCell).join(',')];
+
+  for (var ci = 0; ci < cols.length; ci++) {
+    var col = cols[ci];
+    var m   = qcMeta[col]     || null;
+    var f   = fieldDefMap[col] || null;
+
+    var dt           = sniffType(col);
+    var agg          = (m && m.agg)                    ? m.agg                    : '';
+    var displayName  = (m && m.sourceDisplayName)      ? m.sourceDisplayName      : '';
+    var internalName = (m && m.sourceInternalName)     ? m.sourceInternalName     : '';
+    var dataSource   = (m && m.sourceDataSource)       ? m.sourceDataSource       : '';
+    var tableName    = (m && m.sourceTableName)        ? m.sourceTableName        : '';
+    var tableDesc    = (m && m.sourceTableDescription) ? m.sourceTableDescription : '';
+    var viewName     = (m && m.viewName)               ? m.viewName               : '';
+    var fieldDesc    = (m && m.sourceFieldDescription) ? m.sourceFieldDescription : '';
+
+    // Lookup / foreign-key metadata from raw field definition (SharePoint lookup fields)
+    var lookupList   = f ? (f.lookupList   || f.LookupList   || '') : '';
+    var lookupField  = f ? (f.lookupField  || f.LookupField  || '') : '';
+    var lookupWebUrl = f ? (f.lookupWebUrl || f.LookupWebUrl || '') : '';
+    var isLookupRaw  = (f && f.isLookupRaw) ? 'Yes' : '';
+    var isAutoId     = (f && f.isAutoId)     ? 'Yes' : '';
+
+    // Widget usage
+    var usedWidgets  = _ddGetWidgetsUsingField(col);
+    var widgetNames  = '';
+    for (var wi = 0; wi < usedWidgets.length; wi++) {
+      var wn = usedWidgets[wi].title || usedWidgets[wi].type || '';
+      if (wn) { widgetNames += (widgetNames ? '; ' : '') + wn; }
+    }
+
+    // Lineage breadcrumb
+    var lineageParts = [];
+    if (dataSource) lineageParts.push('Data Source: ' + dataSource);
+    if (tableName)  lineageParts.push('Table: ' + tableName);
+    if (viewName)   lineageParts.push('View: ' + viewName);
+    lineageParts.push('Field: ' + (displayName || internalName || col));
+    var lineage = lineageParts.join(' > ');
+
+    rows.push([col, dt, agg, displayName, internalName, dataSource, tableName,
+               tableDesc, viewName, fieldDesc, lookupList, lookupField, lookupWebUrl,
+               isLookupRaw, isAutoId, widgetNames, lineage].map(_csvCell).join(','));
+  }
+
+  var csv   = rows.join('\n');
+  var title = (DataLaVistaState.design && DataLaVistaState.design.title) ? DataLaVistaState.design.title : 'DataLaVista';
+  downloadText(csv, title + '-DataDictionary.csv', 'text/csv');
+  toast('Data dictionary exported (' + cols.length + ' fields)', 'success');
+}
+
 function openDataDictionaryPopup() {
   const _ddExisting = document.getElementById('dd-overlay');
   if (_ddExisting) _ddExisting.remove();
@@ -3312,7 +3446,7 @@ function openDataDictionaryPopup() {
   const searchRow = cols.length
     ? '<div style="padding:12px 20px 0">'
       + '<input id="dd-search" type="text" class="form-input" placeholder="Search fields, tables, data sources..." '
-      + 'style="width:100%" oninput="_ddFilterCards(this.value)" />'
+      + 'style="width:100%" />'
       + '</div>'
     : '';
 
@@ -3327,6 +3461,16 @@ function openDataDictionaryPopup() {
     + '<div class="popup-footer">'
     + '<button class="btn btn-primary btn-sm" onclick="document.getElementById(\'dd-overlay\').remove()">Close</button>'
     + '</div>';
+
+  var _ddSearchEl = dialog.querySelector('#dd-search');
+  if (_ddSearchEl) _ddSearchEl.addEventListener('input', function(e) { _ddFilterCards(/** @type {HTMLInputElement} */ (e.target).value); });
+
+  var _ddCsvBtn = document.createElement('button');
+  _ddCsvBtn.className = 'btn btn-ghost btn-sm';
+  _ddCsvBtn.textContent = 'Download CSV';
+  _ddCsvBtn.addEventListener('click', _ddDownloadCSV);
+  var _ddFooter = dialog.querySelector('.popup-footer');
+  if (_ddFooter) _ddFooter.prepend(_ddCsvBtn);
 
   overlay.appendChild(dialog);
   document.body.appendChild(overlay);

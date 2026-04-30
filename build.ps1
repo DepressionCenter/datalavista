@@ -4,7 +4,7 @@
 #  Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 #  Created: 2026-03-24
 #  Last Modified: 2026-04-27
-#  Summary: Generates datalavista.js, DataLaVista.html, DataLaVista-nojs.html, DataLaVista-dev.html.
+#  Summary: Generates datalavista.js, DataLaVista.html, DataLaVista-nojs.html.
 #  Notes: See README file for documentation and full license information.
 #  Website: https://github.com/DepressionCenter/datalavista
 #
@@ -33,6 +33,28 @@ $LicenseText = $LicenseText.Replace('{GIT_HASH}', $SourceHash)
 
 # Collect JS source files in sort order
 $JsFiles = Get-ChildItem "$SRC\[0-9][0-9]-*.js" | Sort-Object Name
+
+# ── Helper: get or download esbuild ──────────────────────────────────────────
+$EsBuildVersion = '0.28.0'
+$EsBuildCache   = "$env:LOCALAPPDATA\datalavista-build\esbuild.exe"
+
+function Get-EsBuild {
+    if (Get-Command esbuild -ErrorAction SilentlyContinue) { return 'esbuild' }
+    if (Test-Path $EsBuildCache) { return $EsBuildCache }
+    Write-Host "  Downloading esbuild v$EsBuildVersion..." -ForegroundColor Cyan
+    New-Item -ItemType Directory -Force -Path (Split-Path $EsBuildCache) | Out-Null
+    $tgz = "$env:TEMP\esbuild.tgz"
+    $url = "https://registry.npmjs.org/@esbuild/win32-x64/-/win32-x64-$EsBuildVersion.tgz"
+    Invoke-WebRequest $url -OutFile $tgz
+    $extractDir = "$env:TEMP\esbuild-extract"
+    New-Item -ItemType Directory -Force -Path $extractDir | Out-Null
+    tar -xzf $tgz -C $extractDir
+    $bin = Get-ChildItem $extractDir -Filter 'esbuild.exe' -Recurse | Select-Object -First 1
+    Copy-Item $bin.FullName $EsBuildCache
+    Remove-Item $tgz, $extractDir -Recurse -Force
+    return $EsBuildCache
+}
+$EsBuild = Get-EsBuild
 
 # ── Helper: strip first /* */ block comment from a JS string ─────────────────
 function Strip-LicenseJs {
@@ -64,58 +86,38 @@ function Write-HtmlOutput {
 
 # ── 1. Build datalavista.js ──────────────────────────────────────────────────
 Write-Host 'Building datalavista.js...'
-$sb = [System.Text.StringBuilder]::new()
-$null = $sb.AppendLine('/* ============================================================')
-$null = $sb.AppendLine($LicenseText)
-$null = $sb.AppendLine('================================================================ */')
-$null = $sb.AppendLine('')
-$null = $sb.AppendLine('(() => {')
-$null = $sb.AppendLine("  'use strict';")
+$bodySb = [System.Text.StringBuilder]::new()
+$null = $bodySb.AppendLine('(() => {')
+$null = $bodySb.AppendLine("  'use strict';")
 foreach ($f in $JsFiles) {
-    $null = $sb.AppendLine('')
-    $null = $sb.AppendLine("  /* === $($f.Name) === */")
+    $null = $bodySb.AppendLine('')
+    $null = $bodySb.AppendLine("  /* === $($f.Name) === */")
     $rawJs = [System.IO.File]::ReadAllText($f.FullName, [System.Text.Encoding]::UTF8)
-    $null = $sb.Append((Strip-LicenseJs $rawJs))
-    $null = $sb.AppendLine('')
+    $null = $bodySb.Append((Strip-LicenseJs $rawJs))
+    $null = $bodySb.AppendLine('')
 }
-$null = $sb.AppendLine('')
-$null = $sb.AppendLine('})();')
-$null = $sb.AppendLine('')
-$null = $sb.AppendLine('// Backward-compat shim: re-expose all dlv methods as globals so')
-$null = $sb.AppendLine('// onclick="foo()" HTML attributes continue to work.')
-$null = $sb.AppendLine('if (window.dlv) {')
-$null = $sb.AppendLine('  for (const [k, v] of Object.entries(window.dlv)) {')
-$null = $sb.AppendLine("    if (typeof v === 'function' && !Object.prototype.hasOwnProperty.call(window, k)) {")
-$null = $sb.AppendLine('      window[k] = (...a) => window.dlv[k](...a);')
-$null = $sb.AppendLine('    }')
-$null = $sb.AppendLine('  }')
-$null = $sb.AppendLine('}')
-[System.IO.File]::WriteAllText('datalavista.js', $sb.ToString(), [System.Text.Encoding]::UTF8)
+$null = $bodySb.AppendLine('')
+$null = $bodySb.AppendLine('})();')
+
+$bodyPath     = "$env:TEMP\dlv_js_body.js"
+$minifiedPath = "$env:TEMP\dlv_js_minified.js"
+[System.IO.File]::WriteAllText($bodyPath, $bodySb.ToString(), [System.Text.Encoding]::UTF8)
+& $EsBuild $bodyPath --bundle=false --platform=browser --minify-whitespace --minify-syntax --log-level=error "--outfile=$minifiedPath"
+$minifiedBody = [System.IO.File]::ReadAllText($minifiedPath, [System.Text.Encoding]::UTF8)
+$finalJs = "/* ============================================================`n$LicenseText`n================================================================ */`n`n" + $minifiedBody
+[System.IO.File]::WriteAllText('datalavista.js', $finalJs, [System.Text.Encoding]::UTF8)
 $lineCount = (Get-Content 'datalavista.js').Count
 Write-Host "  -> datalavista.js ($lineCount lines)"
 
 # ── 2. Build DataLaVista-nojs.html ─────────────────────────────────────────
 Write-Host 'Building DataLaVista-nojs.html...'
-Write-HtmlOutput '  <script src="datalavista.js"></script>' 'DataLaVista-nojs.html'
+[System.IO.File]::WriteAllText('DataLaVista-nojs.html', ($HtmlLicenseComment + $CleanTemplate), [System.Text.Encoding]::UTF8)
 Write-Host '  -> DataLaVista-nojs.html'
 
-# ── 3. Build DataLaVista-dev.html ────────────────────────────────────────────
-Write-Host 'Building DataLaVista-dev.html...'
-$devTags = ($JsFiles | ForEach-Object { "  <script src=`"$SRC/$($_.Name)`"></script>" }) -join "`n"
-Write-HtmlOutput $devTags 'DataLaVista-dev.html'
-Write-Host '  -> DataLaVista-dev.html'
-
-# ── 4. Build DataLaVista.html (inline) ──────────────────────────────────────
+# ── 3. Build DataLaVista.html (inline) ──────────────────────────────────────
 Write-Host 'Building DataLaVista.html (inline)...'
-$inlineSb = [System.Text.StringBuilder]::new()
-$null = $inlineSb.AppendLine('  <script>')
-foreach ($f in $JsFiles) {
-    $rawJs = [System.IO.File]::ReadAllText($f.FullName, [System.Text.Encoding]::UTF8)
-    $null = $inlineSb.Append((Strip-LicenseJs $rawJs))
-    $null = $inlineSb.AppendLine('')
-}
-$null = $inlineSb.Append('  </script>')
-Write-HtmlOutput $inlineSb.ToString() 'DataLaVista.html'
+$inlineSnippet = "  <script>`n" + $minifiedBody.TrimEnd() + "`n  </script>"
+Write-HtmlOutput $inlineSnippet 'DataLaVista.html'
 Write-Host '  -> DataLaVista.html'
 
 Write-Host ''

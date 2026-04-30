@@ -720,6 +720,18 @@ async function loadSharePointListsSource(siteUrl, dsName, newAuth='current', new
     };
   }
 
+  // Best-effort: fetch SP site metadata for the data dictionary (fire-and-forget, no await)
+  spFetch(siteUrl + '/_api/web?$select=Title,Url,Id,Description', dsName)
+    .then(function(web) {
+      const d = (web && web.d) ? web.d : web;
+      const ds = /** @type {any} */ (DataLaVistaState.dataSources)[dsName];
+      if (ds && d && d.Title) {
+        ds.siteTitle = d.Title;
+        if (d.Description) ds.description = d.Description;
+      }
+    })
+    .catch(function() {});
+
   const lists = await fetchSPLists(siteUrl, dsName);
   let loadedCount = 0;
 

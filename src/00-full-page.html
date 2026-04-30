@@ -3,7 +3,7 @@ This file is part of DataLaVista™
 DataLaVista.html: Report and dashboard designer main file.
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 Created: 2026-03-10
-Last Modified: 2026-04-04
+Last Modified: 2026-04-28
 Summary: Main window in DataLaVista for loading data and designing reports and dashboards.
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
@@ -3233,28 +3233,28 @@ with this program. If not, see https://www.gnu.org/licenses/.
 
       <!-- Right-click context menu (shared, positioned dynamically) -->
   <div id="dlv-ctx-menu">
-    <div class="ctx-menu-item" id="ctx-copy-url" onclick="dlvCtxCopyUrl();">🔗 Copy URL</div>
+    <div class="ctx-menu-item" id="ctx-copy-url">🔗 Copy URL</div>
     <div class="ctx-menu-sep" id="ctx-sep-url"></div>
-    <div class="ctx-menu-item" id="ctx-refresh-source" onclick="dlvCtxRefreshSource()">🔄 Refresh Source</div>
+    <div class="ctx-menu-item" id="ctx-refresh-source">🔄 Refresh Source</div>
     <div class="ctx-menu-sep" id="ctx-sep-refresh"></div>
-    <div class="ctx-menu-item" id="ctx-rename" onclick="dlvCtxRename()">✏️ Rename</div>
-    <div class="ctx-menu-item danger" id="ctx-delete" onclick="dlvCtxDelete()">🗑 Delete</div>
+    <div class="ctx-menu-item" id="ctx-rename">✏️ Rename</div>
+    <div class="ctx-menu-item danger" id="ctx-delete">🗑 Delete</div>
   </div>
 
   <!-- SharePoint File Picker Modal -->
-  <div id="sp-picker-overlay" onclick="if(event.target===this)spPickerClose()">
+  <div id="sp-picker-overlay">
     <div id="sp-picker-dialog">
       <div id="sp-picker-header">
         <h3>📂 Browse SharePoint Files</h3>
-        <button class="btn btn-ghost btn-icon btn-sm" onclick="spPickerClose()" title="Close">✕</button>
+        <button class="btn btn-ghost btn-icon btn-sm" id="sp-picker-close-btn" title="Close">✕</button>
       </div>
       <div id="sp-picker-breadcrumb"></div>
       <div id="sp-picker-spinner"><div class="spinner" style="width:16px;height:16px;border-width:2px"></div><span>Loading...</span></div>
       <div id="sp-picker-body"></div>
       <div id="sp-picker-footer">
         <span id="sp-picker-selected-label">No file selected</span>
-        <button class="btn btn-default btn-sm" onclick="spPickerClose()">Cancel</button>
-        <button class="btn btn-primary btn-sm" id="sp-picker-select-btn" disabled onclick="spPickerConfirm()">Select</button>
+        <button class="btn btn-default btn-sm" id="sp-picker-cancel-btn">Cancel</button>
+        <button class="btn btn-primary btn-sm" id="sp-picker-select-btn" disabled>Select</button>
       </div>
     </div>
   </div>
@@ -3270,16 +3270,16 @@ with this program. If not, see https://www.gnu.org/licenses/.
       <div id="popup-dialog">
         <div class="popup-header">
           <h2>⚡ Connect to Data Source</h2>
-          <button class="btn btn-ghost btn-icon" onclick="hideConnectPopup()" title="Close">✕</button>
+          <button class="btn btn-ghost btn-icon" id="popup-close-btn" title="Close">✕</button>
         </div>
         <div class="popup-body">
           <div class="source-tabs">
             <div class="source-tab-sp-wrapper" id="tab-sharepoint-wrapper">
-              <div class="source-tab" id="tab-sharepoint" data-src="sharepoint" onclick="switchSourceTab(this,'sharepoint')">SharePoint Lists</div>
+              <div class="source-tab" id="tab-sharepoint" data-src="sharepoint">SharePoint Lists</div>
             </div>
-            <div class="source-tab" data-src="upload" onclick="switchSourceTab(this,'upload')">Upload Files</div>
-            <div class="source-tab" data-src="remote" onclick="switchSourceTab(this,'remote')">Remote Files</div>
-            <div class="source-tab" data-src="loadconfig" onclick="switchSourceTab(this,'loadconfig')">Open Dashboard</div>
+            <div class="source-tab" id="tab-upload" data-src="upload">Upload Files</div>
+            <div class="source-tab" id="tab-remote" data-src="remote">Remote Files</div>
+            <div class="source-tab" id="tab-loadconfig" data-src="loadconfig">Open Dashboard</div>
           </div>
 
           <!-- SharePoint Lists -->
@@ -3312,15 +3312,13 @@ with this program. If not, see https://www.gnu.org/licenses/.
             <div class="form-group">
               <label>Select files to upload</label>
               <div class="dlv-dropzone" id="upload-dropzone"
-                ondragover="event.preventDefault();this.classList.add('drag-over')"
-                ondragleave="this.classList.remove('drag-over')"
-                ondrop="event.preventDefault();this.classList.remove('drag-over');document.getElementById('upload-file-input').files=event.dataTransfer.files;handleUploadFiles()">
+                >
                 <span>📂 Drag &amp; drop files here, or</span>
                 <label class="btn btn-default btn-sm" style="cursor:pointer;margin:0">
                   Browse…
                   <input type="file" id="upload-file-input" multiple
                     accept=".csv,.CSV,.json,.json5,.JSON,.xlsx,.xls,.xml,.XML,.sqlite,.db"
-                    style="display:none" onchange="handleUploadFiles()" />
+                    style="display:none" />
                 </label>
               </div>
               <span class="text-xs text-muted">Supported: CSV, JSON, Excel (.xlsx/.xls), XML, SQLite (.sqlite/.db)</span>
@@ -3340,7 +3338,7 @@ with this program. If not, see https://www.gnu.org/licenses/.
                 <input type="text" class="form-input" id="remote-url"
                   placeholder="https://example.com/data/report.csv"
                   style="flex:1" />
-                <button class="btn btn-default btn-sm" id="btn-sp-browse-remote" onclick="spBrowseRemoteFile()"
+                <button class="btn btn-default btn-sm" id="btn-sp-browse-remote"
                   title="Browse SharePoint document libraries for a data file"
                   style="display:none;white-space:nowrap;flex-shrink:0">📂 Browse SharePoint</button>
               </div>
@@ -3351,7 +3349,7 @@ with this program. If not, see https://www.gnu.org/licenses/.
               <input type="text" class="form-input" id="remote-ds-name" placeholder="auto" maxlength="6" />
             </div>
             <div style="display:flex;justify-content:flex-end;margin-bottom:6px">
-              <button class="btn btn-default btn-sm" onclick="handleAddRemoteUrl()">+ Add to Queue</button>
+              <button class="btn btn-default btn-sm" id="btn-add-remote-url">+ Add to Queue</button>
             </div>
             <div id="remote-queue" class="dlv-queue"><div class="queue-empty">No remote files queued</div></div>
           </div>
@@ -3363,7 +3361,7 @@ with this program. If not, see https://www.gnu.org/licenses/.
               <div style="display:flex;gap:6px;align-items:center">
                 <input type="text" class="form-input" id="config-url" placeholder="https://tenant.sharepoint.com/sites/.../Shared Documents/report.json"
                   style="flex:1" />
-                <button class="btn btn-default btn-sm" id="btn-sp-browse-config" onclick="spBrowseConfig()"
+                <button class="btn btn-default btn-sm" id="btn-sp-browse-config"
                   title="Browse SharePoint document libraries for a dashboard JSON file"
                   style="display:none;white-space:nowrap;flex-shrink:0">📂 Browse SharePoint Files</button>
               </div>
@@ -3386,8 +3384,8 @@ with this program. If not, see https://www.gnu.org/licenses/.
           </div>
         </div>
         <div class="popup-footer">
-          <button class="btn btn-default" onclick="hideConnectPopup()">I'll be back</button>
-          <button class="btn btn-primary" id="btn-do-connect" onclick="doConnect()">⚡ Connect &amp; Load</button>
+          <button class="btn btn-default" id="popup-cancel-btn">I'll be back</button>
+          <button class="btn btn-primary" id="btn-do-connect">⚡ Connect &amp; Load</button>
         </div>
       </div>
     </div>
@@ -3397,34 +3395,34 @@ with this program. If not, see https://www.gnu.org/licenses/.
       <div class="logo">Data<span>LaVista</span></div>
       <div class="toolbar-sep"></div>
       <button class="btn btn-default btn-sm" id="btn-connect" title="Come with me if you want to load... more data."
-        onclick="showConnectPopup()">⚡ Connect + Load</button>
+        onclick="ensureInit();showConnectPopup()">⚡ Connect + Load</button>
       <button class="btn btn-default btn-sm" id="btn-save-config" title="Come with me if you want your report to live."
-        onclick="saveConfig()" disabled>💾 Save</button>
+        disabled>💾 Save</button>
       <div class="toolbar-sep" id="btn-sep-after-save-config"></div>
       <div id="status-bar">Not connected — click Connect / Load to begin</div>
       <div class="toolbar-spacer"></div>
       <!-- Design mode tabs in toolbar -->
       <div id="toolbar-tab-nav" class="hidden">
-        <button id="toolbar-button-query" class="tb-tab-btn active" data-tab="query" onclick="switchTab('query')">Query</button>
+        <button id="toolbar-button-query" class="tb-tab-btn active" data-tab="query">Query</button>
         <span class="tb-tab-sep">›</span>
-        <button id="toolbar-button-design" class="tb-tab-btn" data-tab="design" onclick="switchTab('design')">Design</button>
+        <button id="toolbar-button-design" class="tb-tab-btn" data-tab="design">Design</button>
         <span class="tb-tab-sep">›</span>
-        <button id="toolbar-button-preview" class="tb-tab-btn" data-tab="dashboardPreview" onclick="switchTab('dashboardPreview')">Preview Dashboard</button>
+        <button id="toolbar-button-preview" class="tb-tab-btn" data-tab="dashboardPreview">Preview Dashboard</button>
         <span class="tb-tab-sep">›</span>
-        <button id="toolbar-button-generate" class="tb-tab-btn" data-tab="generate" onclick="switchTab('generate')">Generate Report</button>
+        <button id="toolbar-button-generate" class="tb-tab-btn" data-tab="generate">Generate Report</button>
       </div>
       <!-- Report mode toolbar buttons shown instead of design mode tabs-->
       <div id="toolbar-tab-reportMode" class="hidden">
-        <button id="toolbar-reportMode-button-1" class="btn btn-primary btn-sm" onclick="refreshDashboardPreview()" title="Refresh report data">🔄 Refresh</button>
+        <button id="toolbar-reportMode-button-1" class="btn btn-primary btn-sm" title="Refresh report data">🔄 Refresh</button>
         <span class="tb-tab-sep">›</span>
-        <button id="toolbar-reportMode-button-2" class="btn btn-primary btn-sm" onclick="downloadCSV()" title="Download as CSV">📄 CSV</button>
+        <button id="toolbar-reportMode-button-2" class="btn btn-primary btn-sm" title="Download as CSV">📄 CSV</button>
         <span class="tb-tab-sep">›</span>
-        <button id="toolbar-reportMode-button-3" class="btn btn-primary btn-sm" onclick="printReport()" title="Print report or export to PDF">🖨️ Print</button>
+        <button id="toolbar-reportMode-button-3" class="btn btn-primary btn-sm" title="Print report or export to PDF">🖨️ Print</button>
         <span class="tb-tab-sep">›</span>
-        <button id="toolbar-reportMode-button-4" class="btn btn-primary btn-sm" onclick="shareLiveReport()" title="Copy live report link to clipboard">📨 Share</button>
+        <button id="toolbar-reportMode-button-4" class="btn btn-primary btn-sm" title="Copy live report link to clipboard">📨 Share</button>
       </div>
       <div class="toolbar-sep"></div>
-      <button id="toolbar-button-datadict" class="btn btn-ghost btn-sm btn-help" onclick="openDataDictionaryPopup()" title="Data Dictionary">📖</button>
+      <button id="toolbar-button-datadict" class="btn btn-ghost btn-sm btn-help" title="Data Dictionary">📖</button>
       <div class="toolbar-sep"></div>
       <a href="https://teamdynamix.umich.edu/TDClient/210/DepressionCenter/KB/ArticleDet?ID=15179" target="_blank" title="Help and Documentation"><button id="toolbar-button-help" class="btn btn-ghost btn-sm btn-help" title="Help">?</button></a>
     </div>
@@ -3443,8 +3441,8 @@ with this program. If not, see https://www.gnu.org/licenses/.
           <div class="panel-header">
             <span>Tables &amp; Fields</span>
             <div class="panel-actions">
-              <button class="btn btn-ghost btn-icon btn-sm" onclick="expandAllTables()" title="Expand all">▼</button>
-              <button class="btn btn-ghost btn-icon btn-sm" onclick="collapseAllTables()"
+              <button class="btn btn-ghost btn-icon btn-sm" id="btn-expand-all-tables" title="Expand all">▼</button>
+              <button class="btn btn-ghost btn-icon btn-sm" id="btn-collapse-all-tables"
                 title="Collapse all">▲</button>
             </div>
           </div>
@@ -3459,16 +3457,16 @@ with this program. If not, see https://www.gnu.org/licenses/.
 
           <!-- Query-main tab toolbar -->
           <div id="qm-tabs">
-            <div class="qm-tab active" id="qmt-qb" onclick="switchQMTab('qb')">🧩 Query Builder</div>
-            <div class="qm-tab" id="qmt-sql" onclick="switchQMTab('sql')">📜 SQL Editor</div>
-            <div class="qm-tab" id="qmt-dataPreview" onclick="switchQMTab('dataPreview')">✨ Results</div>
+            <div class="qm-tab active" id="qmt-qb">🧩 Query Builder</div>
+            <div class="qm-tab" id="qmt-sql">📜 SQL Editor</div>
+            <div class="qm-tab" id="qmt-dataPreview">✨ Results</div>
             <div class="qm-spacer"></div>
             <div class="qm-actions">
-              <button class="btn btn-ghost btn-sm" id="btn-sql-locked" onclick="unlockSQL()"
+              <button class="btn btn-ghost btn-sm" id="btn-sql-locked"
                 title="SQL is locked. Click to unlock." style="display:none">🔒 Locked</button>
-              <button class="btn btn-default btn-sm" id="btn-clear-query" onclick="clearQueryBuilder()" title="Clear query builder">🗑️ Clear Query</button>
-              <button class="btn btn-primary btn-sm" id="btn-run-query" onclick="runQuery(); switchQMTab('dataPreview');">▶ Run Query</button>
-              <button class="btn btn-primary btn-sm" id="btn-use-in-design" onclick="useResultsInDesign()" style="display:none">🎨 Use in Design</button>
+              <button class="btn btn-default btn-sm" id="btn-clear-query" title="Clear query builder">🗑️ Clear Query</button>
+              <button class="btn btn-primary btn-sm" id="btn-run-query">▶ Run Query</button>
+              <button class="btn btn-primary btn-sm" id="btn-use-in-design" style="display:none">🎨 Use in Design</button>
             </div>
           </div>
 
@@ -3478,7 +3476,7 @@ with this program. If not, see https://www.gnu.org/licenses/.
               <!-- Advanced QB -->
               <div id="qb-advanced">
                 <div id="qb-canvas-wrap">
-                  <div id="qb-canvas" ondragover="event.preventDefault()" ondrop="onDropToAdvancedQB(event)">
+                  <div id="qb-canvas">
                     <svg id="qb-svg"></svg>
                   </div>
                   <div id="adv-canvas-trash" title="Drop here to remove">🗑️</div>
@@ -3487,7 +3485,7 @@ with this program. If not, see https://www.gnu.org/licenses/.
                 <div id="adv-options-panel">
                   <div class="adv-opts-header">
                     <span class="adv-opts-title" id="adv-opts-title-text">Options</span>
-                    <button id="adv-opts-toggle" onclick="toggleAdvOptionsPanel()" title="Collapse panel">◀</button>
+                    <button id="adv-opts-toggle" title="Collapse panel">◀</button>
                   </div>
                   <div id="adv-options-body">
                     <div class="text-muted text-sm">Drop a table onto the canvas, then click a node or join line to see options.</div>
@@ -3496,7 +3494,7 @@ with this program. If not, see https://www.gnu.org/licenses/.
                 <div id="node-props" style="display:none!important">
                   <div class="node-props-header">
                     <span id="node-props-title">Properties</span>
-                    <button class="btn btn-ghost btn-icon btn-sm" onclick="closeNodeProps()">✕</button>
+                    <button class="btn btn-ghost btn-icon btn-sm" id="btn-close-node-props">✕</button>
                   </div>
                   <div class="node-props-body" id="node-props-body"></div>
                 </div>
@@ -3508,8 +3506,8 @@ with this program. If not, see https://www.gnu.org/licenses/.
           <div id="qm-panel-sql">
             <div id="sql-section">
               <div class="sql-toolbar">
-                <button class="btn btn-default btn-sm" onclick="formatSQL()" title="Format SQL">🖋️ Format SQL</button>
-                <button class="btn btn-default btn-sm" onclick="clearSQLEditor()" title="Clear SQL editor">🧹 Clear Code</button>
+                <button class="btn btn-default btn-sm" id="btn-format-sql" title="Format SQL">🖋️ Format SQL</button>
+                <button class="btn btn-default btn-sm" id="btn-clear-sql" title="Clear SQL editor">🧹 Clear Code</button>
               </div>
               <div id="sql-editor-wrap">
                 <textarea id="sql-editor"></textarea>
@@ -3551,23 +3549,17 @@ with this program. If not, see https://www.gnu.org/licenses/.
           <div id="title-bar">
             <span class="bar-label">Title</span>
             <input type="text" id="title-input" placeholder="Enter report title… or drop a field"
-              oninput="DataLaVistaState.design.title=this.value"
-              onblur="updateDashboardTitleProp('title',this.value)"
-              ondragover="event.preventDefault()"
-              ondrop="insertTitleToken(event)" />
+              />
           </div>
           <div id="filter-bar">
             <span class="bar-label">Filters</span>
             <div class="filter-drop-zone" id="filter-drop-zone"
-              ondragover="event.preventDefault(); this.classList.add('drag-over')"
-              ondragleave="this.classList.remove('drag-over')" ondrop="onDropToFilterBar(event)">
+>
               <span id="filter-drop-hint" class="text-xs text-muted">Drop fields here to add report filters</span>
             </div>
           </div>
           <div id="canvas-wrap">
-            <div id="canvas-drop-zone" ondragover="onCanvasDragOver(event)" ondragleave="onCanvasDragLeave(event)"
-              ondrop="onDropToCanvas(event)"
-              onclick="if(event.target===this){renderDashboardTitleProperties();if(DataLaVistaState.drillHighlight)_clearDrillHighlight();}">
+            <div id="canvas-drop-zone">
               <div id="canvas-empty-hint">
                 <div class="hint-icon">📊</div>
                 <div>Drag widget types or fields onto the canvas</div>
@@ -3604,15 +3596,15 @@ with this program. If not, see https://www.gnu.org/licenses/.
       <div class="tab-panel" id="tab-dashboardPreview">
         <div id="preview-toolbar" class="hidden">
           <span id="preview-label"class="preview-label">Report Preview</span>
-          <button id="preview-toolbar-button-refresh" class="btn btn-default btn-sm" onclick="refreshDashboardPreview()">🔄 Refresh</button>
-          <button id="preview-toolbar-button-download" class="btn btn-default btn-sm" onclick="downloadCSV()">📄 CSV</button>
-          <button id="preview-toolbar-button-print" class="btn btn-default btn-sm" onclick="printPreview()">⬇🖨️ Print</button>
-          <button id="preview-toolbar-button-generate" class="btn btn-primary btn-sm" onclick="switchTab('generate')">✅ Generate Report</button>
+          <button id="preview-toolbar-button-refresh" class="btn btn-default btn-sm">🔄 Refresh</button>
+          <button id="preview-toolbar-button-download" class="btn btn-default btn-sm">📄 CSV</button>
+          <button id="preview-toolbar-button-print" class="btn btn-default btn-sm">⬇🖨️ Print</button>
+          <button id="preview-toolbar-button-generate" class="btn btn-primary btn-sm">✅ Generate Report</button>
         </div>
         <div id="preview-title-bar" class="hidden"></div>
         <div id="preview-filter-bar" class="hidden"></div>
         <div id="preview-canvas-wrap">
-          <div id="preview-canvas" onclick="if(event.target===this&&DataLaVistaState.drillHighlight)_clearDrillHighlight()">
+          <div id="preview-canvas">
             <div class="text-muted text-sm" style="padding:20px">Switch to Preview after designing your report to see
               the live result</div>
           </div>
@@ -3624,7 +3616,7 @@ with this program. If not, see https://www.gnu.org/licenses/.
       <div class="tab-panel" id="tab-generate">
         <div id="generate-toolbar">
           <h2>Generate and Publish</h2>
-          <button class="btn btn-primary" onclick="generateReport()">⚙ Generate</button>
+          <button class="btn btn-primary" id="btn-generate-report">⚙ Generate</button>
         </div>
         <div id="generate-body">
           <div id="gen-info-panel-publish" class="gen-info-panel">
@@ -3674,7 +3666,7 @@ This program is distributed in the hope that it will be useful, but WITHOUT ANY 
             <div class="generate-col-label">
               <span>⚙ Report Config (JSON)</span>
               <div class="gen-actions">
-                <button class="btn btn-default btn-sm" id="btn-copy-json" onclick="copyGenCode()" disabled>📋
+                <button class="btn btn-default btn-sm" id="btn-copy-json" disabled>📋
                   Copy Report to Clipboard</button>
               </div>
             </div>
@@ -3689,13 +3681,13 @@ This program is distributed in the hope that it will be useful, but WITHOUT ANY 
               <h4>Save &amp; Publish</h4>
             </div>
             <div class="gen-info-actions">
-              <button class="btn btn-primary btn-sm" id="btn-publish-sp" disabled onclick="publishToSharePoint()" title="Save this report to a SharePoint document library">☁ Publish to SharePoint</button>
-              <button class="btn btn-default btn-sm" id="btn-save-sp-list" disabled onclick="saveToSharePointList()" title="Save this report to a SharePoint list">📋 Save to SharePoint List</button>
-              <button class="btn btn-default btn-sm" onclick="downloadGenCode('json')">💾 Save Local Copy</button>
+              <button class="btn btn-primary btn-sm" id="btn-publish-sp" disabled title="Save this report to a SharePoint document library">☁ Publish to SharePoint</button>
+              <button class="btn btn-default btn-sm" id="btn-save-sp-list" disabled title="Save this report to a SharePoint list">📋 Save to SharePoint List</button>
+              <button class="btn btn-default btn-sm" id="btn-download-gen-code">💾 Save Local Copy</button>
             </div>
             <div id="gen-publish-result" style="display:none;margin-top:8px;align-items:center;gap:6px;flex-wrap:wrap">
               <a id="gen-publish-url" href="#" target="_blank" style="color:var(--primary);font-weight:700;font-size:11px;text-decoration:underline"></a>
-              <button class="btn btn-ghost btn-sm" onclick="sharePublishedUrl()" style="height:22px;padding:0 8px;font-size:11px;flex-shrink:0">🔗 Share</button>
+              <button class="btn btn-ghost btn-sm" id="btn-share-published-url" style="height:22px;padding:0 8px;font-size:11px;flex-shrink:0">🔗 Share</button>
             </div>
           </div>
         </div>
@@ -3707,24 +3699,12 @@ This program is distributed in the hope that it will be useful, but WITHOUT ANY 
   <!-- Toast container -->
   <div id="toast-container"></div>
 
-      <!-- DataLaVista Scripts -->
-       <!-- DATALAVISTA_SCRIPTS_PLACEHOLDER_OPEN -->
-      <script src="00b-tooltip.js"></script>
-      <script src="01-constants.js"></script>
-      <script src="02-alasql.js"></script>
-      <script src="03-sharepoint.js"></script>
-      <script src="04-normalization.js"></script>
-      <script src="05-data-sources.js"></script>
-      <script src="06-config.js"></script>
-      <script src="07-ui-context-menu.js"></script>
-      <script src="08-qb-basic.js"></script>
-      <script src="09-qb-advanced.js"></script>
-      <script src="10-query.js"></script>
-      <script src="11-design.js"></script>
-      <script src="12-preview.js"></script>
-      <script src="13-ui-utils.js"></script>
-      <script src="14-init.js"></script>
-      <script src="15-public-api.js"></script>
+  <!-- DataLaVista Scripts -->
+  <!-- DATALAVISTA_SCRIPTS_PLACEHOLDER_OPEN -->
+  <!-- Pick one below (or edit) and disable the rest: -->
+  <script src="datalavista.js"></script>
+  <script src="../SiteAssets/datalavista.js"></script>
+  <!-- <script src="https://code.depressioncenter.org/datalavista/datalavista.js"></script> -->
   <!-- DATALAVISTA_SCRIPTS_PLACEHOLDER_CLOSE -->
 </body>
 </html>

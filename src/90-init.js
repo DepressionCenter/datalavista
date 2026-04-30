@@ -152,6 +152,10 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
   // Main initialization function to set up event listeners, resizers, and default states.
   async function init() {
     if (DataLaVistaState && DataLaVistaState._initialized) return;
+    // If a different build already ran init (e.g. CDN + SiteAssets both loaded),
+    // window.DataLaVistaState points to the other build's state object.
+    const _wAny = /** @type {any} */ (window);
+    if (_wAny.DataLaVistaState && _wAny.DataLaVistaState._initialized && _wAny.DataLaVistaState !== DataLaVistaState) return;
     //window.DataLaVistaState = new Proxy(dlvRawState, dlvStateHandler);
     console.log('Initializing...');
     DataLaVistaState._initialized = true;
@@ -219,6 +223,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         }
 
     try { applyDlvEChartsTheme(); } catch(err) { console.warn('Unable to initialize eCharts theme.', err); }
+    try { attachEvents(); } catch(err) { console.error('Unable to initialize event handling.', err); }
 
     if (DataLaVistaState.reportMode === 'view') {
         /* *** DATALAVISTA REPORT VIEW MODE *** */
