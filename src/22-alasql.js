@@ -182,6 +182,53 @@ alasql.fn.DLV_MAX = function(a, b) {
           return alasql.aggr.QUART(v, s, stage, 3);
       };
 
+      // ── DLV_PERCENTILE_* / DLV_IQR ───────────────────────────────────────────
+      // ANSI SQL PERCENTILE_CONT (= R Type 7): linear interpolation, NULLs skipped
+      // Date support: timestamps used for arithmetic; IQR on dates returns ms
+      const _dlvPctCont = function(arr, p) {
+          if (!arr || !arr.length) return null;
+          const isDate = arr[0] instanceof Date;
+          const nums = arr
+              .map(x => x instanceof Date ? x.getTime() : parseFloat(x))
+              .filter(x => !isNaN(x));
+          if (!nums.length) return null;
+          nums.sort((a, b) => a - b);
+          const n = nums.length;
+          if (n === 1) return isDate ? new Date(nums[0]) : nums[0];
+          const h = p * (n - 1);
+          const hf = Math.floor(h);
+          const frac = h - hf;
+          const result = frac === 0 ? nums[hf] : nums[hf] + frac * (nums[hf + 1] - nums[hf]);
+          return isDate ? new Date(result) : result;
+      };
+
+      const _createDLVPctAggr = function(p) {
+          return function(v, s, stage) {
+              if (stage === 1) return (v == null) ? [] : [v];
+              if (stage === 2) { if (v != null) s.push(v); return s; }
+              return _dlvPctCont(s, p);
+          };
+      };
+
+      alasql.aggr.DLV_PERCENTILE_5  = _createDLVPctAggr(0.05);
+      alasql.aggr.DLV_PERCENTILE_10 = _createDLVPctAggr(0.10);
+      alasql.aggr.DLV_PERCENTILE_25 = _createDLVPctAggr(0.25);
+      alasql.aggr.DLV_PERCENTILE_50 = _createDLVPctAggr(0.50);
+      alasql.aggr.DLV_PERCENTILE_75 = _createDLVPctAggr(0.75);
+      alasql.aggr.DLV_PERCENTILE_90 = _createDLVPctAggr(0.90);
+      alasql.aggr.DLV_PERCENTILE_95 = _createDLVPctAggr(0.95);
+
+      alasql.aggr.DLV_IQR = function(v, s, stage) {
+          if (stage === 1) return (v == null) ? [] : [v];
+          if (stage === 2) { if (v != null) s.push(v); return s; }
+          const q1 = _dlvPctCont(s, 0.25);
+          const q3 = _dlvPctCont(s, 0.75);
+          if (q1 == null || q3 == null) return null;
+          const v1 = q1 instanceof Date ? q1.getTime() : q1;
+          const v3 = q3 instanceof Date ? q3.getTime() : q3;
+          return v3 - v1;
+      };
+
       // ── LAST ──────────────────────────────────────────────────────────────────
       // Not available natively in alasql v4.17; only FIRST is available
       alasql.aggr.LAST = alasql.aggr.LAST || function (v, acc, stage) {
