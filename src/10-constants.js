@@ -27,6 +27,37 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
   =============================================================== */
 const DataLaVistaCore = {
   /* ===== CONSTANTS ===== */
+
+  // Data Source icons (The origin or infrastructure hosting the data)
+  DATA_SOURCE_ICONS: {
+    sharepoint:  { icon: '☁️',  title: 'SharePoint Site' }, // Applies to lists, document libraries and files stored in SP/OneDrive
+    database:         { icon: '🛢️', title: 'Database' },
+    api:         { icon: '⇄',   title: 'API' },
+    remote_file: { icon: '☁︎',  title: 'Remote File' }, // Non-SP remote files. Append \uFE0E if OS tries to force it to an emoji
+    file_upload:      { icon: '💾',  title: 'File Upload' },
+    default:     { icon: '🧊',  title: 'Data Source' }
+  },
+
+  // Table/source type icons — SharePoint has sub-keys (list vs library); others are flat.
+  // TODO: Add file extension arrays to use in file picker
+  TABLE_SOURCE_ICONS: {
+    sharepoint: {
+      list:    { icon: '📋', title: 'SharePoint List' },
+      library: { icon: '📁', title: 'Document Library' }
+    },
+    json:    { icon: '📚', title: 'JSON' },
+    csv:     { icon: '📄', title: 'CSV Spreadsheet' },
+    excel:   { icon: '📗', title: 'Excel Spreadsheet' },
+    default: { icon: '⏹️', title: 'Table' }
+  },
+
+  // Queries and views
+  QUERY_ICONS: {
+    view:          { icon: '🪟', title: 'Data View', desc: 'Table wrapper with expanded fields' },
+    query_results: { icon: '✨',  title: 'Query Results', desc: 'Query results after user transformations' },
+    filtered_results: { icon: '⇶', title: 'Filtered Results', desc: 'Query results with global filters applied' }
+  },
+
   // Field type icons for display in field lists, query builder, etc.
   FIELD_TYPE_ICONS: {
     'text':         { icon: '📝', cls: 'type-text' },      // data shown as text
@@ -43,19 +74,6 @@ const DataLaVistaCore = {
     'array':        { icon: '☷', cls: 'type-array' },     // array of primitives
     'object-multi': { icon: '🗃️', cls: 'type-object' },  // array of objects (non-SharePoint)
     'default':      { icon: '❔', cls: 'type-text' }       // unknown/unclassified
-  },
-
-  // Table/source type icons — SharePoint has sub-keys (list vs library); others are flat.
-  // TODO: Add file extension arrays to use in file picker
-  TABLE_SOURCE_ICONS: {
-    sharepoint: {
-      list:    { icon: '📋', title: 'SharePoint List' },
-      library: { icon: '📁', title: 'Document Library' }
-    },
-    json:    { icon: '📚', title: 'JSON' },
-    csv:     { icon: '📄', title: 'CSV Spreadsheet' },
-    excel:   { icon: '📗', title: 'Excel Spreadsheet' },
-    default: { icon: '⏹️', title: 'Table' }
   },
 
   ALASQL_KEYWORDS: [

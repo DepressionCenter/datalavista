@@ -102,7 +102,11 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           if (!rawKey) continue;
           const tableObj = tables[rawKey];
           if (!tableObj) continue;
-          const field = (tableObj.fields || []).find(/** @type {any} */ (f) => f.alias === fieldAlias) || null;
+          const field = (tableObj.fields || []).find(/** @type {any} */ (f) => f.alias === fieldAlias && !f.parentField)
+                     || (tableObj.fields || []).find(/** @type {any} */ (f) => f.alias === fieldAlias)
+                     || (tableObj.fields || []).find(/** @type {any} */ (f) => f.internalName === fieldAlias && !f.parentField)
+                     || (tableObj.fields || []).find(/** @type {any} */ (f) => f.internalName === fieldAlias)
+                     || null;
           meta[resultAlias] = {
             displayType:            field?.displayType            || 'default',
             agg:                    '',
@@ -110,11 +114,10 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
             sourceDisplayName:      field?.displayName            || fieldAlias,
             sourceInternalName:     field?.internalName           || fieldAlias,
             sourceTableKey:         rawKey,
-            sourceTableName:        tableObj.displayName          || rawKey,
+            sourceTableName:        tableObj.alias || tableObj.displayName || rawKey,
             sourceDataSource:       tableObj.dataSource           || '',
             viewName:               CyberdynePipeline.rawTableToView?.[rawKey] || rawKey,
             sourceFieldDescription: field?.description            || '',
-            sourceTableDescription: tableObj.description          || '',
           };
         }
         return meta;

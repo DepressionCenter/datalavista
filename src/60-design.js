@@ -3215,7 +3215,7 @@ function _ddGetWidgetsUsingField(fieldName) {
   return widgets.filter(function(w) {
     const inFields  = (w.fields  || []).includes(fieldName);
     const inX       = w.xField === fieldName;
-    const inY       = (w.yFields || []).includes(fieldName);
+    const inY       = isEChartsWidget(w.type) && (w.yFields || []).includes(fieldName);
     const inSeries  = (w.seriesProps || []).some(function(s) { return s.field === fieldName; });
     const inFilters = (w.filters || []).some(function(f) { return f.field === fieldName; });
     return inFields || inX || inY || inSeries || inFilters;
@@ -3249,9 +3249,12 @@ function _ddRenderCards(filterText) {
     const m = qcMeta[col];
 
     if (lower) {
+      const _tableDescSearch = m && m.sourceTableKey
+        ? (/** @type {any} */ (DataLaVistaState.tables)[m.sourceTableKey] || {}).description || ''
+        : '';
       const haystack = [col, m && m.sourceDisplayName, m && m.sourceInternalName,
         m && m.viewName, m && m.sourceTableName, m && m.sourceDataSource,
-        m && m.sourceFieldDescription, m && m.sourceTableDescription]
+        m && m.sourceFieldDescription, _tableDescSearch]
         .filter(Boolean).join(' ').toLowerCase();
       if (!haystack.includes(lower)) continue;
     }
@@ -3271,8 +3274,15 @@ function _ddRenderCards(filterText) {
       ? '<span class="dd-agg-badge">' + _attrEnc(m.agg) + '</span>'
       : '';
 
-    const fieldDescHtml = m && m.sourceFieldDescription
-      ? '<div class="dd-card-desc">' + _attrEnc(m.sourceFieldDescription) + '</div>'
+    const _fieldDescLive = (() => {
+      if (!m || m.sourceFieldDescription || !m.sourceTableKey || !m.sourceAlias) return '';
+      const _flds = /** @type {any[]} */ ((/** @type {any} */ (DataLaVistaState.tables))[m.sourceTableKey]?.fields || []);
+      return _flds.find(f => (f.alias === m.sourceAlias || f.internalName === m.sourceAlias) && !f.parentField)?.description
+          || _flds.find(f => f.alias === m.sourceAlias || f.internalName === m.sourceAlias)?.description
+          || '';
+    })();
+    const fieldDescHtml = (m && (m.sourceFieldDescription || _fieldDescLive))
+      ? '<div class="dd-card-desc">' + _attrEnc(m.sourceFieldDescription || _fieldDescLive) + '</div>'
       : '';
 
     let breadcrumbHtml = '';
@@ -3291,9 +3301,10 @@ function _ddRenderCards(filterText) {
         crumbs.push('<span class="dd-crumb dd-crumb-ds"' + _dsTip + '>Data Source: ' + _dsInner + '</span>');
       }
       if (m.sourceTableName) {
-        const tableDesc = m.sourceTableDescription
-          ? ' data-dlv-tip="' + _attrEnc(m.sourceTableDescription) + '"'
+        const _tableDescLive = m.sourceTableKey
+          ? ((/** @type {any} */ (DataLaVistaState.tables))[m.sourceTableKey]?.description || '')
           : '';
+        const tableDesc = _tableDescLive ? ' data-dlv-tip="' + _attrEnc(_tableDescLive) + '"' : '';
         crumbs.push('<span class="dd-crumb dd-crumb-table"' + tableDesc + '>Table: ' + _attrEnc(m.sourceTableName) + '</span>');
       }
       if (m.viewName)         crumbs.push('<span class="dd-crumb dd-crumb-view">' + _attrEnc('View: ' + m.viewName) + '</span>');
@@ -3390,9 +3401,11 @@ function _ddDownloadCSV() {
     var displayName  = (m && m.sourceDisplayName)      ? m.sourceDisplayName      : '';
     var internalName = (m && m.sourceInternalName)     ? m.sourceInternalName     : '';
     var dataSource   = (m && m.sourceDataSource)       ? m.sourceDataSource       : '';
-    var tableName    = (m && m.sourceTableName)        ? m.sourceTableName        : '';
-    var tableDesc    = (m && m.sourceTableDescription) ? m.sourceTableDescription : '';
-    var viewName     = (m && m.viewName)               ? m.viewName               : '';
+    var tableName    = (m && m.sourceTableName)  ? m.sourceTableName  : '';
+    var tableDesc    = (m && m.sourceTableKey)
+      ? ((/** @type {any} */ (DataLaVistaState.tables))[m.sourceTableKey]?.description || '')
+      : '';
+    var viewName     = (m && m.viewName)         ? m.viewName         : '';
     var fieldDesc    = (m && m.sourceFieldDescription) ? m.sourceFieldDescription : '';
 
     // Lookup / foreign-key metadata from raw field definition (SharePoint lookup fields)

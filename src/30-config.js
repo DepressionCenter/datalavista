@@ -154,6 +154,7 @@ function buildConfig() {
   const cleanFields = (arr) => (arr || []).filter(f => !f.isSynthetic && !f.isAutoId).map(f => ({
     internalName:  f.internalName || f.InternalName || '',
     displayName:   f.displayName  || f.Title        || '',
+    description:   f.description  || '',
     alias:         f.alias        || '',
     userAlias:     f.userAlias    || f.alias         || '',
     rawType:       f.rawType      || f.TypeAsString  || '',
@@ -179,8 +180,10 @@ function buildConfig() {
     dataSourcesMeta[dsName] = {
       alias: ds.alias || dsName,
       auth: ds.auth || 'current',
+      description: ds.description || '',
       fileName: ds.fileName || '',
       internalName: ds.internalName || dsName,
+      siteTitle: ds.siteTitle || '',
       tables: ds.tables || [],
       token: ds.token || '',
       type: ds.type || 'sharepoint',
@@ -468,6 +471,13 @@ async function loadConfig(cfg) {
   // [END REMOVE AFTER]
   DataLaVistaState.currentWidgetId = null;
   DataLaVistaState.dataSources = cfg.dataSources || {};
+  // Background-refresh SP site title/description for all SP data sources (fire-and-forget)
+  for (const [_dsName, _ds] of Object.entries(DataLaVistaState.dataSources)) {
+    const _dsCast = /** @type {any} */ (_ds);
+    if (_dsCast.type === 'sharepoint' && (_dsCast.siteUrl || _dsCast.url)) {
+      _fetchSPSiteMeta(_dsCast.siteUrl || _dsCast.url, _dsName);
+    }
+  }
   const loadedDesign = cfg.design || {};
   DataLaVistaState.design = {
     title: loadedDesign.title || '',

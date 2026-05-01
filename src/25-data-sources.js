@@ -698,6 +698,23 @@ function tryJSONP(url) {
 }
 
 // ============================================================
+// SHAREPOINT SITE METADATA HELPER
+// ============================================================
+/** @param {string} siteUrl @param {string} dsName */
+function _fetchSPSiteMeta(siteUrl, dsName) {
+  spFetch(siteUrl + '/_api/web?$select=Title,Url,Id,Description', dsName)
+    .then(function(web) {
+      const d = (web && web.d) ? web.d : web;
+      const ds = /** @type {any} */ (DataLaVistaState.dataSources)[/** @type {any} */ (dsName)];
+      if (ds && d && d.Title) {
+        ds.siteTitle = d.Title;
+        if (d.Description) ds.description = d.Description;
+      }
+    })
+    .catch(function() {});
+}
+
+// ============================================================
 // SHAREPOINT SOURCE LOADER
 // ============================================================
 async function loadSharePointListsSource(siteUrl, dsName, newAuth='current', newToken='', description='') {
@@ -720,17 +737,8 @@ async function loadSharePointListsSource(siteUrl, dsName, newAuth='current', new
     };
   }
 
-  // Best-effort: fetch SP site metadata for the data dictionary (fire-and-forget, no await)
-  spFetch(siteUrl + '/_api/web?$select=Title,Url,Id,Description', dsName)
-    .then(function(web) {
-      const d = (web && web.d) ? web.d : web;
-      const ds = /** @type {any} */ (DataLaVistaState.dataSources)[dsName];
-      if (ds && d && d.Title) {
-        ds.siteTitle = d.Title;
-        if (d.Description) ds.description = d.Description;
-      }
-    })
-    .catch(function() {});
+  // Best-effort: fetch SP site title and description for the data dictionary (fire-and-forget)
+  _fetchSPSiteMeta(siteUrl, dsName);
 
   const lists = await fetchSPLists(siteUrl, dsName);
   let loadedCount = 0;
@@ -974,6 +982,8 @@ async function loadJSONSource(url, dsName) {
 
   // Register data source
   if (!DataLaVistaState.dataSources[dsName]) {
+    const _spMatchJson = url && url.match(/(https?:\/\/[^\/]+\/(?:sites|teams)\/[^\/]+)/i);
+    const _spSiteUrlJson = _spMatchJson ? _spMatchJson[1] : null;
     DataLaVistaState.dataSources[dsName] = {
       alias: dsName,
       auth: null,
@@ -983,10 +993,11 @@ async function loadJSONSource(url, dsName) {
       tables: [],
       token: '',
       url: url,
-      siteUrl: null,
+      siteUrl: _spSiteUrlJson,
       isFileUpload: false,
       keepRawData: false
     };
+    if (_spSiteUrlJson) _fetchSPSiteMeta(_spSiteUrlJson, dsName);
   }
 
   setTableState(tableKey, {
@@ -1153,13 +1164,16 @@ async function loadCSVSource(url, dsName, fileName) {
       }
 
       if (!DataLaVistaState.dataSources[dsName]) {
+        const _spMatchCsv = url && url.match(/(https?:\/\/[^\/]+\/(?:sites|teams)\/[^\/]+)/i);
+        const _spSiteUrlCsv = _spMatchCsv ? _spMatchCsv[1] : null;
         DataLaVistaState.dataSources[dsName] = {
           alias: 'Data', auth: null,
           description: 'This CSV file (' + (fileName || dsName + '.csv') + ') was loaded from a URL.',
           internalName: dsName, tables: [], token: null, type: 'csv',
           fileName: fileName || '', isFileUpload: false,
-          url: url, keepRawData: false
+          url: url, siteUrl: _spSiteUrlCsv, keepRawData: false
         };
+        if (_spSiteUrlCsv) _fetchSPSiteMeta(_spSiteUrlCsv, dsName);
       }
       setTableState(tableKey, {
         alias: tableKey, data: rows, dataSource: dsName,

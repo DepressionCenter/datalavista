@@ -2463,6 +2463,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
             const count = _seen2[fa] = (_seen2[fa] || 0) + 1;
             const outAlias = count === 1 ? fa : fa + (count - 1);
             const field = t?.fields?.find(f => f.alias === fa);
+            // Prefer original SP fields (no parentField) for description — derived view fields shadow originals
+            const _origField = (/** @type {any[]} */ (t?.fields || [])).find(f => f.alias === fa && !f.parentField) || field;
             const agg = fieldAggs[fa] || '';
             DataLaVistaState.queryColumnMeta[outAlias] = {
               displayType:             _aggOutputDisplayType(agg, field?.displayType || 'text'),
@@ -2471,11 +2473,10 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
               sourceDisplayName:       field?.displayName || fa,
               sourceInternalName:      field?.internalName || fa,
               sourceTableKey:          nd.tableName,
-              sourceTableName:         t?.displayName || nd.tableName,
+              sourceTableName:         t?.alias || t?.displayName || nd.tableName,
               sourceDataSource:        t?.dataSource || '',
               viewName:                CyberdynePipeline.rawTableToView[nd.tableName] || nd.tableName,
-              sourceFieldDescription:  field?.description || '',
-              sourceTableDescription:  t?.description || '',
+              sourceFieldDescription:  _origField?.description || '',
             };
           }
         }

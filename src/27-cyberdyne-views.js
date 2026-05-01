@@ -158,6 +158,8 @@ validateAliasUniqueness(fields) {
         } catch (e) { console.warn(`[CyberdynePipeline] Failed to create view ${viewName}:`, e.message); }
 
         // Rebuild view metadata from expanded virtual columns
+        const _baseDescMap = {};
+        for (const bf of baseFields) _baseDescMap[bf.internalName] = bf.description || '';
         view.columnMappings = {};
         view.fields = [];
         for (const vc of virtualCols) {
@@ -175,7 +177,8 @@ validateAliasUniqueness(fields) {
             isSynthetic:   vc.isSynthetic,
             parentField:   vc.parentField,
             isLookupRaw:   vc.isLookupRaw || false,
-            isAutoId:      false
+            isAutoId:      false,
+            description:   vc.isSynthetic ? '' : (_baseDescMap[vc.internalName] || ''),
           });
         }
 
