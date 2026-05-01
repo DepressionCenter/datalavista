@@ -222,9 +222,12 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
      */
     function registerTableInAlaSQL(tableKey) {
       const t = DataLaVistaState.tables[tableKey];
-      if (!t || !t.data) return;
+      if (!t) return;
       const alasqlName = '_raw_' + tableKey;
       const existing = Object.keys(alasql.tables).find(k => k.toLowerCase() === alasqlName.toLowerCase());
+      // If alasql already has rows for this table, nothing to do
+      if (existing && alasql.tables[existing].data && alasql.tables[existing].data.length > 0) return;
+      if (!t.data || !t.data.length) return;
       if (existing) {
         alasql(`TRUNCATE TABLE [${existing}]`);
         alasql(`INSERT INTO [${existing}] SELECT * FROM ?`, [t.data]);
@@ -437,8 +440,8 @@ async function fetchTableData(tableName, fetchAll = false) {
   const limit = fetchAll ? 50000 : 10;
  
   // Skip if we already have enough data
-  if (fetchAll && t.loaded && t.data && t.data.length > 10) return; 
-  if (!fetchAll && t.data && t.data.length >= 10) return;          
+  if (fetchAll && t.loaded && t.itemCount > 10) return;
+  if (!fetchAll && t.itemCount >= 10) return;
  
   // *** PROMISE TRACKER: If a fetch is already running, return its promise ***
   if (t.fetchPromise) {
@@ -536,9 +539,9 @@ async function fetchTableData(tableName, fetchAll = false) {
 
             // Update state on the existing table entry (preserves viewName, aliases, etc.)
             if (tbState) {
-              tbState.data   = tb.data;
               tbState.loaded = fetchAll;
               tbState.itemCount = tb.data.length;
+              tbState.data = [];  // alasql owns the rows; no need to duplicate in state
             }
 
             // Rebuild the AlaSQL VIEW now that the raw table exists.
@@ -556,32 +559,33 @@ async function fetchTableData(tableName, fetchAll = false) {
         // Status and cleanup are handled by the finally block below — return early
         // so we don't fall through into the SP-only post-processing code.
         if (!fetchAll) setStatus(`Loaded preview for ${tableName}`, 'success');
-        if (fetchAll) setStatus(`Loaded data for ${tableName} (${(t.data && t.data.length) || 0} rows)`, 'success');
+        if (fetchAll) setStatus(`Loaded data for ${tableName} (${t.itemCount || 0} rows)`, 'success');
         return;
       } else {
         console.warn(`[fetchTableData] Unhandled sourceType "${t.sourceType}" for table "${tableName}"`);
         return;
       }
  
-      t.data = CyberdynePipeline.removeODataColumns(rawData);
+      const _spRows = CyberdynePipeline.removeODataColumns(rawData);
+      t.itemCount = _spRows.length;
       t.loaded = fetchAll;
- 
+
       // Register raw (un-processed) SP objects in the AlaSQL _raw_ table.
       // FieldExpander in _applyViewSQL generates all virtual columns from these objects.
-      if (t.data && t.data.length > 0) {
-        CyberdynePipeline._registerRawTable(tableName, t.data);
+      if (_spRows.length > 0) {
+        CyberdynePipeline._registerRawTable(tableName, _spRows);
       }
- 
+
       // Preserve base SP field definitions on first load (preserves user-renamed aliases on refresh).
       // spFields = t.originalFields (user's aliases) || t.fields (fresh from SP metadata).
       // We deliberately do NOT include synthetic fields here — FieldExpander derives them.
       if (!t.originalFields) {
         t.originalFields = [...spFields];
       }
- 
+
       // Rebuild the VIEW using FieldExpander — generates display/Id/Data/Email/etc columns
       // from the raw SP objects now stored in _raw_tableName.
-      if (t.data && t.data.length > 0) {
+      if (_spRows.length > 0) {
         const viewName = t.viewName || CyberdynePipeline.getViewForTable(tableName);
         if (viewName) {
           try {
@@ -592,9 +596,12 @@ async function fetchTableData(tableName, fetchAll = false) {
           }
         }
       }
-      
+
+      // alasql owns the rows; no need to keep a duplicate copy in state
+      t.data = [];
+
       if (!fetchAll) setStatus(`Loaded preview for ${tableName}`, 'success');
-      if (fetchAll) setStatus(`Loaded data for ${tableName} (${t.data.length} rows)`, 'success');
+      if (fetchAll) setStatus(`Loaded data for ${tableName} (${t.itemCount} rows)`, 'success');
     } finally {
       // *** CLEANUP: Remove the promise once the fetch completes or fails ***
       t.fetchPromise = null;

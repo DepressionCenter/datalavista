@@ -87,6 +87,7 @@ function generateWidgetSQL(w, tableRef = '_results') {
 
 
 async function saveConfig() {
+  await _ensureLZString();
   const config = buildConfig();
   const json = JSON.stringify(config, null, 2);
 
@@ -221,12 +222,25 @@ function buildConfig() {
       url: ds ? (ds.url || '') : ''
     };
  
-    // Only include row data for tables that were explicitly uploaded from a local file
+    // Only include row data for tables that were explicitly uploaded from a local file.
+    // Read rows from alasql (the single source of truth) and compress with LZ-String.
     try {
       const shouldKeepData = t.isFileUpload === true && t.keepRawData === true;
-      if (shouldKeepData && Array.isArray(t.data) && t.data.length > 0) {
-        tablesMeta[name].data = t.data;
-        tablesMeta[name].loaded = true;
+      if (shouldKeepData) {
+        const alasqlName = '_raw_' + name;
+        const existingKey = Object.keys(alasql.tables).find(k => k.toLowerCase() === alasqlName.toLowerCase());
+        const rows = existingKey ? alasql(`SELECT * FROM [${existingKey}]`) : [];
+        if (rows.length > 0 && window['LZString']) {
+          tablesMeta[name].data = window['LZString'].compressToBase64(JSON.stringify(rows));
+          tablesMeta[name].dataCompressed = true;
+          tablesMeta[name].loaded = true;
+        } else if (rows.length > 0) {
+          tablesMeta[name].data = rows;  // LZ-String not ready yet, save plain (fallback)
+          tablesMeta[name].loaded = true;
+        } else {
+          tablesMeta[name].data = [];
+          tablesMeta[name].loaded = false;
+        }
       } else {
         tablesMeta[name].data = [];
         tablesMeta[name].loaded = false;
@@ -674,6 +688,32 @@ async function loadConfig(cfg) {
       }
   }
 
+  // Register file-upload table data into alasql from saved config.
+  // Supports both compressed (dataCompressed=true → Base64 LZ-String) and legacy plain-array formats.
+  // After registration t.data is cleared — alasql is the single in-memory source of truth.
+  for (const [tkey, tmeta] of Object.entries(DataLaVistaState.tables)) {
+    const hasCompressed = tmeta.dataCompressed === true && typeof tmeta.data === 'string';
+    const hasPlainArray = Array.isArray(tmeta.data) && tmeta.data.length > 0;
+    if (!hasCompressed && !hasPlainArray) { tmeta.data = []; continue; }
+    let rows = [];
+    try {
+      if (hasCompressed) {
+        await _ensureLZString();
+        rows = JSON.parse(window['LZString'].decompressFromBase64(tmeta.data));
+      } else {
+        rows = tmeta.data;  // backward compat — old uncompressed configs
+      }
+    } catch (e) {
+      console.warn('[loadConfig] Failed to decompress data for table', tkey, e);
+    }
+    if (rows && rows.length > 0) {
+      CyberdynePipeline._registerRawTable(tkey, rows);
+      tmeta.itemCount = rows.length;
+      tmeta.loaded = true;
+    }
+    tmeta.data = [];  // never keep raw rows in state
+  }
+
   // Background fetch for referenced tables
   if (DataLaVistaState.sql) {
     const referencedTables = findReferencedTables(DataLaVistaState.sql);
@@ -807,7 +847,7 @@ function renderFieldsPanel() {
           <span class="toggle-arrow" id="arrow-${CSS.escape(tkey)}">▶</span>
           <span class="table-icon" title="${tIcon.title}" style="font-size:12px">${tIcon.icon}</span>
           <span class="table-name" id="tlabel-${CSS.escape(tkey)}" title="${tkey}" style="font-size:11px;font-weight:700">${tAlias}</span>
-          <span class="table-count">${t.itemCount || (t.data && t.data.length) || 0}</span>
+          <span class="table-count">${t.itemCount || 0}</span>
         </div>
         <div class="fields-list hidden" id="fields-${CSS.escape(tkey)}"></div>
       `;

@@ -183,7 +183,7 @@ validateAliasUniqueness(fields) {
         }
 
         // Sync t.fields so renderFieldsPanel and QB show the expanded field list
-        if (t && t.data && t.data.length > 0) t.fields = view.fields;
+        if (t && (t.loaded || t.itemCount > 0)) t.fields = view.fields;
         return;
       } else { }
 
@@ -342,7 +342,7 @@ validateAliasUniqueness(fields) {
       // Register data in AlaSQL
       this._registerRawTable(rawTableName, table.data);
 
-      // Store table metadata in state
+      // Store table metadata in state — rows live in alasql, not here
       DataLaVistaState.tables[rawTableName] = {
         internalName: rawTableName,
         displayName: table.metadata.fileName || rawTableName,
@@ -350,7 +350,7 @@ validateAliasUniqueness(fields) {
         dsAlias: dsName,
         dataSource: dsName,
         fields: table.fields,
-        data: table.data,
+        data: [],
         loaded: true,
         sourceType: table.metadata.sourceType || dsMetadata.type,
         isFileUpload: table.metadata.isFileUpload || false,
@@ -443,9 +443,9 @@ validateAliasUniqueness(fields) {
           alias: existingFieldMap[f.internalName] || f.alias
         }));
 
-        // Update state
+        // Update state — rows go to alasql, not state
         existingTable.fields = mergedFields;
-        existingTable.data = table.data;
+        existingTable.data = [];
         existingTable.loaded = true;
         existingTable.itemCount = table.data.length;
 
@@ -476,7 +476,7 @@ validateAliasUniqueness(fields) {
           dsAlias: dsName,
           dataSource: dsName,
           fields: table.fields,
-          data: table.data,
+          data: [],
           loaded: true,
           sourceType: table.metadata?.sourceType || dsMetadata.type,
           isFileUpload: table.metadata?.isFileUpload || false,

@@ -653,13 +653,40 @@ function sniffArrayType(arr) {
 }
 
 /**
+ * Return up to `limit` raw rows from an alasql _raw_ table (empty array if none).
+ * @param {string} tableKey
+ * @param {number} [limit]
+ */
+function _sampleRawRows(tableKey, limit = 100) {
+  if (!tableKey) return [];
+  const alasqlName = '_raw_' + tableKey;
+  const /** @type {any} */ _alasql = (/** @type {any} */ (window)).alasql;
+  if (!_alasql) return [];
+  const existing = Object.keys(_alasql.tables).find(/** @param {string} k */ k => k.toLowerCase() === alasqlName.toLowerCase());
+  if (!existing) return [];
+  try { return _alasql(`SELECT TOP ${limit} * FROM [${existing}]`); } catch { return []; }
+}
+
+/** Load LZ-String from CDN once; no-op on subsequent calls. */
+async function _ensureLZString() {
+  if ((/** @type {any} */ (window)).LZString) return;
+  await new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.5.0/lz-string.min.js';
+    script.onload = resolve;
+    script.onerror = () => reject(new Error('Failed to load LZ-String'));
+    document.head.appendChild(script);
+  });
+}
+
+/**
  * Get a sample array value from a table's raw data for a given internal field name.
  * Returns null if data is not loaded or no array values are found.
+ * @param {string} tableKey
+ * @param {string} fieldInternalName
  */
 function getArraySampleForField(tableKey, fieldInternalName) {
-  const t = DataLaVistaState.tables[tableKey];
-  if (!t || !t.data || !t.data.length) return null;
-  for (const row of t.data) {
+  for (const row of _sampleRawRows(tableKey)) {
     const val = row[fieldInternalName];
     if (Array.isArray(val) && val.length > 0) return val;
   }
@@ -704,13 +731,12 @@ function getObjectKeysForField(tableKey, fieldAlias, displayType) {
 
   if (!tableKey) return [];
   const t = DataLaVistaState.tables[tableKey];
-  if (!t || !t.data || !t.data.length) return [];
 
   // Find internal name for alias
-  const fieldMeta = t.fields && t.fields.find(f => f.alias === fieldAlias);
+  const fieldMeta = t && t.fields && t.fields.find(/** @param {any} f */ f => f.alias === fieldAlias);
   const internalName = fieldMeta ? fieldMeta.internalName : fieldAlias;
 
-  for (const row of t.data) {
+  for (const row of _sampleRawRows(tableKey)) {
     const val = row[internalName];
     if (val == null) continue;
     // Array of objects

@@ -169,7 +169,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 
         for (const tname of referencedTables) {
           const t = DataLaVistaState.tables[tname];
-          if (!t || !t.data || !t.data.length) continue;
+          if (!t || (!t.loaded && !t.itemCount)) continue;
 
           registerTableInAlaSQL(tname);
 

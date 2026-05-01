@@ -339,6 +339,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         // Yield to the browser so the tab switch and toast paint before the heavy work
         await new Promise(resolve => setTimeout(resolve, 0));
 
+        await _ensureLZString();
         _lastGeneratedJson = JSON.stringify(buildConfig(), null, 2);
 
         /** @type {HTMLButtonElement} */ (document.getElementById('btn-copy-json')).disabled = false;

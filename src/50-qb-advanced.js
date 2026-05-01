@@ -729,7 +729,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         el.style.cssText = `left:${nd.x}px;top:${nd.y}px;min-width:160px;max-width:280px`;
 
         const descHTML = t.description ? `<div class="qb-node-desc" title="${t.description.replace(/"/g,'&quot;')}">${t.description}</div>` : '';
-        const rowCount = (t.itemCount || (t.data && t.data.length) || 0).toLocaleString();
+        const rowCount = (t.itemCount || 0).toLocaleString();
 
         el.innerHTML = `
     <div class="qb-node-header">
