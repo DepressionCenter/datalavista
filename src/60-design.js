@@ -3228,157 +3228,386 @@ function _ddFilterCards(text) {
   _ddSearchTimer = setTimeout(function() { _ddRenderCards(text); }, 200);
 }
 
+function _ddSetSearch(text) {
+  const el = document.getElementById('dd-search');
+  if (el) { /** @type {HTMLInputElement} */ (el).value = text; }
+  _ddRenderCards(text);
+}
+
+function _ddTableSourceIcon(tblObj) {
+  if (!tblObj) return DataLaVistaCore.TABLE_SOURCE_ICONS.default;
+  const st = tblObj.sourceType;
+  if (st === 'sharepoint') {
+    return tblObj.isDocLib
+      ? DataLaVistaCore.TABLE_SOURCE_ICONS.sharepoint.library
+      : DataLaVistaCore.TABLE_SOURCE_ICONS.sharepoint.list;
+  }
+  return DataLaVistaCore.TABLE_SOURCE_ICONS[st] || DataLaVistaCore.TABLE_SOURCE_ICONS.default;
+}
+
+function _ddSectionHeader(label) {
+  return '<div class="dd-section-header">' + _attrEnc(label) + '</div>';
+}
+
+function _ddChips(category, entryType) {
+  const catJs = category.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+  const etJs  = entryType.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+  return '<div class="dd-card-meta" style="margin-bottom:6px">'
+    + '<span class="dd-cat-chip dd-clickable" onclick="_ddSetSearch(\'' + catJs + '\')">' + _attrEnc(category) + '</span>'
+    + '<span class="dd-type-chip dd-clickable" onclick="_ddSetSearch(\'' + etJs + '\')">' + _attrEnc(entryType) + '</span>'
+    + '</div>';
+}
+
 function _ddRenderCards(filterText) {
   const body = document.getElementById('dd-body');
   if (!body) return;
 
-  const qcMeta = /** @type {Record<string,any>} */ (DataLaVistaState.queryColumnMeta);
-  const cols   = DataLaVistaState.queryColumns;
-  const lower  = (filterText || '').toLowerCase().trim();
+  const qcMeta      = /** @type {Record<string,any>} */ (DataLaVistaState.queryColumnMeta || {});
+  const cols        = DataLaVistaState.queryColumns || [];
+  const lower       = (filterText || '').toLowerCase().trim();
+  const dataSources = /** @type {Record<string,any>} */ (DataLaVistaState.dataSources || {});
+  const tables      = /** @type {Record<string,any>} */ (DataLaVistaState.tables || {});
+  const pipelineViews = /** @type {Record<string,any>} */ (
+    (typeof CyberdynePipeline !== 'undefined' && CyberdynePipeline && CyberdynePipeline.views) || {}
+  );
+  const hasDsSources = Object.keys(dataSources).length > 0;
 
-  if (!cols.length) {
-    body.innerHTML = '<div style="padding:24px;text-align:center;color:var(--text-secondary)">Run a query first to populate the data dictionary.</div>';
-    return;
-  }
+  let bodyHtml   = '';
+  let totalCount = 0;
 
-  const frag = document.createDocumentFragment();
-  let count = 0;
-
-  for (let i = 0; i < cols.length; i++) {
-    const col = cols[i];
-    const m = qcMeta[col];
-
-    if (lower) {
-      const _tableDescSearch = m && m.sourceTableKey
-        ? (/** @type {any} */ (DataLaVistaState.tables)[m.sourceTableKey] || {}).description || ''
-        : '';
-      const haystack = [col, m && m.sourceDisplayName, m && m.sourceInternalName,
-        m && m.viewName, m && m.sourceTableName, m && m.sourceDataSource,
-        m && m.sourceFieldDescription, _tableDescSearch]
-        .filter(Boolean).join(' ').toLowerCase();
-      if (!haystack.includes(lower)) continue;
+  // === SECTION 1: Data Sources ===
+  if (!hasDsSources) {
+    if (!lower) {
+      bodyHtml += _ddSectionHeader('Data Sources')
+        + '<div style="padding:8px 0 16px;color:var(--text-secondary);font-size:12px">Configure a data source first to see entries here.</div>';
     }
-
-    count++;
-    const dt = sniffType(col);
-    const ti = DataLaVistaCore.FIELD_TYPE_ICONS[dt] || DataLaVistaCore.FIELD_TYPE_ICONS.default;
-    const usedWidgets = _ddGetWidgetsUsingField(col);
-
-    const widgetsHtml = usedWidgets.length
-      ? usedWidgets.map(function(w) {
-          return '<span class="dd-widget-chip">' + _attrEnc(w.title || w.type) + '</span>';
-        }).join('')
-      : '<span class="dd-no-widgets">Not used in any widget yet</span>';
-
-    const aggBadge = m && m.agg
-      ? '<span class="dd-agg-badge">' + _attrEnc(m.agg) + '</span>'
-      : '';
-
-    const _fieldDescLive = (() => {
-      if (!m || m.sourceFieldDescription || !m.sourceTableKey || !m.sourceAlias) return '';
-      const _flds = /** @type {any[]} */ ((/** @type {any} */ (DataLaVistaState.tables))[m.sourceTableKey]?.fields || []);
-      return _flds.find(f => (f.alias === m.sourceAlias || f.internalName === m.sourceAlias) && !f.parentField)?.description
-          || _flds.find(f => f.alias === m.sourceAlias || f.internalName === m.sourceAlias)?.description
-          || '';
-    })();
-    const fieldDescHtml = (m && (m.sourceFieldDescription || _fieldDescLive))
-      ? '<div class="dd-card-desc">' + _attrEnc(m.sourceFieldDescription || _fieldDescLive) + '</div>'
-      : '';
-
-    let breadcrumbHtml = '';
-    if (m) {
-      const crumbs = [];
-      if (m.sourceDataSource) {
-        const _dsObj = /** @type {any} */ (DataLaVistaState.dataSources)?.[m.sourceDataSource] || {};
-        const _tObj  = /** @type {any} */ (DataLaVistaState.tables)?.[m.sourceTableKey]  || {};
-        const _dsLabel = _dsObj.siteTitle || m.sourceDataSource;
-        const _dsDesc  = _dsObj.description || _tObj.description || '';
-        const _dsUrl   = _tObj.siteUrl || (!_tObj.isFileUpload && _tObj.url) || '';
-        const _dsTip   = _dsDesc ? ' data-dlv-tip="' + _attrEnc(_dsDesc) + '"' : '';
-        const _dsInner = _dsUrl
-          ? '<a href="' + _attrEnc(_dsUrl) + '" target="_blank" style="color:inherit;text-decoration:underline dotted">' + _attrEnc(_dsLabel) + '</a>'
-          : _attrEnc(_dsLabel);
-        crumbs.push('<span class="dd-crumb dd-crumb-ds"' + _dsTip + '>Data Source: ' + _dsInner + '</span>');
+  } else {
+    let sHtml  = '';
+    let sCount = 0;
+    for (const dsKey in dataSources) {
+      const ds = dataSources[dsKey];
+      if (!ds) continue;
+      const dsAlias     = ds.alias || dsKey;
+      const dsInternal  = ds.internalName || dsKey;
+      const dsType      = ds.type || 'default';
+      const dsIco       = DataLaVistaCore.DATA_SOURCE_ICONS[dsType] || DataLaVistaCore.DATA_SOURCE_ICONS.default;
+      const dsSiteTitle = ds.siteTitle || '';
+      const dsDesc      = ds.description || '';
+      if (lower) {
+        const hay = [dsAlias, dsInternal, dsSiteTitle, dsDesc, dsType, dsIco.title].filter(Boolean).join(' ').toLowerCase();
+        if (!hay.includes(lower)) continue;
       }
-      if (m.sourceTableName) {
-        const _tableDescLive = m.sourceTableKey
-          ? ((/** @type {any} */ (DataLaVistaState.tables))[m.sourceTableKey]?.description || '')
-          : '';
-        const tableDesc = _tableDescLive ? ' data-dlv-tip="' + _attrEnc(_tableDescLive) + '"' : '';
-        crumbs.push('<span class="dd-crumb dd-crumb-table"' + tableDesc + '>Table: ' + _attrEnc(m.sourceTableName) + '</span>');
-      }
-      if (m.viewName)         crumbs.push('<span class="dd-crumb dd-crumb-view">' + _attrEnc('View: ' + m.viewName) + '</span>');
-      const displayName = m.sourceDisplayName || m.sourceInternalName || col;
-      const intSuffix = (m.sourceInternalName && m.sourceInternalName !== displayName)
-        ? ' <span style="opacity:.6;font-size:10px">[' + _attrEnc(m.sourceInternalName) + ']</span>' : '';
-      crumbs.push('<span class="dd-crumb dd-crumb-field">Field: ' + _attrEnc(displayName) + intSuffix + '</span>');
-      breadcrumbHtml = '<div class="dd-breadcrumb">'
-        + crumbs.join('<span class="dd-arrow">&#x203A;</span>')
+      sCount++;
+      totalCount++;
+      const hasAliasDiff = dsAlias !== dsInternal;
+      const nameHtml     = _attrEnc(dsAlias)
+        + (hasAliasDiff ? ' <span style="opacity:.6;font-size:10px">[' + _attrEnc(dsInternal) + ']</span>' : '');
+      const tipPart1     = dsSiteTitle ? '<strong>' + _attrEnc(dsSiteTitle) + '</strong><br>' : '';
+      const tipPart2     = dsDesc ? _attrEnc(dsDesc) : '';
+      const tipContent   = tipPart1 + tipPart2;
+      const tipAttr      = tipContent ? ' data-dlv-tip="' + _attrEnc(tipContent) + '"' : '';
+      const descHtml     = dsDesc ? '<div class="dd-card-desc">' + _attrEnc(dsDesc) + '</div>' : '';
+      sHtml +=
+        '<div class="dd-card">'
+        + _ddChips('Data Source', dsIco.title)
+        + '<div class="dd-card-header">'
+        + '<span style="font-size:16px;flex-shrink:0">' + dsIco.icon + '</span>'
+        + '<span class="dd-col-name">' + nameHtml + '</span>'
+        + '</div>'
+        + descHtml
+        + '<div class="dd-card-lineage"><div class="dd-breadcrumb">'
+        + '<span class="dd-crumb dd-crumb-ds"' + tipAttr + '>Data Source: ' + nameHtml + '</span>'
+        + '</div></div>'
         + '</div>';
-    } else {
-      breadcrumbHtml = '<div style="font-size:11px;color:var(--text-secondary)">No lineage information available (direct SQL or raw column).</div>';
     }
-
-    const card = document.createElement('div');
-    card.className = 'dd-card';
-    card.innerHTML =
-      '<div class="dd-card-header">'
-      + '<span class="field-type-icon ' + ti.cls + '" style="font-size:11px;flex-shrink:0">' + ti.icon + '</span>'
-      + '<span class="dd-col-name">' + _attrEnc(col) + '</span>'
-      + aggBadge
-      + '</div>'
-      + fieldDescHtml
-      + '<div class="dd-card-lineage">' + breadcrumbHtml + '</div>'
-      + '<div class="dd-card-footer"><span class="dd-footer-label">Appears in:&nbsp;</span>' + widgetsHtml + '</div>';
-    frag.appendChild(card);
+    if (sCount > 0) { bodyHtml += _ddSectionHeader('Data Sources') + sHtml; }
   }
 
-  if (!count) {
-    body.innerHTML = '<div style="padding:24px;text-align:center;color:var(--text-secondary)">No fields match your search.</div>';
+  // === SECTION 2: Tables ===
+  if (hasDsSources) {
+    let sHtml  = '';
+    let sCount = 0;
+    for (const tKey in tables) {
+      const tbl = tables[tKey];
+      if (!tbl) continue;
+      const tblDisplay  = tbl.displayName || tbl.alias || tKey;
+      const tblInternal = tbl.internalName || tKey;
+      const tblDesc     = tbl.description || '';
+      const tblDsAlias  = tbl.dsAlias || tbl.dataSource || '';
+      const tblIco      = _ddTableSourceIcon(tbl);
+      if (lower) {
+        const hay = [tblDisplay, tblInternal, tblDesc, tblDsAlias, tblIco.title].filter(Boolean).join(' ').toLowerCase();
+        if (!hay.includes(lower)) continue;
+      }
+      sCount++;
+      totalCount++;
+      const hasNameDiff = tblDisplay !== tblInternal;
+      const nameHtml    = _attrEnc(tblDisplay)
+        + (hasNameDiff ? ' <span style="opacity:.6;font-size:10px">[' + _attrEnc(tblInternal) + ']</span>' : '');
+      const tipAttr     = tblDesc ? ' data-dlv-tip="' + _attrEnc(tblDesc) + '"' : '';
+      const descHtml    = tblDesc ? '<div class="dd-card-desc">' + _attrEnc(tblDesc) + '</div>' : '';
+      const dsCrumb     = tblDsAlias
+        ? '<span class="dd-crumb dd-crumb-ds">' + _attrEnc(tblDsAlias) + '</span><span class="dd-arrow">&#x203A;</span>'
+        : '';
+      sHtml +=
+        '<div class="dd-card">'
+        + _ddChips('Table', tblIco.title)
+        + '<div class="dd-card-header">'
+        + '<span style="font-size:16px;flex-shrink:0">' + tblIco.icon + '</span>'
+        + '<span class="dd-col-name">' + nameHtml + '</span>'
+        + '</div>'
+        + descHtml
+        + '<div class="dd-card-lineage"><div class="dd-breadcrumb">'
+        + dsCrumb
+        + '<span class="dd-crumb dd-crumb-table"' + tipAttr + '>Table: ' + nameHtml + '</span>'
+        + '</div></div>'
+        + '</div>';
+    }
+    if (sCount > 0) { bodyHtml += _ddSectionHeader('Tables') + sHtml; }
+  }
+
+  // === SECTION 3: Views & Queries ===
+  if (hasDsSources) {
+    let sHtml  = '';
+    let sCount = 0;
+    const cyberdyneNote = '(Pre-processed via Cyberdyne Pipeline with standard and expanded fields.)';
+
+    for (const viewName in pipelineViews) {
+      const view = pipelineViews[viewName];
+      if (!view) continue;
+      const tbl        = tables[view.rawTable] || {};
+      const viewAlias  = tbl.alias || tbl.displayName || viewName;
+      const tblDesc    = tbl.description || '';
+      const dsAlias    = tbl.dsAlias || tbl.dataSource || '';
+      const tblDisplay = tbl.displayName || tbl.alias || view.rawTable || '';
+      const viewIco    = DataLaVistaCore.QUERY_ICONS.view;
+      if (lower) {
+        const hay = [viewAlias, viewName, tblDesc, dsAlias, tblDisplay, viewIco.title].filter(Boolean).join(' ').toLowerCase();
+        if (!hay.includes(lower)) continue;
+      }
+      sCount++;
+      totalCount++;
+      const hasAliasDiff = viewAlias !== viewName;
+      const nameHtml     = _attrEnc(viewAlias)
+        + (hasAliasDiff ? ' <span style="opacity:.6;font-size:10px">[' + _attrEnc(viewName) + ']</span>' : '');
+      const tipPart1     = tblDesc ? _attrEnc(tblDesc) + '<br><br>' : '';
+      const tipContent   = tipPart1 + '<em>' + _attrEnc(cyberdyneNote) + '</em>';
+      const tipAttr      = ' data-dlv-tip="' + _attrEnc(tipContent) + '"';
+      const descHtml     = tblDesc ? '<div class="dd-card-desc">' + _attrEnc(tblDesc) + '</div>' : '';
+      const dsCrumb      = dsAlias
+        ? '<span class="dd-crumb dd-crumb-ds">' + _attrEnc(dsAlias) + '</span><span class="dd-arrow">&#x203A;</span>'
+        : '';
+      const tblCrumb     = tblDisplay
+        ? '<span class="dd-crumb dd-crumb-table">' + _attrEnc(tblDisplay) + '</span><span class="dd-arrow">&#x203A;</span>'
+        : '';
+      sHtml +=
+        '<div class="dd-card">'
+        + _ddChips('View', viewIco.title)
+        + '<div class="dd-card-header">'
+        + '<span style="font-size:16px;flex-shrink:0">' + viewIco.icon + '</span>'
+        + '<span class="dd-col-name">' + nameHtml + '</span>'
+        + '</div>'
+        + descHtml
+        + '<div class="dd-card-lineage"><div class="dd-breadcrumb">'
+        + dsCrumb + tblCrumb
+        + '<span class="dd-crumb dd-crumb-view"' + tipAttr + '>View: ' + nameHtml + '</span>'
+        + '</div></div>'
+        + '</div>';
+    }
+
+    if (cols.length > 0) {
+      const dlvSpecs = [
+        { viewName: 'dlv_results', category: 'Query', icoKey: 'query_results',    displayName: 'Query Results'    },
+        { viewName: 'dlv_active',  category: 'View',  icoKey: 'filtered_results', displayName: 'Filtered Results' }
+      ];
+      for (let si = 0; si < dlvSpecs.length; si++) {
+        const spec    = dlvSpecs[si];
+        const specIco = DataLaVistaCore.QUERY_ICONS[spec.icoKey];
+        if (lower) {
+          const hay = [spec.displayName, spec.viewName, specIco.title, specIco.desc, spec.category].filter(Boolean).join(' ').toLowerCase();
+          if (!hay.includes(lower)) continue;
+        }
+        sCount++;
+        totalCount++;
+        const nameHtml = _attrEnc(spec.displayName)
+          + ' <span style="opacity:.6;font-size:10px">[' + _attrEnc(spec.viewName) + ']</span>';
+        const tipAttr  = specIco.desc ? ' data-dlv-tip="' + _attrEnc(specIco.desc) + '"' : '';
+        const descHtml = specIco.desc ? '<div class="dd-card-desc">' + _attrEnc(specIco.desc) + '</div>' : '';
+        sHtml +=
+          '<div class="dd-card">'
+          + _ddChips(spec.category, specIco.title)
+          + '<div class="dd-card-header">'
+          + '<span style="font-size:16px;flex-shrink:0">' + specIco.icon + '</span>'
+          + '<span class="dd-col-name">' + nameHtml + '</span>'
+          + '</div>'
+          + descHtml
+          + '<div class="dd-card-lineage"><div class="dd-breadcrumb">'
+          + '<span class="dd-crumb dd-crumb-view">' + _attrEnc(spec.category) + ': ' + nameHtml + '</span>'
+          + '</div></div>'
+          + '</div>';
+      }
+    }
+
+    if (sCount > 0) { bodyHtml += _ddSectionHeader('Views & Queries') + sHtml; }
+  }
+
+  // === SECTION 4: Fields ===
+  if (!cols.length) {
+    if (!lower) {
+      bodyHtml += _ddSectionHeader('Fields')
+        + '<div style="padding:8px 0 16px;color:var(--text-secondary);font-size:12px">Run a query first to see field entries here.</div>';
+    }
+  } else {
+    let sHtml  = '';
+    let sCount = 0;
+    for (let i = 0; i < cols.length; i++) {
+      const col = cols[i];
+      const m   = qcMeta[col];
+      if (lower) {
+        const _tableDescSearch = m && m.sourceTableKey ? (tables[m.sourceTableKey] || {}).description || '' : '';
+        const haystack = [col, m && m.sourceDisplayName, m && m.sourceInternalName,
+          m && m.viewName, m && m.sourceTableName, m && m.sourceDataSource,
+          m && m.sourceFieldDescription, _tableDescSearch].filter(Boolean).join(' ').toLowerCase();
+        if (!haystack.includes(lower)) continue;
+      }
+      sCount++;
+      totalCount++;
+      const dt  = sniffType(col);
+      const ti  = DataLaVistaCore.FIELD_TYPE_ICONS[dt] || DataLaVistaCore.FIELD_TYPE_ICONS.default;
+      const usedWidgets = _ddGetWidgetsUsingField(col);
+      const widgetsHtml = usedWidgets.length
+        ? usedWidgets.map(function(w) { return '<span class="dd-widget-chip">' + _attrEnc(w.title || w.type) + '</span>'; }).join('')
+        : '<span class="dd-no-widgets">Not used in any widget yet</span>';
+      const aggBadge = m && m.agg ? '<span class="dd-agg-badge">' + _attrEnc(m.agg) + '</span>' : '';
+      const _fieldDescLive = (() => {
+        if (!m || m.sourceFieldDescription || !m.sourceTableKey || !m.sourceAlias) return '';
+        const _flds = /** @type {any[]} */ ((tables[m.sourceTableKey] || {}).fields || []);
+        return _flds.find(f => (f.alias === m.sourceAlias || f.internalName === m.sourceAlias) && !f.parentField)?.description
+            || _flds.find(f => f.alias === m.sourceAlias || f.internalName === m.sourceAlias)?.description
+            || '';
+      })();
+      const fieldDescHtml = (m && (m.sourceFieldDescription || _fieldDescLive))
+        ? '<div class="dd-card-desc">' + _attrEnc(m.sourceFieldDescription || _fieldDescLive) + '</div>'
+        : '';
+
+      let breadcrumbHtml = '';
+      if (m) {
+        const crumbs = [];
+        if (m.sourceDataSource) {
+          const _dsObj      = dataSources[m.sourceDataSource] || {};
+          const _dsAlias    = _dsObj.alias || m.sourceDataSource;
+          const _dsInternal = _dsObj.internalName || m.sourceDataSource;
+          const _dsSiteTitle = _dsObj.siteTitle || '';
+          const _dsDesc     = _dsObj.description || '';
+          const hasDsAlias  = _dsAlias !== _dsInternal;
+          const _dsNameHtml = _attrEnc(_dsAlias)
+            + (hasDsAlias ? ' <span style="opacity:.6;font-size:10px">[' + _attrEnc(_dsInternal) + ']</span>' : '');
+          const dsTipPart1  = _dsSiteTitle ? '<strong>' + _attrEnc(_dsSiteTitle) + '</strong><br>' : '';
+          const dsTipPart2  = _dsDesc ? _attrEnc(_dsDesc) : '';
+          const _dsTipAttr  = (dsTipPart1 || dsTipPart2) ? ' data-dlv-tip="' + _attrEnc(dsTipPart1 + dsTipPart2) + '"' : '';
+          const _dsJs       = _dsAlias.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+          crumbs.push('<span class="dd-crumb dd-crumb-ds dd-clickable" onclick="_ddSetSearch(\'' + _dsJs + '\')"'
+            + _dsTipAttr + '>Data Source: ' + _dsNameHtml + '</span>');
+        }
+        if (m.sourceTableName) {
+          const _tblObj      = tables[m.sourceTableKey] || {};
+          const _tblDisplay  = _tblObj.displayName || m.sourceTableName;
+          const _tblInt      = _tblObj.internalName || m.sourceTableName;
+          const _tblDesc     = _tblObj.description || '';
+          const hasTblDiff   = _tblDisplay !== _tblInt;
+          const _tblNameHtml = _attrEnc(_tblDisplay)
+            + (hasTblDiff ? ' <span style="opacity:.6;font-size:10px">[' + _attrEnc(_tblInt) + ']</span>' : '');
+          const _tblTipAttr  = _tblDesc ? ' data-dlv-tip="' + _attrEnc(_tblDesc) + '"' : '';
+          const _tblJs       = _tblDisplay.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+          crumbs.push('<span class="dd-crumb dd-crumb-table dd-clickable" onclick="_ddSetSearch(\'' + _tblJs + '\')"'
+            + _tblTipAttr + '>Table: ' + _tblNameHtml + '</span>');
+        }
+        if (m.viewName) {
+          const _tblObj       = tables[m.sourceTableKey] || {};
+          const _viewAlias    = _tblObj.alias || _tblObj.displayName || m.viewName;
+          const _viewTxtDesc  = _tblObj.description || '';
+          const hasViewDiff   = _viewAlias !== m.viewName;
+          const _viewNameHtml = _attrEnc(_viewAlias)
+            + (hasViewDiff ? ' <span style="opacity:.6;font-size:10px">[' + _attrEnc(m.viewName) + ']</span>' : '');
+          const viewNote      = '(Pre-processed via Cyberdyne Pipeline with standard and expanded fields.)';
+          const vTipPart1     = _viewTxtDesc ? _attrEnc(_viewTxtDesc) + '<br><br>' : '';
+          const vTipContent   = vTipPart1 + '<em>' + _attrEnc(viewNote) + '</em>';
+          const _viewTipAttr  = ' data-dlv-tip="' + _attrEnc(vTipContent) + '"';
+          const _viewJs       = _viewAlias.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+          crumbs.push('<span class="dd-crumb dd-crumb-view dd-clickable" onclick="_ddSetSearch(\'' + _viewJs + '\')"'
+            + _viewTipAttr + '>View: ' + _viewNameHtml + '</span>');
+        }
+        const _fieldDisplay = m.sourceDisplayName || m.sourceInternalName || col;
+        const _intSuffix    = (m.sourceInternalName && m.sourceInternalName !== _fieldDisplay)
+          ? ' <span style="opacity:.6;font-size:10px">[' + _attrEnc(m.sourceInternalName) + ']</span>' : '';
+        const _fieldJs      = _fieldDisplay.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+        crumbs.push('<span class="dd-crumb dd-crumb-field dd-clickable" onclick="_ddSetSearch(\'' + _fieldJs + '\')">'
+          + 'Field: ' + _attrEnc(_fieldDisplay) + _intSuffix + '</span>');
+        breadcrumbHtml = '<div class="dd-breadcrumb">'
+          + crumbs.join('<span class="dd-arrow">&#x203A;</span>') + '</div>';
+      } else {
+        breadcrumbHtml = '<div style="font-size:11px;color:var(--text-secondary)">No lineage information available (direct SQL or raw column).</div>';
+      }
+
+      sHtml +=
+        '<div class="dd-card">'
+        + _ddChips('Field', dt)
+        + '<div class="dd-card-header">'
+        + '<span class="field-type-icon ' + ti.cls + '" style="font-size:11px;flex-shrink:0">' + ti.icon + '</span>'
+        + '<span class="dd-col-name">' + _attrEnc(col) + '</span>'
+        + aggBadge
+        + '</div>'
+        + fieldDescHtml
+        + '<div class="dd-card-lineage">' + breadcrumbHtml + '</div>'
+        + '<div class="dd-card-footer"><span class="dd-footer-label">Appears in:&nbsp;</span>' + widgetsHtml + '</div>'
+        + '</div>';
+    }
+    if (sCount > 0) { bodyHtml += _ddSectionHeader('Fields') + sHtml; }
+  }
+
+  if (!bodyHtml) {
+    body.innerHTML = '<div style="padding:24px;text-align:center;color:var(--text-secondary)">'
+      + (lower ? 'No results match your search.' : 'No data available. Add a data source and run a query to get started.')
+      + '</div>';
     return;
   }
 
-  body.innerHTML = '';
-  body.appendChild(frag);
+  body.innerHTML = bodyHtml;
   dlvTooltip.scanDOM(document);
 }
 
 function _ddDownloadCSV() {
-  var cols = DataLaVistaState.queryColumns || [];
-  if (!cols.length) { toast('Run a query first to populate the data dictionary.', 'warning'); return; }
-
+  var dataSources   = /** @type {Record<string,any>} */ (DataLaVistaState.dataSources || {});
+  var tableObjs     = /** @type {Record<string,any>} */ (DataLaVistaState.tables || {});
+  var pipelineViews = /** @type {Record<string,any>} */ (
+    (typeof CyberdynePipeline !== 'undefined' && CyberdynePipeline && CyberdynePipeline.views) || {}
+  );
+  var cols   = DataLaVistaState.queryColumns || [];
   var qcMeta = DataLaVistaState.queryColumnMeta || {};
 
-  // Build alias -> raw field def map from all loaded tables
-  var fieldDefMap = {};
-  var tableObjs = DataLaVistaState.tables || {};
-  for (var tkey in tableObjs) {
-    var tbl = tableObjs[tkey];
-    var tblFields = (tbl && tbl.fields) ? tbl.fields : [];
-    for (var fi = 0; fi < tblFields.length; fi++) {
-      var fd = tblFields[fi];
-      if (fd && fd.alias && !fieldDefMap[fd.alias]) { fieldDefMap[fd.alias] = fd; }
-    }
-  }
-
   var headers = [
-    'Alias (Query Column)',
-    'Data Type',
-    'Aggregation',
+    'Data Dictionary Category',
+    'Data Dictionary Entry Type',
     'Display Name',
     'Internal Name',
     'Data Source',
     'Table/List',
-    'Table Description',
     'View',
-    'Field Description',
-    'Lookup List',
+    'Alias (Query Column)',
+    'Internal Data Type',
+    'Standardized Data Type',
+    'Aggregation',
+    'Description',
+    'Lookup Table',
     'Lookup Field',
-    'Lookup Web URL',
+    'Formula',
+    'Default Value',
+    'Internal ID / GUID',
     'Is Lookup Raw',
     'Is Auto ID',
     'Used In Widgets',
-    'Lineage'
+    'Lineage',
+    'Link'
   ];
 
   function _csvCell(v) {
@@ -3388,65 +3617,176 @@ function _ddDownloadCSV() {
     }
     return s;
   }
+  function _csvRow(arr) { return arr.map(_csvCell).join(','); }
 
-  var rows = [headers.map(_csvCell).join(',')];
+  var rows = [_csvRow(headers)];
 
+  // Data source rows
+  for (var dsKey in dataSources) {
+    var ds = dataSources[dsKey];
+    if (!ds) continue;
+    var dsIco = DataLaVistaCore.DATA_SOURCE_ICONS[ds.type] || DataLaVistaCore.DATA_SOURCE_ICONS.default;
+    var dsAlias = ds.alias || dsKey;
+    rows.push(_csvRow([
+      'Data Source', dsIco.title,
+      dsAlias, ds.internalName || dsKey,
+      dsAlias, '', '', '',
+      ds.type || '', '',  '',
+      ds.description || '',
+      '', '', '', '',
+      ds.guid || '',
+      '', '', '',
+      'Data Source: ' + dsAlias,
+      ds.siteUrl || ds.url || ''
+    ]));
+  }
+
+  // Table rows
+  for (var tKey in tableObjs) {
+    var tbl = tableObjs[tKey];
+    if (!tbl) continue;
+    var tblIco      = _ddTableSourceIcon(tbl);
+    var tblDisplay  = tbl.displayName || tbl.alias || tKey;
+    var tblDsAlias  = tbl.dsAlias || tbl.dataSource || '';
+    var tblLineage  = (tblDsAlias ? 'Data Source: ' + tblDsAlias + ' > ' : '') + 'Table: ' + tblDisplay;
+    rows.push(_csvRow([
+      'Table', tblIco.title,
+      tblDisplay, tbl.internalName || tKey,
+      tblDsAlias, tblDisplay, '', '',
+      tbl.sourceType || '', '', '',
+      tbl.description || '',
+      '', '', '', '',
+      tbl.guid || '',
+      '', '', '',
+      tblLineage,
+      tbl.siteUrl || tbl.url || ''
+    ]));
+  }
+
+  // View rows (CyberdynePipeline views)
+  var cyberdyneNoteCSV = 'Pre-processed via Cyberdyne Pipeline with standard and expanded fields.';
+  for (var viewName in pipelineViews) {
+    var view    = pipelineViews[viewName];
+    if (!view) continue;
+    var vTbl     = tableObjs[view.rawTable] || {};
+    var vDsAlias = vTbl.dsAlias || vTbl.dataSource || '';
+    var vTblDisp = vTbl.displayName || vTbl.alias || view.rawTable || '';
+    var vAlias   = vTbl.alias || vTbl.displayName || viewName;
+    var vDesc    = vTbl.description || '';
+    var vLineage = [
+      vDsAlias ? 'Data Source: ' + vDsAlias : '',
+      vTblDisp ? 'Table: ' + vTblDisp       : '',
+      'View: ' + vAlias + ' [' + viewName + ']'
+    ].filter(Boolean).join(' > ');
+    rows.push(_csvRow([
+      'View', DataLaVistaCore.QUERY_ICONS.view.title,
+      vAlias, viewName,
+      vDsAlias, vTblDisp, vAlias, '',
+      '', '', '',
+      vDesc ? vDesc + ' ' + cyberdyneNoteCSV : cyberdyneNoteCSV,
+      '', '', '', '', '', '', '', '',
+      vLineage, ''
+    ]));
+  }
+
+  // dlv_results and dlv_active rows (if query ran)
+  if (cols.length > 0) {
+    var qi_res = DataLaVistaCore.QUERY_ICONS.query_results;
+    var qi_act = DataLaVistaCore.QUERY_ICONS.filtered_results;
+    rows.push(_csvRow([
+      'Query', qi_res.title, 'Query Results', 'dlv_results',
+      '', '', 'dlv_results', '',
+      '', '', '',
+      qi_res.desc || '',
+      '', '', '', '', '', '', '', '',
+      'Query: Query Results [dlv_results]', ''
+    ]));
+    rows.push(_csvRow([
+      'View', qi_act.title, 'Filtered Results', 'dlv_active',
+      '', '', 'dlv_active', '',
+      '', '', '',
+      qi_act.desc || '',
+      '', '', '', '', '', '', '', '',
+      'View: Filtered Results [dlv_active]', ''
+    ]));
+  }
+
+  // Build alias -> raw field def map from all loaded tables
+  var fieldDefMap = {};
+  for (var ftKey in tableObjs) {
+    var ftbl = tableObjs[ftKey];
+    var tblFields = (ftbl && ftbl.fields) ? ftbl.fields : [];
+    for (var fi = 0; fi < tblFields.length; fi++) {
+      var fd = tblFields[fi];
+      if (fd && fd.alias && !fieldDefMap[fd.alias]) { fieldDefMap[fd.alias] = fd; }
+    }
+  }
+
+  // Field rows
   for (var ci = 0; ci < cols.length; ci++) {
     var col = cols[ci];
     var m   = qcMeta[col]     || null;
     var f   = fieldDefMap[col] || null;
 
     var dt           = sniffType(col);
-    var agg          = (m && m.agg)                    ? m.agg                    : '';
-    var displayName  = (m && m.sourceDisplayName)      ? m.sourceDisplayName      : '';
-    var internalName = (m && m.sourceInternalName)     ? m.sourceInternalName     : '';
-    var dataSource   = (m && m.sourceDataSource)       ? m.sourceDataSource       : '';
-    var tableName    = (m && m.sourceTableName)  ? m.sourceTableName  : '';
+    var agg          = (m && m.agg)               ? m.agg               : '';
+    var displayName  = (m && m.sourceDisplayName) ? m.sourceDisplayName : col;
+    var internalName = (m && m.sourceInternalName)? m.sourceInternalName: '';
+    var dataSource   = (m && m.sourceDataSource)  ? m.sourceDataSource  : '';
+    var tableName    = (m && m.sourceTableName)   ? m.sourceTableName   : '';
     var tableDesc    = (m && m.sourceTableKey)
-      ? ((/** @type {any} */ (DataLaVistaState.tables))[m.sourceTableKey]?.description || '')
+      ? ((tableObjs[m.sourceTableKey] || {}).description || '')
       : '';
-    var viewName     = (m && m.viewName)         ? m.viewName         : '';
+    var viewName_    = (m && m.viewName)           ? m.viewName          : '';
     var fieldDesc    = (m && m.sourceFieldDescription) ? m.sourceFieldDescription : '';
-
-    // Lookup / foreign-key metadata from raw field definition (SharePoint lookup fields)
-    var lookupList   = f ? (f.lookupList   || f.LookupList   || '') : '';
+    var formula      = f ? (f.formula      || f.Formula      || '') : '';
+    var defaultVal   = f ? (f.defaultValue || f.DefaultValue || '') : '';
+    var internalId   = f ? (f.id           || f.guid         || '') : '';
+    var lookupTable  = f ? (f.lookupList   || f.LookupList   || '') : '';
     var lookupField  = f ? (f.lookupField  || f.LookupField  || '') : '';
-    var lookupWebUrl = f ? (f.lookupWebUrl || f.LookupWebUrl || '') : '';
+    var lookupUrl    = f ? (f.lookupWebUrl || f.LookupWebUrl || '') : '';
     var isLookupRaw  = (f && f.isLookupRaw) ? 'Yes' : '';
     var isAutoId     = (f && f.isAutoId)     ? 'Yes' : '';
 
-    // Widget usage
-    var usedWidgets  = _ddGetWidgetsUsingField(col);
-    var widgetNames  = '';
+    var usedWidgets = _ddGetWidgetsUsingField(col);
+    var widgetNames = '';
     for (var wi = 0; wi < usedWidgets.length; wi++) {
       var wn = usedWidgets[wi].title || usedWidgets[wi].type || '';
       if (wn) { widgetNames += (widgetNames ? '; ' : '') + wn; }
     }
 
-    // Lineage breadcrumb
     var lineageParts = [];
     if (dataSource) lineageParts.push('Data Source: ' + dataSource);
     if (tableName)  lineageParts.push('Table: ' + tableName);
-    if (viewName)   lineageParts.push('View: ' + viewName);
+    if (viewName_)  lineageParts.push('View: ' + viewName_);
     lineageParts.push('Field: ' + (displayName || internalName || col));
     var lineage = lineageParts.join(' > ');
 
-    rows.push([col, dt, agg, displayName, internalName, dataSource, tableName,
-               tableDesc, viewName, fieldDesc, lookupList, lookupField, lookupWebUrl,
-               isLookupRaw, isAutoId, widgetNames, lineage].map(_csvCell).join(','));
+    rows.push(_csvRow([
+      'Field', dt,
+      displayName, internalName,
+      dataSource, tableName, viewName_, col,
+      f ? (f.rawType || f.dataType || '') : '',
+      dt, agg,
+      fieldDesc || tableDesc,
+      lookupTable, lookupField,
+      formula, defaultVal, internalId,
+      isLookupRaw, isAutoId,
+      widgetNames,
+      lineage,
+      lookupUrl
+    ]));
   }
 
   var csv   = rows.join('\n');
   var title = (DataLaVistaState.design && DataLaVistaState.design.title) ? DataLaVistaState.design.title : 'DataLaVista';
   downloadText(csv, title + '-DataDictionary.csv', 'text/csv');
-  toast('Data dictionary exported (' + cols.length + ' fields)', 'success');
+  toast('Data dictionary exported (' + (rows.length - 1) + ' entries)', 'success');
 }
 
 function openDataDictionaryPopup() {
   const _ddExisting = document.getElementById('dd-overlay');
   if (_ddExisting) _ddExisting.remove();
-
-  const cols = DataLaVistaState.queryColumns || [];
 
   const overlay = document.createElement('div');
   overlay.id = 'dd-overlay';
@@ -3456,17 +3796,15 @@ function openDataDictionaryPopup() {
   const dialog = document.createElement('div');
   dialog.style.cssText = 'background:var(--surface);border-radius:var(--radius-lg);box-shadow:var(--shadow-lg);width:780px;max-width:calc(100vw - 40px);display:flex;flex-direction:column;animation:popIn 200ms ease;max-height:calc(100vh - 100px)';
 
-  const searchRow = cols.length
-    ? '<div style="padding:12px 20px 0">'
-      + '<input id="dd-search" type="text" class="form-input" placeholder="Search fields, tables, data sources..." '
-      + 'style="width:100%" />'
-      + '</div>'
-    : '';
+  const searchRow = '<div style="padding:12px 20px 0">'
+    + '<input id="dd-search" type="text" class="form-input" placeholder="Search fields, tables, data sources, views..." '
+    + 'style="width:100%" />'
+    + '</div>';
 
   dialog.innerHTML =
     '<div class="popup-header">'
     + '<div><h2 style="font-size:16px;font-weight:600;margin:0 0 2px">Data Dictionary</h2>'
-    + '<div style="font-size:11px;color:var(--text-secondary)">Field sources and widget usage — read left to right</div></div>'
+    + '<div style="font-size:11px;color:var(--text-secondary)">Data sources, tables, views, and fields — read left to right</div></div>'
     + '<button class="btn btn-ghost btn-icon" onclick="document.getElementById(\'dd-overlay\').remove()">&#x2715;</button>'
     + '</div>'
     + searchRow

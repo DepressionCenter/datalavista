@@ -76,6 +76,16 @@ const DataLaVistaCore = {
     'default':      { icon: '❔', cls: 'type-text' }       // unknown/unclassified
   },
 
+  DD_CATEGORIES: ['Data Source', 'Table', 'Query', 'View', 'Calculation', 'Transformation', 'Field', 'Widget', 'Dashboard'],
+
+  DASHBOARD_TYPES: {
+    datalavista: { icon: '📊', title: 'DataLaVista' },
+    powerbi:     { icon: '📊', title: 'Power BI' },
+    looker:      { icon: '📊', title: 'Looker' },
+    tableau:     { icon: '📊', title: 'Tableau' },
+    other:       { icon: '📊', title: 'Other' }
+  },
+
   ALASQL_KEYWORDS: [
   'ATTACH', 'DETACH', 'SHOW', 'TABLES', 'DATABASES', 'FROM', 'SELECT', 'WHERE',
   'GROUP', 'BY', 'ORDER', 'HAVING', 'LIMIT', 'OFFSET', 'JOIN', 'LEFT', 'RIGHT',
