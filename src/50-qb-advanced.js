@@ -35,6 +35,12 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
              'MEDIAN', 'STDEV', 'VAR', 'CV', 'MODE'].includes(agg)) return 'number';
         if (['EARLIEST', 'LATEST', 'FIRST_ALPHA', 'LAST_ALPHA'].includes(agg)) return inputDT || 'text';
         if (['LIST', 'GROUP_CONCAT'].includes(agg)) return 'text';
+        if (['DLV_PERCENTILE_5', 'DLV_PERCENTILE_10', 'DLV_PERCENTILE_25', 'DLV_PERCENTILE_50',
+             'DLV_PERCENTILE_75', 'DLV_PERCENTILE_90', 'DLV_PERCENTILE_95'].includes(agg))
+          return (inputDT === 'date' || inputDT === 'datetime') ? inputDT : 'number';
+        if (['DLV_IQR', 'DLV_ARR_PERCENTILE_5', 'DLV_ARR_PERCENTILE_10', 'DLV_ARR_PERCENTILE_25',
+             'DLV_ARR_PERCENTILE_50', 'DLV_ARR_PERCENTILE_75', 'DLV_ARR_PERCENTILE_90',
+             'DLV_ARR_PERCENTILE_95', 'DLV_ARR_IQR'].includes(agg)) return 'number';
         return inputDT || 'text';
       }
 
@@ -59,19 +65,37 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         const LATEST        = { val: 'LATEST',       label: 'LATEST' };
         const FIRST_ALPHA   = { val: 'FIRST_ALPHA',  label: 'FIRST ALPHABETICALLY' };
         const LAST_ALPHA    = { val: 'LAST_ALPHA',   label: 'LAST ALPHABETICALLY' };
+        const P5    = { val: 'DLV_PERCENTILE_5',  label: 'PERCENTILE 5th' };
+        const P10   = { val: 'DLV_PERCENTILE_10', label: 'PERCENTILE 10th' };
+        const P25   = { val: 'DLV_PERCENTILE_25', label: 'PERCENTILE 25th (Q1)' };
+        const P50   = { val: 'DLV_PERCENTILE_50', label: 'PERCENTILE 50th (Median)' };
+        const P75   = { val: 'DLV_PERCENTILE_75', label: 'PERCENTILE 75th (Q3)' };
+        const P90   = { val: 'DLV_PERCENTILE_90', label: 'PERCENTILE 90th' };
+        const P95   = { val: 'DLV_PERCENTILE_95', label: 'PERCENTILE 95th' };
+        const IQR   = { val: 'DLV_IQR',           label: 'IQR (Interquartile Range)' };
+        const AP5   = { val: 'DLV_ARR_PERCENTILE_5',  label: 'PERCENTILE 5th (of array)' };
+        const AP10  = { val: 'DLV_ARR_PERCENTILE_10', label: 'PERCENTILE 10th (of array)' };
+        const AP25  = { val: 'DLV_ARR_PERCENTILE_25', label: 'PERCENTILE 25th of array (Q1)' };
+        const AP50  = { val: 'DLV_ARR_PERCENTILE_50', label: 'PERCENTILE 50th of array (Median)' };
+        const AP75  = { val: 'DLV_ARR_PERCENTILE_75', label: 'PERCENTILE 75th of array (Q3)' };
+        const AP90  = { val: 'DLV_ARR_PERCENTILE_90', label: 'PERCENTILE 90th (of array)' };
+        const AP95  = { val: 'DLV_ARR_PERCENTILE_95', label: 'PERCENTILE 95th (of array)' };
+        const AIQR  = { val: 'DLV_ARR_IQR',           label: 'IQR of array' };
 
         if (displayType === 'number')
-          return [NONE, COUNT, COUNT_DIST, SUM, AVG, MIN, MAX, MEDIAN, MODE, STDEV, VAR, CV, LIST];
+          return [NONE, COUNT, COUNT_DIST, SUM, AVG, MIN, MAX, MEDIAN, MODE, STDEV, VAR, CV, P5, P10, P25, P50, P75, P90, P95, IQR, LIST];
         if (displayType === 'date' || displayType === 'datetime')
-          return [NONE, COUNT, COUNT_DIST, EARLIEST, LATEST, MEDIAN, MODE, LIST];
+          return [NONE, COUNT, COUNT_DIST, EARLIEST, LATEST, MEDIAN, MODE, P5, P10, P25, P50, P75, P90, P95, IQR, LIST];
         if (displayType === 'boolean')
           return [NONE, COUNT, COUNT_DIST];
         if (displayType === 'user' || displayType === 'lookup' || displayType === 'url')
           return [NONE, COUNT, COUNT_DIST, FIRST_ALPHA, LAST_ALPHA, MODE, LIST];
         if (displayType === 'user-multi' || displayType === 'lookup-multi')
           return [NONE, COUNT, COUNT_DIST, LIST];
-        if (displayType === 'array')
-          return [NONE, COUNT, LIST];
+        if (displayType === 'array' || displayType === 'array-number')
+          return [NONE, AP5, AP10, AP25, AP50, AP75, AP90, AP95, AIQR, COUNT, LIST];
+        if (displayType === 'array-date')
+          return [NONE, AP5, AP10, AP25, AP50, AP75, AP90, AP95, AIQR, COUNT, LIST];
         if (displayType === 'object')
           return [NONE, COUNT];
         // text and default
@@ -874,6 +898,12 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           COUNT:'#', COUNT_DISTINCT:'#*', SUM:'∑', AVG:'x̄', MEDIAN:'med', MODE:'Mo',
           MIN:'↓', MAX:'↑', STDEV:'σ', VAR:'σ²', CV:'CV',
           EARLIEST:'↓', LATEST:'↑', FIRST_ALPHA:'A↓', LAST_ALPHA:'A↑', LIST:'≡',
+          DLV_PERCENTILE_5:'P5',   DLV_PERCENTILE_10:'P10', DLV_PERCENTILE_25:'P25',
+          DLV_PERCENTILE_50:'P50', DLV_PERCENTILE_75:'P75', DLV_PERCENTILE_90:'P90',
+          DLV_PERCENTILE_95:'P95', DLV_IQR:'IQR',
+          DLV_ARR_PERCENTILE_5:'P5',   DLV_ARR_PERCENTILE_10:'P10', DLV_ARR_PERCENTILE_25:'P25',
+          DLV_ARR_PERCENTILE_50:'P50', DLV_ARR_PERCENTILE_75:'P75', DLV_ARR_PERCENTILE_90:'P90',
+          DLV_ARR_PERCENTILE_95:'P95', DLV_ARR_IQR:'IQR',
           // legacy
           FIRST:'⟨', LAST:'⟩', GROUP_CONCAT:'≡'
         };

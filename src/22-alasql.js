@@ -229,6 +229,30 @@ alasql.fn.DLV_MAX = function(a, b) {
           return v3 - v1;
       };
 
+      // ── DLV_ARR_PERCENTILE_* / DLV_ARR_IQR (scalar) ─────────────────────────
+      // Scalar versions: operate on a single array-valued column cell.
+      // Reuse _dlvPctCont — same algorithm, same date support.
+      const _createDLVArrPctFn = function(p) {
+          return function(arr) { return _dlvPctCont(arr, p); };
+      };
+
+      alasql.fn.DLV_ARR_PERCENTILE_5  = _createDLVArrPctFn(0.05);
+      alasql.fn.DLV_ARR_PERCENTILE_10 = _createDLVArrPctFn(0.10);
+      alasql.fn.DLV_ARR_PERCENTILE_25 = _createDLVArrPctFn(0.25);
+      alasql.fn.DLV_ARR_PERCENTILE_50 = _createDLVArrPctFn(0.50);
+      alasql.fn.DLV_ARR_PERCENTILE_75 = _createDLVArrPctFn(0.75);
+      alasql.fn.DLV_ARR_PERCENTILE_90 = _createDLVArrPctFn(0.90);
+      alasql.fn.DLV_ARR_PERCENTILE_95 = _createDLVArrPctFn(0.95);
+
+      alasql.fn.DLV_ARR_IQR = function(arr) {
+          const q1 = _dlvPctCont(arr, 0.25);
+          const q3 = _dlvPctCont(arr, 0.75);
+          if (q1 == null || q3 == null) return null;
+          const v1 = q1 instanceof Date ? q1.getTime() : q1;
+          const v3 = q3 instanceof Date ? q3.getTime() : q3;
+          return v3 - v1;
+      };
+
       // ── LAST ──────────────────────────────────────────────────────────────────
       // Not available natively in alasql v4.17; only FIRST is available
       alasql.aggr.LAST = alasql.aggr.LAST || function (v, acc, stage) {

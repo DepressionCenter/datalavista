@@ -126,6 +126,22 @@ QB_AGGS: [
   { val: 'LATEST',       label: 'LATEST',                      types: 'date' },
   { val: 'FIRST_ALPHA',  label: 'FIRST ALPHABETICALLY',        types: 'text' },
   { val: 'LAST_ALPHA',   label: 'LAST ALPHABETICALLY',         types: 'text' },
+  { val: 'DLV_PERCENTILE_5',  label: 'PERCENTILE 5th',              types: 'numeric' },
+  { val: 'DLV_PERCENTILE_10', label: 'PERCENTILE 10th',             types: 'numeric' },
+  { val: 'DLV_PERCENTILE_25', label: 'PERCENTILE 25th (Q1)',        types: 'numeric' },
+  { val: 'DLV_PERCENTILE_50', label: 'PERCENTILE 50th (Median)',    types: 'numeric' },
+  { val: 'DLV_PERCENTILE_75', label: 'PERCENTILE 75th (Q3)',        types: 'numeric' },
+  { val: 'DLV_PERCENTILE_90', label: 'PERCENTILE 90th',             types: 'numeric' },
+  { val: 'DLV_PERCENTILE_95', label: 'PERCENTILE 95th',             types: 'numeric' },
+  { val: 'DLV_IQR',           label: 'IQR (Interquartile Range)',   types: 'numeric' },
+  { val: 'DLV_ARR_PERCENTILE_5',  label: 'PERCENTILE 5th (of array)',           types: 'array' },
+  { val: 'DLV_ARR_PERCENTILE_10', label: 'PERCENTILE 10th (of array)',          types: 'array' },
+  { val: 'DLV_ARR_PERCENTILE_25', label: 'PERCENTILE 25th of array (Q1)',       types: 'array' },
+  { val: 'DLV_ARR_PERCENTILE_50', label: 'PERCENTILE 50th of array (Median)',   types: 'array' },
+  { val: 'DLV_ARR_PERCENTILE_75', label: 'PERCENTILE 75th of array (Q3)',       types: 'array' },
+  { val: 'DLV_ARR_PERCENTILE_90', label: 'PERCENTILE 90th (of array)',          types: 'array' },
+  { val: 'DLV_ARR_PERCENTILE_95', label: 'PERCENTILE 95th (of array)',          types: 'array' },
+  { val: 'DLV_ARR_IQR',           label: 'IQR of array',                        types: 'array' },
 ],
 
 // Base Filter Conditions
@@ -511,6 +527,28 @@ function getArrayScalarOps(scalarType) {
       { val: 'ARR_ANY_NE', label: 'any element not equals', group: 'By element value' },
     );
   }
+  const pctStats = [
+    { key: 'P5',  label: 'P5'  },
+    { key: 'P10', label: 'P10' },
+    { key: 'P25', label: 'P25 (Q1)' },
+    { key: 'P50', label: 'P50 (Median)' },
+    { key: 'P75', label: 'P75 (Q3)' },
+    { key: 'P90', label: 'P90' },
+    { key: 'P95', label: 'P95' },
+    { key: 'IQR', label: 'IQR' },
+  ];
+  const cmpOps = [
+    { sfx: 'EQ',  sym: '='  }, { sfx: 'NE',  sym: '≠' },
+    { sfx: 'GT',  sym: '>'  }, { sfx: 'GTE', sym: '≥' },
+    { sfx: 'LT',  sym: '<'  }, { sfx: 'LTE', sym: '≤' },
+  ];
+  const pctOps = (st === 'number' || st === 'date')
+    ? pctStats.flatMap(s => cmpOps.map(c => ({
+        val: `ARR_${s.key}_${c.sfx}`,
+        label: `${s.label} ${c.sym}`,
+        group: `By ${s.label}`,
+      })))
+    : [];
   return [
     ...group1,
     { val: 'ARR_CONTAINS',  label: 'contains value',                  group: 'By element value' },
@@ -522,6 +560,7 @@ function getArrayScalarOps(scalarType) {
     { val: 'ARR_LEN_LTE',   label: '# of elements less or equal',    group: 'By # of elements' },
     { val: 'ARR_EMPTY',     label: 'is empty',     noInput: true, group: 'Array' },
     { val: 'ARR_NOT_EMPTY', label: 'is not empty', noInput: true, group: 'Array' },
+    ...pctOps,
   ];
 }
 
@@ -947,6 +986,18 @@ function condToSQL(c, colExpr, displayType) {
     const lop = { ARR_LEN_EQ:'=', ARR_LEN_NE:'!=', ARR_LEN_GT:'>', ARR_LEN_GTE:'>=', ARR_LEN_LT:'<', ARR_LEN_LTE:'<=' }[op] || '=';
     const v = raw !== '' && !isNaN(raw) ? raw : '0';
     return `${colExpr}->length ${lop} ${v}`;
+  }
+
+  // ── array scalar — percentile / IQR comparisons ───────────────────────────
+  if (op.startsWith('ARR_P') || op.startsWith('ARR_IQR')) {
+    const m = op.match(/^ARR_(P\d+|IQR)_(EQ|NE|GT|GTE|LT|LTE)$/);
+    if (m) {
+      const cmpMap = { EQ:'=', NE:'!=', GT:'>', GTE:'>=', LT:'<', LTE:'<=' };
+      const cmp = cmpMap[/** @type {keyof typeof cmpMap} */ (m[2])];
+      const fn  = m[1] === 'IQR' ? 'DLV_ARR_IQR' : `DLV_ARR_PERCENTILE_${m[1].slice(1)}`;
+      const v   = _fmtSQLVal(raw, dt);
+      return `${fn}(${colExpr}) ${cmp} ${v}`;
+    }
   }
 
   // ── array-of-objects — DLV_ARRAY_INCLUDES ────────────────────────────────
