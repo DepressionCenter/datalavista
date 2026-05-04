@@ -1360,7 +1360,14 @@ function _buildDatasetOption(w, rows) {
         var val = p.data && p.data['__dlvy_0'] != null ? p.data['__dlvy_0'] : '';
         return name + ': ' + val + ' (' + p.percent.toFixed(1) + '%)';
       } },
-      series  : [{ type: 'pie', encode: { itemName: xDim, value: '__dlvy_0' }, radius: ['30%', '65%'], label: { fontSize: 11 }, emphasis: { focus: 'self' }, blur: { itemStyle: { opacity: 0.15 } } }]
+      series  : [{ type: 'pie', encode: { itemName: xDim, value: '__dlvy_0' }, radius: ['30%', '65%'], label: { fontSize: 11, formatter: function(p) {
+        var raw = p.data ? p.data[xDim] : p.name;
+        var name = raw == null ? '' : (typeof raw === 'object'
+          ? (raw.Title || raw.title || raw.name || raw.Name || raw.label || raw.Label || String(raw))
+          : String(raw));
+        var val = p.data && p.data['__dlvy_0'] != null ? p.data['__dlvy_0'] : '';
+        return name + ': ' + val + ' (' + p.percent.toFixed(1) + '%)';
+      } }, emphasis: { focus: 'self' }, blur: { itemStyle: { opacity: 0.15 } } }]
     };
   }
 
@@ -1627,7 +1634,13 @@ function _buildChartOption(w, rows) {
     const filterField = dims[0];
     let filterValue = params.name;
     if (w.type === 'scatter' && Array.isArray(params.data)) filterValue = String(params.data[0]);
-    if (!filterField || filterValue == null) return;
+    // params.name is empty for non-string xDim values (booleans, objects) in all dataset-based charts.
+    // Fall back to raw row data when name is missing.
+    if ((filterValue == null || filterValue === '') && params.data && typeof params.data === 'object' && !Array.isArray(params.data)) {
+      var _rawClickVal = params.data[filterField];
+      if (_rawClickVal != null) filterValue = _rawClickVal;
+    }
+    if (!filterField || filterValue == null || filterValue === '') return;
     const mode = w.interactionMode || (DataLaVistaState.design && DataLaVistaState.design.interactionMode) || 'cross-filter';
     if (mode === 'cross-filter') {
       applyDrillFilter(filterField, String(filterValue));
@@ -1687,11 +1700,18 @@ function _buildChartOption(w, rows) {
 
       function deleteWidget(wid) {
         var deletedW = DataLaVistaState.design.widgets.find(w => w.id === wid);
-        // If deleting a container, orphan its children back to canvas
+        // If deleting a container, also delete all child widgets
         if (deletedW && deletedW.type === 'container') {
+          var childIds = [];
           DataLaVistaState.design.widgets.forEach(function(cw) {
-            if (cw.parentContainerId === wid) { cw.parentContainerId = null; }
+            if (cw.parentContainerId === wid) { childIds.push(cw.id); }
           });
+          for (var ci = 0; ci < childIds.length; ci++) {
+            var cid = childIds[ci];
+            if (DataLaVistaState.charts[cid]) { try { DataLaVistaState.charts[cid].dispose(); } catch(e) {} delete DataLaVistaState.charts[cid]; }
+            if (DataLaVistaState._chartROs && DataLaVistaState._chartROs[cid]) { try { DataLaVistaState._chartROs[cid].disconnect(); } catch(e) {} delete DataLaVistaState._chartROs[cid]; }
+          }
+          DataLaVistaState.design.widgets = DataLaVistaState.design.widgets.filter(function(cw) { return cw.parentContainerId !== wid; });
         }
         DataLaVistaState.design.widgets = DataLaVistaState.design.widgets.filter(w => w.id !== wid);
         if (DataLaVistaState.charts[wid]) { try { DataLaVistaState.charts[wid].dispose(); } catch (e) { } delete DataLaVistaState.charts[wid]; }
@@ -3088,7 +3108,15 @@ function _renderBarLineOptionsHTML(w, wid) {
         if (!(alasql.tables && alasql.tables['dlv_results'])) return;
         const allFilters = { ...(DataLaVistaState.previewFilters || {}), ...(DataLaVistaState.drillFilters || {}) };
         alasql('DROP VIEW IF EXISTS [dlv_active]');
-        const whereClauses = Object.entries(allFilters).map(([f, v]) => `[${f}] = '${String(v).replace(/'/g, "''")}'`);
+        var whereClauses = Object.entries(allFilters).map(function(entry) {
+          var f = entry[0];
+          var v = entry[1];
+          if (typeof v === 'boolean') return '[' + f + '] = ' + v;
+          var sv = String(v);
+          if ((sv === 'true' || sv === 'false') && sniffType(f) === 'boolean') return '[' + f + '] = ' + sv;
+          if (typeof v === 'object' && v !== null) return '[' + f + '] = \'' + (v.Title || v.title || v.name || v.Name || sv).replace(/'/g, "''") + '\'';
+          return '[' + f + '] = \'' + sv.replace(/'/g, "''") + '\'';
+        });
         const where = whereClauses.length ? ` WHERE ${whereClauses.join(' AND ')}` : '';
         alasql(`CREATE VIEW [dlv_active] AS SELECT * FROM [dlv_results]${where}`);
         DataLaVistaState.design.previewFilteredData = null;
