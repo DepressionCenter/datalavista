@@ -2197,6 +2197,7 @@ function _renderBarLineOptionsHTML(w, wid) {
         dlvTooltip.update(btn, html, { html: true, maxWidth: '500px', placement: 'top', delay: 0 });
         // Force immediate show
         btn.dispatchEvent(new MouseEvent('mouseenter'));
+        try { navigator.clipboard.writeText(formatted).then(() => toast('Widget SQL code copied to clipboard', 'success')); } catch(err) { }
       }
 
       // ── Per-widget conditions ────────────────────────────────────────────
