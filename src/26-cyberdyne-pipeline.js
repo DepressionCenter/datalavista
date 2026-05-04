@@ -35,7 +35,7 @@ const CyberdynePipeline = {
 
   /* ===== DATE PATTERNS ===== */
   DATE_PATTERNS: {
-    iso:         /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}(\.\d+)?Z?)?$/,
+    iso:         /^\d{4}-\d{2}-\d{2}([T ]\d{2}:\d{2}:\d{2}(\.\d+)?(?:Z|[+-]\d{2}:\d{2})?)?$/,
     oracle:      /^\d{2}-[A-Z]{3}-\d{2,4}$/i,
     excelCsv:    /^\d{1,2}\/\d{1,2}\/\d{2,4}$/,
     unixEpoch:   /^\d{10}$/,
@@ -137,12 +137,12 @@ const CyberdynePipeline = {
     if (objectCount > 0)         return 'object';
 
     if (dateCount >= threshold) {
-      // Datetime detection: any non-midnight time component → datetime
+      // Datetime detection: any non-midnight time component to datetime
       const hasTime = sample.some(row => {
         const v = row[column];
         if (!v) return false;
         const s = String(v);
-        const m = s.match(/T(\d{2}):(\d{2}):(\d{2})/);
+        const m = s.match(/[T ](\d{2}):(\d{2}):(\d{2})/);
         return m && !(m[1] === '00' && m[2] === '00' && m[3] === '00');
       });
       return hasTime ? 'datetime' : 'date';

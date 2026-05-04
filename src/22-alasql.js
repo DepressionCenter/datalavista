@@ -814,22 +814,31 @@ alasql.from.DLV_ARRAY_EXTRACT_ELEMENT = function(tableName, opts, cb, idx, query
         return `${base}/_layouts/15/userphoto.aspx?size=L&accountname=${encodeURIComponent(claimsStr)}`;
       };
 
-      // ── DLV_NORMALIZE_DATE: normalize date strings to 'YYYY-MM-DD [HH:mm:ss]'─
+// ── DLV_NORMALIZE_DATE: normalize date strings to 'YYYY-MM-DD [HH:mm:ss]'─
       alasql.fn.DLV_NORMALIZE_DATE = function(val) {
         if (val === null || val === undefined || val === '') return val;
         const str = String(val).trim();
+        
         // ISO with T separator: 2026-01-15T14:30:00Z / 2026-01-15T00:00:00.000 / 2026-01-15T14:30:00+05:00
         const isoTM = str.match(/^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2}:\d{2})(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})?/);
         if (isoTM) {
-          const datePart = isoTM[1]; const timePart = isoTM[2];
-          return timePart === '00:00:00' ? datePart : `${datePart} ${timePart}`;
+          const datePart = isoTM[1]; 
+          const timePart = isoTM[2];
+          return `${datePart} ${timePart}`; // Changed: removed ternary check for '00:00:00'
         }
+        
         // Already ISO date: 2026-01-15
         if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
+        
         // ISO datetime without T: "2026-01-15 14:30:00" (pandas/numpy/datetime variants)
         // Handles optional fractional seconds and optional timezone offset (+00:00 / -05:00 / Z)
         const isoSpaceM = str.match(/^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2})(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})?$/);
-        if (isoSpaceM) { const datePart = isoSpaceM[1]; const timePart = isoSpaceM[2]; return timePart === '00:00:00' ? datePart : `${datePart} ${timePart}`; }
+        if (isoSpaceM) { 
+          const datePart = isoSpaceM[1]; 
+          const timePart = isoSpaceM[2]; 
+          return `${datePart} ${timePart}`; // Changed: removed ternary check for '00:00:00'
+        }
+        
         // Oracle: 15-JAN-2026 or 15-JAN-26
         const ORACLE_MONTHS = {JAN:1,FEB:2,MAR:3,APR:4,MAY:5,JUN:6,JUL:7,AUG:8,SEP:9,OCT:10,NOV:11,DEC:12};
         const oracleM = str.match(/^(\d{2})-([A-Z]{3})-(\d{2,4})$/i);
@@ -840,6 +849,7 @@ alasql.from.DLV_ARRAY_EXTRACT_ELEMENT = function(tableName, opts, cb, idx, query
           if (yr < 100) yr += yr < 30 ? 2000 : 1900;
           return `${yr}-${mon}-${day}`;
         }
+        
         // MM/DD/YYYY or M/D/YY
         const slashM = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
         if (slashM) {
@@ -849,6 +859,7 @@ alasql.from.DLV_ARRAY_EXTRACT_ELEMENT = function(tableName, opts, cb, idx, query
           const day = String(slashM[2]).padStart(2, '0');
           return `${yr}-${mon}-${day}`;
         }
+        
         // Long-form: "April 19, 2026" or "April 19,2026"
         const LONG_MONTHS_ND = {january:1,february:2,march:3,april:4,may:5,june:6,july:7,august:8,september:9,october:10,november:11,december:12};
         const lfM = str.match(/^([A-Za-z]+)\s+(\d{1,2}),\s*(\d{4})$/);
@@ -857,33 +868,37 @@ alasql.from.DLV_ARRAY_EXTRACT_ELEMENT = function(tableName, opts, cb, idx, query
           const day = String(parseInt(lfM[2], 10)).padStart(2, '0');
           return `${lfM[3]}-${mon}-${day}`;
         }
+        
         // Unix epoch (10 digits)
         if (/^\d{10}$/.test(str)) {
           const n = parseInt(str, 10);
           if (n > 946684800 && n < 9999999999) {
             let d = new Date(n * 1000).toISOString().replace('T', ' ').replace('Z', '').replace(/\.\d+$/, '');
-            return d.endsWith(' 00:00:00') ? d.replace(' 00:00:00', '') : d;
+            return d; // Changed: removed endsWith(' 00:00:00') check
           }
         }
+        
         // Unix epoch ms (13 digits)
         if (/^\d{13}$/.test(str)) {
           const n = parseInt(str, 10);
           if (n > 946684800000 && n < 9999999999999) {
             let d = new Date(n).toISOString().replace('T', ' ').replace('Z', '').replace(/\.\d+$/, '');
-            return d.endsWith(' 00:00:00') ? d.replace(' 00:00:00', '') : d;
+            return d; // Changed: removed endsWith(' 00:00:00') check
           }
         }
+        
         // Scientific notation epoch (e.g. 1.7116e+12 ms)
         if (/^\d+\.?\d*[eE][+-]?\d+$/.test(str)) {
           const n = parseFloat(str);
           if (n > 9.46e11 && n < 9.99e12) {
             let d = new Date(n).toISOString().replace('T', ' ').replace('Z', '').replace(/\.\d+$/, '');
-            return d.endsWith(' 00:00:00') ? d.replace(' 00:00:00', '') : d;
+            return d;  // Changed: removed endsWith(' 00:00:00') check
           }
         }
+        
         return val; // return original if no pattern matched
       };
-
+      
       // ── DLV_DATE_PART: extract a named part from a normalised date string ───────
       // Expects val to already be in 'YYYY-MM-DD' or 'YYYY-MM-DD HH:mm:ss' format
       // (i.e. pre-processed by DLV_NORMALIZE_DATE).  In SQL: DLV_DATE_PART(DLV_NORMALIZE_DATE(col), 'part')
