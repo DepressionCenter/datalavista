@@ -1463,7 +1463,11 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           if (!nd) return;
           const t = DataLaVistaState.tables[nd.tableName];
           if (!t) return;
-          const fields = t.fields.filter(f => !f.isAutoId && !f.isLookupRaw && !f.isSynthetic).sort((/** @type {any} */ a, /** @type {any} */ b) => (a.alias || '').localeCompare(b.alias || ''));
+          const _ndCp = /** @type {any} */ (CyberdynePipeline);
+          const _ndVn = _ndCp.rawTableToView[nd.tableName];
+          const _ndVf = _ndVn && _ndCp.views[_ndVn]?.fields;
+          const _ndAll = /** @type {any[]} */ (_ndVf || t.fields || []);
+          const fields = _ndAll.filter(f => !f.isAutoId && !f.isLookupRaw && !f.isSynthetic).sort((/** @type {any} */ a, /** @type {any} */ b) => (a.alias || '').localeCompare(b.alias || ''));
 
           // Ensure state arrays / maps exist on older nodes (loaded from saved config)
           if (!nd.conditions)       nd.conditions = [];
@@ -1704,7 +1708,10 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         const nd = DataLaVistaState.advancedQB.nodes[nodeId];
         if (!nd) return;
         const t = DataLaVistaState.tables[nd.tableName];
-        const fields = t ? t.fields.filter(f => !f.isAutoId && !f.isLookupRaw && !f.isSynthetic) : [];
+        const _acCp = /** @type {any} */ (CyberdynePipeline);
+        const _acVn = _acCp.rawTableToView[nd.tableName];
+        const _acVf = _acVn && _acCp.views[_acVn]?.fields;
+        const fields = (_acVf || t?.fields || []).filter(/** @param {any} f */ f => !f.isAutoId && !f.isLookupRaw && !f.isSynthetic);
         if (!nd.conditions) nd.conditions = [];
         nd.conditions.push({ conj: 'AND', field: fields[0]?.alias || '', op: '=', value: '' });
         rebuildAdvancedSQL();
@@ -2497,12 +2504,16 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         for (const [id, nd] of nodes) {
           const fieldAggs = nd.fieldAggs || {};
           const t = DataLaVistaState.tables[nd.tableName];
+          const _qcmCp = /** @type {any} */ (CyberdynePipeline);
+          const _qcmVn = _qcmCp.rawTableToView[nd.tableName];
+          const _qcmVf = _qcmVn && _qcmCp.views[_qcmVn]?.fields;
+          const _qcmAll = /** @type {any[]} */ (_qcmVf || t?.fields || []);
           for (const fa of nd.selectedFields) {
             const count = _seen2[fa] = (_seen2[fa] || 0) + 1;
             const outAlias = count === 1 ? fa : fa + (count - 1);
-            const field = t?.fields?.find(f => f.alias === fa);
+            const field = _qcmAll.find(f => f.alias === fa);
             // Prefer original SP fields (no parentField) for description — derived view fields shadow originals
-            const _origField = (/** @type {any[]} */ (t?.fields || [])).find(f => f.alias === fa && !f.parentField) || field;
+            const _origField = _qcmAll.find(f => f.alias === fa && !f.parentField) || field;
             const agg = fieldAggs[fa] || '';
             DataLaVistaState.queryColumnMeta[outAlias] = {
               displayType:             _aggOutputDisplayType(agg, field?.displayType || 'text'),

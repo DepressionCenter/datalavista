@@ -71,8 +71,8 @@ const DataLaVistaCore = {
     'lookup':       { icon: '🔍', cls: 'type-lookup' },    // SP single lookup / single taxonomy
     'lookup-multi': { icon: '🔍', cls: 'type-lookup' },    // SP multi lookup / multi taxonomy / choice-multi
     'object':       { icon: '🗂️', cls: 'type-object' },    // single generic object
-    'array':        { icon: '☷', cls: 'type-array' },     // array of primitives
     'object-multi': { icon: '🗃️', cls: 'type-object' },  // array of objects (non-SharePoint)
+    'array':        { icon: '☷', cls: 'type-array' },     // array of primitives    
     'default':      { icon: '❔', cls: 'type-text' }       // unknown/unclassified
   },
 
@@ -297,8 +297,8 @@ SKIP_FIELDS: new Set([
     { id: 'scatter',      label: 'Scatter',             icon: '⁙',  category: 'echarts',        defaultTitle: 'Scatter Plot',        usesECharts: true,  supportsDataset: true,  supportsInteraction: true,  optionBuilder: '_buildScatterOption', seriesBuilder: null,               sqlBuilder: null,               htmlRenderer: null, dimensionLabels: ['X Axis'], seriesLabel: 'Y Values'   },
     { id: 'violin',       label: 'Violin',              icon: '⧖',  category: 'echarts-custom', defaultTitle: 'Violin Plot',         usesECharts: true,  supportsDataset: false, supportsInteraction: false, optionBuilder: '_buildViolinOption',  seriesBuilder: null,               sqlBuilder: null,               htmlRenderer: null, dimensionLabels: ['Group'],  seriesLabel: 'Values'     },
     // { id: 'sleep_stages', label: 'Sleep Stages',        icon: '☾',  category: 'echarts-custom', defaultTitle: 'Sleep Stages',        usesECharts: true,  supportsDataset: false, supportsInteraction: false, optionBuilder: '_buildSleepStagesOption', seriesBuilder: null,            sqlBuilder: null,               htmlRenderer: null, dimensionLabels: ['Start'],  seriesLabel: 'Fields'     },
-    // { id: 'agp_tir',      label: 'AGP Time in Range',   icon: '▤',  category: 'custom',         defaultTitle: 'AGP Time in Range',   usesECharts: true,  supportsDataset: false, supportsInteraction: false, optionBuilder: '_buildAgpTirOption',  seriesBuilder: null,               sqlBuilder: null,               htmlRenderer: null, dimensionLabels: ['X Axis'], seriesLabel: 'Glucose'    },
-    // { id: 'agp_overlay',  label: 'AGP Glucose Overlay', icon: '≋',  category: 'custom',         defaultTitle: 'AGP Glucose Overlay', usesECharts: true,  supportsDataset: false, supportsInteraction: false, optionBuilder: '_buildAgpOverlayOption', seriesBuilder: null,            sqlBuilder: null,               htmlRenderer: null, dimensionLabels: ['X Axis'], seriesLabel: 'Glucose'    },
+    // { id: 'agp_overlay',  label: 'Glucose Overlay',     icon: '≋',  category: 'echarts-custom', defaultTitle: 'Glucose Overlay',     usesECharts: true,  supportsDataset: false, supportsInteraction: false, optionBuilder: '_buildAgpOverlayOption', seriesBuilder: null,            sqlBuilder: '_buildAgpOverlaySql',  htmlRenderer: null, dimensionLabels: ['Datetime'], seriesLabel: 'Glucose Value' },
+    // { id: 'agp_tir',      label: 'Time in Range',       icon: '▤',  category: 'echarts-custom', defaultTitle: 'Time in Range',       usesECharts: true,  supportsDataset: false, supportsInteraction: false, optionBuilder: '_buildAgpTirOption',  seriesBuilder: null,               sqlBuilder: '_buildAgpTirSql',      htmlRenderer: null, dimensionLabels: ['Datetime'], seriesLabel: 'Glucose Value' },
     { id: 'kpi',          label: 'KPI',                 icon: '★',  category: 'builtin',       defaultTitle: 'KPI',                 usesECharts: false, supportsDataset: false, supportsInteraction: false, optionBuilder: null,                  seriesBuilder: null,               sqlBuilder: null,               htmlRenderer: null, dimensionLabels: [],          seriesLabel: 'Metric'     },
     { id: 'text',         label: 'Text',                icon: 'T',   category: 'builtin',       defaultTitle: 'Text',                usesECharts: false, supportsDataset: false, supportsInteraction: false, optionBuilder: null,                  seriesBuilder: null,               sqlBuilder: null,               htmlRenderer: null, dimensionLabels: [],          seriesLabel: ''           },
     { id: 'placeholder',  label: 'Blank',               icon: '⬚',  category: 'builtin',       defaultTitle: '',                    usesECharts: false, supportsDataset: false, supportsInteraction: false, optionBuilder: null,                  seriesBuilder: null,               sqlBuilder: null,               htmlRenderer: null, dimensionLabels: [],          seriesLabel: ''           },
@@ -803,9 +803,10 @@ function classifyDisplayType(displayType, tableKey, fieldInternalName, fieldAlia
   );
   const _arrObjTypes = ['lookup','lookup-multi','user','user-multi','taxonomy','taxkeyword','taxonomy-multi','taxkeyword-multi'];
 
-  if (dt === 'boolean') return _base('boolean');
-  if (dt === 'number')  return _base('number');
-  if (dt === 'date')    return _base('date');
+  if (dt === 'boolean')  return _base('boolean');
+  if (dt === 'number')   return _base('number');
+  if (dt === 'date')     return _base('date');
+  if (dt === 'datetime') return _base('date');
 
   if (_arrObjTypes.includes(dt))
     return _base('array-objects', { isArrayObjects: true, objectKeys: getObjectKeysForField(tableKey, fieldAlias, dt) });
