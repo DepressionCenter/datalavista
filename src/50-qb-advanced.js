@@ -1491,7 +1491,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
             const sel = nd.selectedFields.includes(f.alias);
             const agg = nd.fieldAggs[f.alias] || '';
             const aggActive = agg !== '';
-            const expandable     = _isExpandableLookupField(f, t);
+            const expandable     = _isExpandableLookupField(f, t, nd.tableName);
             const dateExpandable = _isExpandableDateField(f, t);
             const isExpandable   = expandable || dateExpandable;
             const expanded       = isExpandable && _expandedLookupFields[id]?.has(f.alias);
@@ -2131,10 +2131,14 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       // Returns true if a field should get the expand-to-children UX.
       // Any non-synthetic field with at least one non-raw, non-autoId synthetic child is expandable.
       // Date types are excluded here — they are handled separately by _isExpandableDateField.
-      function _isExpandableLookupField(f, t) {
+      function _isExpandableLookupField(f, t, tableName = '') {
         if (!f || !t || f.isLookupRaw || f.isAutoId || f.isSynthetic) return false;
         if (f.displayType === 'date' || f.displayType === 'datetime') return false;
-        return (t.fields || []).some(x => x.isSynthetic && !x.isLookupRaw && !x.isAutoId && x.parentField === f.internalName);
+        const _cp = /** @type {any} */ (CyberdynePipeline);
+        const _vn = tableName && _cp.rawTableToView[tableName];
+        const _vf = _vn && _cp.views[_vn] && _cp.views[_vn].fields;
+        const _fields = /** @type {any[]} */ (_vf || t.fields || []);
+        return _fields.some(x => x.isSynthetic && !x.isLookupRaw && !x.isAutoId && x.parentField === f.internalName);
       }
 
       // Returns true if f is a synthetic field whose parent is a date-typed field
@@ -2227,7 +2231,11 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       // tableKey = nd.tableName (the raw table key, same as the key in DataLaVistaState.tables)
       function _getChildFieldsForLookup(f, tableKey) {
         const t = DataLaVistaState.tables[tableKey];
-        const synthChildren = (t?.fields || []).filter(x =>
+        const _cp = /** @type {any} */ (CyberdynePipeline);
+        const _vn = _cp.rawTableToView[tableKey];
+        const _vf = _vn && _cp.views[_vn] && _cp.views[_vn].fields;
+        const _fields = /** @type {any[]} */ (_vf || t?.fields || []);
+        const synthChildren = _fields.filter(x =>
           x.isSynthetic && !x.isLookupRaw && !x.isAutoId && x.parentField === f.internalName
         );
         // For multi-select SP lookup fields: also include remote table fields for rollup aggregation

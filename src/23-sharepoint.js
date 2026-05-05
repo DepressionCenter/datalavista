@@ -484,7 +484,7 @@ async function fetchTableData(tableName, fetchAll = false) {
             if (!_pruneSql.includes(aliasUp) && !_pruneSql.includes(internalUp)) return;
           }
           
-          const typeStr = (f.displayType || f.TypeAsString || f.type || '').toLowerCase();
+          const typeStr = (f.TypeAsString || f.type || '').toLowerCase();
           const isPeople = typeStr.includes('user');
           const isLookup = typeStr.includes('lookup');
           const isTax = typeStr.includes('taxonomy') || internalName === 'TaxKeyword';

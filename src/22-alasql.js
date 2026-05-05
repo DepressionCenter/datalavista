@@ -1041,7 +1041,7 @@ alasql.from.DLV_ARRAY_EXTRACT_ELEMENT = function(tableName, opts, cb, idx, query
       };
 
       // ── CV: coefficient of variation (population) ────────────────────────────
-      alasql.aggr.CV = function(v, s, stage) {
+      alasql.aggr.CV = function(v, s, stage) { // TODO: Rename to DLV_CV
         if (stage === 1) { s = { sum: 0, sumSq: 0, n: 0 }; }
         if (stage <= 2 && v != null) {
           const x = Number(v);

@@ -182,8 +182,13 @@ validateAliasUniqueness(fields) {
           });
         }
 
-        // Sync t.fields so renderFieldsPanel and QB show the expanded field list
-        if (t && (t.loaded || t.itemCount > 0)) t.fields = view.fields;
+        // Sync t.fields only when _raw_ data is actually in AlaSQL.
+        // Using t.itemCount > 0 caused t.fields to be set to synthetic view fields during
+        // restoreViewsFromConfig (before data loaded), which corrupted spFields fallback in
+        // fetchTableData when t.originalFields was null, breaking lookups, users, and booleans.
+        let _hasRawData = false;
+        try { _hasRawData = (/** @type {any} */ (window)).alasql('SELECT COUNT(*) AS n FROM [_raw_' + rawTable + ']')[0].n > 0; } catch (_) {}
+        if (t && _hasRawData) t.fields = view.fields;
         return;
       } else { }
 
