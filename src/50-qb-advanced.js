@@ -2677,17 +2677,26 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
               : childLookupKey;
             const childAlias  = getNodeAlias(childNodeId,  childNd);
             const parentAlias = getNodeAlias(parentNodeId, parentNd);
-            // The DLV_LOOKUP virtual table gets the alias of the "new" node being joined into the query
-            const dlvAlias = getNodeAlias(newNodeId, newNd);
+            // dlvAlias = the user-visible alias for the node being joined in (the "new" node).
+            // A hidden bridge alias (_dlvBridge) carries the DLV_LOOKUP rows; the actual table
+            // is then joined to it so that [dlvAlias].[Field] resolves to the real table's columns.
+            const dlvAlias    = getNodeAlias(newNodeId, newNd);
+            const parentViewName = getView(parentNd.tableName);
+            const _dlvBridge  = '_dlv_' + dlvAlias;
             if (parentNodeId === mainId) {
-              // REVERSE: primary table (e.g. People) is the FROM; source table (Events) owns the lookup column.
-              // DLV_LOOKUP returns Events scalars + _LookupId → join ON _LookupId = People.ID
-              sql += `\nLEFT JOIN DLV_LOOKUP("${localViewName}", "${lookupColName}") AS [${dlvAlias}]`
-                   + ` ON [${dlvAlias}].[_LookupId] = [${parentAlias}].[${parentJoinKey}]`;
+              // REVERSE: primary table (e.g. People) is the FROM; child table (Events) is being joined.
+              // Bridge on _LookupId = People.ID, then join child table rows via _SourceID.
+              sql += `\nLEFT JOIN DLV_LOOKUP("${localViewName}", "${lookupColName}") AS [${_dlvBridge}]`
+                   + ` ON [${_dlvBridge}].[_LookupId] = [${parentAlias}].[${parentJoinKey}]`
+                   + `\nLEFT JOIN [${localViewName}] AS [${dlvAlias}]`
+                   + ` ON [${dlvAlias}].[${localPK}] = [${_dlvBridge}].[_SourceID]`;
             } else {
-              // FORWARD: source table (Events) is the FROM; DLV_LOOKUP joined ON _SourceID = Events.ID
-              sql += `\nLEFT JOIN DLV_LOOKUP("${localViewName}", "${lookupColName}") AS [${dlvAlias}]`
-                   + ` ON [${dlvAlias}].[_SourceID] = [${childAlias}].[${localPK}]`;
+              // FORWARD: child table (Events) is the FROM; parent table (People) is being joined.
+              // Bridge on _SourceID = Events.ID, then join parent table rows via _LookupId.
+              sql += `\nLEFT JOIN DLV_LOOKUP("${localViewName}", "${lookupColName}") AS [${_dlvBridge}]`
+                   + ` ON [${_dlvBridge}].[_SourceID] = [${childAlias}].[${localPK}]`
+                   + `\nLEFT JOIN [${parentViewName}] AS [${dlvAlias}]`
+                   + ` ON [${dlvAlias}].[${parentJoinKey}] = [${_dlvBridge}].[_LookupId]`;
             }
           } else {
             const _keysConj = j.keysConj === 'OR' ? ' OR ' : ' AND ';
