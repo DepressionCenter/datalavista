@@ -107,43 +107,6 @@ const DataLaVistaCore = {
   'DLV_TAX_LABELS', 'DLV_TAX_IDS', 'DLV_PARSE_BOOL', 'DLV_PARSE_DATE'
 ],
 
-// Base Aggregation Options for Query Builder (reference list; filtering is done in aggsForType())
-QB_AGGS: [
-  { val: '',             label: '— none —',                    types: 'all' },
-  { val: 'COUNT',        label: 'COUNT',                       types: 'all' },
-  { val: 'COUNT_DISTINCT', label: 'COUNT DISTINCT',            types: 'all' },
-  { val: 'LIST',         label: 'LIST',                        types: 'all' },
-  { val: 'SUM',          label: 'SUM',                         types: 'numeric' },
-  { val: 'AVG',          label: 'AVG',                         types: 'numeric' },
-  { val: 'MIN',          label: 'MIN',                         types: 'numeric' },
-  { val: 'MAX',          label: 'MAX',                         types: 'numeric' },
-  { val: 'MEDIAN',       label: 'MEDIAN',                      types: 'numeric' },
-  { val: 'MODE',         label: 'MODE',                        types: 'all' },
-  { val: 'STDEV',        label: 'STD DEV',                     types: 'numeric' },
-  { val: 'VAR',          label: 'VARIANCE',                    types: 'numeric' },
-  { val: 'CV',           label: 'CV (Coeff. of Variation)',    types: 'numeric' },
-  { val: 'EARLIEST',     label: 'EARLIEST',                    types: 'date' },
-  { val: 'LATEST',       label: 'LATEST',                      types: 'date' },
-  { val: 'FIRST_ALPHA',  label: 'FIRST ALPHABETICALLY',        types: 'text' },
-  { val: 'LAST_ALPHA',   label: 'LAST ALPHABETICALLY',         types: 'text' },
-  { val: 'DLV_PERCENTILE_5',  label: 'PERCENTILE 5th',              types: 'numeric' },
-  { val: 'DLV_PERCENTILE_10', label: 'PERCENTILE 10th',             types: 'numeric' },
-  { val: 'DLV_PERCENTILE_25', label: 'PERCENTILE 25th (Q1)',        types: 'numeric' },
-  { val: 'DLV_PERCENTILE_50', label: 'PERCENTILE 50th (Median)',    types: 'numeric' },
-  { val: 'DLV_PERCENTILE_75', label: 'PERCENTILE 75th (Q3)',        types: 'numeric' },
-  { val: 'DLV_PERCENTILE_90', label: 'PERCENTILE 90th',             types: 'numeric' },
-  { val: 'DLV_PERCENTILE_95', label: 'PERCENTILE 95th',             types: 'numeric' },
-  { val: 'DLV_IQR',           label: 'IQR (Interquartile Range)',   types: 'numeric' },
-  { val: 'DLV_ARR_PERCENTILE_5',  label: 'PERCENTILE 5th (of array)',           types: 'array' },
-  { val: 'DLV_ARR_PERCENTILE_10', label: 'PERCENTILE 10th (of array)',          types: 'array' },
-  { val: 'DLV_ARR_PERCENTILE_25', label: 'PERCENTILE 25th of array (Q1)',       types: 'array' },
-  { val: 'DLV_ARR_PERCENTILE_50', label: 'PERCENTILE 50th of array (Median)',   types: 'array' },
-  { val: 'DLV_ARR_PERCENTILE_75', label: 'PERCENTILE 75th of array (Q3)',       types: 'array' },
-  { val: 'DLV_ARR_PERCENTILE_90', label: 'PERCENTILE 90th (of array)',          types: 'array' },
-  { val: 'DLV_ARR_PERCENTILE_95', label: 'PERCENTILE 95th (of array)',          types: 'array' },
-  { val: 'DLV_ARR_IQR',           label: 'IQR of array',                        types: 'array' },
-],
-
 // Base Filter Conditions
 QB_OPS: [
 { val: '=', label: '= equals' },
