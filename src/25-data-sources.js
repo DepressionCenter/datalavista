@@ -259,8 +259,12 @@ async function doConnect() {
  * @param {object} newState
  */
 function setTableState(tableKey, newState) {
-  const prevAlias = DataLaVistaState.tables[tableKey]?.alias;
-  DataLaVistaState.tables[tableKey] = prevAlias ? { ...newState, alias: prevAlias } : newState;
+  const prev = DataLaVistaState.tables[tableKey];
+  let state = newState;
+  if (prev?.alias) state = { ...state, alias: prev.alias };
+  // Preserve originalFields so $select/$expand generation doesn't fall back to synthetic view fields
+  if (prev?.originalFields) state = { ...state, originalFields: prev.originalFields };
+  DataLaVistaState.tables[tableKey] = state;
 }
 
 // ============================================================

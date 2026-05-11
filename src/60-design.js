@@ -1079,8 +1079,7 @@ function rankSuggestions(rules, cols, meta) {
               return aggToSQL(agg, `[${yf}]`, alias);
             }
             // Conditions-filtered aggregates — transpile user-friendly vals to SQL ops for CASE patterns
-            const sqlOp = { EARLIEST:'MIN', FIRST_ALPHA:'MIN', LATEST:'MAX', LAST_ALPHA:'MAX',
-              LIST:'GROUP_CONCAT', GROUP_CONCAT:'GROUP_CONCAT' }[agg] || agg;
+            const sqlOp = (DataLaVistaCore.AGG_META[agg] || {}).sqlFn || agg;
             const caseWhen = _condsToWhereBody(sConds);
             if (sqlOp === 'SUM')           return `SUM(CASE WHEN ${caseWhen} THEN 1 ELSE 0 END) AS [${alias}]`;
             if (sqlOp === 'COUNT')         return `COUNT(CASE WHEN ${caseWhen} THEN 1 ELSE NULL END) AS [${alias}]`;
@@ -2097,7 +2096,7 @@ function _renderBarLineOptionsHTML(w, wid) {
         const isLineType = () => !local.seriesType || local.seriesType === 'line' || (local.seriesType === '' && w.type === 'line');
 
         _s.renderHeader = () => {
-          const aggLabel = agg ? (agg === 'COUNT_DISTINCT' ? 'COUNT DISTINCT' : agg) : 'RAW';
+          const aggLabel = agg ? ((DataLaVistaCore.AGG_META[agg] || {}).label || agg) : 'RAW';
           return `<div class="popup-header panel-header">
             <h3 style="font-size:15px;font-weight:600;margin:0">Advanced Properties</h3>
             <button class="btn btn-ghost btn-icon" onclick="_dlvSeries.close()">✕</button>
@@ -3301,6 +3300,18 @@ function _ddRenderCards(filterText) {
   );
   const hasDsSources = Object.keys(dataSources).length > 0;
 
+  // Advanced QB filter: when QB nodes are present, restrict DS/Table/View sections to referenced tables only.
+  const advNodes = (DataLaVistaState.advancedQB && DataLaVistaState.advancedQB.nodes) || {};
+  const referencedTableKeys = new Set(Object.values(advNodes).map(function(n) { return n.tableName; }).filter(Boolean));
+  const inAdvancedMode = referencedTableKeys.size > 0;
+  const referencedDsKeys = new Set();
+  if (inAdvancedMode) {
+    referencedTableKeys.forEach(function(tKey) {
+      var tbl = tables[tKey];
+      if (tbl) { var dsRef = tbl.dataSource || tbl.dsAlias; if (dsRef) referencedDsKeys.add(dsRef); }
+    });
+  }
+
   let bodyHtml   = '';
   let totalCount = 0;
 
@@ -3316,6 +3327,7 @@ function _ddRenderCards(filterText) {
     for (const dsKey in dataSources) {
       const ds = dataSources[dsKey];
       if (!ds) continue;
+      if (inAdvancedMode && !referencedDsKeys.has(dsKey) && !referencedDsKeys.has(ds.alias) && !referencedDsKeys.has(ds.internalName)) continue;
       const dsAlias     = ds.alias || dsKey;
       const dsInternal  = ds.internalName || dsKey;
       const dsType      = ds.type || 'default';
@@ -3359,6 +3371,7 @@ function _ddRenderCards(filterText) {
     for (const tKey in tables) {
       const tbl = tables[tKey];
       if (!tbl) continue;
+      if (inAdvancedMode && !referencedTableKeys.has(tKey)) continue;
       const tblDisplay  = tbl.displayName || tbl.alias || tKey;
       const tblInternal = tbl.internalName || tKey;
       const tblDesc     = tbl.description || '';
@@ -3404,6 +3417,7 @@ function _ddRenderCards(filterText) {
     for (const viewName in pipelineViews) {
       const view = pipelineViews[viewName];
       if (!view) continue;
+      if (inAdvancedMode && !referencedTableKeys.has(view.rawTable)) continue;
       const tbl        = tables[view.rawTable] || {};
       const viewAlias  = tbl.alias || tbl.displayName || viewName;
       const tblDesc    = tbl.description || '';

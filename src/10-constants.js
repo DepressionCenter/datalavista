@@ -104,7 +104,13 @@ const DataLaVistaCore = {
   'DLV_ARRAY_MATCH', 'DLV_ARRAY_EMPTY', 'DLV_ARRAY_EXTRACT_ELEMENT', 'DLV_ARRAY_INCLUDES', 'COUNT_LOOKUP_VALUES',
   'DLV_JOIN', 'DLV_LOOKUP', 'DLV_UNNEST_LOOKUP', 'DLV_KEYS', 'DLV_DROP', 'DLV_DISPLAY', 'DLV_IDS',
   'DLV_EMAIL', 'DLV_EMAILS', 'DLV_PICTURE_URL', 'DLV_NORMALIZE_DATE',
-  'DLV_TAX_LABELS', 'DLV_TAX_IDS', 'DLV_PARSE_BOOL', 'DLV_PARSE_DATE'
+  'DLV_TAX_LABELS', 'DLV_TAX_IDS', 'DLV_PARSE_BOOL', 'DLV_PARSE_DATE',
+  'MEDIAN', 'MODE', 'STDEV', 'VAR', 'CV',
+  'DLV_PERCENTILE_5', 'DLV_PERCENTILE_10', 'DLV_PERCENTILE_25', 'DLV_PERCENTILE_50',
+  'DLV_PERCENTILE_75', 'DLV_PERCENTILE_90', 'DLV_PERCENTILE_95', 'DLV_IQR',
+  'DLV_ARR_PERCENTILE_5', 'DLV_ARR_PERCENTILE_10', 'DLV_ARR_PERCENTILE_25', 'DLV_ARR_PERCENTILE_50',
+  'DLV_ARR_PERCENTILE_75', 'DLV_ARR_PERCENTILE_90', 'DLV_ARR_PERCENTILE_95', 'DLV_ARR_IQR',
+  'DLV_MERGE_LIST', 'DLV_MERGE_COUNT_DISTINCT', 'DLV_MERGE_MEDIAN', 'DLV_MERGE_MODE'
 ],
 
 // Base Filter Conditions
@@ -273,7 +279,53 @@ SKIP_FIELDS: new Set([
   get BUILTIN_CHART_IDS()   { return new Set(this.WIDGET_TYPES.filter(t => t.category === 'echarts').map(t => t.id)); },
 
   // Widget types where SELECT DISTINCT is applied when no aggregation is present
-  DISTINCT_WIDGET_IDS: new Set(['table','bar','line','pie'])
+  DISTINCT_WIDGET_IDS: new Set(['table','bar','line','pie']),
+
+  // Single source of truth for all aggregate type metadata.
+  // label: full display name for dropdowns
+  // icon: short symbol for pills / buttons
+  // alias: SQL-safe PascalCase suffix appended to rollup column names (e.g. Contacts_Title_UniqueCount)
+  // sqlFn: SQL function keyword emitted by aggToSQL() — preprocessSQL() transparently rewrites MIN/MAX → DLV_MIN/DLV_MAX
+  // outputType: display type of the aggregate output, used for filter/sort panel display typing in rollup context
+  // category: 'row' = GROUP BY aggregate | 'array' = operates on a single cell's array value (not valid in GROUP BY)
+  AGG_META: {
+    COUNT:          { label: 'COUNT',                            icon: '#',   alias: 'Count',       sqlFn: 'COUNT',               outputType: 'number', category: 'row'   },
+    COUNT_DISTINCT: { label: 'COUNT DISTINCT',                   icon: '#*',  alias: 'UniqueCount',  sqlFn: 'COUNT_DISTINCT',       outputType: 'number', category: 'row'   },
+    SUM:            { label: 'SUM',                              icon: '∑',   alias: 'Sum',          sqlFn: 'SUM',                 outputType: 'number', category: 'row'   },
+    AVG:            { label: 'AVG',                              icon: 'x̄',   alias: 'Avg',          sqlFn: 'AVG',                 outputType: 'number', category: 'row'   },
+    MIN:            { label: 'MIN',                              icon: '↓',   alias: 'Min',          sqlFn: 'MIN',                 outputType: 'number', category: 'row'   },
+    MAX:            { label: 'MAX',                              icon: '↑',   alias: 'Max',          sqlFn: 'MAX',                 outputType: 'number', category: 'row'   },
+    MEDIAN:         { label: 'MEDIAN',                           icon: 'med', alias: 'Median',       sqlFn: 'MEDIAN',              outputType: 'number', category: 'row'   },
+    MODE:           { label: 'MODE',                             icon: 'Mo',  alias: 'Mode',         sqlFn: 'MODE',                outputType: 'text',   category: 'row'   },
+    STDEV:          { label: 'STD DEV',                          icon: 'σ',   alias: 'StdDev',       sqlFn: 'STDEV',               outputType: 'number', category: 'row'   },
+    VAR:            { label: 'VARIANCE',                         icon: 'σ²',  alias: 'Variance',     sqlFn: 'VAR',                 outputType: 'number', category: 'row'   },
+    CV:             { label: 'CV (Coeff. of Variation)',         icon: 'CV',  alias: 'CV',           sqlFn: 'CV',                  outputType: 'number', category: 'row'   },
+    LIST:           { label: 'LIST',                             icon: '≡',   alias: 'List',         sqlFn: 'GROUP_CONCAT',        outputType: 'text',   category: 'row'   },
+    EARLIEST:       { label: 'EARLIEST',                         icon: '↓',   alias: 'Earliest',     sqlFn: 'MIN',                 outputType: 'date',   category: 'row'   },
+    LATEST:         { label: 'LATEST',                           icon: '↑',   alias: 'Latest',       sqlFn: 'MAX',                 outputType: 'date',   category: 'row'   },
+    FIRST_ALPHA:    { label: 'FIRST ALPHABETICALLY',             icon: 'A↓',  alias: 'FirstAlpha',   sqlFn: 'MIN',                 outputType: 'text',   category: 'row'   },
+    LAST_ALPHA:     { label: 'LAST ALPHABETICALLY',              icon: 'A↑',  alias: 'LastAlpha',    sqlFn: 'MAX',                 outputType: 'text',   category: 'row'   },
+    DLV_PERCENTILE_5:    { label: 'PERCENTILE 5th',              icon: 'P5',  alias: 'P5',   sqlFn: 'DLV_PERCENTILE_5',   outputType: 'number', category: 'row'   },
+    DLV_PERCENTILE_10:   { label: 'PERCENTILE 10th',             icon: 'P10', alias: 'P10',  sqlFn: 'DLV_PERCENTILE_10',  outputType: 'number', category: 'row'   },
+    DLV_PERCENTILE_25:   { label: 'PERCENTILE 25th (Q1)',        icon: 'P25', alias: 'P25',  sqlFn: 'DLV_PERCENTILE_25',  outputType: 'number', category: 'row'   },
+    DLV_PERCENTILE_50:   { label: 'PERCENTILE 50th (Median)',    icon: 'P50', alias: 'P50',  sqlFn: 'DLV_PERCENTILE_50',  outputType: 'number', category: 'row'   },
+    DLV_PERCENTILE_75:   { label: 'PERCENTILE 75th (Q3)',        icon: 'P75', alias: 'P75',  sqlFn: 'DLV_PERCENTILE_75',  outputType: 'number', category: 'row'   },
+    DLV_PERCENTILE_90:   { label: 'PERCENTILE 90th',             icon: 'P90', alias: 'P90',  sqlFn: 'DLV_PERCENTILE_90',  outputType: 'number', category: 'row'   },
+    DLV_PERCENTILE_95:   { label: 'PERCENTILE 95th',             icon: 'P95', alias: 'P95',  sqlFn: 'DLV_PERCENTILE_95',  outputType: 'number', category: 'row'   },
+    DLV_IQR:             { label: 'IQR (Interquartile Range)',   icon: 'IQR', alias: 'IQR',  sqlFn: 'DLV_IQR',            outputType: 'number', category: 'row'   },
+    DLV_ARR_PERCENTILE_5:  { label: 'PERCENTILE 5th (of array)',         icon: 'P5',  alias: 'P5',  sqlFn: 'DLV_ARR_PERCENTILE_5',  outputType: 'number', category: 'array' },
+    DLV_ARR_PERCENTILE_10: { label: 'PERCENTILE 10th (of array)',        icon: 'P10', alias: 'P10', sqlFn: 'DLV_ARR_PERCENTILE_10', outputType: 'number', category: 'array' },
+    DLV_ARR_PERCENTILE_25: { label: 'PERCENTILE 25th of array (Q1)',     icon: 'P25', alias: 'P25', sqlFn: 'DLV_ARR_PERCENTILE_25', outputType: 'number', category: 'array' },
+    DLV_ARR_PERCENTILE_50: { label: 'PERCENTILE 50th of array (Median)', icon: 'P50', alias: 'P50', sqlFn: 'DLV_ARR_PERCENTILE_50', outputType: 'number', category: 'array' },
+    DLV_ARR_PERCENTILE_75: { label: 'PERCENTILE 75th of array (Q3)',     icon: 'P75', alias: 'P75', sqlFn: 'DLV_ARR_PERCENTILE_75', outputType: 'number', category: 'array' },
+    DLV_ARR_PERCENTILE_90: { label: 'PERCENTILE 90th (of array)',        icon: 'P90', alias: 'P90', sqlFn: 'DLV_ARR_PERCENTILE_90', outputType: 'number', category: 'array' },
+    DLV_ARR_PERCENTILE_95: { label: 'PERCENTILE 95th (of array)',        icon: 'P95', alias: 'P95', sqlFn: 'DLV_ARR_PERCENTILE_95', outputType: 'number', category: 'array' },
+    DLV_ARR_IQR:           { label: 'IQR of array',                      icon: 'IQR', alias: 'IQR', sqlFn: 'DLV_ARR_IQR',          outputType: 'number', category: 'array' },
+    // TODO: Legacy only. Remove later.
+    FIRST:        { label: 'FIRST',        icon: '⟨', alias: 'First', sqlFn: 'MIN',          outputType: 'text', category: 'row' },
+    LAST:         { label: 'LAST',         icon: '⟩', alias: 'Last',  sqlFn: 'MAX',          outputType: 'text', category: 'row' },
+    GROUP_CONCAT: { label: 'GROUP CONCAT', icon: '≡', alias: 'List',  sqlFn: 'GROUP_CONCAT', outputType: 'text', category: 'row' },
+  }
 
 } // End DataLaVistaCore
 

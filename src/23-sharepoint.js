@@ -576,12 +576,10 @@ async function fetchTableData(tableName, fetchAll = false) {
         CyberdynePipeline._registerRawTable(tableName, _spRows);
       }
 
-      // Preserve base SP field definitions on first load (preserves user-renamed aliases on refresh).
-      // spFields = t.originalFields (user's aliases) || t.fields (fresh from SP metadata).
+      // Preserve base SP field definitions. Always refresh on fetch so schema changes are reflected.
+      // setTableState carries originalFields forward across refreshes so $select/$expand stays valid.
       // We deliberately do NOT include synthetic fields here — FieldExpander derives them.
-      if (!t.originalFields) {
-        t.originalFields = [...spFields];
-      }
+      t.originalFields = [...spFields];
 
       // Rebuild the VIEW using FieldExpander — generates display/Id/Data/Email/etc columns
       // from the raw SP objects now stored in _raw_tableName.

@@ -62,6 +62,10 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       ];
       const NAME_FIELD_SET = new Set(NAME_FIELD_PRIORITY);
 
+      // nd.groupBy entries are { field, auto?: true } objects.
+      // Older saved state may have plain strings — _gbField normalizes both.
+      function _gbField(e) { return typeof e === 'string' ? e : (e.field || ''); }
+
       // Maps agg + source displayType → output displayType for queryColumnMeta.
       function _aggOutputDisplayType(agg, inputDT) { //TODO: does this conflict with 10-constants.js? Should this go in another file?
         if (!agg) return inputDT || 'text';
@@ -78,43 +82,31 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         return inputDT || 'text';
       }
 
+      // Helpers that derive display info from the single source of truth in DataLaVistaCore.AGG_META.
+      function _aggOpt(val) { return { val: val, label: (DataLaVistaCore.AGG_META[val] || {}).label || val }; }
+      function _aggOutputType(agg) { return (DataLaVistaCore.AGG_META[agg] || {}).outputType || 'number'; }
+
       // Which aggregates are visible for a given field displayType.
       // Used by showAggPopup() in 42-ui-shared.js (shared by advanced QB + design tab). TODO: Should this move to another file?
       /** @param {string} displayType */
       function aggsForType(displayType) {
-        const NONE          = { val: '',             label: '— none —' };
-        const COUNT         = { val: 'COUNT',        label: 'COUNT' };
-        const COUNT_DIST    = { val: 'COUNT_DISTINCT', label: 'COUNT DISTINCT' };
-        const LIST          = { val: 'LIST',         label: 'LIST' };
-        const SUM           = { val: 'SUM',          label: 'SUM' };
-        const AVG           = { val: 'AVG',          label: 'AVG' };
-        const MIN           = { val: 'MIN',          label: 'MIN' };
-        const MAX           = { val: 'MAX',          label: 'MAX' };
-        const MEDIAN        = { val: 'MEDIAN',       label: 'MEDIAN' };
-        const MODE          = { val: 'MODE',         label: 'MODE' };
-        const STDEV         = { val: 'STDEV',        label: 'STD DEV' };
-        const VAR           = { val: 'VAR',          label: 'VARIANCE' };
-        const CV            = { val: 'CV',           label: 'CV (Coeff. of Variation)' };
-        const EARLIEST      = { val: 'EARLIEST',     label: 'EARLIEST' };
-        const LATEST        = { val: 'LATEST',       label: 'LATEST' };
-        const FIRST_ALPHA   = { val: 'FIRST_ALPHA',  label: 'FIRST ALPHABETICALLY' };
-        const LAST_ALPHA    = { val: 'LAST_ALPHA',   label: 'LAST ALPHABETICALLY' };
-        const P5    = { val: 'DLV_PERCENTILE_5',  label: 'PERCENTILE 5th' };
-        const P10   = { val: 'DLV_PERCENTILE_10', label: 'PERCENTILE 10th' };
-        const P25   = { val: 'DLV_PERCENTILE_25', label: 'PERCENTILE 25th (Q1)' };
-        const P50   = { val: 'DLV_PERCENTILE_50', label: 'PERCENTILE 50th (Median)' };
-        const P75   = { val: 'DLV_PERCENTILE_75', label: 'PERCENTILE 75th (Q3)' };
-        const P90   = { val: 'DLV_PERCENTILE_90', label: 'PERCENTILE 90th' };
-        const P95   = { val: 'DLV_PERCENTILE_95', label: 'PERCENTILE 95th' };
-        const IQR   = { val: 'DLV_IQR',           label: 'IQR (Interquartile Range)' };
-        const AP5   = { val: 'DLV_ARR_PERCENTILE_5',  label: 'PERCENTILE 5th (of array)' };
-        const AP10  = { val: 'DLV_ARR_PERCENTILE_10', label: 'PERCENTILE 10th (of array)' };
-        const AP25  = { val: 'DLV_ARR_PERCENTILE_25', label: 'PERCENTILE 25th of array (Q1)' };
-        const AP50  = { val: 'DLV_ARR_PERCENTILE_50', label: 'PERCENTILE 50th of array (Median)' };
-        const AP75  = { val: 'DLV_ARR_PERCENTILE_75', label: 'PERCENTILE 75th of array (Q3)' };
-        const AP90  = { val: 'DLV_ARR_PERCENTILE_90', label: 'PERCENTILE 90th (of array)' };
-        const AP95  = { val: 'DLV_ARR_PERCENTILE_95', label: 'PERCENTILE 95th (of array)' };
-        const AIQR  = { val: 'DLV_ARR_IQR',           label: 'IQR of array' };
+        const NONE       = { val: '', label: '— none —' };
+        const COUNT      = _aggOpt('COUNT');       const COUNT_DIST = _aggOpt('COUNT_DISTINCT');
+        const LIST       = _aggOpt('LIST');        const SUM        = _aggOpt('SUM');
+        const AVG        = _aggOpt('AVG');         const MIN        = _aggOpt('MIN');
+        const MAX        = _aggOpt('MAX');         const MEDIAN     = _aggOpt('MEDIAN');
+        const MODE       = _aggOpt('MODE');        const STDEV      = _aggOpt('STDEV');
+        const VAR        = _aggOpt('VAR');         const CV         = _aggOpt('CV');
+        const EARLIEST   = _aggOpt('EARLIEST');    const LATEST     = _aggOpt('LATEST');
+        const FIRST_ALPHA = _aggOpt('FIRST_ALPHA'); const LAST_ALPHA = _aggOpt('LAST_ALPHA');
+        const P5  = _aggOpt('DLV_PERCENTILE_5');  const P10 = _aggOpt('DLV_PERCENTILE_10');
+        const P25 = _aggOpt('DLV_PERCENTILE_25'); const P50 = _aggOpt('DLV_PERCENTILE_50');
+        const P75 = _aggOpt('DLV_PERCENTILE_75'); const P90 = _aggOpt('DLV_PERCENTILE_90');
+        const P95 = _aggOpt('DLV_PERCENTILE_95'); const IQR = _aggOpt('DLV_IQR');
+        const AP5  = _aggOpt('DLV_ARR_PERCENTILE_5');  const AP10 = _aggOpt('DLV_ARR_PERCENTILE_10');
+        const AP25 = _aggOpt('DLV_ARR_PERCENTILE_25'); const AP50 = _aggOpt('DLV_ARR_PERCENTILE_50');
+        const AP75 = _aggOpt('DLV_ARR_PERCENTILE_75'); const AP90 = _aggOpt('DLV_ARR_PERCENTILE_90');
+        const AP95 = _aggOpt('DLV_ARR_PERCENTILE_95'); const AIQR = _aggOpt('DLV_ARR_IQR');
 
         if (displayType === 'number')
           return [NONE, COUNT, COUNT_DIST, SUM, AVG, MIN, MAX, MEDIAN, MODE, STDEV, VAR, CV, P5, P10, P25, P50, P75, P90, P95, IQR, LIST];
@@ -136,26 +128,19 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         return [NONE, COUNT, COUNT_DIST, FIRST_ALPHA, LAST_ALPHA, MODE, LIST];
       }
 
-      // Transpile a stored aggregate val into a SQL fragment. TODO: Does this conflict or can get out of sync with 10-contants.js?
+      // Transpile a stored aggregate val into a SQL fragment. Labels/icons/SQL mapping lives in DataLaVistaCore.AGG_META.
       // colExpr: bare SQL column reference (e.g. [alias].[field])
       // alias:   desired output alias (omitted → no AS clause)
       /** @param {string} agg @param {string} colExpr @param {string} [alias] */
       function aggToSQL(agg, colExpr, alias) {
-        const AS = alias ? ` AS [${alias}]` : '';
+        const AS  = alias ? ' AS [' + alias + ']' : '';
         const col = colExpr;
-        switch (agg) {
-          case 'EARLIEST':
-          case 'FIRST_ALPHA':   return `MIN(${col})${AS}`;
-          case 'LATEST':
-          case 'LAST_ALPHA':    return `MAX(${col})${AS}`;
-          case 'LIST':
-          case 'GROUP_CONCAT':  return `GROUP_CONCAT(${col} ORDER BY ${col} ASC SEPARATOR ';')${AS}`;
-          case 'COUNT_DISTINCT': return `COUNT(DISTINCT ${col})${AS}`;
-          case '':
-          case undefined:
-          case null:            return alias ? `${col} AS [${alias}]` : col;
-          default:              return `${agg}(${col})${AS}`;
-        }
+        if (!agg) return alias ? col + ' AS [' + alias + ']' : col;
+        if (agg === 'COUNT_DISTINCT') return 'COUNT(DISTINCT ' + col + ')' + AS;
+        if (agg === 'LIST' || agg === 'GROUP_CONCAT')
+          return 'GROUP_CONCAT(' + col + ' ORDER BY ' + col + " ASC SEPARATOR ';')" + AS;
+        var fn = (DataLaVistaCore.AGG_META[agg] || {}).sqlFn || agg;
+        return fn + '(' + col + ')' + AS;
       }
 
       // Date macro helpers — converts date filter macros (e.g. 'THIS_MONTH') to SQL range expressions.
@@ -390,7 +375,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         if (!trash || trash._dlvDropReady) return;
         trash._dlvDropReady = true;
 
-        const AQB_DROP_TYPES = new Set(['adv-node-trash','adv-field-pill','adv-join-trash',
+        const AQB_DROP_TYPES = new Set(['adv-node-trash','adv-field-pill','adv-rollup-pill','adv-join-trash',
                                          'adv-node-cond','adv-node-sort','adv-node-gb']);
 
         trash.addEventListener('dragover', e => {
@@ -438,6 +423,17 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
               });
             } else {
               poofPill(nodeId, field, () => { advNodeToggleField(nodeId, field); });
+            }
+          } else if (data.type === 'adv-rollup-pill') {
+            const { nodeId, parentAlias, childField } = data;
+            const pillEl = document.querySelector(`#adv-pills-${nodeId} [data-parent-alias="${parentAlias}"][data-child-field="${childField}"]`);
+            if (pillEl) {
+              const pr = pillEl.getBoundingClientRect();
+              shootLightning(tx, ty, pr.left + pr.width/2, pr.top + pr.height/2, () => {
+                _toggleLookupChild(nodeId, parentAlias, childField, false);
+              });
+            } else {
+              _toggleLookupChild(nodeId, parentAlias, childField, false);
             }
           } else if (data.type === 'adv-join-trash') {
             const idx = data.idx;
@@ -1094,22 +1090,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       }
 
       // ── Returns a short icon/label for an aggregate function ─────────────────
-      function getAggIcon(agg) {
-        const m = {
-          COUNT:'#', COUNT_DISTINCT:'#*', SUM:'∑', AVG:'x̄', MEDIAN:'med', MODE:'Mo',
-          MIN:'↓', MAX:'↑', STDEV:'σ', VAR:'σ²', CV:'CV',
-          EARLIEST:'↓', LATEST:'↑', FIRST_ALPHA:'A↓', LAST_ALPHA:'A↑', LIST:'≡',
-          DLV_PERCENTILE_5:'P5',   DLV_PERCENTILE_10:'P10', DLV_PERCENTILE_25:'P25',
-          DLV_PERCENTILE_50:'P50', DLV_PERCENTILE_75:'P75', DLV_PERCENTILE_90:'P90',
-          DLV_PERCENTILE_95:'P95', DLV_IQR:'IQR',
-          DLV_ARR_PERCENTILE_5:'P5',   DLV_ARR_PERCENTILE_10:'P10', DLV_ARR_PERCENTILE_25:'P25',
-          DLV_ARR_PERCENTILE_50:'P50', DLV_ARR_PERCENTILE_75:'P75', DLV_ARR_PERCENTILE_90:'P90',
-          DLV_ARR_PERCENTILE_95:'P95', DLV_ARR_IQR:'IQR',
-          // legacy
-          FIRST:'⟨', LAST:'⟩', GROUP_CONCAT:'≡'
-        };
-        return m[agg] || '∑';
-      }
+      function getAggIcon(agg) { return (DataLaVistaCore.AGG_META[agg] || {}).icon || '∑'; }
 
       // ── Returns an inline SVG Venn diagram for the given join type ────────────
       let _vennIdCounter = 0;
@@ -1222,7 +1203,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         if (!nd || !pillsEl) return;
         const fieldAggs = nd.fieldAggs || {};
 
-        if (!nd.selectedFields.length) {
+        const hasRollupEntries = Object.values(nd.lookupAggFields || {}).some(arr => arr.length > 0);
+        if (!nd.selectedFields.length && !hasRollupEntries) {
           pillsEl.innerHTML = '<span style="font-size:10px;color:var(--text-disabled);font-style:italic">No fields — select in Options</span>';
           return;
         }
@@ -1233,14 +1215,32 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         let html = visible.map(f => {
           const agg = fieldAggs[f];
           const isAgg = agg && agg !== '';
-          const label = isAgg ? `${f} (${getAggIcon(agg)})` : f;
-          return `<span class="qb-node-pill${isAgg ? ' agg-pill' : ''}" data-field="${f}" draggable="true">${label
-            }<span class="pill-x" data-node-id="${nodeId}" data-field="${f}">×</span></span>`;
+          const label = isAgg ? (f + ' (' + getAggIcon(agg) + ')') : f;
+          return '<span class="qb-node-pill' + (isAgg ? ' agg-pill' : '') + '" data-field="' + f + '" draggable="true">'
+            + label + '<span class="pill-x" data-node-id="' + nodeId + '" data-field="' + f + '">×</span></span>';
         }).join('');
 
         if (extra > 0) {
-          html += `<span class="qb-node-pill" style="background:var(--text-disabled);cursor:default"
-            title="Do you really need this many fields?">+${extra}</span>`;
+          html += '<span class="qb-node-pill" style="background:var(--text-disabled);cursor:default"'
+            + ' title="Do you really need this many fields?">+' + extra + '</span>';
+        }
+
+        // Also show active child rollup pills (from nd.lookupAggFields)
+        for (const [parentAlias, entries] of Object.entries(nd.lookupAggFields || {})) {
+          for (const { agg, alias, field: childField } of entries) {
+            const _paJs = parentAlias.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+            const _cfJs = childField.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+            const _nidJs = nodeId.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+            html += '<span class="qb-node-pill agg-pill rollup-agg-pill"'
+              + ' data-parent-alias="' + parentAlias + '" data-child-field="' + childField + '"'
+              + ' draggable="true"'
+              + ' ondragstart="event.stopPropagation();safeDragSet(event,{type:\'adv-rollup-pill\',nodeId:\'' + _nidJs + '\',parentAlias:\'' + _paJs + '\',childField:\'' + _cfJs + '\'})">'
+              + alias + ' (' + getAggIcon(agg) + ')'
+              + '<span class="rollup-pill-x"'
+              + ' onclick="event.stopPropagation();_toggleLookupChild(\'' + _nidJs + '\',\'' + _paJs + '\',\'' + _cfJs + '\',false)"'
+              + '>×</span>'
+              + '</span>';
+          }
         }
 
         pillsEl.innerHTML = html;
@@ -1283,8 +1283,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         if (idx >= 0) {
           nd.selectedFields.splice(idx, 1);
           if (nd.fieldAggs)        delete nd.fieldAggs[field];
-          if (nd.lookupAggFields)  delete nd.lookupAggFields[field];
-          if (nd.groupBy) { const gbIdx = nd.groupBy.indexOf(field); if (gbIdx >= 0) nd.groupBy.splice(gbIdx, 1); }
+          if (nd.groupBy) { const gbIdx = nd.groupBy.findIndex(e => _gbField(e) === field); if (gbIdx >= 0) nd.groupBy.splice(gbIdx, 1); }
         } else {
           nd.selectedFields.push(field);
         }
@@ -1709,8 +1708,15 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
               (DataLaVistaState.relationships || []).some(r =>
                 r.isMultiSelect && r.childTableKey === nd.tableName && r.spLookupField === f.internalName
               );
+            const activeChildEntries = hasObjChildren ? ((nd.lookupAggFields || {})[f.alias] || []) : [];
+            const childAggSummary = activeChildEntries.length
+              ? activeChildEntries.slice(0, 3).map(e => getAggIcon(e.agg)).join(' ')
+              : '∑';
+            const childAggTitle = activeChildEntries.length
+              ? activeChildEntries.map(e => e.alias).join(', ')
+              : 'Expand ▼ to select child field aggregates';
             const aggBtn = hasObjChildren
-              ? '<button class="adv-agg-btn" disabled title="Expand ▼ to select child field aggregates">∑</button>'
+              ? '<button class="adv-agg-btn' + (activeChildEntries.length ? ' has-agg' : '') + '" disabled title="' + childAggTitle + '">' + childAggSummary + '</button>'
               : '<button class="' + aggBtnCls + '" title="' + aggLabel + '"'
                 + ' onclick="event.stopPropagation();showAdvAggPopup(\'' + id + '\',\'' + f.alias + '\',this)">'
                 + aggBtnContent + '</button>';
@@ -1781,14 +1787,16 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           const renderNodeGroupBy = () => {
             if (!nd.groupBy.length)
               return '<div style="font-size:11px;color:var(--text-disabled);padding:2px 0">No grouping — click + Add</div>';
-            return nd.groupBy.map((g, gi) => `
-              <div class="qb-sort-row" draggable="true"
+            return nd.groupBy.map((g, gi) => {
+              const gField = _gbField(g);
+              return `<div class="qb-sort-row" draggable="true"
                   ondragstart="event.stopPropagation();safeDragSet(event,{type:'adv-node-gb',nodeId:'${id}',idx:${gi}})">
                 <select class="form-input qb-field-select" onchange="advNodeGB('${id}',${gi},this.value)">
-                  ${fields.map(f=>`<option value="${f.alias}" ${f.alias===g?'selected':''}>${f.alias}</option>`).join('')}
+                  ${fields.map(f=>'<option value="' + f.alias + '"' + (f.alias===gField?' selected':'') + '>' + f.alias + '</option>').join('')}
                 </select>
                 <button class="btn btn-ghost btn-sm btn-icon" onclick="advNodeRemoveGB('${id}',${gi})">✕</button>
-              </div>`).join('');
+              </div>`;
+            }).join('');
           };
 
           // ── Drop-zone handler factories ─────────────────────────
@@ -1806,12 +1814,36 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           // ── GROUP BY auto-lock when aggregates active ────────────
           const activeAggs = nd.selectedFields.filter(f => (nd.fieldAggs || {})[f]);
           const hasAggs    = activeAggs.length > 0;
+          // Also lock when child rollup aggs drive the GROUP BY (hasAggs on parent may still be false)
+          const hasChildRollupAggs = !!(nd.lookupAggFields && Object.values(nd.lookupAggFields).some(arr => arr.length > 0));
+          const gbLocked = hasAggs || hasChildRollupAggs;
           const nonAggFields = nd.selectedFields.filter(f => !(nd.fieldAggs || {})[f]);
-          const gbAutoHTML = hasAggs
+          const gbAutoMsg = hasAggs
             ? (nonAggFields.length
-                ? `<div style="font-size:11px;color:var(--text-disabled);padding:2px 0">Auto: ${nonAggFields.join(', ')}</div>`
-                : `<div style="font-size:11px;color:var(--text-disabled);padding:2px 0">All fields aggregated — no GROUP BY needed</div>`)
+                ? 'Auto: ' + nonAggFields.join(', ')
+                : 'All fields aggregated — no GROUP BY needed')
+            : 'Managed automatically (lookup rollup aggregates active)';
+          const gbAutoHTML = gbLocked
+            ? '<div style="font-size:11px;color:var(--text-disabled);padding:2px 0">' + gbAutoMsg + '</div>'
             : null;
+
+          // Expose lookupAggFields rollup outputs in Filter and Sort panels.
+          // The DLV_LOOKUP subquery always pre-aggregates, so rollup aliases are always scalar in
+          // the outer query — they belong in WHERE regardless of whether hasAggs is true.
+          // TODO: If the outer query groups OVER the subquery output, these should move to HAVING.
+          //       Add a "GROUP FILTERS" (HAVING) section to Advanced QB that auto-migrates conditions
+          //       from WHERE to HAVING when the node transitions into aggregate mode.
+          // TODO: Single-select lookup/user child fields (via simple LEFT JOIN, not DLV_LOOKUP) and
+          //       non-lookup field-level aggregates (nd.fieldAggs) should also appear in Filter/Sort.
+          //       Requires HAVING clause support and a proper single-select JOIN mechanism.
+          if (nd.lookupAggFields) {
+            for (const childEntries of Object.values(nd.lookupAggFields)) {
+              for (const { agg, alias } of childEntries) {
+                condCols.push({ alias, displayType: _aggOutputType(agg), tableKey: nd.tableName, fieldInternalName: alias });
+                if (!sortCols.includes(alias)) sortCols.push(alias);
+              }
+            }
+          }
 
           setTitle(nd.alias || nd.tableName);
           body.innerHTML = primaryHTML + `
@@ -1840,10 +1872,10 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
             </div>
             <div class="adv-node-section">
               <div class="adv-node-section-hdr">
-                <span>${hasAggs ? 'GROUP BY (auto)' : 'GROUP BY'}</span>
-                ${hasAggs ? '' : `<button class="btn btn-ghost btn-sm" onclick="advNodeAddGB('${id}')">+ Add</button>`}
+                <span>${gbLocked ? 'GROUP BY (auto)' : 'GROUP BY'}</span>
+                ${gbLocked ? '' : `<button class="btn btn-ghost btn-sm" onclick="advNodeAddGB('${id}')">+ Add</button>`}
               </div>
-              <div id="adv-node-groupby" class="adv-drop-zone">${hasAggs ? gbAutoHTML : renderNodeGroupBy()}</div>
+              <div id="adv-node-groupby" class="adv-drop-zone">${gbLocked ? gbAutoHTML : renderNodeGroupBy()}</div>
             </div>`;
 
           // Wire drop zones to accept field pills / field rows dropped onto them
@@ -1869,7 +1901,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           makeDZHandlers(groupZone, data => {
             if (data.type === 'adv-field-pill' || data.type === 'adv-field-row') {
               if (!nd.groupBy) nd.groupBy = [];
-              nd.groupBy.push(data.field);
+              nd.groupBy.push({ field: data.field });
               rebuildAdvancedSQL(); renderAdvOptionsPanel('node', id);
             }
           });
@@ -1959,7 +1991,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       function advNodeGB(nodeId, idx, val) {
         const nd = DataLaVistaState.advancedQB.nodes[nodeId];
         if (!nd) return;
-        nd.groupBy[idx] = val;
+        nd.groupBy[idx] = { field: val };
         rebuildAdvancedSQL();
         renderAdvOptionsPanel('node', nodeId);
       }
@@ -1969,7 +2001,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         const t = DataLaVistaState.tables[nd.tableName];
         const fields = t ? t.fields.filter(f => !f.isAutoId && !f.isLookupRaw) : [];
         if (!nd.groupBy) nd.groupBy = [];
-        nd.groupBy.push(fields[0]?.alias || '');
+        nd.groupBy.push({ field: fields[0]?.alias || '' });
         rebuildAdvancedSQL();
         renderAdvOptionsPanel('node', nodeId);
       }
@@ -2400,22 +2432,14 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 
       // Aggregates available for child fields by type (no "none" option — child fields always have an agg)
       function _childAggsForType(displayType) {
-        const COUNT_DIST  = { val: 'COUNT_DISTINCT', label: 'COUNT DISTINCT' };
-        const COUNT       = { val: 'COUNT',          label: 'COUNT' };
-        const LIST        = { val: 'LIST',           label: 'LIST' };
-        const SUM         = { val: 'SUM',            label: 'SUM' };
-        const AVG         = { val: 'AVG',            label: 'AVG' };
-        const MIN         = { val: 'MIN',            label: 'MIN' };
-        const MAX         = { val: 'MAX',            label: 'MAX' };
-        const MEDIAN      = { val: 'MEDIAN',         label: 'MEDIAN' };
-        const MODE        = { val: 'MODE',           label: 'MODE' };
-        const STDEV       = { val: 'STDEV',          label: 'STD DEV' };
-        const VAR         = { val: 'VAR',            label: 'VARIANCE' };
-        const CV          = { val: 'CV',             label: 'CV (Coeff. of Variation)' };
-        const EARLIEST    = { val: 'EARLIEST',       label: 'EARLIEST' };
-        const LATEST      = { val: 'LATEST',         label: 'LATEST' };
-        const FIRST_ALPHA = { val: 'FIRST_ALPHA',    label: 'FIRST ALPHABETICALLY' };
-        const LAST_ALPHA  = { val: 'LAST_ALPHA',     label: 'LAST ALPHABETICALLY' };
+        const COUNT_DIST  = _aggOpt('COUNT_DISTINCT'); const COUNT      = _aggOpt('COUNT');
+        const LIST        = _aggOpt('LIST');           const SUM        = _aggOpt('SUM');
+        const AVG         = _aggOpt('AVG');            const MIN        = _aggOpt('MIN');
+        const MAX         = _aggOpt('MAX');            const MEDIAN     = _aggOpt('MEDIAN');
+        const MODE        = _aggOpt('MODE');           const STDEV      = _aggOpt('STDEV');
+        const VAR         = _aggOpt('VAR');            const CV         = _aggOpt('CV');
+        const EARLIEST    = _aggOpt('EARLIEST');       const LATEST     = _aggOpt('LATEST');
+        const FIRST_ALPHA = _aggOpt('FIRST_ALPHA');    const LAST_ALPHA = _aggOpt('LAST_ALPHA');
 
         if (displayType === 'number')
           return [COUNT_DIST, COUNT, SUM, AVG, MIN, MAX, MEDIAN, MODE, STDEV, VAR, CV, LIST];
@@ -2446,7 +2470,9 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         const synthChildren = _fields.filter(x =>
           x.isSynthetic && !x.isLookupRaw && !x.isAutoId && x.parentField === f.internalName
         );
-        // For multi-select SP lookup fields: also include remote table fields for rollup aggregation
+        // For SP multi-select lookup fields: also include remote table fields for rollup aggregation.
+        // Single-select lookup/user fields require a different JOIN mechanism (not DLV_LOOKUP subquery).
+        // TODO: Add single-select JOIN path (simple LEFT JOIN, no aggregation required) in a future phase.
         if (f.displayType === 'lookup-multi') {
           const rel = (DataLaVistaState.relationships || []).find(r =>
             r.source === 'sharepoint-lookup' && r.isMultiSelect &&
@@ -2485,7 +2511,34 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         renderAdvOptionsPanel('node', nodeId);
       }
 
-      // Toggle a child field on/off; default agg = COUNT_DISTINCT
+      function _lookupChildAlias(parentAlias, childField, agg) {
+        return parentAlias + '_' + childField + '_' + ((DataLaVistaCore.AGG_META[agg] || {}).alias || agg);
+      }
+
+      // Pick a smart default agg for a child rollup field based on its name
+      function _smartChildAgg(nd, childField) {
+        if (NAME_FIELD_SET.has(childField.toLowerCase())) return 'LIST';
+        const lc = childField.toLowerCase();
+        if (lc.endsWith('name') || lc.endsWith('title')) return 'LIST';
+        // Look up display type from the remote table if possible
+        const tableFields = DataLaVistaState.tables[nd.tableName]?.fields || [];
+        const remoteRels  = (DataLaVistaState.relationships || []).filter(r =>
+          r.source === 'sharepoint-lookup' && r.childTableKey === nd.tableName
+        );
+        for (const rel of remoteRels) {
+          const remoteT = DataLaVistaState.tables[rel.parentTableKey];
+          if (!remoteT) continue;
+          const rf = (remoteT.fields || []).find(f => (f.alias || f.internalName) === childField);
+          if (!rf) continue;
+          if (rf.displayType === 'number') return 'SUM';
+          if (rf.displayType === 'date' || rf.displayType === 'datetime') return 'LATEST';
+          if (rf.displayType === 'text' && (lc.endsWith('name') || lc.endsWith('title'))) return 'LIST';
+          return 'COUNT_DISTINCT';
+        }
+        return 'COUNT_DISTINCT';
+      }
+
+      // Toggle a child field on/off; default agg chosen by _smartChildAgg
       function _toggleLookupChild(nodeId, parentAlias, childField, checked) {
         const nd = DataLaVistaState.advancedQB.nodes[nodeId];
         if (!nd) return;
@@ -2493,25 +2546,38 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         if (!nd.lookupAggFields[parentAlias]) nd.lookupAggFields[parentAlias] = [];
         if (checked) {
           if (!nd.lookupAggFields[parentAlias].find(x => x.field === childField)) {
+            const defaultAgg = _smartChildAgg(nd, childField);
             nd.lookupAggFields[parentAlias].push({
               field: childField,
-              agg: 'COUNT_DISTINCT',
-              alias: parentAlias + '_' + childField
+              agg: defaultAgg,
+              alias: _lookupChildAlias(parentAlias, childField, defaultAgg)
             });
           }
         } else {
           nd.lookupAggFields[parentAlias] = nd.lookupAggFields[parentAlias].filter(x => x.field !== childField);
         }
         rebuildAdvancedSQL();
+        updateAdvNodePills(nodeId);
         renderAdvOptionsPanel('node', nodeId);
       }
 
-      // Change the aggregate for a checked child field
+      // Change the aggregate for a checked child field; also updates the alias and migrates
+      // any saved conditions/sorts that referenced the old alias.
       function _setLookupChildAgg(nodeId, parentAlias, childField, newAgg) {
         const nd = DataLaVistaState.advancedQB.nodes[nodeId];
         if (!nd?.lookupAggFields?.[parentAlias]) return;
         const entry = nd.lookupAggFields[parentAlias].find(x => x.field === childField);
-        if (entry) { entry.agg = newAgg; rebuildAdvancedSQL(); }
+        if (!entry) return;
+        const oldAlias = entry.alias;
+        entry.agg = newAgg;
+        entry.alias = _lookupChildAlias(parentAlias, childField, newAgg);
+        if (oldAlias !== entry.alias) {
+          if (nd.conditions) nd.conditions.forEach(c => { if (c.field === oldAlias) c.field = entry.alias; });
+          if (nd.sorts) nd.sorts.forEach(s => { if (s.field === oldAlias) s.field = entry.alias; });
+          renderAdvOptionsPanel('node', nodeId);
+        }
+        rebuildAdvancedSQL();
+        updateAdvNodePills(nodeId);
       }
 
       // Render the indented child-field rows for an expanded field.
@@ -2804,18 +2870,25 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           ? [...(allFields.length ? selects : []), ...childSelects]
           : selects;
 
-        // Auto GROUP BY: if any field has an agg, non-agg fields need to be in GROUP BY
+        // Auto GROUP BY: if any field has an agg, non-agg fields need to be in GROUP BY.
+        // Auto-added entries are stored as { field, auto: true } so they can be removed
+        // cleanly when the last aggregate is removed (Bug 8).
         const hasAnyAgg = allFields.some(f => f.agg);
         if (hasAnyAgg) {
           for (const [, nd] of nodes) {
             if (!nd.groupBy) nd.groupBy = [];
             const fieldAggs = nd.fieldAggs || {};
-            // Purge fields that now have an aggregate (may have been added in a previous pass)
-            nd.groupBy = nd.groupBy.filter(fa => !fieldAggs[fa]);
-            // Add non-aggregated selected fields not already present
+            // Purge entries for fields that now have an aggregate
+            nd.groupBy = nd.groupBy.filter(e => !fieldAggs[_gbField(e)]);
+            // Add non-aggregated selected fields as auto entries if not already present
             for (const fa of nd.selectedFields) {
-              if (!fieldAggs[fa] && !nd.groupBy.includes(fa)) nd.groupBy.push(fa);
+              if (!fieldAggs[fa] && !nd.groupBy.some(e => _gbField(e) === fa)) nd.groupBy.push({ field: fa, auto: true });
             }
+          }
+        } else {
+          // No aggregates active — remove any auto-added GROUP BY entries
+          for (const [, nd] of nodes) {
+            if (nd.groupBy) nd.groupBy = nd.groupBy.filter(e => !e.auto);
           }
         }
 
@@ -2933,14 +3006,37 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         const allGB = [];
         for (const [nid, nd] of nodes) {
           if (nd.groupBy && nd.groupBy.length)
-            nd.groupBy.forEach(g => allGB.push(`[${getNodeAlias(nid, nd)}].[${g}]`));
+            nd.groupBy.forEach(g => allGB.push('[' + getNodeAlias(nid, nd) + '].[' + _gbField(g) + ']'));
+        }
+        // When outer query has GROUP BY but DLV_LOOKUP rollup subqueries are in direct mode
+        // (hasParentAgg=false), their output columns are scalar per primary PK but not yet in
+        // any GROUP BY or aggregate — add them so the SQL engine doesn't return NULL/error.
+        if (allGB.length && !hasParentAgg) {
+          for (const [, nd] of nodes) {
+            if (!nd.lookupAggFields) continue;
+            for (const [pa, entries] of Object.entries(nd.lookupAggFields)) {
+              if (!entries || !entries.length) continue;
+              const subAlias = '_dlv_' + pa;
+              for (const { alias } of entries) allGB.push('[' + subAlias + '].[' + alias + ']');
+            }
+          }
         }
         if (allGB.length) sql += `\nGROUP BY ${allGB.join(', ')}`;
 
         const allOrder = [];
         for (const [nid, nd] of nodes) {
-          if (nd.sorts && nd.sorts.length)
-            nd.sorts.forEach(s => allOrder.push(`[${getNodeAlias(nid, nd)}].[${s.field}] ${s.dir || 'ASC'}`));
+          if (nd.sorts && nd.sorts.length) {
+            const rollupSub = /** @type {Record<string,string>} */ ({});
+            if (nd.lookupAggFields)
+              for (const [pa, entries] of Object.entries(nd.lookupAggFields))
+                for (const { alias } of entries) rollupSub[alias] = '_dlv_' + pa;
+            nd.sorts.forEach(s => {
+              const ref = rollupSub[s.field]
+                ? '[' + rollupSub[s.field] + '].[' + s.field + ']'
+                : '[' + getNodeAlias(nid, nd) + '].[' + s.field + ']';
+              allOrder.push(ref + ' ' + (s.dir || 'ASC'));
+            });
+          }
         }
         if (allOrder.length) sql += `\nORDER BY ${allOrder.join(', ')}`;
 
@@ -2957,11 +3053,25 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           || tableKey;
         const prefix = vname ? `[${vname}].` : '';
         const t = DataLaVistaState.tables[tableKey];
+        const rollupMap = /** @type {Record<string,{sub:string,dt:string}>} */ ({});
+        if (nd.lookupAggFields) {
+          for (const [pa, entries] of Object.entries(nd.lookupAggFields)) {
+            const sub = '_dlv_' + pa;
+            for (const { agg, alias } of entries)
+              rollupMap[alias] = { sub, dt: _aggOutputType(agg) };
+          }
+        }
         return nd.conditions.map((c, i) => {
           const conj = i === 0 ? '' : (c.conj + ' ');
-          const col  = `${prefix}[${c.field}]`;
-          const fieldMeta = t && t.fields && t.fields.find(f => f.alias === c.field);
-          const dt = fieldMeta ? (fieldMeta.displayType || 'text') : 'text';
+          let col, dt;
+          if (rollupMap[c.field]) {
+            col = '[' + rollupMap[c.field].sub + '].[' + c.field + ']';
+            dt  = rollupMap[c.field].dt;
+          } else {
+            col = prefix + '[' + c.field + ']';
+            const fm = t && t.fields && t.fields.find(/** @param {any} f */ f => f.alias === c.field);
+            dt = fm ? (fm.displayType || 'text') : 'text';
+          }
           return conj + condToSQL(c, col, dt);
         }).join(' ');
       }
