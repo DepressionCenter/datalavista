@@ -1236,7 +1236,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
               + ' draggable="true"'
               + ' ondragstart="event.stopPropagation();safeDragSet(event,{type:\'adv-rollup-pill\',nodeId:\'' + _nidJs + '\',parentAlias:\'' + _paJs + '\',childField:\'' + _cfJs + '\'})">'
               + alias + ' (' + getAggIcon(agg) + ')'
-              + '<span class="rollup-pill-x"'
+              + '<span class="rollup-pill-x" style="cursor:pointer"'
               + ' onclick="event.stopPropagation();_toggleLookupChild(\'' + _nidJs + '\',\'' + _paJs + '\',\'' + _cfJs + '\',false)"'
               + '>×</span>'
               + '</span>';
@@ -1702,11 +1702,12 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
             const aggBtnCls   = 'adv-agg-btn' + (aggActive ? ' has-agg' : '');
             const aggLabel    = aggActive ? (aggsForType(f.displayType).find(a => a.val === agg)?.label || agg) : 'No aggregate';
             const aggBtnContent = aggActive ? getAggIcon(agg) : '∑';
-            // Disable agg button only for multi-select SP lookup fields that have remote rollup children
+            // Disable agg button only for multi-select SP lookup/user fields that have remote rollup children
             // (the user must expand and pick child field aggregates instead of aggregating the parent directly).
-            const hasObjChildren = expandable && f.displayType === 'lookup-multi' &&
+            const hasObjChildren = expandable && (f.displayType === 'lookup-multi' || f.displayType === 'user-multi') &&
               (DataLaVistaState.relationships || []).some(r =>
-                r.isMultiSelect && r.childTableKey === nd.tableName && r.spLookupField === f.internalName
+                r.source === 'sharepoint-lookup' &&
+                r.childTableKey === nd.tableName && r.spLookupField === f.internalName
               );
             const activeChildEntries = hasObjChildren ? ((nd.lookupAggFields || {})[f.alias] || []) : [];
             const childAggSummary = activeChildEntries.length
@@ -2369,8 +2370,9 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       }
 
       // Returns true if a field should get the expand-to-children UX.
-      // Any non-synthetic field with at least one non-raw, non-autoId synthetic child is expandable.
-      // Date types are excluded here — they are handled separately by _isExpandableDateField.
+      // True when: at least one non-raw, non-autoId synthetic child exists, OR
+      // the field is a lookup/user type with a remote SP relationship (single- or multi-select).
+      // Date types are excluded — handled by _isExpandableDateField.
       function _isExpandableLookupField(f, t, tableName = '') {
         if (!f || !t || f.isLookupRaw || f.isAutoId || f.isSynthetic) return false;
         if (f.displayType === 'date' || f.displayType === 'datetime') return false;
@@ -2378,7 +2380,15 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         const _vn = tableName && _cp.rawTableToView[tableName];
         const _vf = _vn && _cp.views[_vn] && _cp.views[_vn].fields;
         const _fields = /** @type {any[]} */ (_vf || t.fields || []);
-        return _fields.some(x => x.isSynthetic && !x.isLookupRaw && !x.isAutoId && x.parentField === f.internalName);
+        if (_fields.some(x => x.isSynthetic && !x.isLookupRaw && !x.isAutoId && x.parentField === f.internalName)) return true;
+        if (['lookup-multi', 'lookup', 'user', 'user-multi'].includes(f.displayType) && tableName) {
+          return (DataLaVistaState.relationships || []).some(r =>
+            r.source === 'sharepoint-lookup' &&
+            r.childTableKey === tableName && r.spLookupField === f.internalName &&
+            DataLaVistaState.tables[r.parentTableKey]
+          );
+        }
+        return false;
       }
 
       // Returns true if f is a synthetic field whose parent is a date-typed field
@@ -2470,12 +2480,11 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         const synthChildren = _fields.filter(x =>
           x.isSynthetic && !x.isLookupRaw && !x.isAutoId && x.parentField === f.internalName
         );
-        // For SP multi-select lookup fields: also include remote table fields for rollup aggregation.
-        // Single-select lookup/user fields require a different JOIN mechanism (not DLV_LOOKUP subquery).
-        // TODO: Add single-select JOIN path (simple LEFT JOIN, no aggregation required) in a future phase.
-        if (f.displayType === 'lookup-multi') {
+        // For SP multi-select lookup and user-multi fields: include remote table fields for rollup aggregation.
+        // Single-select lookup/user fields use a different JOIN path (Phase 6, not yet implemented).
+        if (f.displayType === 'lookup-multi' || f.displayType === 'user-multi') {
           const rel = (DataLaVistaState.relationships || []).find(r =>
-            r.source === 'sharepoint-lookup' && r.isMultiSelect &&
+            r.source === 'sharepoint-lookup' &&
             r.childTableKey === tableKey && r.spLookupField === f.internalName
           );
           const remoteTable = rel?.parentTableKey && DataLaVistaState.tables[rel.parentTableKey];
@@ -2817,7 +2826,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
             const parentField = t?.fields?.find(f => f.alias === parentAlias);
             if (!parentField) continue;
 
-            if (parentField.displayType === 'lookup' || parentField.displayType === 'lookup-multi') {
+            if (parentField.displayType === 'lookup' || parentField.displayType === 'lookup-multi' || parentField.displayType === 'user-multi') {
               const remoteView = _getRemoteViewForLookup(nd.tableName, parentAlias);
               if (!remoteView) continue;
               const subAlias = '_dlv_' + parentAlias;
@@ -2959,7 +2968,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
             const localViewName = getView(childNd.tableName);
             const localPK = _resolveTablePK(childTable);
             const childFieldMeta = childTable?.fields.find(f => f.alias === childLookupKey);
-            const lookupColName = (childFieldMeta?.displayType === 'lookup' || childFieldMeta?.displayType === 'lookup-multi')
+            const lookupColName = (['lookup', 'lookup-multi', 'user-multi'].includes(childFieldMeta?.displayType))
               ? childLookupKey + 'Data'
               : childLookupKey;
             const childAlias  = getNodeAlias(childNodeId,  childNd);
