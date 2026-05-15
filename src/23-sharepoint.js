@@ -440,7 +440,7 @@ async function fetchTableData(tableName, fetchAll = false) {
   const limit = fetchAll ? 50000 : 10;
  
   // Skip if we already have enough data
-  if (fetchAll && t.loaded && t.itemCount > 10) return;
+  if (fetchAll && t.loaded) return;
   if (!fetchAll && t.itemCount >= 10) return;
  
   // *** PROMISE TRACKER: If a fetch is already running, return its promise ***

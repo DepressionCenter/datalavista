@@ -592,7 +592,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           sorts: [],
           groupBy: [],
           fieldAggs: {},
-          lookupAggFields: {}   // { [parentAlias]: [{ field, agg, alias }] }
+          lookupAggFields:    {},  // { [parentAlias]: [{ field, agg, alias }] }
+          lookupDirectFields: {}   // { [parentAlias]: [{ field, alias, relParentKey, displayType }] }
         };
 
         // Auto-assign primary table to the first node added
@@ -648,18 +649,20 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         const deriveSPAlias = (childTableKey, childField) => {
           const childT = DataLaVistaState.tables[childTableKey];
           const childAlias = childT?.alias || childTableKey;
-          // childField is the *Data synthetic field; strip 'Data' suffix to get the internalName,
-          // then look up the field's alias (view column name) for the display label.
-          const fieldInternalName = childField.endsWith('Data') ? childField.slice(0, -4) : childField;
-          const fieldObj = (childT?.fields || []).find(f => f.internalName === fieldInternalName);
-          const fieldBase = fieldObj?.alias || fieldInternalName;
+          // Strip synthetic suffixes (*Data for multi-select, *Id for single-select) to get
+          // the real field internalName, then use its display alias for the label.
+          const stripped = childField.endsWith('Data') ? childField.slice(0, -4)
+            : childField.endsWith('Id') ? childField.slice(0, -2)
+            : childField;
+          const fieldObj = (childT?.fields || []).find(f => f.internalName === stripped);
+          const fieldBase = fieldObj?.alias || stripped;
           return childAlias + '_' + fieldBase;
         };
 
         // Track how many times we've used the new node as parent/child for a given lookup field,
         // so subsequent rels get a fresh sibling node instead.
         const usedNewNodeForParent = new Set(); // childTableKey already handled via newNodeId as parent
-        let _newNodeUsedAsChildDLV = false;     // true after newNodeId first used as fromNode in a DLV_LOOKUP child rel
+        let _newNodeUsedAsChild = false;        // true after newNodeId first used as fromNode in any child rel
         let _sibParentCount = 0;
         let _sibChildCount  = 0;
 
@@ -710,16 +713,15 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           updateAdvNodePills(nodeId);
         }
 
-        // Group multi-select SP lookup rels by counterpart table to detect modal cases
-        const parentMultiLookupGrouped = {}; // childTableKey → rel[] (new node is parent)
-        const childMultiLookupGrouped  = {}; // parentTableKey → rel[] (new node is child)
+        // Group ALL rels by counterpart table to detect multi-link cases (any combination of types)
+        const parentGrouped = {}; // childTableKey → rel[] (new node is parent)
+        const childGrouped  = {}; // parentTableKey → rel[] (new node is child)
         for (const rel of rels) {
-          if (!(rel.source === 'sharepoint-lookup' && rel.isMultiSelect)) continue;
           if (rel.childTableKey === rel.parentTableKey) continue;
           if (rel.parentTableKey === newTableName && existingTableToNodes[rel.childTableKey])
-            (parentMultiLookupGrouped[rel.childTableKey] ??= []).push(rel);
+            (parentGrouped[rel.childTableKey] ??= []).push(rel);
           else if (rel.childTableKey === newTableName && existingTableToNodes[rel.parentTableKey])
-            (childMultiLookupGrouped[rel.parentTableKey] ??= []).push(rel);
+            (childGrouped[rel.parentTableKey] ??= []).push(rel);
         }
 
         // Apply a single rel where the new node is the parent (toNodeId side)
@@ -777,9 +779,9 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           const toNodeId = existingTableToNodes[rel.parentTableKey][0];
           const relDlvAlias = deriveSPAlias(rel.childTableKey, rel.childField);
           let fromNodeId;
-          if (!_newNodeUsedAsChildDLV) {
+          if (!_newNodeUsedAsChild) {
             fromNodeId = newNodeId;
-            _newNodeUsedAsChildDLV = true;
+            _newNodeUsedAsChild = true;
             DataLaVistaState.advancedQB.nodeAliases ??= {};
             DataLaVistaState.advancedQB.nodeAliases[newNodeId] = relDlvAlias;
           } else {
@@ -799,52 +801,62 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           });
         }
 
+        // Apply a single non-DLV_LOOKUP (LEFT JOIN) rel where the new node is the child (fromNodeId side)
+        function _applyChildSingleRel(rel) {
+          const childT  = DataLaVistaState.tables[rel.childTableKey];
+          const parentT = DataLaVistaState.tables[rel.parentTableKey];
+          const childFieldAlias  = (childT?.fields || []).find(f => f.internalName === rel.childField)?.alias  || rel.childField;
+          const parentFieldAlias = (parentT?.fields || []).find(f => f.internalName === rel.parentField)?.alias || rel.parentField;
+          const joinType = rel.joinType || 'LEFT';
+          const relAlias = deriveSPAlias(rel.childTableKey, rel.childField);
+          let fromNodeId;
+          if (!_newNodeUsedAsChild) {
+            fromNodeId = newNodeId;
+            _newNodeUsedAsChild = true;
+          } else {
+            _sibChildCount++;
+            const nd0 = DataLaVistaState.advancedQB.nodes[newNodeId];
+            fromNodeId = addAdvNode(newTableName, (nd0?.x ?? 0) + 200, (nd0?.y ?? 0) + _sibChildCount * 100, undefined, relAlias, true);
+          }
+          const toNodeId = existingTableToNodes[rel.parentTableKey][0];
+          const preAlreadyJoined = DataLaVistaState.advancedQB.joins.some(j => {
+            const jFrom = DataLaVistaState.advancedQB.nodes[j.fromNode]?.tableName;
+            const jTo   = DataLaVistaState.advancedQB.nodes[j.toNode]?.tableName;
+            if (!((jFrom === rel.childTableKey && jTo === rel.parentTableKey) ||
+                  (jFrom === rel.parentTableKey && jTo === rel.childTableKey))) return false;
+            normalizeJoinKeys(j);
+            return j.keys.some(k => k.fromKey === childFieldAlias && k.toKey === parentFieldAlias);
+          });
+          if (preAlreadyJoined) return;
+          DataLaVistaState.advancedQB.joins.push({
+            fromNode: fromNodeId, fromSide: 'right',
+            toNode: toNodeId,     toSide: 'left',
+            fromKey: childFieldAlias, toKey: parentFieldAlias, type: joinType
+          });
+        }
+
         // Main loop: auto-apply single-rel cases; skip multi-rel groups (handled by modal)
         for (const rel of rels) {
           if (rel.childTableKey === rel.parentTableKey) continue;
           const isMultiLookup = rel.source === 'sharepoint-lookup' && rel.isMultiSelect;
 
           if (rel.parentTableKey === newTableName && existingTableToNodes[rel.childTableKey]) {
-            if (isMultiLookup && (parentMultiLookupGrouped[rel.childTableKey]?.length ?? 0) > 1) continue;
+            if ((parentGrouped[rel.childTableKey]?.length ?? 0) > 1) continue;
             _applyParentRel(rel);
 
           } else if (rel.childTableKey === newTableName && existingTableToNodes[rel.parentTableKey]) {
-            if (isMultiLookup) {
-              if ((childMultiLookupGrouped[rel.parentTableKey]?.length ?? 0) > 1) continue;
-              _applyChildDLVRel(rel);
-            } else {
-              // Non-DLV_LOOKUP child rel (LEFT JOIN, sqlite-fk, etc.)
-              const childT  = DataLaVistaState.tables[rel.childTableKey];
-              const parentT = DataLaVistaState.tables[rel.parentTableKey];
-              const childFieldAlias  = (childT?.fields || []).find(f => f.internalName === rel.childField)?.alias  || rel.childField;
-              const parentFieldAlias = (parentT?.fields || []).find(f => f.internalName === rel.parentField)?.alias || rel.parentField;
-              const joinType   = rel.joinType || 'LEFT';
-              const fromNodeId = newNodeId;
-              const toNodeId   = existingTableToNodes[rel.parentTableKey][0];
-              const preAlreadyJoined = DataLaVistaState.advancedQB.joins.some(j => {
-                const jFrom = DataLaVistaState.advancedQB.nodes[j.fromNode]?.tableName;
-                const jTo   = DataLaVistaState.advancedQB.nodes[j.toNode]?.tableName;
-                if (!((jFrom === rel.childTableKey && jTo === rel.parentTableKey) ||
-                      (jFrom === rel.parentTableKey && jTo === rel.childTableKey))) return false;
-                normalizeJoinKeys(j);
-                return j.keys.some(k => k.fromKey === childFieldAlias && k.toKey === parentFieldAlias);
-              });
-              if (preAlreadyJoined) continue;
-              DataLaVistaState.advancedQB.joins.push({
-                fromNode: fromNodeId, fromSide: 'right',
-                toNode: toNodeId,     toSide: 'left',
-                fromKey: childFieldAlias, toKey: parentFieldAlias, type: joinType
-              });
-            }
+            if ((childGrouped[rel.parentTableKey]?.length ?? 0) > 1) continue;
+            if (isMultiLookup) _applyChildDLVRel(rel);
+            else               _applyChildSingleRel(rel);
           }
         }
 
         // Show picker modal for multi-rel groups (one modal per group, sequenced)
         const modalGroups = [];
-        for (const [k, groupRels] of Object.entries(parentMultiLookupGrouped)) {
+        for (const [k, groupRels] of Object.entries(parentGrouped)) {
           if (groupRels.length > 1) modalGroups.push({ direction: 'parent', counterpartKey: k, rels: groupRels });
         }
-        for (const [k, groupRels] of Object.entries(childMultiLookupGrouped)) {
+        for (const [k, groupRels] of Object.entries(childGrouped)) {
           if (groupRels.length > 1) modalGroups.push({ direction: 'child', counterpartKey: k, rels: groupRels });
         }
         if (modalGroups.length > 0) _showLookupPickerModal(modalGroups, 0);
@@ -853,7 +865,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           if (groupIdx >= groups.length) return;
           const { direction, counterpartKey, rels: groupRels } = groups[groupIdx];
           const counterpartName = DataLaVistaState.tables[counterpartKey]?.alias || counterpartKey;
-          const applyRel = direction === 'parent' ? _applyParentRel : _applyChildDLVRel;
 
           const overlay = document.createElement('div');
           overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:10200;display:flex;align-items:center;justify-content:center;';
@@ -879,7 +890,9 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
             cb.type = 'checkbox';
             cb.checked = true;
             const span = document.createElement('span');
-            span.textContent = deriveSPAlias(rel.childTableKey, rel.childField);
+            const isMultiSel = rel.source === 'sharepoint-lookup' && rel.isMultiSelect;
+            span.textContent = deriveSPAlias(rel.childTableKey, rel.childField)
+              + (isMultiSel ? ' [multi]' : ' [single]');
             lbl.append(cb, span);
             list.appendChild(lbl);
             checkboxes.push({ cb, rel });
@@ -919,7 +932,23 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
             _showLookupPickerModal(groups, groupIdx + 1);
           });
           applyBtn.addEventListener('click', () => {
-            for (const { cb, rel } of checkboxes) { if (cb.checked) applyRel(rel); }
+            for (const { cb, rel } of checkboxes) {
+              if (!cb.checked) continue;
+              if (direction === 'parent') {
+                _applyParentRel(rel);
+              } else {
+                const isMulti = rel.source === 'sharepoint-lookup' && rel.isMultiSelect;
+                (isMulti ? _applyChildDLVRel : _applyChildSingleRel)(rel);
+              }
+            }
+            const _hdrEl = document.getElementById('adv-' + newNodeId);
+            const _hdrSpan = _hdrEl?.querySelector('.qb-node-header span:not(.qb-node-join-icon)');
+            if (_hdrSpan) {
+              const _nd = DataLaVistaState.advancedQB.nodes[newNodeId];
+              const _a  = DataLaVistaState.advancedQB.nodeAliases?.[newNodeId];
+              const _b  = _nd?.alias || _nd?.tableName || '';
+              _hdrSpan.innerHTML = _b + (_a && _a !== _b ? ` <span style="opacity:.6;font-size:11px">(${_a})</span>` : '');
+            }
             close();
             document.removeEventListener('keydown', onKey);
             redrawJoins();
@@ -1588,23 +1617,37 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           const fromFields = augmentFields(fromT, fromND?.tableName);
           const toFields   = augmentFields(toT,   toND?.tableName);
           const isLookupJoin = j.type === 'DLV_LOOKUP';
+          const _isLookupField = f =>
+            f.displayType === 'lookup' || f.displayType === 'lookup-multi' ||
+            f.displayType === 'array'  || (f.alias || '').endsWith('Data');
+          const _isIdField = f => f.isAutoId || f.displayType === 'number' || f.displayType === 'text';
+          // Detect which side holds the lookup/array field (child side) to apply correct restrictions
+          // and swap the display so the parent always appears on the LEFT.
+          const _kp0 = j.keys[0];
+          const _fromKeyMeta = _kp0?.fromKey ? fromFields.find(f => f.alias === _kp0.fromKey) : null;
+          const fromIsChild = isLookupJoin && (_fromKeyMeta
+            ? _isLookupField(_fromKeyMeta)
+            : fromFields.some(_isLookupField));
+          const displaySwapped = j.toNode === DataLaVistaState.advancedQB.primaryNodeId;
           const filteredFromFields = isLookupJoin
-            ? fromFields.filter(f => f.displayType === 'lookup' || f.displayType === 'lookup-multi' || f.displayType === 'array' || (f.alias || '').endsWith('Data'))
+            ? (fromIsChild ? fromFields.filter(_isLookupField) : fromFields.filter(_isIdField))
             : fromFields;
           const filteredToFields = isLookupJoin
-            ? toFields.filter(f => f.isAutoId || f.displayType === 'number' || f.displayType === 'text')
+            ? (fromIsChild ? toFields.filter(_isIdField) : toFields.filter(_isLookupField))
             : toFields;
           const makeFromOpts = (selectedKey) => filteredFromFields.map(f => `<option value="${f.alias}" ${f.alias === selectedKey ? 'selected' : ''}>${f.alias}${f.isAutoId ? ' [auto]' : ''}</option>`).join('');
           const makeToOpts   = (selectedKey) => filteredToFields.map(f => `<option value="${f.alias}" ${f.alias === selectedKey ? 'selected' : ''}>${f.alias}${f.isAutoId ? ' [auto]' : ''}</option>`).join('');
+          const leftAlias  = displaySwapped ? toAlias   : fromAlias;
+          const rightAlias = displaySwapped ? fromAlias : toAlias;
 
           const keyPairRows = j.keys.map((kp, ki) => `
             <div class="adv-join-key-row" style="display:grid;grid-template-columns:1fr auto 1fr auto;gap:4px;align-items:center;margin-bottom:4px">
-              <select class="form-input" style="height:26px" onchange="setActiveJoinKeyProp(${ki},'fromKey',this.value)">
-                ${makeFromOpts(kp.fromKey)}
+              <select class="form-input" style="height:26px" onchange="setActiveJoinKeyProp(${ki},'${displaySwapped ? 'toKey' : 'fromKey'}',this.value)">
+                ${displaySwapped ? makeToOpts(kp.toKey) : makeFromOpts(kp.fromKey)}
               </select>
               <span style="font-size:13px;color:var(--text-disabled);padding:0 2px">=</span>
-              <select class="form-input" style="height:26px" onchange="setActiveJoinKeyProp(${ki},'toKey',this.value)">
-                ${makeToOpts(kp.toKey)}
+              <select class="form-input" style="height:26px" onchange="setActiveJoinKeyProp(${ki},'${displaySwapped ? 'fromKey' : 'toKey'}',this.value)">
+                ${displaySwapped ? makeFromOpts(kp.fromKey) : makeToOpts(kp.toKey)}
               </select>
               <button class="btn btn-sm" style="padding:0 5px;height:26px;min-width:24px;background:transparent;color:var(--text-disabled);font-size:14px;line-height:1"
                 title="Remove this key pair" ${j.keys.length <= 1 ? 'disabled style="opacity:.3;padding:0 5px;height:26px;min-width:24px"' : ''}
@@ -1614,18 +1657,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           setTitle('Join Options');
           body.innerHTML = `
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-              <div style="font-size:11px;font-weight:600;color:var(--text-disabled)">LEFT: ${fromAlias}</div>
-              <div style="font-size:11px;color:var(--text-disabled)">RIGHT: ${toAlias}</div>
-            </div>
-            <div class="form-group" style="margin-bottom:4px">
-              <label>Alias (left)</label>
-              <input type="text" class="form-input" style="height:26px" value="${fromAlias}"
-                oninput="if(DataLaVistaState.advancedQB.nodes['${j.fromNode}']) { DataLaVistaState.advancedQB.nodes['${j.fromNode}'].alias=this.value; if(DataLaVistaState.advancedQB.nodeAliases?.['${j.fromNode}']!==undefined) DataLaVistaState.advancedQB.nodeAliases['${j.fromNode}']=this.value; rebuildAdvancedSQL(); }"/>
-            </div>
-            <div class="form-group" style="margin-bottom:8px">
-              <label>Alias (right)</label>
-              <input type="text" class="form-input" style="height:26px" value="${toAlias}"
-                oninput="if(DataLaVistaState.advancedQB.nodes['${j.toNode}']) { DataLaVistaState.advancedQB.nodes['${j.toNode}'].alias=this.value; if(DataLaVistaState.advancedQB.nodeAliases?.['${j.toNode}']!==undefined) DataLaVistaState.advancedQB.nodeAliases['${j.toNode}']=this.value; rebuildAdvancedSQL(); }"/>
+              <div style="font-size:11px;font-weight:600;color:var(--text-disabled)">LEFT: ${leftAlias}</div>
+              <div style="font-size:11px;color:var(--text-disabled)">RIGHT: ${rightAlias}</div>
             </div>
             <div class="adv-node-section-hdr" style="margin-bottom:6px">KEY FIELDS
             ${isLookupJoin ? '' : `<span class="qb-badge" style="font-size:10px;padding:2px 8px;cursor:pointer;margin-left:4px"
@@ -1817,13 +1850,16 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           const hasAggs    = activeAggs.length > 0;
           // Also lock when child rollup aggs drive the GROUP BY (hasAggs on parent may still be false)
           const hasChildRollupAggs = !!(nd.lookupAggFields && Object.values(nd.lookupAggFields).some(arr => arr.length > 0));
-          const gbLocked = hasAggs || hasChildRollupAggs;
+          const hasDLVLookupToThisNode = (DataLaVistaState.advancedQB.joins || []).some(j =>
+            j.type === 'DLV_LOOKUP' && j.toNode === id
+          );
+          const gbLocked = hasAggs || hasChildRollupAggs || hasDLVLookupToThisNode;
           const nonAggFields = nd.selectedFields.filter(f => !(nd.fieldAggs || {})[f]);
           const gbAutoMsg = hasAggs
             ? (nonAggFields.length
                 ? 'Auto: ' + nonAggFields.join(', ')
                 : 'All fields aggregated — no GROUP BY needed')
-            : 'Managed automatically (lookup rollup aggregates active)';
+            : 'Managed automatically (aggregated lookup joins active)';
           const gbAutoHTML = gbLocked
             ? '<div style="font-size:11px;color:var(--text-disabled);padding:2px 0">' + gbAutoMsg + '</div>'
             : null;
@@ -1841,6 +1877,14 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
             for (const childEntries of Object.values(nd.lookupAggFields)) {
               for (const { agg, alias } of childEntries) {
                 condCols.push({ alias, displayType: _aggOutputType(agg), tableKey: nd.tableName, fieldInternalName: alias });
+                if (!sortCols.includes(alias)) sortCols.push(alias);
+              }
+            }
+          }
+          if (nd.lookupDirectFields) {
+            for (const dirEntries of Object.values(nd.lookupDirectFields)) {
+              for (const { alias, displayType } of dirEntries) {
+                condCols.push({ alias, displayType: displayType || 'text', tableKey: nd.tableName, fieldInternalName: alias });
                 if (!sortCols.includes(alias)) sortCols.push(alias);
               }
             }
@@ -2481,7 +2525,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           x.isSynthetic && !x.isLookupRaw && !x.isAutoId && x.parentField === f.internalName
         );
         // For SP multi-select lookup and user-multi fields: include remote table fields for rollup aggregation.
-        // Single-select lookup/user fields use a different JOIN path (Phase 6, not yet implemented).
         if (f.displayType === 'lookup-multi' || f.displayType === 'user-multi') {
           const rel = (DataLaVistaState.relationships || []).find(r =>
             r.source === 'sharepoint-lookup' &&
@@ -2493,6 +2536,22 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
               !rf.isAutoId && !rf.isLookupRaw && !rf.isSynthetic &&
               !['lookup', 'lookup-multi', 'array', 'object'].includes(rf.displayType)
             ).map(rf => ({ ...rf, _isRemoteRollup: true }));
+            return [...synthChildren, ...remoteFields];
+          }
+        }
+        // For single-select lookup/user fields: direct LEFT JOIN path (no aggregation).
+        if (f.displayType === 'lookup' || f.displayType === 'user') {
+          const rel = (DataLaVistaState.relationships || []).find(r =>
+            r.source === 'sharepoint-lookup' && !r.isMultiSelect &&
+            r.childTableKey === tableKey && r.spLookupField === f.internalName &&
+            DataLaVistaState.tables[r.parentTableKey]
+          );
+          if (rel) {
+            const remoteTable = DataLaVistaState.tables[rel.parentTableKey];
+            const remoteFields = (remoteTable?.fields || []).filter(rf =>
+              !rf.isAutoId && !rf.isLookupRaw && !rf.isSynthetic &&
+              !['lookup', 'lookup-multi', 'array', 'object'].includes(rf.displayType)
+            ).map(rf => ({ ...rf, _isRemoteJoin: true, _relParentKey: rel.parentTableKey }));
             return [...synthChildren, ...remoteFields];
           }
         }
@@ -2570,6 +2629,30 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         renderAdvOptionsPanel('node', nodeId);
       }
 
+      // Toggle a single-select remote field on/off; stores entry in lookupDirectFields (plain LEFT JOIN, no agg).
+      function _toggleLookupDirectField(nodeId, parentAlias, fieldAlias, relParentKey, checked) {
+        const nd = DataLaVistaState.advancedQB.nodes[nodeId];
+        if (!nd) return;
+        nd.lookupDirectFields ??= {};
+        nd.lookupDirectFields[parentAlias] ??= [];
+        if (checked) {
+          if (nd.lookupDirectFields[parentAlias].some(e => e.field === fieldAlias)) return;
+          const remoteTable = DataLaVistaState.tables[relParentKey];
+          const rf = (remoteTable?.fields || []).find(f => f.alias === fieldAlias);
+          nd.lookupDirectFields[parentAlias].push({
+            field: fieldAlias,
+            alias: parentAlias + '_' + fieldAlias,
+            relParentKey,
+            displayType: rf?.displayType || 'text'
+          });
+        } else {
+          nd.lookupDirectFields[parentAlias] = nd.lookupDirectFields[parentAlias].filter(e => e.field !== fieldAlias);
+        }
+        rebuildAdvancedSQL();
+        updateAdvNodePills(nodeId);
+        renderAdvOptionsPanel('node', nodeId);
+      }
+
       // Change the aggregate for a checked child field; also updates the alias and migrates
       // any saved conditions/sorts that referenced the old alias.
       function _setLookupChildAgg(nodeId, parentAlias, childField, newAgg) {
@@ -2615,6 +2698,16 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
               + (checked ? '' : ' disabled')
               + ' onchange="_setLookupChildAgg(\'' + nodeId + '\',\'' + parentField.alias + '\',\'' + cf.alias + '\',this.value)"'
               + ' onclick="event.stopPropagation()">' + aggOptions + '</select>'
+              + '</div>';
+          }
+          if (cf._isRemoteJoin) {
+            const dirEntries = nd.lookupDirectFields?.[parentField.alias] || [];
+            const dirChecked = dirEntries.some(e => e.field === cf.alias);
+            return '<div class="adv-field-row adv-child-field-row' + (dirChecked ? ' selected' : '') + '" style="padding-left:22px">'
+              + '<input type="checkbox" ' + (dirChecked ? 'checked' : '')
+              + ' onclick="event.stopPropagation();_toggleLookupDirectField(\'' + nodeId + '\',\'' + parentField.alias + '\',\'' + cf.alias + '\',\'' + (cf._relParentKey || '') + '\',this.checked)"/>'
+              + '<span class="field-type-icon ' + ti.cls + '">' + ti.icon + '</span>'
+              + '<span class="field-name" style="font-size:11px">' + (cf.userAlias || cf.alias) + '</span>'
               + '</div>';
           }
           const sel = nd.selectedFields.includes(cf.alias);
@@ -2875,8 +2968,32 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
             }
           }
         }
-        const finalSelects = childSelects.length
-          ? [...(allFields.length ? selects : []), ...childSelects]
+        // ── Direct LEFT JOINs for single-select lookupDirectFields (no DLV_LOOKUP bridge)
+        const directSelects = [];
+        const directJoins   = [];
+        for (const [nid, nd] of nodes) {
+          if (!nd.lookupDirectFields) continue;
+          const nodeAlias = getNodeAlias(nid, nd);
+          const _cp2 = /** @type {any} */ (CyberdynePipeline);
+          for (const [parentAlias, entries] of Object.entries(nd.lookupDirectFields)) {
+            if (!entries || !entries.length) continue;
+            const { relParentKey } = entries[0];
+            if (!relParentKey) continue;
+            const remoteView = _cp2.rawTableToView[relParentKey];
+            if (!remoteView) continue;
+            const joinAlias = '_dir_' + parentAlias;
+            directJoins.push(
+              `\nLEFT JOIN [${remoteView}] AS [${joinAlias}] ON [${nodeAlias}].[${parentAlias}Id] = [${joinAlias}].[ID]`
+            );
+            for (const { field, alias } of entries) {
+              directSelects.push(`  [${joinAlias}].[${field}] AS [${alias}]`);
+            }
+          }
+        }
+
+        const allChildSelects = [...childSelects, ...directSelects];
+        const finalSelects = allChildSelects.length
+          ? [...(allFields.length ? selects : []), ...allChildSelects]
           : selects;
 
         // Auto GROUP BY: if any field has an agg, non-agg fields need to be in GROUP BY.
@@ -3002,6 +3119,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         }
 
         if (lookupJoins.length) sql += lookupJoins.join('');
+        if (directJoins.length) sql += directJoins.join('');
 
         const allWhere = [];
         for (const [nid, nd] of nodes) {
