@@ -1,10 +1,13 @@
 /* ============================================================
 This file is part of DataLaVista™
-99-start-datalavista.js: DataLaVista™ app entry point and initialization.
+01-preload.js: Prevents DataLaVista scripts from loading more than once.
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
-Created: 2026-03-24
-Last Modified: 2026-04-04
-Summary: App initialization, lazy init guard, and report URL loading.
+Created: 2026-04-28
+Last Modified: 2026-04-28
+Summary: Prevents DataLaVista scripts from loading more than once,
+        to allow using multiple script tags with src
+        to accomodate CSP issues in SP without needing to
+        manually edit the script tag.
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
 
@@ -18,15 +21,8 @@ but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 GNU General Public License for more details.
 You should have received a copy of the GNU General Public License along
-with this program. If not, see <https://www.gnu.org/licenses/>.
+with this program. If not, see https://www.gnu.org/licenses.
 ================================================================ */
 
-// Self-init
-(function startDataLaVista() {
-  console.log("*** Starting DataLaVista™ ***");
-  try {
-    init();
-  } catch (e) {
-    console.error('DataLaVista init crashed:', e);
-  }
-})();
+if (window._dlvLoaded) { return; }
+window._dlvLoaded = true;

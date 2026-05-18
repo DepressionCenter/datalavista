@@ -126,6 +126,20 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       if(document.getElementById('toolbar-tab-reportMode')) document.getElementById('toolbar-tab-reportMode').classList.add('hidden');
     } else{return;}
   }
+
+  // Register a DataLaVista ECharts theme that reads from the report-level theme settings.
+  // Called at startup and re-called after theme changes to apply font/color settings.
+  function applyDlvEChartsTheme() {
+    const echarts = /** @type {any} */ ((/** @type {any} */ (window)).echarts);
+    if (!echarts) return;
+    const t = (DataLaVistaState.design && DataLaVistaState.design.theme) || {};
+    echarts.registerTheme('dlv', {
+      color: (t.palette && t.palette.length) ? t.palette : undefined,
+      textStyle: t.fontFamily ? { fontFamily: t.fontFamily } : undefined,
+      backgroundColor: t.backgroundColor || 'transparent'
+    });
+  }
+
   
   // Guard: call init() automatically if it was never called (e.g. SiteAssets/lazy mode).
   function ensureInit() {
@@ -138,6 +152,10 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
   // Main initialization function to set up event listeners, resizers, and default states.
   async function init() {
     if (DataLaVistaState && DataLaVistaState._initialized) return;
+    // If a different build already ran init (e.g. CDN + SiteAssets both loaded),
+    // window.DataLaVistaState points to the other build's state object.
+    const _wAny = /** @type {any} */ (window);
+    if (_wAny.DataLaVistaState && _wAny.DataLaVistaState._initialized && _wAny.DataLaVistaState !== DataLaVistaState) return;
     //window.DataLaVistaState = new Proxy(dlvRawState, dlvStateHandler);
     console.log('Initializing...');
     DataLaVistaState._initialized = true;
@@ -181,7 +199,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
     DataLaVistaState.spSiteUrl = getSpSiteUrl() || ''; // Store in state for global access and reactivity; default to empty string if not detected
     if(DataLaVistaState.spSiteUrl) {
       DataLaVistaState.isSpSite = true;
-      console.log('Detected SharePoint environment. Site URL: ' + DataLaVistaState.spSiteUrl);
     }
 
     // If running inside SharePoint, check if the page is in edit mode
@@ -205,6 +222,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           if (window._cmEditor) window._cmEditor.setValue('-- Connect to a data source and drag a table into the query builder\n-- or write your SQL here directly\nSELECT \'DataLaVista\'');
         }
 
+    try { applyDlvEChartsTheme(); } catch(err) { console.warn('Unable to initialize eCharts theme.', err); }
+    try { attachEvents(); } catch(err) { console.error('Unable to initialize event handling.', err); }
 
     if (DataLaVistaState.reportMode === 'view') {
         /* *** DATALAVISTA REPORT VIEW MODE *** */
@@ -224,7 +243,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         swapReportMode('edit'); // Apply report mode UI classes and button visibility
         initToolbox();
         initResizers();
-        setQBMode('basic');
         switchQMTab('qb');
         switchTab('query');
         spPickerCheckVisibility();
@@ -266,6 +284,11 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         });
         document.getElementById('title-input')?.addEventListener('focus', () => {
           renderDashboardTitleProperties();
+        });
+
+        // Escape clears active cross-highlight
+        document.addEventListener('keydown', (e) => {
+          if (e.key === 'Escape' && DataLaVistaState.drillHighlight) _clearDrillHighlight();
         });
         
         // If a report URL was provided with reportMode=Edit, populate config-url and load it into the designer

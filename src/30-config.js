@@ -25,7 +25,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 // ============================================================
 function generateWidgetSQL(w, tableRef = '_results') {
   const q = `[${tableRef}]`;
-  if (w.type === 'text' || w.type === 'placeholder') return null;
+  if (w.type === 'text' || w.type === 'placeholder' || w.type === 'container') return null;
 
   const whereParts = [];
   if (w.filters && w.filters.length) {
@@ -59,17 +59,18 @@ function generateWidgetSQL(w, tableRef = '_results') {
     return `SELECT ${cols} FROM ${q}${where}`;
   }
 
-  if (['bar', 'line', 'pie'].includes(w.type)) {
+  if (isEChartsWidget(w.type) && w.type !== 'scatter') {
   const xField = w.xField;
   const yFields = (Array.isArray(w.yFields) && w.yFields.length) ? w.yFields : (w.yField ? [w.yField] : []);
   if (!xField) return `SELECT * FROM ${q}${where}`;
   if (!yFields.length) return `SELECT [${xField}] FROM ${q}${where}`;
   const agg = (w.aggregation || '').toUpperCase();
   if (!agg || agg === 'NONE') {
-    return `SELECT [${xField}], ${yFields.map(f=>`[${f}]`).join(', ')} FROM ${q}${where}`;
+    var _ywrapNoAgg = yFields.map(function(f) { return '[' + f + ']'; }).join(', ');
+    return 'SELECT [' + xField + '], ' + _ywrapNoAgg + ' FROM ' + q + where;
   }
   const yExprs = yFields.map(f =>
-    agg === 'COUNT' ? `COUNT(*) AS [${f}]` : `${agg}([${f}]) AS [${f}]`
+    agg === 'COUNT' ? 'COUNT(*) AS [' + f + ']' : agg + '([' + f + ']) AS [' + f + ']'
   ).join(', ');
   return `SELECT [${xField}], ${yExprs} FROM ${q}${where} GROUP BY [${xField}]`;
 }
@@ -86,6 +87,7 @@ function generateWidgetSQL(w, tableRef = '_results') {
 
 
 async function saveConfig() {
+  await _ensureLZString();
   const config = buildConfig();
   const json = JSON.stringify(config, null, 2);
 
@@ -149,22 +151,26 @@ async function _saveConfigToSpList(json, reportUrl, siteUrl) {
 
 // Build a clean, minimal config object from the current state, suitable for saving or sharing
 function buildConfig() {
-  // TODO: DEBUG: It looks like relationships, basicQB and advancedQB are not being included in the config.
-  const cleanFields = (arr) => (arr || []).map(f => ({
-    InternalName: f.InternalName || f.internalName || '',
-    internalName: f.internalName || f.InternalName || '',
-    Title: f.Title || f.displayName || '',
-    displayName: f.displayName || f.Title || '',
-    TypeAsString: f.TypeAsString || '',
-    type: f.type || '',
-    alias: f.alias || '',
-    displayType: f.displayType || 'text',
-    required: !!f.required,
-    maxLength: f.maxLength || null,
-    isAutoId: !!f.isAutoId,
-    choices: (Array.isArray(f.choices) && f.choices.length <= 50) ? f.choices : null,
-    lookupList: f.lookupList || null,
-    lookupField: f.lookupField || null
+  // TODO: DEBUG: Confirm that relationships and advancedQB are  being included in the config.
+  const cleanFields = (arr) => (arr || []).filter(f => !f.isSynthetic && !f.isAutoId).map(f => ({
+    internalName:  f.internalName || f.InternalName || '',
+    displayName:   f.displayName  || f.Title        || '',
+    description:   f.description  || '',
+    alias:         f.alias        || '',
+    userAlias:     f.userAlias    || f.alias         || '',
+    rawType:       f.rawType      || f.TypeAsString  || '',
+    rawTypeSource: f.rawTypeSource || (f.TypeAsString ? 'sharepoint' : 'unknown'),
+    type:          f.type         || '',
+    dataType:      f.dataType     || 'text',
+    displayType:   f.displayType  || 'text',
+    calculatedType: f.calculatedType || f.calculatedFieldType || null,
+    displayFormat: f.displayFormat || null,
+    required:      !!f.required,
+    maxLength:     f.maxLength     || null,
+    isAutoId:      !!f.isAutoId,
+    choices:       (Array.isArray(f.choices) && f.choices.length <= 50) ? f.choices : null,
+    lookupList:    f.lookupList    || null,
+    lookupField:   f.lookupField   || null
   }));
  
  
@@ -175,8 +181,10 @@ function buildConfig() {
     dataSourcesMeta[dsName] = {
       alias: ds.alias || dsName,
       auth: ds.auth || 'current',
+      description: ds.description || '',
       fileName: ds.fileName || '',
       internalName: ds.internalName || dsName,
+      siteTitle: ds.siteTitle || '',
       tables: ds.tables || [],
       token: ds.token || '',
       type: ds.type || 'sharepoint',
@@ -214,12 +222,25 @@ function buildConfig() {
       url: ds ? (ds.url || '') : ''
     };
  
-    // Only include row data for tables that were explicitly uploaded from a local file
+    // Only include row data for tables that were explicitly uploaded from a local file.
+    // Read rows from alasql (the single source of truth) and compress with LZ-String.
     try {
       const shouldKeepData = t.isFileUpload === true && t.keepRawData === true;
-      if (shouldKeepData && Array.isArray(t.data) && t.data.length > 0) {
-        tablesMeta[name].data = t.data;
-        tablesMeta[name].loaded = true;
+      if (shouldKeepData) {
+        const alasqlName = '_raw_' + name;
+        const existingKey = Object.keys(alasql.tables).find(k => k.toLowerCase() === alasqlName.toLowerCase());
+        const rows = existingKey ? alasql(`SELECT * FROM [${existingKey}]`) : [];
+        if (rows.length > 0 && window['LZString']) {
+          tablesMeta[name].data = window['LZString'].compressToBase64(JSON.stringify(rows));
+          tablesMeta[name].dataCompressed = true;
+          tablesMeta[name].loaded = true;
+        } else if (rows.length > 0) {
+          tablesMeta[name].data = rows;  // LZ-String not ready yet, save plain (fallback)
+          tablesMeta[name].loaded = true;
+        } else {
+          tablesMeta[name].data = [];
+          tablesMeta[name].loaded = false;
+        }
       } else {
         tablesMeta[name].data = [];
         tablesMeta[name].loaded = false;
@@ -231,37 +252,50 @@ function buildConfig() {
     }
   }
  
-  const cleanWidgets = (DataLaVistaState.design.widgets || []).map(w => ({
+  const cleanWidgets = (DataLaVistaState.design.widgets || []).map(/** @param {any} w */ w => ({
     id: w.id,
     type: w.type,
     title: w.title || '',
     showTitle: w.showTitle !== false,
-    showHeaders: w.showHeaders !== false,
     widthPct: w.widthPct || 48,
     heightVh: w.heightVh || 33,
-    fields: Array.isArray(w.fields) ? [...w.fields] : [],
-    xField: w.xField || '',
-    yField: w.yField || '',
+    // Unified dimension model — dimensions[0] is the primary axis (replaces xField)
+    dimensions: Array.isArray(w.dimensions) && w.dimensions.length ? [...w.dimensions] : (w.xField ? [w.xField] : []),
+    // Keep xField/yFields for backward compat with older tooling reading the JSON
+    xField: (Array.isArray(w.dimensions) && w.dimensions[0]) || w.xField || '',
     yFields: Array.isArray(w.yFields) ? [...w.yFields] : [],
+    fields: Array.isArray(w.fields) ? [...w.fields] : [],
     aggregation: w.aggregation || '',
     fillColor: w.fillColor || '#0078d4',
     borderColor: w.borderColor || '#edebe9',
     borderSize: w.borderSize != null ? w.borderSize : 1,
-    widgetBackgroundColor: w.widgetBackgroundColor || '#fefefe',
+    widgetBackgroundColor: w.widgetBackgroundColor ?? '#fefefe',
     chartBackgroundColor: w.chartBackgroundColor || '#fefefe',
     titleBackgroundColor: w.titleBackgroundColor || '#fefefe',
     titleFontSize: w.titleFontSize || 14,
     titleFontColor: w.titleFontColor || '#323130',
-    headersBackgroundColor: w.headersBackgroundColor || '#f3f2f1',
-    headersFontSize: w.headersFontSize || 12,
-    headersFontColor: w.headersFontColor || '#323130',
     fontSize: w.fontSize || 13,
     fontColor: w.fontColor || '#323130',
-    kpiMetricFontSize: w.kpiMetricFontSize || 36,
-    kpiLabelFontSize: w.kpiLabelFontSize || 13,
-    kpiLabelOverride: w.kpiLabelOverride || '',
     stacked: !!w.stacked,
     showTrendLine: !!w.showTrendLine,
+    // Per-widget interaction override — undefined means inherit report-level setting
+    ...(w.interactionMode ? { interactionMode: w.interactionMode } : {}),
+    // typeConfig: namespaces type-specific props cleanly
+    typeConfig: Object.assign(
+      {},
+      w.typeConfig || {},
+      w.type === 'kpi'     ? { kpiMetricFontSize: (w.typeConfig && w.typeConfig.kpiMetricFontSize) || w.kpiMetricFontSize || 36,
+                               kpiLabelFontSize:  (w.typeConfig && w.typeConfig.kpiLabelFontSize)  || w.kpiLabelFontSize  || 13,
+                               kpiLabelOverride:  (w.typeConfig && w.typeConfig.kpiLabelOverride)  || w.kpiLabelOverride  || '' } : {},
+      w.type === 'scatter' ? { bubbleSizeField:  (w.typeConfig && w.typeConfig.bubbleSizeField)  || w.bubbleSizeField  || '',
+                               bubbleColorField: (w.typeConfig && w.typeConfig.bubbleColorField) || w.bubbleColorField || '' } : {},
+      w.type === 'text'    ? { textContent: (w.typeConfig && w.typeConfig.textContent) || w.textContent || '',
+                               imageUrl:    (w.typeConfig && w.typeConfig.imageUrl)    || w.imageUrl    || '' } : {},
+      w.type === 'table'   ? { showHeaders:            (w.typeConfig && w.typeConfig.showHeaders)            ?? (w.showHeaders            !== false),
+                               headersBackgroundColor: (w.typeConfig && w.typeConfig.headersBackgroundColor) || w.headersBackgroundColor || '#f3f2f1',
+                               headersFontSize:        (w.typeConfig && w.typeConfig.headersFontSize)        || w.headersFontSize        || 12,
+                               headersFontColor:       (w.typeConfig && w.typeConfig.headersFontColor)       || w.headersFontColor       || '#323130' } : {}
+    ),
     seriesProps: (Array.isArray(w.seriesProps) ? w.seriesProps : []).map(sp => ({
       field:      sp.field      || '',
       agg:        sp.agg        || '',
@@ -284,10 +318,6 @@ function buildConfig() {
         return out;
       })
     })),
-    bubbleSizeField: w.bubbleSizeField || '',
-    bubbleColorField: w.bubbleColorField || '',
-    textContent: w.textContent || '',
-    imageUrl: w.imageUrl || '',
     fieldAggs: Object.assign({}, w.fieldAggs || {}),
     conditions: (w.conditions || []).map(c => ({
       conj:       c.conj       || 'AND',
@@ -309,15 +339,27 @@ function buildConfig() {
       value: f.value !== undefined ? f.value : '',
       position: f.position || 'widget'
     })),
-    widgetSql: (() => { try { return buildWidgetSQL(w)?.sql || null; } catch(_) { return null; } })()
+    widgetSql: (() => { try { return buildWidgetSQL(w)?.sql || null; } catch(_) { return null; } })(),
+    parentContainerId: w.parentContainerId || null,
+    minHeightVh: w.minHeightVh != null ? w.minHeightVh : 30,
+    containerGap: w.containerGap != null ? w.containerGap : 8,
+    containerPadding: w.containerPadding != null ? w.containerPadding : 8,
+    containerAlign: w.containerAlign || 'top'
   }));
  
   const cleanDesign = {
     title: DataLaVistaState.design.title || '',
     showDashboardTitle: DataLaVistaState.design.showDashboardTitle !== false,
     dashboardTitleTooltip: DataLaVistaState.design.dashboardTitleTooltip || '',
+    interactionMode: DataLaVistaState.design.interactionMode || 'cross-filter',
+    theme: {
+      palette:         (DataLaVistaState.design.theme && DataLaVistaState.design.theme.palette)         || [],
+      fontFamily:      (DataLaVistaState.design.theme && DataLaVistaState.design.theme.fontFamily)      || '',
+      fontSize:        (DataLaVistaState.design.theme && DataLaVistaState.design.theme.fontSize)        || null,
+      backgroundColor: (DataLaVistaState.design.theme && DataLaVistaState.design.theme.backgroundColor) || ''
+    },
     widgets: cleanWidgets,
-    filters: (DataLaVistaState.design.filters || []).map(f => ({
+    filters: (DataLaVistaState.design.filters || []).map(/** @param {any} f */ f => ({
       field: f.field || '',
       label: f.label || f.field || '',
       position: f.position || 'bar'
@@ -328,7 +370,7 @@ function buildConfig() {
   // Collect all SQL text: main query + every widget's generated SQL
   // TODO: DEBUG: This probably shoulnd't take widget SQL into account since it always uses the materialized view. Only state.sql should be used.
   const _allSqlParts = [DataLaVistaState.sql || ''];
-  for (const w of DataLaVistaState.design.widgets || []) {
+  for (const w of /** @type {any[]} */ (DataLaVistaState.design.widgets || [])) {
     const wsql = generateWidgetSQL(w, '_results');
     if (wsql) _allSqlParts.push(wsql);
   }
@@ -370,9 +412,9 @@ function buildConfig() {
  
   return {
     _license: 'This file is part of DataLaVista™. This is a configuration script for a report designed in DataLaVista™. Copyright © 2026 The Regents of the University of Michigan. This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version. This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details. You should have received a copy of the GNU General Public License along with this program. If not, see https://www.gnu.org/licenses.',
+    _min_version: 0.5,
     activeTab: (DataLaVistaState.reportMode === 'view') ? 'dashboardPreview' : 'design',
     advancedQB: DataLaVistaState.advancedQB || {},
-    basicQB: DataLaVistaState.basicQB || {},
     currentWidgetId: DataLaVistaState.currentWidgetId || null,
     dataSources: dataSourcesMeta,
     design: cleanDesign,
@@ -381,7 +423,6 @@ function buildConfig() {
     qbSectionHeight: DataLaVistaState.qbSectionHeight || 60,
     qmTab: DataLaVistaState.qmTab || 'dataPreview',
     queryColumns: Array.isArray(DataLaVistaState.queryColumns) ? [...DataLaVistaState.queryColumns] : [],
-    queryMode: (DataLaVistaState.queryMode && DataLaVistaState.queryMode != null && DataLaVistaState.queryMode != undefined && DataLaVistaState.queryMode != '') ? DataLaVistaState.queryMode : 'sql',
     relationships: (DataLaVistaState.relationships || []).filter(r =>
       _referencedKeys.has(r.childTableKey) || _referencedKeys.has(r.parentTableKey)
     ),
@@ -421,24 +462,79 @@ async function loadConfig(cfg) {
   if (cfg && typeof cfg !== 'object') throw new Error('Invalid report config — no report JSON detected.');
 
   if (!cfg._license) throw new Error('Invalid report config — missing _license key');
+  // TODO: Check the new key, _min_version, and display a warning saying this report maybe incompatible with this version of DataLaVista, if the key doesn't exist or if it is <0.5.
   // Basic validation passed — now clear the existing state and load the config values
   CyberdynePipeline.clearAllViews(); // drop any existing AlaSQL views before reloading
   //DataLaVistaState.activeTab = (DataLaVistaState.reportMode==='view')?'dataPreview':'design';
   DataLaVistaState.advancedQB = cfg.advancedQB || {};
   DataLaVistaState.advancedQB.nodeAliases ??= {};
-  DataLaVistaState.basicQB = cfg.basicQB || {};
+  // Restore or default primaryNodeId — preserves saved value; falls back to first node
+  DataLaVistaState.advancedQB.primaryNodeId ??= null;
+  if (!DataLaVistaState.advancedQB.primaryNodeId) {
+    const firstKey = Object.keys(DataLaVistaState.advancedQB.nodes || {})[0];
+    if (firstKey) DataLaVistaState.advancedQB.primaryNodeId = firstKey;
+  }
+  // [REMOVE AFTER: backward compat — read old basicQB only when basic QB was active, migrate to advanced QB]
+  // If the saved config had basic QB as the active query mode, copy its state into advanced QB so the
+  // canvas shows the right content. Otherwise, ignore basicQB entirely so stale data doesn't pollute.
+  if (cfg.queryMode === 'basic' && cfg.basicQB) {
+    DataLaVistaState.basicQB = cfg.basicQB;
+    _migrateBasicToAdvancedQB();
+    DataLaVistaState.basicQB = {};  // clear after migration — not needed in new state
+  }
+  // [END REMOVE AFTER]
   DataLaVistaState.currentWidgetId = null;
   DataLaVistaState.dataSources = cfg.dataSources || {};
+  // Background-refresh SP site title/description for all SP data sources (fire-and-forget)
+  for (const [_dsName, _ds] of Object.entries(DataLaVistaState.dataSources)) {
+    const _dsCast = /** @type {any} */ (_ds);
+    if (_dsCast.type === 'sharepoint' && (_dsCast.siteUrl || _dsCast.url)) {
+      _fetchSPSiteMeta(_dsCast.siteUrl || _dsCast.url, _dsName);
+    }
+  }
   const loadedDesign = cfg.design || {};
   DataLaVistaState.design = {
-    title: loadedDesign.title || 'DataLaVista Report',
+    title: loadedDesign.title || '',
     showDashboardTitle: loadedDesign.showDashboardTitle !== false,
     dashboardTitleTooltip: loadedDesign.dashboardTitleTooltip || '',
+    interactionMode: loadedDesign.interactionMode || 'cross-filter',
+    theme: {
+      palette:         (loadedDesign.theme && loadedDesign.theme.palette)         || [],
+      fontFamily:      (loadedDesign.theme && loadedDesign.theme.fontFamily)      || '',
+      fontSize:        (loadedDesign.theme && loadedDesign.theme.fontSize)        || null,
+      backgroundColor: (loadedDesign.theme && loadedDesign.theme.backgroundColor) || ''
+    },
     widgets: loadedDesign.widgets || [],
     filters: loadedDesign.filters || []
   };
-  // Migrate legacy single-yField to yFields array + backfill new widget defaults
-  for (const w of DataLaVistaState.design.widgets) {
+  // Migrate and backfill widget schema fields
+  for (const w of /** @type {any[]} */ (DataLaVistaState.design.widgets)) {
+    // dimensions[] — new multi-dim array; derive from xField for old configs
+    if (!Array.isArray(w.dimensions) || !w.dimensions.length) {
+      w.dimensions = w.xField ? [w.xField] : [];
+    }
+    // typeConfig — namespace for type-specific props; read both old top-level and new typeConfig
+    if (!w.typeConfig || typeof w.typeConfig !== 'object') w.typeConfig = {};
+    if (w.type === 'kpi') {
+      w.typeConfig.kpiMetricFontSize = w.typeConfig.kpiMetricFontSize ?? w.kpiMetricFontSize ?? 36;
+      w.typeConfig.kpiLabelFontSize  = w.typeConfig.kpiLabelFontSize  ?? w.kpiLabelFontSize  ?? 13;
+      w.typeConfig.kpiLabelOverride  = w.typeConfig.kpiLabelOverride  ?? w.kpiLabelOverride  ?? '';
+    }
+    if (w.type === 'scatter') {
+      w.typeConfig.bubbleSizeField  = w.typeConfig.bubbleSizeField  ?? w.bubbleSizeField  ?? '';
+      w.typeConfig.bubbleColorField = w.typeConfig.bubbleColorField ?? w.bubbleColorField ?? '';
+    }
+    if (w.type === 'text') {
+      w.typeConfig.textContent = w.typeConfig.textContent ?? w.textContent ?? '';
+      w.typeConfig.imageUrl    = w.typeConfig.imageUrl    ?? w.imageUrl    ?? '';
+    }
+    if (w.type === 'table') {
+      w.typeConfig.showHeaders            = w.typeConfig.showHeaders            ?? (w.showHeaders !== false);
+      w.typeConfig.headersBackgroundColor = w.typeConfig.headersBackgroundColor ?? w.headersBackgroundColor ?? '#f3f2f1';
+      w.typeConfig.headersFontSize        = w.typeConfig.headersFontSize        ?? w.headersFontSize        ?? 12;
+      w.typeConfig.headersFontColor       = w.typeConfig.headersFontColor       ?? w.headersFontColor       ?? '#323130';
+    }
+
     if (!Array.isArray(w.yFields))        w.yFields = w.yField ? [w.yField] : [];
     if (w.stacked          == null)       w.stacked = false;
     if (w.showTrendLine    == null)       w.showTrendLine = false;
@@ -463,7 +559,7 @@ async function loadConfig(cfg) {
     // Populate seriesProps (unified source of truth).
     // New configs have it saved directly; legacy configs need reconstruction.
     if (!Array.isArray(w.seriesProps) || !w.seriesProps.length) {
-      const _isChartW = ['bar','line','pie','scatter'].includes(w.type);
+      const _isChartW = isEChartsWidget(w.type);
       if (_isChartW) {
         const _yfs = (Array.isArray(w.yFields) && w.yFields.length) ? w.yFields : (w.yField ? [w.yField] : []);
         w.seriesProps = _yfs.map((yf, yi) => {
@@ -506,18 +602,51 @@ async function loadConfig(cfg) {
       value: c.value != null ? c.value : ''
     }));
     if (!w.sorts)                         w.sorts = [];
+    // Container / layout fields
+    if (w.parentContainerId === undefined) w.parentContainerId = null;
+    if (w.minHeightVh      == null)       w.minHeightVh      = w.heightVh || 30;
+    if (w.containerGap     == null)       w.containerGap     = 8;
+    if (w.containerPadding == null)       w.containerPadding = 8;
+    if (w.containerAlign   == null)       w.containerAlign   = 'top';
+    // placeholder and container default showTitle to false
+    if (w.showTitle == null) {
+      if (w.type === 'placeholder' || w.type === 'container') {
+        w.showTitle = false;
+      } else {
+        w.showTitle = true;
+      }
+    }
   }
   DataLaVistaState.previewFilters = cfg.previewFilters || {};
   // Normalize legacy tab name ('previewData' was renamed to 'dataPreview')
   DataLaVistaState.qmTab = (cfg.qmTab === 'previewData') ? 'dataPreview' : (cfg.qmTab || 'qb');
   DataLaVistaState.queryColumns = Array.isArray(cfg.queryColumns) ? [...cfg.queryColumns] : [];
-  DataLaVistaState.queryMode = (cfg.queryMode && cfg.queryMode != null && cfg.queryMode != undefined && cfg.queryMode != '') ? cfg.queryMode : 'sql';
   // Don't load reportMode or reportUrl from config - it's handled by init()
   DataLaVistaState.relationships = Array.isArray(cfg.relationships) ? cfg.relationships : [];
   DataLaVistaState.sql = cfg.sql || '';
   DataLaVistaState.sqlLocked = cfg.sqlLocked || false;
   DataLaVistaState.tables = cfg.tables || {};
- 
+
+  // Back-fill new field schema properties for configs saved before the type-system overhaul
+  for (const tmeta of Object.values(DataLaVistaState.tables)) {
+    for (const fields of [tmeta.fields, tmeta.baseFields, tmeta.originalFields]) {
+      if (!Array.isArray(fields)) continue;
+      for (const f of fields) {
+        if (f.userAlias    == null) f.userAlias    = f.alias        || '';
+        if (f.rawType      == null) f.rawType      = f.TypeAsString || f.type || '';
+        if (f.rawTypeSource == null) f.rawTypeSource = f.TypeAsString ? 'sharepoint' : 'unknown';
+        if (f.dataType     == null) f.dataType     = 'text';
+        if (f.displayFormat == null) f.displayFormat = null;
+        if (f.derivedColumns == null) f.derivedColumns = null;
+        if (f.calculatedType == null) f.calculatedType = f.calculatedFieldType || null;
+        // Re-derive displayType for old configs where DateTime was stored as 'date'
+        if (f.displayType === 'date' && (f.rawType === 'DateTime' || f.type === 'datetime')) {
+          f.displayType = 'datetime';
+        }
+      }
+    }
+  }
+
   // Restore view definitions (gracefully skipped for legacy configs without views)
   if (cfg.views && typeof cfg.views === 'object' && Object.keys(cfg.views).length) {
     CyberdynePipeline.restoreViewsFromConfig(cfg.views);
@@ -559,6 +688,32 @@ async function loadConfig(cfg) {
       }
   }
 
+  // Register file-upload table data into alasql from saved config.
+  // Supports both compressed (dataCompressed=true → Base64 LZ-String) and legacy plain-array formats.
+  // After registration t.data is cleared — alasql is the single in-memory source of truth.
+  for (const [tkey, tmeta] of Object.entries(DataLaVistaState.tables)) {
+    const hasCompressed = tmeta.dataCompressed === true && typeof tmeta.data === 'string';
+    const hasPlainArray = Array.isArray(tmeta.data) && tmeta.data.length > 0;
+    if (!hasCompressed && !hasPlainArray) { tmeta.data = []; continue; }
+    let rows = [];
+    try {
+      if (hasCompressed) {
+        await _ensureLZString();
+        rows = JSON.parse(window['LZString'].decompressFromBase64(tmeta.data));
+      } else {
+        rows = tmeta.data;  // backward compat — old uncompressed configs
+      }
+    } catch (e) {
+      console.warn('[loadConfig] Failed to decompress data for table', tkey, e);
+    }
+    if (rows && rows.length > 0) {
+      CyberdynePipeline._registerRawTable(tkey, rows);
+      tmeta.itemCount = rows.length;
+      tmeta.loaded = true;
+    }
+    tmeta.data = [];  // never keep raw rows in state
+  }
+
   // Background fetch for referenced tables
   if (DataLaVistaState.sql) {
     const referencedTables = findReferencedTables(DataLaVistaState.sql);
@@ -598,21 +753,18 @@ async function loadConfig(cfg) {
     if (titleInput) titleInput.value = DataLaVistaState.design.title || '';
     renderDesignCanvas();
     renderFieldsPanel();
-    renderBasicQB();
     renderAdvancedQB();
-    // Restore the QB mode (basic/advanced) and active sub-tab (qb/sql/dataPreview)
-    // that were saved with the config, so the user lands on the right panel.
-    // Temporarily lock SQL so rebuildBasicSQL/rebuildAdvancedSQL inside setQBMode
-    // don't overwrite the SQL that was loaded from the config.
-    const _savedSqlLocked = DataLaVistaState.sqlLocked;
-    DataLaVistaState.sqlLocked = true;
-    setQBMode(DataLaVistaState.queryMode || 'basic');
-    DataLaVistaState.sqlLocked = _savedSqlLocked;
-    // Re-apply the loaded SQL and editor state after QB mode is set
+    renderAdvOptionsPanel();
+    // Rebuild SQL from QB when the QB tab was active (not the manual SQL tab), or when
+    // the config was migrated from basic QB (cfg.queryMode === 'basic').
+    const _qbWasActive = /** @type {any} */ (DataLaVistaState).qmTab === 'qb' || cfg.queryMode === 'basic';
+    if (!DataLaVistaState.sqlLocked && _qbWasActive && Object.keys(DataLaVistaState.advancedQB.nodes || {}).length) {
+      rebuildAdvancedSQL();
+      renderDesignFieldsPanel();
+    }
+    // Re-apply the loaded SQL and restore the active sub-tab (qb/sql/dataPreview)
     if (DataLaVistaState.sql && /** @type {any} */ (window)._cmEditor) /** @type {any} */ (window)._cmEditor.setValue(DataLaVistaState.sql);
     switchQMTab(DataLaVistaState.qmTab || 'qb');
-    // Re-enable design tabs after all renders/mode-switches, since rebuildBasicSQL()
-    // called by setQBMode() invokes hideUseInDesign() which would disable them.
     if (querySucceeded) showUseInDesign();
     setStatus('Config loaded', 'success');
     toast('Config loaded successfully', 'success');
@@ -695,7 +847,7 @@ function renderFieldsPanel() {
           <span class="toggle-arrow" id="arrow-${CSS.escape(tkey)}">▶</span>
           <span class="table-icon" title="${tIcon.title}" style="font-size:12px">${tIcon.icon}</span>
           <span class="table-name" id="tlabel-${CSS.escape(tkey)}" title="${tkey}" style="font-size:11px;font-weight:700">${tAlias}</span>
-          <span class="table-count">${t.itemCount || (t.data && t.data.length) || 0}</span>
+          <span class="table-count">${t.itemCount || 0}</span>
         </div>
         <div class="fields-list hidden" id="fields-${CSS.escape(tkey)}"></div>
       `;

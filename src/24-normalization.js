@@ -45,7 +45,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       if (Array.isArray(val)) {
         return val.map(v => {
           if (typeof v === 'object' && v !== null) {
-            return v.Label || v.Title || v.Name || v.Value || v.lookupValue || JSON.stringify(v);
+            return v.Label || v.Title || v.Name || v.Value || v.value || v.lookupValue || v.LookupValue || v.displayValue || v.DisplayValue || JSON.stringify(v);
           }
           return v;
         }).join(', ');
@@ -56,88 +56,11 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         // TaxKeyword / Enterprise Keywords
         if (val.TermGuid !== undefined) return val.Label || val.Title || '';
         if (val.results && Array.isArray(val.results)) {
-          return val.results.map(r => r.Label || r.Title || r.Name || r.lookupValue || JSON.stringify(r)).join(', ');
+          return val.results.map(r => r.Label || r.Title || r.Name || r.lookupValue || r.LookupValue || r.displayValue || r.DisplayValue || JSON.stringify(r)).join(', ');
         }
-        return val.Label || val.Title || val.Name || val.lookupValue || val.Value || JSON.stringify(val);
+        return val.Label || val.Title || val.Name || val.Value || val.value || val.lookupValue || val.LookupValue || val.displayValue || val.DisplayValue || JSON.stringify(val);
       }
       return val;
-    }
-
-    // Normalize a single row of SharePoint data
-    function normalizeRow(row, fields) {
-      const out = {};
-      for (const f of fields) {
-        let val = row[f.internalName];
-        if (val === undefined) val = row[f.internalName + 'Id'] !== undefined ? null : undefined;
-        if (val === undefined) { out[f.alias] = null; continue; }
-
-        // Lookup fields
-        if (f.type === 'lookup') {
-          const idVal = row[f.internalName + 'Id'];
-          out[f.alias + 'Id'] = idVal !== undefined ? idVal : null;
-          out[f.alias] = normalizeObject(val);
-        }
-        // Multi-lookup
-        else if (f.type === 'lookup-multi') {
-          const results = (val && val.results) ? val.results : (Array.isArray(val) ? val : []);
-          const ids = row[f.internalName + 'Id'];
-          const idResults = ids ? ((ids.results || ids) || []) : [];
-          out[f.alias + 'Id'] = Array.isArray(idResults) ? idResults.join(',') : idResults;
-          out[f.alias] = results.map(r => r.lookupValue || r.Label || r.Title || r.Name || String(r)).join(', ');
-        }
-        // TaxKeyword / Managed Metadata
-        else if (f.type === 'taxkeyword') {
-          const results = (val && val.results) ? val.results : (Array.isArray(val) ? val : (val ? [val] : []));
-          out[f.alias + 'Id'] = results.map(r => r.WssId || r.TermGuid || '').join(',');
-          out[f.alias] = results.map(r => r.Label || r.Term || r.Title || '').join(', ');
-        }
-        // Person/User fields
-        else if (f.type === 'user') {
-          const idVal = row[f.internalName + 'Id'];
-          out[f.alias + 'Id'] = idVal !== undefined ? idVal : null;
-          out[f.alias] = normalizeObject(val);
-        }
-        // Multi-user
-        else if (f.type === 'user-multi') {
-          const results = (val && val.results) ? val.results : (Array.isArray(val) ? val : []);
-          const ids = row[f.internalName + 'Id'];
-          const idResults = ids ? ((ids.results || ids) || []) : [];
-          out[f.alias + 'Id'] = Array.isArray(idResults) ? idResults.join(',') : String(idResults);
-          out[f.alias] = results.map(r => r.Title || r.Name || String(r)).join(', ');
-        }
-        // Choice/multi-choice
-        else if (f.type === 'choice-multi') {
-          const results = (val && val.results) ? val.results : (Array.isArray(val) ? val : (val ? [val] : []));
-          out[f.alias] = results.join(', ');
-        }
-        // Date
-        else if (
-          f.type.startsWith('date') ||
-          (f.type === 'calculated' && f.calculatedFieldType === 'date')
-        ) {
-          out[f.alias] = normalizeDate(val);
-        }
-        // Boolean
-        else if (
-            f.type.startsWith('bool') ||
-            f.type.toLowerCase() === 'yesno' ||
-            f.type.toLowerCase() === 'yes/no' ||
-            (f.type === 'calculated' && f.calculatedFieldType === 'boolean')
-            ) {
-            out[f.alias] = (
-              (typeof val === 'boolean' && val === true) ||
-              (typeof val === 'string' && val.toString().toLowerCase() === 'yes') ||
-              (typeof val === 'string' && val.toString().toLowerCase() === 'true') ||
-              (typeof val === 'number' && val === 1) ||
-              (typeof val === 'string' && val.toString() === '1')
-            ) ? true : false;
-        }
-        // Default
-        else {
-          out[f.alias] = normalizeObject(val);
-        }
-      }
-      return out;
     }
 
     // Parse SharePoint field type
@@ -151,9 +74,10 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       if (t === 'lookupmulti') return 'lookup-multi';
       if (t === 'choice') return 'choice';
       if (t === 'multichoice') return 'choice-multi';
-      if (t.startsWith('bool') || t === 'yesno' || t === 'yes/no') return 'boolean';
+      if (t.startsWith('bool') || t === 'yesno' || t === 'yes/no' || t === 'attachments') return 'boolean';
       if (t === 'number' || t === 'currency' || t === 'integer' || t === 'counter' || t === 'autoid' || t === 'float' || t === 'decimal' || t === 'bigint') return 'number';
-      if (t === 'datetime' || t === 'date') return 'date';
+      if (t === 'datetime') return 'datetime';
+      if (t === 'date') return 'date';
       if (t === 'url' || t === 'hyperlink' || t === 'link') return 'url';
       if (t === 'calculated') return 'text';
       if (t === 'note' || t === 'html') return 'html';
@@ -163,11 +87,21 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
     function fieldDisplayType(type) {
     const t = (type || '').toLowerCase();
     if (t === 'number' || t === 'currency' || t === 'integer' || t === 'counter' || t === 'autoid' || t === 'float' || t === 'decimal' || t === 'bigint') return 'number';
-    if (t === 'date' || t === 'datetime') return 'date';
+    if (t === 'datetime') return 'datetime';
+    if (t === 'date') return 'date';
     if (t === 'bool' || t === 'boolean') return 'boolean';
-    if (['lookup', 'lookup-multi', 'user', 'user-multi', 'taxkeyword'].includes(t)) return 'lookup';
-    if (t === 'choice-multi') return 'array';
+    if (t === 'user') return 'user';
+    if (t === 'user-multi') return 'user-multi';
+    if (t === 'lookup') return 'lookup';
+    if (t === 'lookup-multi') return 'lookup-multi';
+    if (t === 'taxkeyword') return 'lookup';   // single taxonomy → lookup; multi handled by FieldExpander isMulti check
+    if (t === 'url' || t === 'hyperlink' || t === 'link') return 'url';
+    if (t === 'choice-multi') return 'lookup-multi';
     if (t === 'choice') return 'text';
+    if (t === 'html') return 'text';
+    if (t === 'object') return 'object';
+    if (t === 'array' || t === 'array-primitives') return 'array';
+    if (t === 'array-objects') return 'lookup-multi';
     return 'text';
 }
 
@@ -226,6 +160,16 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       return false;
     }
 
+    /** Default displayFormat for a given SP TypeAsString (rawType). Returns null for types with no special formatting. */
+    function defaultDisplayFormat(rawType) {
+      const rt = (rawType || '').toLowerCase();
+      if (rt === 'integer' || rt === 'counter' || rt === 'autoid') return { style: 'decimal', decimals: 0 };
+      if (rt === 'currency') return { style: 'currency', decimals: 2 };
+      if (rt === 'number' || rt === 'float' || rt === 'decimal') return { style: 'decimal', decimals: 2 };
+      if (rt === 'boolean' || rt === 'yes/no' || rt === 'yesno') return { style: 'yes-no' };
+      return null;
+    }
+
     // Build field meta from SharePoint field definition
     function buildFieldMeta(spField) {
       // Use InternalName if available; fall back to Title then EntityTypeName
@@ -237,26 +181,45 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 
       const displayName = spField.Title || decodeSpFieldName(internalName);
       const description = spField.Description || '';
-      const fieldType = (spField.TypeAsString && spField.TypeAsString=='Calculated' ? 'Calculated' : parseFieldType(spField.TypeAsString, internalName));
-      const calculatedFieldType = (spField.CalculatedFieldTypeAsString ? parseFieldType(spField.CalculatedFieldTypeAsString, internalName) : null);
+      const rawType = spField.TypeAsString || '';
+      const fieldType = (rawType === 'Calculated' ? 'Calculated' : parseFieldType(rawType, internalName));
+      const calculatedType = (spField.CalculatedFieldTypeAsString ? parseFieldType(spField.CalculatedFieldTypeAsString, internalName) : null);
+
+      // dataType: canonical SQL storage type (6 values)
+      const _ft = (fieldType || '').toLowerCase();
+      let dataType = 'text';
+      if (_ft === 'number' || _ft === 'currency' || _ft === 'integer' || _ft === 'counter' || _ft === 'autoid' || _ft === 'float' || _ft === 'decimal' || _ft === 'bigint') dataType = 'number';
+      else if (_ft === 'date' || _ft === 'datetime') dataType = 'date';
+      else if (_ft === 'boolean') dataType = 'boolean';
+      else if (_ft === 'array' || _ft === 'array-primitives' || _ft === 'array-objects' || _ft === 'choice-multi' || _ft === 'user-multi' || _ft === 'lookup-multi' || _ft === 'taxkeyword') dataType = 'array';
+      else if (_ft === 'object') dataType = 'object';
 
       // Build alias from display name (PascalCase, no spaces)
       let alias = toPascalCase(displayName);
       if (!alias || alias === internalName) alias = toPascalCase(decodeSpFieldName(internalName)) || internalName;
 
+      const resolvedDisplayType = fieldDisplayType(calculatedType || fieldType);
+
       return {
-        internalName : internalName,
-        displayName: displayName,
-        description: description,
-        alias: alias,
-        type: fieldType,
-        displayType: fieldDisplayType(calculatedFieldType || fieldType),
-        calculatedFieldType: calculatedFieldType,
-        required: spField.Required,
-        maxLength: spField.MaxLength,
-        choices: spField.Choices ? (spField.Choices.results || spField.Choices) : null,
-        lookupList: (fieldType === 'lookup' || fieldType === 'lookup-multi') ? (spField.LookupList || null) : null,
-        lookupField: (fieldType === 'lookup' || fieldType === 'lookup-multi') ? (spField.LookupField || null) : null,
+        internalName:    internalName,
+        displayName:     displayName,
+        description:     description,
+        alias:           alias,
+        userAlias:       alias,
+        rawType:         rawType,
+        rawTypeSource:   'sharepoint',
+        type:            fieldType,
+        dataType:        dataType,
+        displayType:     resolvedDisplayType,
+        calculatedType:  calculatedType,
+        calculatedFieldType: calculatedType,   // legacy alias
+        displayFormat:   defaultDisplayFormat(rawType),
+        derivedColumns:  null,
+        required:        spField.Required,
+        maxLength:       spField.MaxLength,
+        choices:         spField.Choices ? (spField.Choices.results || spField.Choices) : null,
+        lookupList:      (fieldType === 'lookup' || fieldType === 'lookup-multi') ? (spField.LookupList || null) : null,
+        lookupField:     (fieldType === 'lookup' || fieldType === 'lookup-multi') ? (spField.LookupField || null) : null,
       };
     }
 

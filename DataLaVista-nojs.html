@@ -1,10 +1,7 @@
 ﻿<!--
 This file is part of DataLaVista™
-DataLaVista.html: Report and dashboard designer main file.
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
-Created: 2026-03-10
-Last Modified: 2026-04-04
-Summary: Main window in DataLaVista for loading data and designing reports and dashboards.
+Summary: DataLaVista™ is a lightweight, client-side reporting and dashboard toolkit.
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
 
@@ -19,19 +16,22 @@ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 GNU General Public License for more details.
 You should have received a copy of the GNU General Public License along
 with this program. If not, see https://www.gnu.org/licenses/.
-
 -->
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>DataLaVista™: Reports & Dashboards</title>
+  <title>DataLaVista™: Dashboard Designer</title>
 
   <!-- AlaSQL -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/alasql/4.1.3/alasql.min.js"></script>
-  <!--script src="https://cdn.jsdelivr.net/npm/alasql@4.17.2/dist/alasql.min.js" integrity="sha256-cSUWm7ESD8Wh7fMFQMkVwlbYugKkhpH1q6bPGIZy9bg=" crossorigin="anonymous"></script -->
+  <script src="https://cdn.jsdelivr.net/npm/alasql@4.17.2/dist/alasql.min.js" integrity="sha256-cSUWm7ESD8Wh7fMFQMkVwlbYugKkhpH1q6bPGIZy9bg=" crossorigin="anonymous"></script>
   <!-- ECharts -->
   <script src="https://cdn.jsdelivr.net/npm/echarts@6.0.0/dist/echarts.min.js" integrity="sha256-uqjf5+HZM2uY6Jhrp+IOoV582+oe9CpZ1ZR4Yy+kWh0=" crossorigin="anonymous"></script>
+  <!-- ECharts custom series (auto-register to global echarts) -->
+  <script src="https://cdn.jsdelivr.net/npm/@echarts-x/custom-stage/dist/stage.auto.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@echarts-x/custom-line-range/dist/line-range.auto.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@echarts-x/custom-bar-range/dist/bar-range.auto.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@echarts-x/custom-violin/dist/violin.auto.js"></script>
   <!-- SheetJS v0.18.5 -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" integrity="sha256-yVBhl8r4CaB1tt7h2g02+xnacVj/6KiOewyWxdhiPJk=" crossorigin="anonymous"></script>
   <!-- CodeMirror core -->
@@ -639,6 +639,107 @@ with this program. If not, see https://www.gnu.org/licenses/.
       color: #b52c30;
       font-size: 13px;
     }
+
+    /* ── Data Dictionary popup ───────────────────────────────────── */
+    .dd-card {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px 14px;
+      margin-bottom: 8px;
+      background: var(--bg);
+    }
+    .dd-card:last-child { margin-bottom: 0; }
+    .dd-card-header {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 8px;
+      flex-wrap: wrap;
+    }
+    .dd-col-name {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+      word-break: break-word;
+    }
+    .dd-agg-badge {
+      font-size: 9px;
+      font-weight: 700;
+      background: var(--primary);
+      color: #fff;
+      border-radius: 3px;
+      padding: 1px 5px;
+      white-space: nowrap;
+    }
+    .dd-card-desc {
+      font-size: 11px;
+      color: var(--text-secondary);
+      font-style: italic;
+      margin-bottom: 8px;
+      line-height: 1.5;
+    }
+    .dd-card-lineage { margin-bottom: 8px; }
+    .dd-crumb[data-dlv-tip] { cursor: help; }
+    .dd-breadcrumb {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 4px;
+    }
+    .dd-crumb {
+      display: inline-flex;
+      align-items: center;
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 10px;
+      white-space: nowrap;
+      max-width: 240px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .dd-crumb-ds    { background: #e8f0fe; color: #1558d6; }
+    .dd-crumb-table { background: #fce8e6; color: #a50e0e; }
+    .dd-crumb-view  { background: #e6f4ea; color: #0d652d; }
+    .dd-crumb-field { background: #fef7e0; color: #7b5e00; }
+    .dd-arrow {
+      font-size: 14px;
+      color: var(--text-disabled);
+      user-select: none;
+      flex-shrink: 0;
+    }
+    .dd-card-footer {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 4px;
+    }
+    .dd-footer-label {
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--text-disabled);
+      text-transform: uppercase;
+      letter-spacing: .3px;
+      white-space: nowrap;
+    }
+    .dd-widget-chip {
+      font-size: 10px;
+      background: var(--primary-ultralight);
+      color: var(--primary);
+      border: 1px solid var(--primary-light);
+      border-radius: 10px;
+      padding: 1px 7px;
+      white-space: nowrap;
+    }
+    .dd-no-widgets {
+      font-size: 10px;
+      color: var(--text-disabled);
+      font-style: italic;
+    }
+    .dd-clickable { cursor: pointer; }
+    .dd-clickable:hover { filter: brightness(.92); }
+    .dd-cat-chip  { display:inline-block; font-size:10px; font-weight:600; padding:1px 6px; border-radius:4px; background:var(--bg-tertiary); color:var(--text-secondary); margin-right:4px; }
+    .dd-type-chip { display:inline-block; font-size:10px; padding:1px 6px; border-radius:4px; background:var(--bg-tertiary); color:var(--text-secondary); }
+    .dd-section-header { font-size:11px; font-weight:600; color:var(--text-secondary); padding:10px 0 4px; text-transform:uppercase; letter-spacing:.05em; border-bottom:1px solid var(--border); margin-bottom:8px; }
 
     .btn-danger {
       background: var(--error);
@@ -1456,6 +1557,11 @@ with this program. If not, see https://www.gnu.org/licenses/.
       box-shadow: 0 0 0 3px var(--primary-light);
     }
 
+    .qb-table-node.primary-table {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px var(--primary-light), 0 0 14px 4px rgba(0, 120, 212, 0.35);
+    }
+
     .qb-node-header {
       background: var(--primary);
       color: white;
@@ -1557,10 +1663,13 @@ with this program. If not, see https://www.gnu.org/licenses/.
       transition: opacity var(--transition);
     }
     .qb-node-pill.agg-pill { background: #e9950d; }
+    .qb-node-pill.agg-pill.rollup-agg-pill { opacity: .8; }
     .qb-node-pill:hover { opacity: .85; }
     .qb-node-pill.join-drop-hover { outline: 2px solid #0078d4; background: #cce4f7; color: #003a6c; opacity: 1; }
     .qb-node-pill .pill-x { cursor: pointer; font-size: 9px; opacity: .65; margin-left: 1px; line-height: 1; }
     .qb-node-pill .pill-x:hover { opacity: 1; }
+    .qb-node-pill .rollup-pill-x { cursor: pointer; font-size: 9px; opacity: .65; margin-left: 1px; line-height: 1; }
+    .qb-node-pill .rollup-pill-x:hover { opacity: 1; }
 
     /* ── Join icon in node header ────────────────────────────── */
     .qb-node-join-icon {
@@ -1627,6 +1736,22 @@ with this program. If not, see https://www.gnu.org/licenses/.
       transition: all var(--transition);
     }
     .adv-agg-btn.has-agg { background: #e9950d; color: white; border-color: transparent; }
+    .adv-agg-btn[disabled] { pointer-events: none; opacity: 0.35; cursor: default; }
+
+    /* ── Expand arrow button for lookup/array fields ─────────── */
+    .adv-expand-btn {
+      font-size: 9px; padding: 1px 4px; border-radius: 3px; min-width: 18px; text-align: center;
+      background: transparent; border: 1px solid var(--border);
+      cursor: pointer; flex-shrink: 0; color: var(--text-secondary);
+      transition: background var(--transition);
+    }
+    .adv-expand-btn:hover { background: var(--surface2); }
+
+    /* ── Child field rows (indented under expandable parent) ─── */
+    .adv-child-fields { margin-left: 0; }
+    .adv-child-field-row { background: var(--surface2); margin-bottom: 1px; }
+    .adv-child-field-row.selected { background: var(--primary-ultralight); }
+    .adv-child-field-row input[type=checkbox] { pointer-events: auto; }
 
     /* ── Agg popup ───────────────────────────────────────────── */
     .adv-agg-popup {
@@ -1973,6 +2098,11 @@ with this program. If not, see https://www.gnu.org/licenses/.
       background: var(--surface2);
       flex-shrink: 0;
       min-height: 32px;
+    }
+    
+    /* Allow [hidden] attribute to override display:flex on .widget-header */
+    .widget-header[hidden] {
+      display: none !important;
     }
 
     .widget-title {
@@ -3107,28 +3237,28 @@ with this program. If not, see https://www.gnu.org/licenses/.
 
       <!-- Right-click context menu (shared, positioned dynamically) -->
   <div id="dlv-ctx-menu">
-    <div class="ctx-menu-item" id="ctx-copy-url" onclick="dlvCtxCopyUrl();">🔗 Copy URL</div>
+    <div class="ctx-menu-item" id="ctx-copy-url">🔗 Copy URL</div>
     <div class="ctx-menu-sep" id="ctx-sep-url"></div>
-    <div class="ctx-menu-item" id="ctx-refresh-source" onclick="dlvCtxRefreshSource()">🔄 Refresh Source</div>
+    <div class="ctx-menu-item" id="ctx-refresh-source">🔄 Refresh Source</div>
     <div class="ctx-menu-sep" id="ctx-sep-refresh"></div>
-    <div class="ctx-menu-item" id="ctx-rename" onclick="dlvCtxRename()">✏️ Rename</div>
-    <div class="ctx-menu-item danger" id="ctx-delete" onclick="dlvCtxDelete()">🗑 Delete</div>
+    <div class="ctx-menu-item" id="ctx-rename">✏️ Rename</div>
+    <div class="ctx-menu-item danger" id="ctx-delete">🗑 Delete</div>
   </div>
 
   <!-- SharePoint File Picker Modal -->
-  <div id="sp-picker-overlay" onclick="if(event.target===this)spPickerClose()">
+  <div id="sp-picker-overlay">
     <div id="sp-picker-dialog">
       <div id="sp-picker-header">
         <h3>📂 Browse SharePoint Files</h3>
-        <button class="btn btn-ghost btn-icon btn-sm" onclick="spPickerClose()" title="Close">✕</button>
+        <button class="btn btn-ghost btn-icon btn-sm" id="sp-picker-close-btn" title="Close">✕</button>
       </div>
       <div id="sp-picker-breadcrumb"></div>
       <div id="sp-picker-spinner"><div class="spinner" style="width:16px;height:16px;border-width:2px"></div><span>Loading...</span></div>
       <div id="sp-picker-body"></div>
       <div id="sp-picker-footer">
         <span id="sp-picker-selected-label">No file selected</span>
-        <button class="btn btn-default btn-sm" onclick="spPickerClose()">Cancel</button>
-        <button class="btn btn-primary btn-sm" id="sp-picker-select-btn" disabled onclick="spPickerConfirm()">Select</button>
+        <button class="btn btn-default btn-sm" id="sp-picker-cancel-btn">Cancel</button>
+        <button class="btn btn-primary btn-sm" id="sp-picker-select-btn" disabled>Select</button>
       </div>
     </div>
   </div>
@@ -3144,16 +3274,16 @@ with this program. If not, see https://www.gnu.org/licenses/.
       <div id="popup-dialog">
         <div class="popup-header">
           <h2>⚡ Connect to Data Source</h2>
-          <button class="btn btn-ghost btn-icon" onclick="hideConnectPopup()" title="Close">✕</button>
+          <button class="btn btn-ghost btn-icon" id="popup-close-btn" title="Close">✕</button>
         </div>
         <div class="popup-body">
           <div class="source-tabs">
             <div class="source-tab-sp-wrapper" id="tab-sharepoint-wrapper">
-              <div class="source-tab" id="tab-sharepoint" data-src="sharepoint" onclick="switchSourceTab(this,'sharepoint')">SharePoint Lists</div>
+              <div class="source-tab" id="tab-sharepoint" data-src="sharepoint">SharePoint Lists</div>
             </div>
-            <div class="source-tab" data-src="upload" onclick="switchSourceTab(this,'upload')">Upload Files</div>
-            <div class="source-tab" data-src="remote" onclick="switchSourceTab(this,'remote')">Remote Files</div>
-            <div class="source-tab" data-src="loadconfig" onclick="switchSourceTab(this,'loadconfig')">Open Dashboard</div>
+            <div class="source-tab" id="tab-upload" data-src="upload">Upload Files</div>
+            <div class="source-tab" id="tab-remote" data-src="remote">Remote Files</div>
+            <div class="source-tab" id="tab-loadconfig" data-src="loadconfig">Open Dashboard</div>
           </div>
 
           <!-- SharePoint Lists -->
@@ -3186,15 +3316,13 @@ with this program. If not, see https://www.gnu.org/licenses/.
             <div class="form-group">
               <label>Select files to upload</label>
               <div class="dlv-dropzone" id="upload-dropzone"
-                ondragover="event.preventDefault();this.classList.add('drag-over')"
-                ondragleave="this.classList.remove('drag-over')"
-                ondrop="event.preventDefault();this.classList.remove('drag-over');document.getElementById('upload-file-input').files=event.dataTransfer.files;handleUploadFiles()">
+                >
                 <span>📂 Drag &amp; drop files here, or</span>
                 <label class="btn btn-default btn-sm" style="cursor:pointer;margin:0">
                   Browse…
                   <input type="file" id="upload-file-input" multiple
                     accept=".csv,.CSV,.json,.json5,.JSON,.xlsx,.xls,.xml,.XML,.sqlite,.db"
-                    style="display:none" onchange="handleUploadFiles()" />
+                    style="display:none" />
                 </label>
               </div>
               <span class="text-xs text-muted">Supported: CSV, JSON, Excel (.xlsx/.xls), XML, SQLite (.sqlite/.db)</span>
@@ -3214,7 +3342,7 @@ with this program. If not, see https://www.gnu.org/licenses/.
                 <input type="text" class="form-input" id="remote-url"
                   placeholder="https://example.com/data/report.csv"
                   style="flex:1" />
-                <button class="btn btn-default btn-sm" id="btn-sp-browse-remote" onclick="spBrowseRemoteFile()"
+                <button class="btn btn-default btn-sm" id="btn-sp-browse-remote"
                   title="Browse SharePoint document libraries for a data file"
                   style="display:none;white-space:nowrap;flex-shrink:0">📂 Browse SharePoint</button>
               </div>
@@ -3225,7 +3353,7 @@ with this program. If not, see https://www.gnu.org/licenses/.
               <input type="text" class="form-input" id="remote-ds-name" placeholder="auto" maxlength="6" />
             </div>
             <div style="display:flex;justify-content:flex-end;margin-bottom:6px">
-              <button class="btn btn-default btn-sm" onclick="handleAddRemoteUrl()">+ Add to Queue</button>
+              <button class="btn btn-default btn-sm" id="btn-add-remote-url">+ Add to Queue</button>
             </div>
             <div id="remote-queue" class="dlv-queue"><div class="queue-empty">No remote files queued</div></div>
           </div>
@@ -3237,7 +3365,7 @@ with this program. If not, see https://www.gnu.org/licenses/.
               <div style="display:flex;gap:6px;align-items:center">
                 <input type="text" class="form-input" id="config-url" placeholder="https://tenant.sharepoint.com/sites/.../Shared Documents/report.json"
                   style="flex:1" />
-                <button class="btn btn-default btn-sm" id="btn-sp-browse-config" onclick="spBrowseConfig()"
+                <button class="btn btn-default btn-sm" id="btn-sp-browse-config"
                   title="Browse SharePoint document libraries for a dashboard JSON file"
                   style="display:none;white-space:nowrap;flex-shrink:0">📂 Browse SharePoint Files</button>
               </div>
@@ -3260,8 +3388,8 @@ with this program. If not, see https://www.gnu.org/licenses/.
           </div>
         </div>
         <div class="popup-footer">
-          <button class="btn btn-default" onclick="hideConnectPopup()">I'll be back</button>
-          <button class="btn btn-primary" id="btn-do-connect" onclick="doConnect()">⚡ Connect &amp; Load</button>
+          <button class="btn btn-default" id="popup-cancel-btn">I'll be back</button>
+          <button class="btn btn-primary" id="btn-do-connect">⚡ Connect &amp; Load</button>
         </div>
       </div>
     </div>
@@ -3271,32 +3399,34 @@ with this program. If not, see https://www.gnu.org/licenses/.
       <div class="logo">Data<span>LaVista</span></div>
       <div class="toolbar-sep"></div>
       <button class="btn btn-default btn-sm" id="btn-connect" title="Come with me if you want to load... more data."
-        onclick="showConnectPopup()">⚡ Connect + Load</button>
+        onclick="ensureInit();showConnectPopup()">⚡ Connect + Load</button>
       <button class="btn btn-default btn-sm" id="btn-save-config" title="Come with me if you want your report to live."
-        onclick="saveConfig()" disabled>💾 Save</button>
+        disabled>💾 Save</button>
       <div class="toolbar-sep" id="btn-sep-after-save-config"></div>
       <div id="status-bar">Not connected — click Connect / Load to begin</div>
       <div class="toolbar-spacer"></div>
       <!-- Design mode tabs in toolbar -->
       <div id="toolbar-tab-nav" class="hidden">
-        <button id="toolbar-button-query" class="tb-tab-btn active" data-tab="query" onclick="switchTab('query')">Query</button>
+        <button id="toolbar-button-query" class="tb-tab-btn active" data-tab="query">Query</button>
         <span class="tb-tab-sep">›</span>
-        <button id="toolbar-button-design" class="tb-tab-btn" data-tab="design" onclick="switchTab('design')">Design</button>
+        <button id="toolbar-button-design" class="tb-tab-btn" data-tab="design">Design</button>
         <span class="tb-tab-sep">›</span>
-        <button id="toolbar-button-preview" class="tb-tab-btn" data-tab="dashboardPreview" onclick="switchTab('dashboardPreview')">Preview Dashboard</button>
+        <button id="toolbar-button-preview" class="tb-tab-btn" data-tab="dashboardPreview">Preview Dashboard</button>
         <span class="tb-tab-sep">›</span>
-        <button id="toolbar-button-generate" class="tb-tab-btn" data-tab="generate" onclick="switchTab('generate')">Generate Report</button>
+        <button id="toolbar-button-generate" class="tb-tab-btn" data-tab="generate">Generate Report</button>
       </div>
       <!-- Report mode toolbar buttons shown instead of design mode tabs-->
       <div id="toolbar-tab-reportMode" class="hidden">
-        <button id="toolbar-reportMode-button-1" class="btn btn-primary btn-sm" onclick="refreshDashboardPreview()" title="Refresh report data">🔄 Refresh</button>
+        <button id="toolbar-reportMode-button-1" class="btn btn-primary btn-sm" title="Refresh report data">🔄 Refresh</button>
         <span class="tb-tab-sep">›</span>
-        <button id="toolbar-reportMode-button-2" class="btn btn-primary btn-sm" onclick="downloadCSV()" title="Download as CSV">📄 CSV</button>
+        <button id="toolbar-reportMode-button-2" class="btn btn-primary btn-sm" title="Download as CSV">📄 CSV</button>
         <span class="tb-tab-sep">›</span>
-        <button id="toolbar-reportMode-button-3" class="btn btn-primary btn-sm" onclick="printReport()" title="Print report or export to PDF">🖨️ Print</button>
+        <button id="toolbar-reportMode-button-3" class="btn btn-primary btn-sm" title="Print report or export to PDF">🖨️ Print</button>
         <span class="tb-tab-sep">›</span>
-        <button id="toolbar-reportMode-button-4" class="btn btn-primary btn-sm" onclick="shareLiveReport()" title="Copy live report link to clipboard">📨 Share</button>
+        <button id="toolbar-reportMode-button-4" class="btn btn-primary btn-sm" title="Copy live report link to clipboard">📨 Share</button>
       </div>
+      <div class="toolbar-sep"></div>
+      <button id="toolbar-button-datadict" class="btn btn-ghost btn-sm btn-help" title="Data Dictionary">📖</button>
       <div class="toolbar-sep"></div>
       <a href="https://teamdynamix.umich.edu/TDClient/210/DepressionCenter/KB/ArticleDet?ID=15179" target="_blank" title="Help and Documentation"><button id="toolbar-button-help" class="btn btn-ghost btn-sm btn-help" title="Help">?</button></a>
     </div>
@@ -3315,8 +3445,8 @@ with this program. If not, see https://www.gnu.org/licenses/.
           <div class="panel-header">
             <span>Tables &amp; Fields</span>
             <div class="panel-actions">
-              <button class="btn btn-ghost btn-icon btn-sm" onclick="expandAllTables()" title="Expand all">▼</button>
-              <button class="btn btn-ghost btn-icon btn-sm" onclick="collapseAllTables()"
+              <button class="btn btn-ghost btn-icon btn-sm" id="btn-expand-all-tables" title="Expand all">▼</button>
+              <button class="btn btn-ghost btn-icon btn-sm" id="btn-collapse-all-tables"
                 title="Collapse all">▲</button>
             </div>
           </div>
@@ -3331,45 +3461,26 @@ with this program. If not, see https://www.gnu.org/licenses/.
 
           <!-- Query-main tab toolbar -->
           <div id="qm-tabs">
-            <div class="qm-tab active" id="qmt-qb" onclick="switchQMTab('qb')">
-              🧩 Query Builder
-              <span class="qm-subtabs" id="qb-subtabs">
-                <span class="qm-sub active" id="qb-basic-btn" onclick="event.stopPropagation();setQBMode('basic')">Basic</span>
-                <span class="qm-sub" id="qb-adv-btn" onclick="event.stopPropagation();setQBMode('advanced')">Advanced</span>
-              </span>
-            </div>
-            <div class="qm-tab" id="qmt-sql" onclick="switchQMTab('sql')">📜 SQL Editor</div>
-            <div class="qm-tab" id="qmt-dataPreview" onclick="switchQMTab('dataPreview')">✨ Results</div>
+            <div class="qm-tab active" id="qmt-qb">🧩 Query Builder</div>
+            <div class="qm-tab" id="qmt-sql">📜 SQL Editor</div>
+            <div class="qm-tab" id="qmt-dataPreview">✨ Results</div>
             <div class="qm-spacer"></div>
             <div class="qm-actions">
-              <button class="btn btn-ghost btn-sm" id="btn-sql-locked" onclick="unlockSQL()"
+              <button class="btn btn-ghost btn-sm" id="btn-sql-locked"
                 title="SQL is locked. Click to unlock." style="display:none">🔒 Locked</button>
-              <button class="btn btn-default btn-sm" id="btn-clear-query" onclick="clearQueryBuilder()" title="Clear query builder">🗑️ Clear Query</button>
-              <button class="btn btn-primary btn-sm" id="btn-run-query" onclick="runQuery(); switchQMTab('dataPreview');">▶ Run Query</button>
-              <button class="btn btn-primary btn-sm" id="btn-use-in-design" onclick="useResultsInDesign()" style="display:none">🎨 Use in Design</button>
+              <button class="btn btn-default btn-sm" id="btn-clear-query" title="Clear query builder">🗑️ Clear Query</button>
+              <button class="btn btn-primary btn-sm" id="btn-run-query">▶ Run Query</button>
+              <button class="btn btn-primary btn-sm" id="btn-use-in-design" style="display:none">🎨 Use in Design</button>
             </div>
           </div>
 
           <!-- Panel: Query Builder -->
           <div id="qm-panel-qb" class="active">
             <div id="qb-section">
-              <!-- Basic QB -->
-              <div id="qb-basic">
-                <div id="qb-basic-drop" class="drop-zone"
-                  ondragover="event.preventDefault(); this.classList.add('drag-over')"
-                  ondragleave="this.classList.remove('drag-over')" ondrop="onDropToBasicQB(event)">
-                  <div>
-                    <div style="font-size:24px;margin-bottom:4px">📋</div>
-                    <div>Drag a table or field here to start building your query</div>
-                  </div>
-                </div>
-                <div id="qb-basic-content"></div>
-              </div>
-
               <!-- Advanced QB -->
-              <div id="qb-advanced" style="display:none">
+              <div id="qb-advanced">
                 <div id="qb-canvas-wrap">
-                  <div id="qb-canvas" ondragover="event.preventDefault()" ondrop="onDropToAdvancedQB(event)">
+                  <div id="qb-canvas">
                     <svg id="qb-svg"></svg>
                   </div>
                   <div id="adv-canvas-trash" title="Drop here to remove">🗑️</div>
@@ -3378,7 +3489,7 @@ with this program. If not, see https://www.gnu.org/licenses/.
                 <div id="adv-options-panel">
                   <div class="adv-opts-header">
                     <span class="adv-opts-title" id="adv-opts-title-text">Options</span>
-                    <button id="adv-opts-toggle" onclick="toggleAdvOptionsPanel()" title="Collapse panel">◀</button>
+                    <button id="adv-opts-toggle" title="Collapse panel">◀</button>
                   </div>
                   <div id="adv-options-body">
                     <div class="text-muted text-sm">Drop a table onto the canvas, then click a node or join line to see options.</div>
@@ -3387,7 +3498,7 @@ with this program. If not, see https://www.gnu.org/licenses/.
                 <div id="node-props" style="display:none!important">
                   <div class="node-props-header">
                     <span id="node-props-title">Properties</span>
-                    <button class="btn btn-ghost btn-icon btn-sm" onclick="closeNodeProps()">✕</button>
+                    <button class="btn btn-ghost btn-icon btn-sm" id="btn-close-node-props">✕</button>
                   </div>
                   <div class="node-props-body" id="node-props-body"></div>
                 </div>
@@ -3399,8 +3510,8 @@ with this program. If not, see https://www.gnu.org/licenses/.
           <div id="qm-panel-sql">
             <div id="sql-section">
               <div class="sql-toolbar">
-                <button class="btn btn-default btn-sm" onclick="formatSQL()" title="Format SQL">🖋️ Format SQL</button>
-                <button class="btn btn-default btn-sm" onclick="clearSQLEditor()" title="Clear SQL editor">🧹 Clear Code</button>
+                <button class="btn btn-default btn-sm" id="btn-format-sql" title="Format SQL">🖋️ Format SQL</button>
+                <button class="btn btn-default btn-sm" id="btn-clear-sql" title="Clear SQL editor">🧹 Clear Code</button>
               </div>
               <div id="sql-editor-wrap">
                 <textarea id="sql-editor"></textarea>
@@ -3441,20 +3552,18 @@ with this program. If not, see https://www.gnu.org/licenses/.
         <div id="design-main">
           <div id="title-bar">
             <span class="bar-label">Title</span>
-            <input type="text" id="title-input" placeholder="Enter report title..."
-              oninput="DataLaVistaState.design.title=this.value" />
+            <input type="text" id="title-input" placeholder="Enter report title… or drop a field"
+              />
           </div>
           <div id="filter-bar">
             <span class="bar-label">Filters</span>
             <div class="filter-drop-zone" id="filter-drop-zone"
-              ondragover="event.preventDefault(); this.classList.add('drag-over')"
-              ondragleave="this.classList.remove('drag-over')" ondrop="onDropToFilterBar(event)">
+>
               <span id="filter-drop-hint" class="text-xs text-muted">Drop fields here to add report filters</span>
             </div>
           </div>
           <div id="canvas-wrap">
-            <div id="canvas-drop-zone" ondragover="onCanvasDragOver(event)" ondragleave="onCanvasDragLeave(event)"
-              ondrop="onDropToCanvas(event)">
+            <div id="canvas-drop-zone">
               <div id="canvas-empty-hint">
                 <div class="hint-icon">📊</div>
                 <div>Drag widget types or fields onto the canvas</div>
@@ -3491,10 +3600,10 @@ with this program. If not, see https://www.gnu.org/licenses/.
       <div class="tab-panel" id="tab-dashboardPreview">
         <div id="preview-toolbar" class="hidden">
           <span id="preview-label"class="preview-label">Report Preview</span>
-          <button id="preview-toolbar-button-refresh" class="btn btn-default btn-sm" onclick="refreshDashboardPreview()">🔄 Refresh</button>
-          <button id="preview-toolbar-button-download" class="btn btn-default btn-sm" onclick="downloadCSV()">📄 CSV</button>
-          <button id="preview-toolbar-button-print" class="btn btn-default btn-sm" onclick="printPreview()">⬇🖨️ Print</button>
-          <button id="preview-toolbar-button-generate" class="btn btn-primary btn-sm" onclick="switchTab('generate')">✅ Generate Report</button>
+          <button id="preview-toolbar-button-refresh" class="btn btn-default btn-sm">🔄 Refresh</button>
+          <button id="preview-toolbar-button-download" class="btn btn-default btn-sm">📄 CSV</button>
+          <button id="preview-toolbar-button-print" class="btn btn-default btn-sm">⬇🖨️ Print</button>
+          <button id="preview-toolbar-button-generate" class="btn btn-primary btn-sm">✅ Generate Report</button>
         </div>
         <div id="preview-title-bar" class="hidden"></div>
         <div id="preview-filter-bar" class="hidden"></div>
@@ -3511,7 +3620,7 @@ with this program. If not, see https://www.gnu.org/licenses/.
       <div class="tab-panel" id="tab-generate">
         <div id="generate-toolbar">
           <h2>Generate and Publish</h2>
-          <button class="btn btn-primary" onclick="generateReport()">⚙ Generate</button>
+          <button class="btn btn-primary" id="btn-generate-report">⚙ Generate</button>
         </div>
         <div id="generate-body">
           <div id="gen-info-panel-publish" class="gen-info-panel">
@@ -3561,7 +3670,7 @@ This program is distributed in the hope that it will be useful, but WITHOUT ANY 
             <div class="generate-col-label">
               <span>⚙ Report Config (JSON)</span>
               <div class="gen-actions">
-                <button class="btn btn-default btn-sm" id="btn-copy-json" onclick="copyGenCode()" disabled>📋
+                <button class="btn btn-default btn-sm" id="btn-copy-json" disabled>📋
                   Copy Report to Clipboard</button>
               </div>
             </div>
@@ -3576,13 +3685,13 @@ This program is distributed in the hope that it will be useful, but WITHOUT ANY 
               <h4>Save &amp; Publish</h4>
             </div>
             <div class="gen-info-actions">
-              <button class="btn btn-primary btn-sm" id="btn-publish-sp" disabled onclick="publishToSharePoint()" title="Save this report to a SharePoint document library">☁ Publish to SharePoint</button>
-              <button class="btn btn-default btn-sm" id="btn-save-sp-list" disabled onclick="saveToSharePointList()" title="Save this report to a SharePoint list">📋 Save to SharePoint List</button>
-              <button class="btn btn-default btn-sm" onclick="downloadGenCode('json')">💾 Save Local Copy</button>
+              <button class="btn btn-primary btn-sm" id="btn-publish-sp" disabled title="Save this report to a SharePoint document library">☁ Publish to SharePoint</button>
+              <button class="btn btn-default btn-sm" id="btn-save-sp-list" disabled title="Save this report to a SharePoint list">📋 Save to SharePoint List</button>
+              <button class="btn btn-default btn-sm" id="btn-download-gen-code">💾 Save Local Copy</button>
             </div>
             <div id="gen-publish-result" style="display:none;margin-top:8px;align-items:center;gap:6px;flex-wrap:wrap">
               <a id="gen-publish-url" href="#" target="_blank" style="color:var(--primary);font-weight:700;font-size:11px;text-decoration:underline"></a>
-              <button class="btn btn-ghost btn-sm" onclick="sharePublishedUrl()" style="height:22px;padding:0 8px;font-size:11px;flex-shrink:0">🔗 Share</button>
+              <button class="btn btn-ghost btn-sm" id="btn-share-published-url" style="height:22px;padding:0 8px;font-size:11px;flex-shrink:0">🔗 Share</button>
             </div>
           </div>
         </div>
@@ -3594,7 +3703,12 @@ This program is distributed in the hope that it will be useful, but WITHOUT ANY 
   <!-- Toast container -->
   <div id="toast-container"></div>
 
-      <!-- DataLaVista Scripts -->
-         <script src="datalavista.js"></script>
+  <!-- DataLaVista Scripts -->
+  <!-- DATALAVISTA_SCRIPTS_PLACEHOLDER_OPEN -->
+  <!-- Pick one below (or edit) and disable the rest: -->
+  <script src="datalavista.js"></script>
+  <script src="../SiteAssets/datalavista.js"></script>
+  <!-- <script src="https://code.depressioncenter.org/datalavista/datalavista.js"></script> -->
+  <!-- DATALAVISTA_SCRIPTS_PLACEHOLDER_CLOSE -->
 </body>
 </html>

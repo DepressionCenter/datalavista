@@ -213,6 +213,20 @@ async function doConnect() {
   
     progText.textContent = 'Loading dashboard...';
     await loadConfig(parsed);
+    // If loaded from a URL, pre-fill reportUrl and show the published URL (same as ?report= param loading)
+    if (configUrl) {
+      DataLaVistaState.reportUrl = configUrl;
+      const configUrlEl = document.getElementById('config-url');
+      if (configUrlEl) configUrlEl.value = configUrl;
+      if (DataLaVistaState.isSpSite && DataLaVistaState.spSiteUrl) {
+        const spBase = DataLaVistaState.spSiteUrl.substring(0, DataLaVistaState.spSiteUrl.lastIndexOf('/') + 1);
+        if (spBase && configUrl.startsWith(spBase)) {
+          const dlvUrl = new URL(window.location.href);
+          const publishedUrl = dlvUrl.origin + dlvUrl.pathname + '?report=' + encodeURIComponent(configUrl);
+          _showPublishResult(publishedUrl);
+        }
+      }
+    }
 }
 
     // Post successful connection popup cleanup and UI updates
@@ -245,8 +259,12 @@ async function doConnect() {
  * @param {object} newState
  */
 function setTableState(tableKey, newState) {
-  const prevAlias = DataLaVistaState.tables[tableKey]?.alias;
-  DataLaVistaState.tables[tableKey] = prevAlias ? { ...newState, alias: prevAlias } : newState;
+  const prev = DataLaVistaState.tables[tableKey];
+  let state = newState;
+  if (prev?.alias) state = { ...state, alias: prev.alias };
+  // Preserve originalFields so $select/$expand generation doesn't fall back to synthetic view fields
+  if (prev?.originalFields) state = { ...state, originalFields: prev.originalFields };
+  DataLaVistaState.tables[tableKey] = state;
 }
 
 // ============================================================
@@ -684,6 +702,23 @@ function tryJSONP(url) {
 }
 
 // ============================================================
+// SHAREPOINT SITE METADATA HELPER
+// ============================================================
+/** @param {string} siteUrl @param {string} dsName */
+function _fetchSPSiteMeta(siteUrl, dsName) {
+  spFetch(siteUrl + '/_api/web?$select=Title,Url,Id,Description', dsName)
+    .then(function(web) {
+      const d = (web && web.d) ? web.d : web;
+      const ds = /** @type {any} */ (DataLaVistaState.dataSources)[/** @type {any} */ (dsName)];
+      if (ds && d && d.Title) {
+        ds.siteTitle = d.Title;
+        if (d.Description) ds.description = d.Description;
+      }
+    })
+    .catch(function() {});
+}
+
+// ============================================================
 // SHAREPOINT SOURCE LOADER
 // ============================================================
 async function loadSharePointListsSource(siteUrl, dsName, newAuth='current', newToken='', description='') {
@@ -705,6 +740,9 @@ async function loadSharePointListsSource(siteUrl, dsName, newAuth='current', new
       keepRawData: false
     };
   }
+
+  // Best-effort: fetch SP site title and description for the data dictionary (fire-and-forget)
+  _fetchSPSiteMeta(siteUrl, dsName);
 
   const lists = await fetchSPLists(siteUrl, dsName);
   let loadedCount = 0;
@@ -752,7 +790,6 @@ async function loadSharePointListsSource(siteUrl, dsName, newAuth='current', new
         alias: tableAlias,
         dsAlias: dsName,
         fields: fieldMetas,
-        //originalFields: fields, // TODO: Commented out to debug synthetic fields not being generated 3/31/26
         data: [],
         loaded: false,
         sourceType: 'sharepoint',
@@ -804,8 +841,9 @@ async function loadSharePointListsSource(siteUrl, dsName, newAuth='current', new
 // ============================================================
 
 // Fetch JSON from a URL trying multiple strategies.
-// Skips external proxies if the URL is on the same site as the current page
-// (or the detected SharePoint site), since proxies can't authenticate there.
+// Skips external proxies if the URL is on the same host as the current page,
+// on the same SharePoint tenant/site, or otherwise same-origin — proxies
+// cannot authenticate to internal servers and must not receive private data.
 async function fetchJSONWithFallbacks(url) {
   if (window.location.protocol === 'file:') {
     throw new Error(
@@ -820,8 +858,12 @@ async function fetchJSONWithFallbacks(url) {
     try {
       const target = new URL(url);
       if (target.origin === window.location.origin) return true;
+      if (target.hostname === window.location.hostname) return true;
       const spSite = typeof getSpSiteUrl === 'function' && getSpSiteUrl();
-      if (spSite && url.startsWith(spSite)) return true;
+      if (spSite) {
+        if (url.startsWith(spSite)) return true;
+        try { if (new URL(spSite).origin === target.origin) return true; } catch(_) {}
+      }
     } catch (e) {}
     return false;
   })();
@@ -852,6 +894,7 @@ async function fetchJSONWithFallbacks(url) {
 }
 
 // Fetch raw CSV text from a URL trying multiple strategies.
+// Skips external proxies for same-host, same-origin, and SharePoint tenant URLs (privacy).
 async function fetchCSVWithFallbacks(url) {
   const encodedUrl = encodeURIComponent(url);
 
@@ -859,8 +902,12 @@ async function fetchCSVWithFallbacks(url) {
     try {
       const target = new URL(url);
       if (target.origin === window.location.origin) return true;
+      if (target.hostname === window.location.hostname) return true;
       const spSite = typeof getSpSiteUrl === 'function' && getSpSiteUrl();
-      if (spSite && url.startsWith(spSite)) return true;
+      if (spSite) {
+        if (url.startsWith(spSite)) return true;
+        try { if (new URL(spSite).origin === target.origin) return true; } catch(_) {}
+      }
     } catch (e) {}
     return false;
   })();
@@ -879,7 +926,6 @@ async function fetchCSVWithFallbacks(url) {
   for (const s of strategies) {
     try {
       const text = await s.fn();
-      console.info(`[fetchCSVWithFallbacks] ✅ succeeded via: ${s.name} (${isSameOrigin ? 'same-origin' : 'cross-origin'})`);
       return text;
     } catch (err) {
       errors[s.name] = err.message;
@@ -888,7 +934,7 @@ async function fetchCSVWithFallbacks(url) {
   }
 
   const summary = Object.entries(errors).map(([k, v]) => `  [${k}] ${v}`).join('\n');
-  console.error('[fetchCSVWithFallbacks] All strategies failed:', summary);
+  console.warn('[fetchCSVWithFallbacks] All strategies failed:', summary);
   throw new Error('Unable to fetch file. Check the URL and try again.');
 }
 
@@ -940,6 +986,8 @@ async function loadJSONSource(url, dsName) {
 
   // Register data source
   if (!DataLaVistaState.dataSources[dsName]) {
+    const _spMatchJson = url && url.match(/(https?:\/\/[^\/]+\/(?:sites|teams)\/[^\/]+)/i);
+    const _spSiteUrlJson = _spMatchJson ? _spMatchJson[1] : null;
     DataLaVistaState.dataSources[dsName] = {
       alias: dsName,
       auth: null,
@@ -949,10 +997,11 @@ async function loadJSONSource(url, dsName) {
       tables: [],
       token: '',
       url: url,
-      siteUrl: null,
+      siteUrl: _spSiteUrlJson,
       isFileUpload: false,
       keepRawData: false
     };
+    if (_spSiteUrlJson) _fetchSPSiteMeta(_spSiteUrlJson, dsName);
   }
 
   setTableState(tableKey, {
@@ -1119,13 +1168,16 @@ async function loadCSVSource(url, dsName, fileName) {
       }
 
       if (!DataLaVistaState.dataSources[dsName]) {
+        const _spMatchCsv = url && url.match(/(https?:\/\/[^\/]+\/(?:sites|teams)\/[^\/]+)/i);
+        const _spSiteUrlCsv = _spMatchCsv ? _spMatchCsv[1] : null;
         DataLaVistaState.dataSources[dsName] = {
           alias: 'Data', auth: null,
           description: 'This CSV file (' + (fileName || dsName + '.csv') + ') was loaded from a URL.',
           internalName: dsName, tables: [], token: null, type: 'csv',
           fileName: fileName || '', isFileUpload: false,
-          url: url, keepRawData: false
+          url: url, siteUrl: _spSiteUrlCsv, keepRawData: false
         };
+        if (_spSiteUrlCsv) _fetchSPSiteMeta(_spSiteUrlCsv, dsName);
       }
       setTableState(tableKey, {
         alias: tableKey, data: rows, dataSource: dsName,

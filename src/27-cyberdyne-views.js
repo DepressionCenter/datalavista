@@ -110,27 +110,44 @@ validateAliasUniqueness(fields) {
         const siteUrl   = (t && t.siteUrl)    ? t.siteUrl    : (DataLaVistaState.spSiteUrl || '');
 
         const virtualCols = [];
-        const seenAliases = new Set();
+        const seenAliasMap = new Map(); // alias → { vcIndex, isSynthetic }
+        const _resolveAlias = (baseAlias, internalName) => {
+          const pascalInternal = toPascalCase(internalName) || internalName;
+          if (pascalInternal && pascalInternal !== baseAlias && !seenAliasMap.has(pascalInternal)) return pascalInternal;
+          let counter = 2;
+          while (seenAliasMap.has(baseAlias + '_' + counter)) counter++;
+          return baseAlias + '_' + counter;
+        };
         for (const field of baseFields) {
           const expanded = this.FieldExpander.expand(field, rawTableRef, { sourceType, siteUrl });
           for (const vc of expanded) {
-            // ── Fix 1: warn and rename instead of silently dropping ──────────
             let alias = vc.alias;
-            if (seenAliases.has(alias)) {
-              console.warn(
-                `[CyberdynePipeline] _applyViewSQL: Duplicate alias "${alias}" in view "${viewName}"` +
-                ` (internalName: "${vc.internalName}", parentField: "${vc.parentField}").` +
-                ` Suffixing to avoid silent data loss.`
-              );
-              let counter = 2;
-              while (seenAliases.has(alias + '_' + counter)) counter++;
-              alias = alias + '_' + counter;
+            if (seenAliasMap.has(alias)) {
+              const existing = seenAliasMap.get(alias);
+              if (!vc.isSynthetic && existing.isSynthetic) {
+                // Source field wins: retroactively rename the conflicting synthetic
+                const newAlias = _resolveAlias(alias, virtualCols[existing.vcIndex].internalName);
+                console.warn(
+                  `[CyberdynePipeline] _applyViewSQL: Source field "${alias}" conflicts with synthetic in view "${viewName}".` +
+                  ` Renaming synthetic (internalName: "${virtualCols[existing.vcIndex].internalName}") to "${newAlias}".`
+                );
+                virtualCols[existing.vcIndex] = { ...virtualCols[existing.vcIndex], alias: newAlias };
+                seenAliasMap.delete(alias);
+                seenAliasMap.set(newAlias, { vcIndex: existing.vcIndex, isSynthetic: true });
+                // alias stays unchanged — source field keeps its original name
+              } else {
+                // Existing wins (or both synthetic): rename incoming
+                const newAlias = _resolveAlias(alias, vc.internalName);
+                console.warn(
+                  `[CyberdynePipeline] _applyViewSQL: Duplicate alias "${vc.alias}" in view "${viewName}"` +
+                  ` (internalName: "${vc.internalName}", parentField: "${vc.parentField}").` +
+                  ` Resolved to "${newAlias}" to avoid silent data loss.`
+                );
+                alias = newAlias;
+              }
             }
-            seenAliases.add(alias);
-            // Shallow-clone vc only if the alias actually changed, to avoid
-            // mutating the FieldExpander's output object in place.
+            seenAliasMap.set(alias, { vcIndex: virtualCols.length, isSynthetic: vc.isSynthetic });
             virtualCols.push(alias !== vc.alias ? { ...vc, alias } : vc);
-            // ── End Fix 1 ────────────────────────────────────────────────────
           }
         }
         if (virtualCols.length === 0) return;
@@ -141,24 +158,37 @@ validateAliasUniqueness(fields) {
         } catch (e) { console.warn(`[CyberdynePipeline] Failed to create view ${viewName}:`, e.message); }
 
         // Rebuild view metadata from expanded virtual columns
+        const _baseDescMap = {};
+        for (const bf of baseFields) _baseDescMap[bf.internalName] = bf.description || '';
         view.columnMappings = {};
         view.fields = [];
         for (const vc of virtualCols) {
           view.columnMappings[vc.alias] = vc.internalName;
           view.fields.push({
-            internalName: vc.internalName,
-            displayName: vc.alias,
-            alias: vc.alias,
-            type: vc.type,
-            displayType: vc.displayType,
-            isSynthetic: vc.isSynthetic,
-            parentField: vc.parentField,
-            isAutoId: false
+            internalName:  vc.internalName,
+            displayName:   vc.alias,
+            alias:         vc.alias,
+            userAlias:     vc.alias,
+            type:          vc.type,
+            dataType:      vc.type,   // type IS the dataType for vc (text/number/date/boolean/array/object)
+            displayType:   vc.displayType,
+            displayFormat: vc.displayFormat || null,
+            derivedColumns: null,
+            isSynthetic:   vc.isSynthetic,
+            parentField:   vc.parentField,
+            isLookupRaw:   vc.isLookupRaw || false,
+            isAutoId:      false,
+            description:   vc.isSynthetic ? '' : (_baseDescMap[vc.internalName] || ''),
           });
         }
 
-        // Sync t.fields so renderFieldsPanel and QB show the expanded field list
-        if (t && t.data && t.data.length > 0) t.fields = view.fields;
+        // Sync t.fields only when _raw_ data is actually in AlaSQL.
+        // Using t.itemCount > 0 caused t.fields to be set to synthetic view fields during
+        // restoreViewsFromConfig (before data loaded), which corrupted spFields fallback in
+        // fetchTableData when t.originalFields was null, breaking lookups, users, and booleans.
+        let _hasRawData = false;
+        try { _hasRawData = (/** @type {any} */ (window)).alasql('SELECT COUNT(*) AS n FROM [_raw_' + rawTable + ']')[0].n > 0; } catch (_) {}
+        if (t && _hasRawData) t.fields = view.fields;
         return;
       } else { }
 
@@ -170,7 +200,6 @@ validateAliasUniqueness(fields) {
       if (cols.length === 0) return; // Nothing to select yet (lazy SP list)
       try { alasql(`DROP VIEW IF EXISTS [${viewName}]`); } catch (_) {}
       try {
-        console.log(`[CyberdynePipeline] Creating view cyberdyne-views.js Line 142 ${viewName} with columns:`, cols);
         alasql(`CREATE VIEW [${viewName}] AS SELECT ${cols.join(', ')} FROM ${rawTableRef}`);
       } catch (e) { console.warn(`[CyberdynePipeline] Failed to create view ${viewName}:`, e.message); }
     },
@@ -318,7 +347,7 @@ validateAliasUniqueness(fields) {
       // Register data in AlaSQL
       this._registerRawTable(rawTableName, table.data);
 
-      // Store table metadata in state
+      // Store table metadata in state — rows live in alasql, not here
       DataLaVistaState.tables[rawTableName] = {
         internalName: rawTableName,
         displayName: table.metadata.fileName || rawTableName,
@@ -326,7 +355,7 @@ validateAliasUniqueness(fields) {
         dsAlias: dsName,
         dataSource: dsName,
         fields: table.fields,
-        data: table.data,
+        data: [],
         loaded: true,
         sourceType: table.metadata.sourceType || dsMetadata.type,
         isFileUpload: table.metadata.isFileUpload || false,
@@ -419,9 +448,9 @@ validateAliasUniqueness(fields) {
           alias: existingFieldMap[f.internalName] || f.alias
         }));
 
-        // Update state
+        // Update state — rows go to alasql, not state
         existingTable.fields = mergedFields;
-        existingTable.data = table.data;
+        existingTable.data = [];
         existingTable.loaded = true;
         existingTable.itemCount = table.data.length;
 
@@ -452,7 +481,7 @@ validateAliasUniqueness(fields) {
           dsAlias: dsName,
           dataSource: dsName,
           fields: table.fields,
-          data: table.data,
+          data: [],
           loaded: true,
           sourceType: table.metadata?.sourceType || dsMetadata.type,
           isFileUpload: table.metadata?.isFileUpload || false,
@@ -545,7 +574,7 @@ validateAliasUniqueness(fields) {
         const typeStr = (field.TypeAsString || field.type || '').toLowerCase();
         const isMultiSelect = typeStr.includes('multi') || typeStr.includes('multichoice');
         const childJoinField = isMultiSelect
-          ? field.alias + 'Data'   // array field → DLV_INCLUDES join
+          ? field.alias + 'Data'   // array field → DLV_LOOKUP join
           : field.alias + 'Id';    // scalar FK  → regular LEFT JOIN
 
         const exists = DataLaVistaState.relationships.some(r =>
@@ -761,9 +790,10 @@ validateAliasUniqueness(fields) {
           ? this._expandTaxonomyMulti(field, outKey, rawCol)
           : this._expandTaxonomy(field, outKey, rawCol);
       }
-      if (ft === 'url') return this._expandUrlField(field, outKey, rawCol);
-      if (typeStr === 'calculated' && (field.CalculatedTypeAsString || field.calculatedFieldType)) {
-        const newFieldType = parseFieldType(field.CalculatedTypeAsString || field.calculatedFieldType);
+      if (ft === 'url')          return this._expandUrlField(field, outKey, rawCol);
+      if (ft === 'choice-multi') return this._expandChoiceMulti(field, outKey, rawCol);
+      if (typeStr === 'calculated' && (field.CalculatedTypeAsString || field.calculatedType || field.calculatedFieldType)) {
+        const newFieldType = parseFieldType(field.CalculatedTypeAsString || field.calculatedType || field.calculatedFieldType);
         // Shallow-clone to avoid mutating the shared state field object
         field = Object.assign({}, field, { type: newFieldType, displayType: fieldDisplayType(newFieldType) });
         // Re-derive ft so subsequent type-branches route correctly
@@ -771,9 +801,11 @@ validateAliasUniqueness(fields) {
       }
 
       // ── Generic types inferred from data ───────────────────────────────────
-      if (ft === 'object') return this._expandGenericObject(field, outKey, rawCol);
-      if (ft === 'array')  return this._expandGenericArray(field, outKey, rawCol);
-      if (ft === 'date')   return this._expandDateField(field, outKey, rawCol);
+      if (ft === 'object')           return this._expandGenericObject(field, outKey, rawCol);
+      if (ft === 'array-objects')    return this._expandArrayObjects(field, outKey, rawCol);
+      if (ft === 'array-primitives') return this._expandArrayPrimitives(field, outKey, rawCol);
+      if (ft === 'array')            return this._expandArrayPrimitives(field, outKey, rawCol);
+      if (ft === 'date' || ft === 'datetime') return this._expandDateField(field, outKey, rawCol);
 
       // ── Explicit Parsers for SharePoint Calculated Fields ONLY ─────────────
       if (typeStr === 'calculated') {
@@ -786,90 +818,164 @@ validateAliasUniqueness(fields) {
     },
 
     _vc(alias, internalName, sqlExpr, type, displayType, isSynthetic, parentField) {
-      return { alias, internalName, sqlExpr, type, displayType, isSynthetic: !!isSynthetic, parentField };
+      return { alias, internalName, sqlExpr, type, displayType, isSynthetic: !!isSynthetic, parentField, isLookupRaw: false, displayFormat: null };
+    },
+    // Like _vc but marks the field as a raw lookup internal (hidden from all pickers).
+    _vcRaw(alias, internalName, sqlExpr, type, displayType, parentField) {
+      return { alias, internalName, sqlExpr, type, displayType, isSynthetic: true, parentField, isLookupRaw: true, displayFormat: null };
     },
 
     _expandUserSingle(field, outKey, rawCol, siteUrl) {
-      const base = (siteUrl || '..').replace(/\/$/, '');
       return [
-        this._vc(outKey,                  field.internalName, `DLV_DISPLAY(${rawCol})`,                                          'text',   'text',   false, field.internalName),
-        this._vc(outKey + 'Id',           field.internalName, `DLV_PROP(${rawCol}, 'Id')`,                                       'number', 'number', true,  field.internalName),
-        this._vc(outKey + 'Claims',       field.internalName, `DLV_PROP(${rawCol}, 'Name')`,                                     'text',   'text',   true,  field.internalName),
-        this._vc(outKey + 'Email',        field.internalName, `DLV_EMAIL(DLV_PROP(${rawCol}, 'Name'))`,                          'text',   'text',   true,  field.internalName),
-        this._vc(outKey + 'PictureUrl',   field.internalName, `DLV_PICTURE_URL(DLV_PROP(${rawCol}, 'Name'), '${base}')`,         'text',   'text',   true,  field.internalName),
-        this._vc(outKey + 'Data',         field.internalName, rawCol,                                                             'object', 'object', true,  field.internalName),
+        this._vc   (outKey,          field.internalName, `DLV_DISPLAY(${rawCol})`,              'text',   'user',   false, field.internalName),
+        this._vc   (outKey + 'Id',   field.internalName, `DLV_PROP(${rawCol}, 'Id')`,           'number', 'number', true,  field.internalName),
+        this._vc   (outKey + 'Email', field.internalName, `DLV_EMAIL(DLV_PROP(${rawCol}, 'Name'))`, 'text', 'text', true,  field.internalName),
+        this._vcRaw(outKey + 'Data', field.internalName, rawCol,                                 'object', 'object', field.internalName),
       ];
     },
 
     _expandUserMulti(field, outKey, rawCol) {
       return [
-        this._vc(outKey,          field.internalName, `DLV_JOIN(${rawCol}, 'Title')`, 'text',  'text',  false, field.internalName),
-        this._vc(outKey + 'Ids',  field.internalName, `DLV_IDS(${rawCol})`,           'text',  'text',  true,  field.internalName),
-        this._vc(outKey + 'Emails', field.internalName, `DLV_EMAILS(${rawCol})`,      'text',  'text',  true,  field.internalName),
-        this._vc(outKey + 'Data', field.internalName, rawCol,                          'array', 'array', true,  field.internalName),
+        this._vc   (outKey,           field.internalName, `DLV_JOIN(${rawCol}, 'Title')`, 'text',   'user-multi', false, field.internalName),
+        this._vc   (outKey + 'Count', field.internalName, `${rawCol}->length`,             'number', 'number',     true,  field.internalName),
+        this._vcRaw(outKey + 'Ids',   field.internalName, `DLV_IDS(${rawCol})`,            'array',  'array',      field.internalName),
+        this._vcRaw(outKey + 'Data',  field.internalName, rawCol,                           'array',  'array',      field.internalName),
       ];
     },
 
     _expandLookupSingle(field, outKey, rawCol) {
       return [
-        this._vc(outKey,         field.internalName, `DLV_DISPLAY(${rawCol})`,   'text',   'text',   false, field.internalName),
-        this._vc(outKey + 'Id',  field.internalName, `DLV_PROP(${rawCol}, 'Id')`, 'number', 'number', true,  field.internalName),
-        this._vc(outKey + 'Data', field.internalName, rawCol,                     'object', 'object', true,  field.internalName),
+        this._vc   (outKey,          field.internalName, `DLV_DISPLAY(${rawCol})`,    'text',   'lookup', false, field.internalName),
+        this._vc   (outKey + 'Id',   field.internalName, `DLV_PROP(${rawCol}, 'Id')`, 'number', 'number', true,  field.internalName),
+        this._vcRaw(outKey + 'Data', field.internalName, rawCol,                       'object', 'object', field.internalName),
       ];
     },
 
     _expandLookupMulti(field, outKey, rawCol) {
       return [
-        this._vc(outKey,          field.internalName, `DLV_JOIN(${rawCol}, 'Title')`, 'text',  'text',  false, field.internalName),
-        this._vc(outKey + 'Ids',  field.internalName, `DLV_IDS(${rawCol})`,           'text',  'text',  true,  field.internalName),
-        this._vc(outKey + 'Data', field.internalName, rawCol,                          'array', 'array', true,  field.internalName),
+        this._vc   (outKey,           field.internalName, `DLV_JOIN(${rawCol}, 'Title')`, 'text',   'lookup-multi', false, field.internalName),
+        this._vc   (outKey + 'Count', field.internalName, `${rawCol}->length`,             'number', 'number',       true,  field.internalName),
+        this._vcRaw(outKey + 'Ids',   field.internalName, `DLV_IDS(${rawCol})`,            'array',  'array',        field.internalName),
+        this._vcRaw(outKey + 'Data',  field.internalName, rawCol,                           'array',  'array',        field.internalName),
       ];
     },
 
     _expandTaxonomy(field, outKey, rawCol) {
       return [
-        this._vc(outKey,         field.internalName, `DLV_TAX_LABELS(${rawCol})`, 'text', 'text', false, field.internalName),
-        this._vc(outKey + 'Id',  field.internalName, `DLV_TAX_IDS(${rawCol})`,   'text', 'text', true,  field.internalName),
-        this._vc(outKey + 'Data', field.internalName, rawCol,                     'object', 'object', true, field.internalName),
+        this._vc   (outKey,          field.internalName, `DLV_TAX_LABELS(${rawCol})`, 'text',   'lookup', false, field.internalName),
+        this._vc   (outKey + 'Id',   field.internalName, `DLV_TAX_IDS(${rawCol})`,   'text',   'text',   true,  field.internalName),
+        this._vcRaw(outKey + 'Data', field.internalName, rawCol,                       'object', 'object', field.internalName),
       ];
     },
 
     _expandTaxonomyMulti(field, outKey, rawCol) {
       return [
-        this._vc(outKey,          field.internalName, `DLV_TAX_LABELS(${rawCol})`, 'text',  'text',  false, field.internalName),
-        this._vc(outKey + 'Ids',  field.internalName, `DLV_TAX_IDS(${rawCol})`,   'text',  'text',  true,  field.internalName),
-        this._vc(outKey + 'Data', field.internalName, rawCol,                       'array', 'array', true,  field.internalName),
+        this._vc   (outKey,            field.internalName, `DLV_TAX_LABELS(${rawCol})`,      'text',   'lookup-multi', false, field.internalName),
+        this._vc   (outKey + 'Count',  field.internalName, `${rawCol}->length`,               'number', 'number',       true,  field.internalName),
+        this._vcRaw(outKey + 'Ids',    field.internalName, `DLV_TAX_IDS(${rawCol})`,          'array',  'array',        field.internalName),
+        this._vc   (outKey + 'Labels', field.internalName, `DLV_TAX_LABELS_ONLY(${rawCol})`,  'array',  'array',        true,  field.internalName),
+        this._vcRaw(outKey + 'Data',   field.internalName, rawCol,                             'array',  'array',        field.internalName),
       ];
     },
 
     _expandUrlField(field, outKey, rawCol) {
       return [
-        this._vc(outKey,           field.internalName, `DLV_PROP(${rawCol}, 'Url')`,         'text',   'text',   false, field.internalName),
-        this._vc(outKey + 'Label', field.internalName, `DLV_PROP(${rawCol}, 'Description')`, 'text',   'text',   true,  field.internalName),
-        this._vc(outKey + 'Data',  field.internalName, rawCol,                                'object', 'object', true,  field.internalName),
+        this._vc(outKey,           field.internalName, `DLV_PROP(${rawCol}, 'Url')`,         'text', 'url',  false, field.internalName),
+        this._vc(outKey + 'Label', field.internalName, `DLV_PROP(${rawCol}, 'Description')`, 'text', 'text', true,  field.internalName),
       ];
     },
 
     _expandGenericObject(field, outKey, rawCol) {
+      const cols = [
+        this._vc   (outKey,          field.internalName, `DLV_DISPLAY(${rawCol})`, 'text',   'object', false, field.internalName),
+        this._vc   (outKey + 'Id',   field.internalName, `DLV_ID_PROP(${rawCol})`, 'text',   'text',   true,  field.internalName),
+      ];
+      // Expand each key found in the sample data
+      const reservedSuffixes = new Set(['Id', 'Data']);
+      for (const key of (field.objectKeys || [])) {
+        const keySuffix = toPascalCase(key) || key;
+        if (!keySuffix || reservedSuffixes.has(keySuffix)) continue;
+        reservedSuffixes.add(keySuffix);
+        cols.push(this._vc(outKey + keySuffix, field.internalName, `DLV_PROP(${rawCol}, '${key}')`, 'text', 'text', true, field.internalName));
+      }
+      cols.push(this._vcRaw(outKey + 'Data', field.internalName, rawCol, 'object', 'object', field.internalName));
+      return cols;
+    },
+
+    _expandArrayPrimitives(field, outKey, rawCol) {
       return [
-        this._vc(outKey,          field.internalName, `DLV_DISPLAY(${rawCol})`,    'text',   'text',   false, field.internalName),
-        this._vc(outKey + 'Id',   field.internalName, `DLV_PROP(${rawCol}, 'Id')`, 'text',   'text',   true,  field.internalName),
-        this._vc(outKey + 'Data', field.internalName, rawCol,                       'object', 'object', true,  field.internalName),
+        this._vc   (outKey,           field.internalName, `DLV_JOIN(${rawCol}, '')`, 'text',   'array',  false, field.internalName),
+        this._vc   (outKey + 'Count', field.internalName, `${rawCol}->length`,        'number', 'number', true,  field.internalName),
+        this._vcRaw(outKey + 'Data',  field.internalName, rawCol,                     'array',  'array',  field.internalName),
       ];
     },
 
-    _expandGenericArray(field, outKey, rawCol) {
-      return [
-        this._vc(outKey,          field.internalName, `DLV_JOIN(${rawCol}, '')`, 'text',  'text',  false, field.internalName),
-        this._vc(outKey + 'Ids',  field.internalName, `DLV_IDS(${rawCol})`,      'text',  'text',  true,  field.internalName),
-        this._vc(outKey + 'Data', field.internalName, rawCol,                     'array', 'array', true,  field.internalName),
+    _expandArrayObjects(field, outKey, rawCol) {
+      const elementKeys      = field.elementKeys      || [];
+      const hasElementIds    = field.hasElementIds    || false;
+      const hasElementLabels = field.hasElementLabels || false;
+
+      const cols = [
+        this._vc   (outKey,           field.internalName, `DLV_JOIN(${rawCol}, '')`, 'text',   'object-multi', false, field.internalName),
+        this._vc   (outKey + 'Count', field.internalName, `${rawCol}->length`,        'number', 'number',       true,  field.internalName),
       ];
+      if (hasElementIds)    cols.push(this._vcRaw(outKey + 'Ids',    field.internalName, `DLV_IDS(${rawCol})`,      'array', 'array', field.internalName));
+      if (hasElementLabels) cols.push(this._vc   (outKey + 'Labels', field.internalName, `DLV_JOIN(${rawCol}, '')`, 'array', 'array', true, field.internalName));
+
+      // Per-key synthetics — one array-of-values field per element key
+      const usedSuffixes = new Set(['Count', 'Data', 'Ids', 'Labels']);
+      for (const key of elementKeys) {
+        const keySuffix = toPascalCase(key) || key;
+        if (!keySuffix || usedSuffixes.has(keySuffix)) continue;
+        usedSuffixes.add(keySuffix);
+        cols.push(this._vc(outKey + keySuffix, field.internalName, `DLV_ARRAY_PROP(${rawCol}, '${key}')`, 'array', 'array', true, field.internalName));
+      }
+
+      cols.push(this._vcRaw(outKey + 'Data', field.internalName, rawCol, 'array', 'array', field.internalName));
+      return cols;
     },
 
     _expandDateField(field, outKey, rawCol) {
-      return [
-        this._vc(outKey, field.internalName, `DLV_NORMALIZE_DATE(${rawCol})`, 'date', 'date', false, field.internalName),
+      // Use displayType to distinguish date-only vs datetime (not alias heuristic)
+      const isDatetime = (field.displayType === 'datetime') || (field.type === 'datetime');
+      // When the alias already ends in "Date" (e.g. EventDate), keep that field as
+      // date-only and add a *DateTime synthetic instead of creating *DateDate.
+      const aliasEndsInDate = /date$/i.test(outKey);
+      const nd = `DLV_NORMALIZE_DATE(${rawCol})`;
+      const dp = (p) => `DLV_DATE_PART(${nd}, '${p}')`;
+
+      const mainExpr   = (isDatetime && !aliasEndsInDate) ? nd        : dp('date');
+      const mainDispTy = (isDatetime && !aliasEndsInDate) ? 'datetime' : 'date';
+
+      const cols = [
+        this._vc(outKey, field.internalName, mainExpr, 'date', mainDispTy, false, field.internalName),
       ];
+
+      if (isDatetime) {
+        if (aliasEndsInDate) {
+          // Alias already ends in "Date" — add DateTime synthetic with full value instead
+          cols.push(this._vc(outKey + 'DateTime', field.internalName, nd, 'date', 'datetime', true, field.internalName));
+        } else {
+          cols.push(this._vc(outKey + 'Date', field.internalName, dp('date'), 'date', 'date', true, field.internalName));
+        }
+      }
+      cols.push(this._vc(outKey + 'Time', field.internalName, dp('time'), 'date', 'date', true, field.internalName));
+
+      cols.push(this._vc(outKey + 'Year',       field.internalName, dp('year'),       'number', 'number', true, field.internalName));
+      cols.push(this._vc(outKey + 'YearText',   field.internalName, dp('yearText'),   'text',   'text',   true, field.internalName));
+      cols.push(this._vc(outKey + 'FiscalYear', field.internalName, dp('fiscalYear'), 'text',   'text',   true, field.internalName));
+      cols.push(this._vc(outKey + 'Month',      field.internalName, dp('month'),      'number', 'number', true, field.internalName));
+      cols.push(this._vc(outKey + 'MonthText',  field.internalName, dp('monthText'),  'text',   'text',   true, field.internalName));
+      cols.push(this._vc(outKey + 'MonthName',  field.internalName, dp('monthName'),  'text',   'text',   true, field.internalName));
+      cols.push(this._vc(outKey + 'Day',        field.internalName, dp('day'),        'number', 'number', true, field.internalName));
+      cols.push(this._vc(outKey + 'DayName',    field.internalName, dp('dayName'),    'text',   'text',   true, field.internalName));
+
+      if (isDatetime) {
+        cols.push(this._vc(outKey + 'Hour',     field.internalName, dp('hour'),     'number', 'number', true, field.internalName));
+        cols.push(this._vc(outKey + 'HourText', field.internalName, dp('hourText'), 'text',   'text',   true, field.internalName));
+      }
+
+      return cols;
     },
 
     // ── Boolean Fields ───────────────────────────────────────────
@@ -883,6 +989,14 @@ validateAliasUniqueness(fields) {
     _expandNumberField(field, outKey, rawCol) {
       return [
         this._vc(outKey, field.internalName, `DLV_PARSE_NUMBER(${rawCol})`, 'number', field.displayType || field.type || 'number', false, field.internalName),
+      ];
+    },
+
+    _expandChoiceMulti(field, outKey, rawCol) {
+      return [
+        this._vc   (outKey,           field.internalName, `DLV_JOIN(${rawCol}, '')`, 'text',   'lookup-multi', false, field.internalName),
+        this._vc   (outKey + 'Count', field.internalName, `${rawCol}->length`,        'number', 'number',       true,  field.internalName),
+        this._vcRaw(outKey + 'Data',  field.internalName, rawCol,                     'array',  'array',        field.internalName),
       ];
     },
 

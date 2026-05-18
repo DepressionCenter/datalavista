@@ -21,6 +21,109 @@ You should have received a copy of the GNU General Public License along
 with this program. If not, see <https://www.gnu.org/licenses/>.
 ================================================================ */
       // ============================================================
+      // QUERY COLUMN METADATA INFERENCE
+      // ============================================================
+
+      // Recursively find the first { tableid, columnid } node in an AlaSQL AST subtree.
+      function _ddFindColRef(node) {
+        if (!node || typeof node !== 'object') return null;
+        if (typeof node.tableid === 'string' && typeof node.columnid === 'string')
+          return { tableAlias: node.tableid, fieldAlias: node.columnid };
+        for (const v of Object.values(node)) {
+          const found = Array.isArray(v)
+            ? v.reduce(/** @type {any} */ ((acc, item) => acc || _ddFindColRef(item)), null)
+            : _ddFindColRef(v);
+          if (found) return found;
+        }
+        return null;
+      }
+
+      // Build queryColumnMeta by parsing the user SQL: maps each result column alias back
+      // to its source table + field definition, giving the data dictionary full lineage info.
+      function _inferQueryColumnMeta(sql) {
+        // nameToKey: view name or raw table key → raw table key
+        const nameToKey = /** @type {Record<string,string>} */ ({});
+        for (const [v, k] of Object.entries(CyberdynePipeline.viewToRawTable || {})) nameToKey[v] = k;
+        for (const k of Object.keys(DataLaVistaState.tables || {})) if (!nameToKey[k]) nameToKey[k] = k;
+
+        // Parse FROM/JOIN clauses to map SQL-level aliases to raw table keys.
+        // Handles both bracketed ([Table] AS [Alias]) and bare (Table AS Alias) forms.
+        const sqlAliasToRawKey = /** @type {Record<string,string>} */ ({});
+        for (const m of sql.matchAll(/(?:FROM|JOIN)\s+\[([^\]]+)\](?:\s+AS\s+\[([^\]]+)\])?/gi)) {
+          const ref = m[1], alias = m[2] || m[1], rawKey = nameToKey[ref] || ref;
+          sqlAliasToRawKey[alias] = rawKey;
+          sqlAliasToRawKey[ref]   = rawKey;
+        }
+        for (const m of sql.matchAll(/(?:FROM|JOIN)\s+([A-Za-z_]\w*)(?:\s+AS\s+([A-Za-z_]\w*))?(?=\s)/gi)) {
+          const ref = m[1], alias = m[2] || m[1];
+          if (!sqlAliasToRawKey[alias]) sqlAliasToRawKey[alias] = nameToKey[ref] || ref;
+          if (!sqlAliasToRawKey[ref])   sqlAliasToRawKey[ref]   = nameToKey[ref] || ref;
+        }
+
+        // Extract result alias → { tableAlias, fieldAlias } from SELECT expressions.
+        const colRefs = /** @type {Record<string,{tableAlias:string,fieldAlias:string}>} */ ({});
+
+        // Try alasql.parse() for a proper AST walk first.
+        let usedParser = false;
+        try {
+          const parsed = /** @type {any} */ (alasql).parse(sql);
+          const stmt = Array.isArray(parsed) ? parsed[0] : (parsed?.statements?.[0] ?? parsed);
+          const columns = stmt?.columns;
+          if (Array.isArray(columns) && columns.length) {
+            for (const col of columns) {
+              const resultAlias = col.as || col.expr?.columnid || col.columnid || null;
+              if (!resultAlias) continue;
+              const ref = _ddFindColRef(col.expr ?? col);
+              if (ref) colRefs[resultAlias] = ref;
+            }
+            usedParser = true;
+          }
+        } catch (_) {}
+
+        // Fallback: regex over SELECT clause.
+        if (!usedParser) {
+          const selectMatch = sql.match(/^\s*SELECT\s+([\s\S]+?)\s+FROM\b/i);
+          if (selectMatch) {
+            for (const colExpr of splitSelectCols(selectMatch[1])) {
+              const resultAlias = getBareColName(colExpr.trim());
+              if (!resultAlias) continue;
+              const dm = colExpr.match(/\[([^\]]+)\]\.\[([^\]]+)\]/) ||
+                         colExpr.match(/\b([A-Za-z_]\w*)\.([A-Za-z_]\w*)\b/);
+              if (dm) colRefs[resultAlias] = { tableAlias: dm[1], fieldAlias: dm[2] };
+            }
+          }
+        }
+
+        // Build the meta object, matching the structure set by the Advanced QB.
+        const meta = /** @type {Record<string,any>} */ ({});
+        const tables = DataLaVistaState.tables || {};
+        for (const [resultAlias, { tableAlias, fieldAlias }] of Object.entries(colRefs)) {
+          const rawKey  = sqlAliasToRawKey[tableAlias] || nameToKey[tableAlias];
+          if (!rawKey) continue;
+          const tableObj = tables[rawKey];
+          if (!tableObj) continue;
+          const field = (tableObj.fields || []).find(/** @type {any} */ (f) => f.alias === fieldAlias && !f.parentField)
+                     || (tableObj.fields || []).find(/** @type {any} */ (f) => f.alias === fieldAlias)
+                     || (tableObj.fields || []).find(/** @type {any} */ (f) => f.internalName === fieldAlias && !f.parentField)
+                     || (tableObj.fields || []).find(/** @type {any} */ (f) => f.internalName === fieldAlias)
+                     || null;
+          meta[resultAlias] = {
+            displayType:            field?.displayType            || 'default',
+            agg:                    '',
+            sourceAlias:            fieldAlias,
+            sourceDisplayName:      field?.displayName            || fieldAlias,
+            sourceInternalName:     field?.internalName           || fieldAlias,
+            sourceTableKey:         rawKey,
+            sourceTableName:        tableObj.alias || tableObj.displayName || rawKey,
+            sourceDataSource:       tableObj.dataSource           || '',
+            viewName:               CyberdynePipeline.rawTableToView?.[rawKey] || rawKey,
+            sourceFieldDescription: field?.description            || '',
+          };
+        }
+        return meta;
+      }
+
+      // ============================================================
       // RUN QUERY
       // ============================================================
       async function runQuery() {
@@ -66,7 +169,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 
         for (const tname of referencedTables) {
           const t = DataLaVistaState.tables[tname];
-          if (!t || !t.data || !t.data.length) continue;
+          if (!t || (!t.loaded && !t.itemCount)) continue;
 
           registerTableInAlaSQL(tname);
 
@@ -87,19 +190,36 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           }
         }
 
+        // Ensure .select is compiled on all views before running JOINs.
+        // New AlaSQL lazily compiles .select only when a view is used as primary FROM target;
+        // JOIN targets need it pre-compiled or the query fails.
+        for (const tname of referencedTables) {
+          const t = DataLaVistaState.tables[tname];
+          if (!t) continue;
+          const viewName = t.viewName || CyberdynePipeline.getViewForTable(tname);
+          if (viewName && alasql.tables?.[viewName]?.view) {
+            if (typeof alasql.tables[viewName].select !== 'function') {
+              try { alasql(`SELECT * FROM [${viewName}] LIMIT 1`); } catch(e) {
+                console.warn(`[_executeQuery] Failed to pre-compile .select for view ${viewName}:`, e.message);
+              }
+            }
+          }
+        }
+
         const processedSQL = preprocessSQL(sql);
         const results = alasql(processedSQL);
         if (!Array.isArray(results)) throw new Error('Query returned no results');
 
-        alasql('DROP TABLE IF EXISTS [dlv_results]');
+        // TODO: Instead of dropping/recreating tables/views on every query, could we ALTER TABLE? ALTER VIEW is not supported by alasql.
         alasql('DROP VIEW  IF EXISTS [dlv_active]');
-        alasql('CREATE TABLE [dlv_results]');
-        alasql.tables['dlv_results'].data = results;   // O(1) reference assignment
-        alasql('CREATE VIEW [dlv_active] AS SELECT * FROM [dlv_results]');
+        alasql('DROP TABLE IF EXISTS [dlv_results]'); alasql('CREATE TABLE [dlv_results]');
+        alasql('SELECT * INTO [dlv_results] FROM ?', [results]);
+        alasql('CREATE VIEW [dlv_active] AS SELECT * FROM [dlv_results]'); try { alasql('SELECT * FROM [dlv_active] LIMIT 1'); } catch(e) { }
 
         DataLaVistaState.queryResultsReady = true;
         DataLaVistaState.design.previewFilteredData = null;
         DataLaVistaState.queryColumns = results.length ? Object.keys(results[0]) : DataLaVistaState.queryColumns;
+        DataLaVistaState.queryColumnMeta = _inferQueryColumnMeta(sql);
 
         return results;
       }
@@ -195,6 +315,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
   // TODO: Need to keep track of source ds/table/internal field ID/data type
   // This will probably break if two tables have the a field with the same alias but different types
   function sniffType(col) {
+    const meta = DataLaVistaState.queryColumnMeta?.[col];
+    if (meta?.displayType) return meta.displayType;
     const typeMap = {};
     for (const t of Object.values(DataLaVistaState.tables)) {
       for (const f of (t.fields || [])) {

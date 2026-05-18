@@ -35,12 +35,13 @@ const CyberdynePipeline = {
 
   /* ===== DATE PATTERNS ===== */
   DATE_PATTERNS: {
-    iso:         /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}(\.\d+)?Z?)?$/,
+    iso:         /^\d{4}-\d{2}-\d{2}([T ]\d{2}:\d{2}:\d{2}(\.\d+)?(?:Z|[+-]\d{2}:\d{2})?)?$/,
     oracle:      /^\d{2}-[A-Z]{3}-\d{2,4}$/i,
     excelCsv:    /^\d{1,2}\/\d{1,2}\/\d{2,4}$/,
     unixEpoch:   /^\d{10}$/,
     unixEpochMs: /^\d{13}$/,
-    scientific:  /^\d+\.?\d*[eE][+-]?\d+$/
+    scientific:  /^\d+\.?\d*[eE][+-]?\d+$/,
+    longForm:    /^(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},\s*\d{4}$/i,
   },
 
   /* ===== NULL / ERROR VALUES TO IGNORE IN TYPE DETECTION ===== */
@@ -72,6 +73,7 @@ const CyberdynePipeline = {
       // Unix epoch in scientific notation (e.g., 1.7116e+12 ms)
       return n > 9.46e11 && n < 9.99e12;
     }
+    if (this.DATE_PATTERNS.longForm.test(str)) return true;
     return false;
   },
 
@@ -118,9 +120,34 @@ const CyberdynePipeline = {
     }
     if (validCount === 0) return 'text';
     const threshold = validCount * 0.6;
-    if (arrayCount > 0)          return 'array';
+
+    if (arrayCount > 0) {
+      // Sub-classify: array-of-objects vs array-of-primitives
+      for (const row of sample) {
+        const val = row[column];
+        if (Array.isArray(val) && val.length > 0) {
+          const first = val.find(v => v != null);
+          if (first !== undefined && typeof first === 'object' && !Array.isArray(first)) return 'array-objects';
+          return 'array-primitives';
+        }
+      }
+      return 'array-primitives';
+    }
+
     if (objectCount > 0)         return 'object';
-    if (dateCount >= threshold)  return 'date';
+
+    if (dateCount >= threshold) {
+      // Datetime detection: any non-midnight time component to datetime
+      const hasTime = sample.some(row => {
+        const v = row[column];
+        if (!v) return false;
+        const s = String(v);
+        const m = s.match(/[T ](\d{2}):(\d{2}):(\d{2})/);
+        return m && !(m[1] === '00' && m[2] === '00' && m[3] === '00');
+      });
+      return hasTime ? 'datetime' : 'date';
+    }
+
     if (numericCount >= threshold) return 'number';
     if (boolCount >= threshold)  return 'boolean';
     return 'text';
@@ -128,7 +155,21 @@ const CyberdynePipeline = {
 
   /** Map internal type to display type */
   mapDisplayType(type) {
-    const map = { number: 'number', boolean: 'boolean', date: 'date', array: 'array', object: 'object', lookup: 'lookup' };
+    const map = {
+      number:           'number',
+      boolean:          'boolean',
+      date:             'date',
+      datetime:         'datetime',
+      array:            'array',
+      'array-primitives': 'array',
+      'array-objects':  'object-multi',
+      object:           'object',
+      lookup:           'lookup',
+      'lookup-multi':   'lookup-multi',
+      user:             'user',
+      'user-multi':     'user-multi',
+      url:              'url',
+    };
     return map[type] || 'text';
   },
 
@@ -173,76 +214,6 @@ const CyberdynePipeline = {
      SYNTHETIC FIELD GENERATION
   ============================================================ */
 
-  /**
-   * @deprecated Since view-layer refactor. Synthetic field generation now happens
-   * in _applyViewSQL via FieldExpander. This function is kept only for backward
-   * compatibility with external callers and old config restore paths.
-   *
-   * Expand arrays and objects into additional synthetic columns.
-   * For arrays: FieldName → semicolon-joined display, FieldNameIds → IDs, FieldNameData → original
-   * For objects: FieldName → display value, FieldNameId → ID, FieldNameData → original object
-   * Returns { rows, fields } with the expanded data.
-   */
-  addSyntheticFields(rows, fields) {
-    if (!Array.isArray(rows) || rows.length === 0) return { rows, fields };
-    const syntheticFields = [];
-    const processedRows = rows.map(row => {
-      const newRow = { ...row };
-      for (const field of fields) {
-        const value = row[field.internalName];
-        if (value === null || value === undefined) continue;
-
-        // Handle arrays
-        if (Array.isArray(value)) {
-          // Build semicolon-joined display string
-          newRow[field.internalName] = value.map(v => {
-            if (typeof v === 'object' && v !== null) {
-              return v.Title || v.Label || v.Name || v.Value || v.lookupValue || JSON.stringify(v);
-            }
-            return String(v);
-          }).join('; ');
-
-          // Preserve original array in Data column
-          newRow[field.internalName + 'Data'] = value;
-          if (!syntheticFields.find(f => f.internalName === field.internalName + 'Data')) {
-            syntheticFields.push({ internalName: field.internalName + 'Data', displayName: field.displayName + ' (Data)', alias: field.alias + 'Data', type: 'array', displayType: 'array' });
-          }
-
-          // Extract IDs if objects have Id/ID
-          if (value.length > 0 && typeof value[0] === 'object' && value[0] !== null && (value[0].Id !== undefined || value[0].ID !== undefined)) {
-            const ids = value.map(v => v.Id !== undefined ? v.Id : v.ID).filter(id => id != null);
-            newRow[field.internalName + 'Ids'] = ids.join('; ');
-            if (!syntheticFields.find(f => f.internalName === field.internalName + 'Ids')) {
-              syntheticFields.push({ internalName: field.internalName + 'Ids', displayName: field.displayName + ' IDs', alias: field.alias + 'Ids', type: 'text', displayType: 'text' });
-            }
-          }
-        }
-
-        // Handle single objects (not arrays)
-        else if (typeof value === 'object') {
-          // Extract display value
-          newRow[field.internalName] = value.Title || value.Label || value.Name || value.Value || value.lookupValue || JSON.stringify(value);
-
-          // Preserve original object in Data column
-          newRow[field.internalName + 'Data'] = value;
-          if (!syntheticFields.find(f => f.internalName === field.internalName + 'Data')) {
-            syntheticFields.push({ internalName: field.internalName + 'Data', displayName: field.displayName + ' (Data)', alias: field.alias + 'Data', type: 'object', displayType: 'object' });
-          }
-
-          // Extract ID if object has Id/ID
-          if (value.Id !== undefined || value.ID !== undefined) {
-            newRow[field.internalName + 'Id'] = value.Id !== undefined ? value.Id : value.ID;
-            if (!syntheticFields.find(f => f.internalName === field.internalName + 'Id')) {
-              syntheticFields.push({ internalName: field.internalName + 'Id', displayName: field.displayName + ' ID', alias: field.alias + 'Id', type: 'number', displayType: 'number' });
-            }
-          }
-        }
-      }
-      return newRow;
-    });
-    return { rows: processedRows, fields: [...fields, ...syntheticFields] };
-  },
-
   /* ============================================================
      FIELD TYPE INFERENCE
   ============================================================ */
@@ -254,15 +225,62 @@ const CyberdynePipeline = {
   inferFieldTypes(rows) {
     if (!Array.isArray(rows) || rows.length === 0) return [];
     const firstRow = rows[0];
+    const sample = rows.slice(0, 25);
     return Object.keys(firstRow).map(name => {
       const type = this.guessFieldType(name, rows);
+      const displayType = this.mapDisplayType(type);
+      // dataType: canonical SQL storage type
+      let dataType = 'text';
+      if (type === 'number') dataType = 'number';
+      else if (type === 'date' || type === 'datetime') dataType = 'date';
+      else if (type === 'boolean') dataType = 'boolean';
+      else if (type === 'array' || type === 'array-primitives' || type === 'array-objects') dataType = 'array';
+      else if (type === 'object') dataType = 'object';
+      const alias = toPascalCase(name) || name;
+
+      // Collect nested keys for object and array-of-objects fields
+      let objectKeys, elementKeys, hasElementIds, hasElementLabels;
+      if (type === 'object') {
+        const keySet = new Set();
+        for (const row of sample) {
+          const val = row[name];
+          if (val && typeof val === 'object' && !Array.isArray(val)) {
+            for (const k of Object.keys(val)) keySet.add(k);
+          }
+        }
+        objectKeys = [...keySet];
+      } else if (type === 'array-objects') {
+        const keySet = new Set();
+        for (const row of sample) {
+          const val = row[name];
+          if (Array.isArray(val)) {
+            for (const elem of val) {
+              if (elem && typeof elem === 'object' && !Array.isArray(elem)) {
+                for (const k of Object.keys(elem)) keySet.add(k);
+              }
+            }
+          }
+        }
+        elementKeys = [...keySet];
+        hasElementIds    = elementKeys.some(k => /^(id|Id|ID|key|Key)$/.test(k));
+        hasElementLabels = elementKeys.some(k => /^(label|Label|title|Title|name|Name)$/.test(k));
+      }
+
       return {
-        internalName: name,
-        displayName: name,
-        alias: toPascalCase(name) || name,
+        internalName:  name,
+        displayName:   name,
+        alias:         alias,
+        userAlias:     alias,
+        rawType:       'inferred',
+        rawTypeSource: 'inferred',
         type,
-        displayType: this.mapDisplayType(type),
-        required: false
+        dataType,
+        displayType,
+        displayFormat: null,
+        derivedColumns: null,
+        required:      false,
+        ...(objectKeys   !== undefined ? { objectKeys }                              : {}),
+        ...(elementKeys  !== undefined ? { elementKeys, hasElementIds, hasElementLabels } : {}),
       };
     });
   },
@@ -276,12 +294,11 @@ const CyberdynePipeline = {
     const alasqlName = '_raw_' + rawTableName;
     const existing = Object.keys(alasql.tables).find(k => k.toLowerCase() === alasqlName.toLowerCase());
     if (existing) {
-      // Update data in-place so any VIEW referencing this table stays valid
-      alasql.tables[existing].data = data;
+      alasql(`TRUNCATE TABLE [${existing}]`);
+      alasql(`INSERT INTO [${existing}] SELECT * FROM ?`, [data]);
     } else {
       alasql(`CREATE TABLE [${alasqlName}]`);
-      const actual = Object.keys(alasql.tables).find(k => k.toLowerCase() === alasqlName.toLowerCase()) || alasqlName;
-      alasql.tables[actual].data = data;
+      alasql(`INSERT INTO [${alasqlName}] SELECT * FROM ?`, [data]);
     }
   },
 

@@ -26,48 +26,244 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
     function setupAlaSQL() {
       if (typeof alasql === 'undefined') return;
 
-      // ── MAXDATE: string-safe MAX for dates and text ──────────────────────────
-      const maxDateAggr = function (v, acc, stage) {
-        if (stage === 1) return v;
-        if (stage === 2) { if (!acc) return v; if (!v) return acc; return String(v) > String(acc) ? v : acc; }
-        return acc;
-      };
-      const maxDateFunc = function (a, b) { if (b === undefined) return a; return String(a) > String(b) ? a : b; };
-      alasql.aggr.MAXDATE = maxDateAggr;
-      alasql.aggr.MAX = maxDateAggr;
-      alasql.fn.MAXDATE = maxDateFunc;
-      alasql.fn.MAX = maxDateFunc;
+      /* OVERRIDES OF ALASQL FUNCTIONS */
 
-      // ── MINDATE: string-safe MIN for dates and text ──────────────────────────
-      const minDateAggr = function (v, acc, stage) {
-        if (stage === 1) return v;
-        if (stage === 2) { if (!acc) return v; if (!v) return acc; return String(v) < String(acc) ? v : acc; }
-        return acc;
-      };
-      const minDateFunc = function (a, b) { if (b === undefined) return a; return String(a) < String(b) ? a : b; };
-      alasql.aggr.MINDATE = minDateAggr;
-      alasql.aggr.MIN = minDateAggr;
-      alasql.fn.MINDATE = minDateFunc;
-      alasql.fn.MIN = minDateFunc;
-
-
-      // ── SUM: coerce strings to numbers ──────────────────────────────────────
-      alasql.aggr.SUM = function (v, acc, stage) {
-        const num = parseFloat(v) || 0;
-        if (stage === 1) return num;
-        if (stage === 2) return (acc || 0) + num;
-        return acc;
+      // ── GREATEST / MAX (scalar) and LEAST / MIN (scalar) ─────────────────────
+      // ANSI SQL: skip NULLs; return NULL only if all arguments are NULL
+      // Fixes incorrect null coercion and unreliable Date comparison in v4.17
+      // Here for completness but these cannot be applied dynamically, only on compilation
+      alasql.stdlib.GREATEST = alasql.stdlib.MAX = function () {
+          var args = Array.prototype.slice.call(arguments);
+          return '(function(){ ' +
+              'var vals = [' + args.join(',') + '].filter(function(x){ return x !== null && typeof x !== "undefined"; }); ' +
+              'if(!vals.length) return undefined; ' +
+              'return vals.reduce(function(a,b){ ' +
+                  'var av = a instanceof Date ? a.getTime() : a; ' +
+                  'var bv = b instanceof Date ? b.getTime() : b; ' +
+                  'return av > bv ? a : b; }); ' +
+          '})()';
       };
 
-      // ── LAST: not in AlaSQL natively (FIRST is, so we leave that alone) ────────
-      if (!alasql.aggr.LAST) {
-        alasql.aggr.LAST = function (v, acc, stage) {
+      alasql.stdlib.LEAST = alasql.stdlib.MIN = function () {
+          var args = Array.prototype.slice.call(arguments);
+          return '(function(){ ' +
+              'var vals = [' + args.join(',') + '].filter(function(x){ return x !== null && typeof x !== "undefined"; }); ' +
+              'if(!vals.length) return undefined; ' +
+              'return vals.reduce(function(a,b){ ' +
+                  'var av = a instanceof Date ? a.getTime() : a; ' +
+                  'var bv = b instanceof Date ? b.getTime() : b; ' +
+                  'return av < bv ? a : b; }); ' +
+          '})()';
+      };
+
+      alasql.aggr.DLV_MIN = function(v, acc, stage) {
+  if (stage === 1) return v;
+  if (stage === 2) {
+    if (acc == null) return v; if (v == null) return acc;
+    var vv = v   instanceof Date ? v.getTime()   : v;
+    var av = acc instanceof Date ? acc.getTime() : acc;
+    if (typeof vv === 'number' && typeof av === 'number') return vv < av ? v : acc;
+    return String(v) < String(acc) ? v : acc;
+  }
+  return acc;
+};
+alasql.aggr.DLV_MAX = function(v, acc, stage) {
+  if (stage === 1) return v;
+  if (stage === 2) {
+    if (acc == null) return v; if (v == null) return acc;
+    var vv = v   instanceof Date ? v.getTime()   : v;
+    var av = acc instanceof Date ? acc.getTime() : acc;
+    if (typeof vv === 'number' && typeof av === 'number') return vv > av ? v : acc;
+    return String(v) > String(acc) ? v : acc;
+  }
+  return acc;
+};
+alasql.fn.DLV_MIN = function(a, b) {
+  if (a == null) return b; if (b == null) return a;
+  var av = a instanceof Date ? a.getTime() : a;
+  var bv = b instanceof Date ? b.getTime() : b;
+  if (typeof av === 'number' && typeof bv === 'number') return av < bv ? a : b;
+  return String(a) < String(b) ? a : b;
+};
+alasql.fn.DLV_MAX = function(a, b) {
+  if (a == null) return b; if (b == null) return a;
+  var av = a instanceof Date ? a.getTime() : a;
+  var bv = b instanceof Date ? b.getTime() : b;
+  if (typeof av === 'number' && typeof bv === 'number') return av > bv ? a : b;
+  return String(a) > String(b) ? a : b;
+};
+
+      // ── VAR (sample variance) ─────────────────────────────────────────────────
+      // ANSI SQL VAR_SAMP: return NULL for fewer than 2 non-null values
+      // Fixes incorrect return of 0 in v4.17
+      alasql.aggr.VAR = function (v, s, stage) {
+          if (stage === 1) {
+              return v === null ? {sum: 0, sumSq: 0, count: 0} : {sum: v, sumSq: v * v, count: 1};
+          } else if (stage === 2) {
+              if (v !== null) {
+                  s.sum += v;
+                  s.sumSq += v * v;
+                  s.count++;
+              }
+              return s;
+          } else {
+              if (s.count > 1)
+                  return (s.sumSq - (s.sum * s.sum) / s.count) / (s.count - 1);
+              return undefined;
+          }
+      };
+
+      // ── STDEV (sample standard deviation) ────────────────────────────────────
+      // Removes duplicate definition present in v4.17; inherits VAR fix above
+      alasql.aggr.STDEV = function (v, s, stage) {
+          if (stage === 1 || stage === 2) {
+              return alasql.aggr.VAR(v, s, stage);
+          } else {
+              return Math.sqrt(alasql.aggr.VAR(v, s, stage));
+          }
+      };
+
+      // ── VARP (population variance) ────────────────────────────────────────────
+      // ANSI SQL VAR_POP: skip NULLs; return NULL for empty set
+      // Fixes missing null guards and incorrect return of 0 in v4.17
+      alasql.aggr.VARP = function (value, accumulator, stage) {
+          if (stage === 1) {
+              if (value === null || value === undefined)
+                  return {count: 0, sum: 0, sumSq: 0};
+              return {count: 1, sum: value, sumSq: value * value};
+          } else if (stage === 2) {
+              if (value !== null && value !== undefined) {
+                  accumulator.count++;
+                  accumulator.sum += value;
+                  accumulator.sumSq += value * value;
+              }
+              return accumulator;
+          } else {
+              if (accumulator.count === 0) return undefined;
+              var mean = accumulator.sum / accumulator.count;
+              return accumulator.sumSq / accumulator.count - mean * mean;
+          }
+      };
+
+      // STDEVP, STD, STDDEV delegate to VARP and inherit the fix automatically
+      alasql.aggr.STD =
+          alasql.aggr.STDDEV =
+          alasql.aggr.STDEVP =
+              function (v, s, stage) {
+                  if (stage === 1 || stage === 2) {
+                      return alasql.aggr.VARP(v, s, stage);
+                  } else {
+                      return Math.sqrt(alasql.aggr.VARP(v, s, stage));
+                  }
+              };
+
+      // ── QUART / QUART2 / QUART3 ───────────────────────────────────────────────
+      // ANSI SQL PERCENTILE_CONT: linear interpolation; skip NULLs; return NULL for empty set
+      // Fixes step-function behaviour, wrong formula, and missing null guards in v4.17
+      alasql.aggr.QUART = function (v, s, stage, nth) {
+          if (stage === 1) return (v === null || v === undefined) ? [] : [v];
+          if (stage === 2) { if (v !== null && v !== undefined) s.push(v); return s; }
+          if (!s.length) return undefined;
+          nth = nth || 1;
+          var r = s.slice().sort(function(a, b) { return a - b; });
+          var n = r.length;
+          var h = (nth / 4) * (n - 1);
+          var hf = Math.floor(h);
+          var frac = h - hf;
+          if (frac === 0) return r[hf];
+          return r[hf] + frac * (r[hf + 1] - r[hf]);
+      };
+
+      alasql.aggr.QUART2 = function (v, s, stage) {
+          return alasql.aggr.QUART(v, s, stage, 2);
+      };
+
+      alasql.aggr.QUART3 = function (v, s, stage) {
+          return alasql.aggr.QUART(v, s, stage, 3);
+      };
+
+      // ── DLV_PERCENTILE_* / DLV_IQR ───────────────────────────────────────────
+      // ANSI SQL PERCENTILE_CONT (= R Type 7): linear interpolation, NULLs skipped
+      // Date support: timestamps used for arithmetic; IQR on dates returns ms
+      const _dlvPctCont = function(arr, p) {
+          if (!arr || !arr.length) return null;
+          const isDate = arr[0] instanceof Date;
+          const nums = arr
+              .map(x => x instanceof Date ? x.getTime() : parseFloat(x))
+              .filter(x => !isNaN(x));
+          if (!nums.length) return null;
+          nums.sort((a, b) => a - b);
+          const n = nums.length;
+          if (n === 1) return isDate ? new Date(nums[0]) : nums[0];
+          const h = p * (n - 1);
+          const hf = Math.floor(h);
+          const frac = h - hf;
+          const result = frac === 0 ? nums[hf] : nums[hf] + frac * (nums[hf + 1] - nums[hf]);
+          return isDate ? new Date(result) : result;
+      };
+
+      const _createDLVPctAggr = function(p) {
+          return function(v, s, stage) {
+              if (stage === 1) return (v == null) ? [] : [v];
+              if (stage === 2) { if (v != null) s.push(v); return s; }
+              return _dlvPctCont(s, p);
+          };
+      };
+
+      alasql.aggr.DLV_PERCENTILE_5  = _createDLVPctAggr(0.05);
+      alasql.aggr.DLV_PERCENTILE_10 = _createDLVPctAggr(0.10);
+      alasql.aggr.DLV_PERCENTILE_25 = _createDLVPctAggr(0.25);
+      alasql.aggr.DLV_PERCENTILE_50 = _createDLVPctAggr(0.50);
+      alasql.aggr.DLV_PERCENTILE_75 = _createDLVPctAggr(0.75);
+      alasql.aggr.DLV_PERCENTILE_90 = _createDLVPctAggr(0.90);
+      alasql.aggr.DLV_PERCENTILE_95 = _createDLVPctAggr(0.95);
+
+      alasql.aggr.DLV_IQR = function(v, s, stage) {
+          if (stage === 1) return (v == null) ? [] : [v];
+          if (stage === 2) { if (v != null) s.push(v); return s; }
+          const q1 = _dlvPctCont(s, 0.25);
+          const q3 = _dlvPctCont(s, 0.75);
+          if (q1 == null || q3 == null) return null;
+          const v1 = q1 instanceof Date ? q1.getTime() : q1;
+          const v3 = q3 instanceof Date ? q3.getTime() : q3;
+          return v3 - v1;
+      };
+
+      // ── DLV_ARR_PERCENTILE_* / DLV_ARR_IQR (scalar) ─────────────────────────
+      // Scalar versions: operate on a single array-valued column cell.
+      // Reuse _dlvPctCont — same algorithm, same date support.
+      const _createDLVArrPctFn = function(p) {
+          return function(arr) { return _dlvPctCont(arr, p); };
+      };
+
+      alasql.fn.DLV_ARR_PERCENTILE_5  = _createDLVArrPctFn(0.05);
+      alasql.fn.DLV_ARR_PERCENTILE_10 = _createDLVArrPctFn(0.10);
+      alasql.fn.DLV_ARR_PERCENTILE_25 = _createDLVArrPctFn(0.25);
+      alasql.fn.DLV_ARR_PERCENTILE_50 = _createDLVArrPctFn(0.50);
+      alasql.fn.DLV_ARR_PERCENTILE_75 = _createDLVArrPctFn(0.75);
+      alasql.fn.DLV_ARR_PERCENTILE_90 = _createDLVArrPctFn(0.90);
+      alasql.fn.DLV_ARR_PERCENTILE_95 = _createDLVArrPctFn(0.95);
+
+      alasql.fn.DLV_ARR_IQR = function(arr) {
+          const q1 = _dlvPctCont(arr, 0.25);
+          const q3 = _dlvPctCont(arr, 0.75);
+          if (q1 == null || q3 == null) return null;
+          const v1 = q1 instanceof Date ? q1.getTime() : q1;
+          const v3 = q3 instanceof Date ? q3.getTime() : q3;
+          return v3 - v1;
+      };
+
+      // ── LAST ──────────────────────────────────────────────────────────────────
+      // Not available natively in alasql v4.17; only FIRST is available
+      alasql.aggr.LAST = alasql.aggr.LAST || function (v, acc, stage) {
           if (stage === 1) return v;
-          if (stage === 2) return v;   // always overwrite with latest value
+          if (stage === 2) return v;
           return acc;
-        };
       };
 
+      /* ENDS OVERRIDES OF ALASQL FUNCTIONS */
+
+      
       // Return true if elementValue is included in lookupArray,
       // checking a specific property if elementName is provided.
       // If no elementName is given, checks if elementValue matches any Id/ID/id properties.
@@ -78,6 +274,12 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         const op = operator || '=';
 
         if (elementName != null && elementName !== '') {
+            if (op === '=') {
+                return lookupArray.some(member =>
+                    member && member[elementName] != null &&
+                    member[elementName] === elementValue
+                );
+            }
             return lookupArray.some(member =>
                 member && member[elementName] != null &&
                 sqlCompare(member[elementName], op, elementValue)
@@ -93,11 +295,13 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         );
     };
 
-    // Legacy wrapper — calls DLV_INCLUDES with no elementName (triggers Id/ID/id fallback)
-    // TODO: Delete this once all code is migrated to DLV_INCLUDES,
-    // and replace INCLUDES() with DLV_INCLUDES() in any SQL loaded through loadConfig().
+    // DLV_ARRAY_INCLUDES is the canonical name; DLV_INCLUDES kept for backward compat with saved SQL.
+    alasql.fn.DLV_ARRAY_INCLUDES = alasql.fn.DLV_INCLUDES;
+
+    // Legacy wrapper — calls DLV_ARRAY_INCLUDES with no elementName (triggers Id/ID/id fallback).
+    // TODO: Delete once all saved SQL is migrated off INCLUDES().
     alasql.fn.INCLUDES = function (lookupArray, itemKey) {
-        return alasql.fn.DLV_INCLUDES(lookupArray, null, itemKey);
+        return alasql.fn.DLV_ARRAY_INCLUDES(lookupArray, null, itemKey);
     };
 
 
@@ -107,6 +311,16 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         if (typeof obj !== 'object' || Array.isArray(obj)) return null;
         const v = obj[prop];
         return v !== undefined ? v : null;
+      };
+
+      // ── DLV_ID_PROP: extract id from an object, trying Id → ID → id → Key → key ──
+      alasql.fn.DLV_ID_PROP = function(obj) {
+        if (obj === null || obj === undefined) return null;
+        if (typeof obj !== 'object' || Array.isArray(obj)) return null;
+        for (const k of ['Id', 'ID', 'id', 'Key', 'key']) {
+          if (obj[k] !== undefined) return obj[k];
+        }
+        return null;
       };
 
       // ── DLV_ARRAY_EMPTY: returns true if array is null, not an array, or has no elements ──
@@ -132,71 +346,255 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
     };
 
 
-      /**
- * DLV_ARRAY_EXPAND
- * Expands an array-of-objects column into a flat result set.
+/**
+ * DLV_UNNEST_LOOKUP - Table-valued function for AlaSQL v4.17
  *
- * @param {string} tableName  - Table or view name
- * @param {string} opts       - JSON string with options:
- *   @param {string}   opts.columnToExpand  - (required) Column containing array of objects
- *   @param {string}   [opts.parentId]      - Field to use as ParentId; falls back to Id, ID, or row number
- *   @param {string[]} [opts.elements]      - Child fields to include; omit for all fields
- *   @param {boolean}  [opts.skipEmptyArrays=false] - Skip rows with null/empty arrays
+ * Explodes a multi-select lookup column (array of {Id, Title} objects)
+ * from a source table into a flat junction-style table.
  *
- * Output columns: ParentId, ParentRowNumber, ChildRowNumber, ...(child fields)
+ * Usage in SQL:
+ *   FROM DLV_UNNEST_LOOKUP("DepresCen_EventSummary", "AttendeesData")
  *
- * Minimum usage:
- *   SELECT * FROM DLV_ARRAY_EXPAND("MyTable", '{"columnToExpand":"MyArrayCol"}')
+ * Returns rows with columns:
+ *   _SourceID    — the ID (all caps) of the parent row
+ *   _LookupId    — the Id from each object in the array (or NULL if array is empty)
+ *   _LookupTitle — the Title from each object in the array (or NULL if array is empty)
  *
- * Full usage:
- *   SELECT * FROM DLV_ARRAY_EXPAND("MyTable", '{"columnToExpand":"RecipientData","parentId":"ID","elements":["Title","Id"],"skipEmptyArrays":true}')
+ * Behavior:
+ *   - Parent rows with empty/null/missing arrays emit one row
+ *     with _LookupId = NULL and _LookupTitle = NULL.
+ *     This preserves LEFT JOIN semantics when starting FROM this table.
+ *   - Only reads the ID column and the specified lookup column
+ *     from the source table for memory efficiency.
  */
-alasql.from.DLV_ARRAY_EXPAND = function(tableName, opts, cb, idx, query) {
-    let parentIdField = null, columnToExpand = null, elements = null, skipEmptyArrays = false;
+alasql.from.DLV_UNNEST_LOOKUP = function (tableName, opts, cb, idx, query) {
+    let srcTableName, colName;
 
-    if (typeof opts === 'string') {
-        try {
-            const parsed = JSON.parse(opts);
-            parentIdField   = parsed.parentId       || null;
-            columnToExpand  = parsed.columnToExpand || null;
-            elements        = Array.isArray(parsed.elements) && parsed.elements.length > 0 ? parsed.elements : null;
-            skipEmptyArrays = parsed.skipEmptyArrays === true;
-        } catch(e) {}
+    if (typeof tableName === 'string' && typeof opts === 'string') {
+        srcTableName = tableName;
+        colName = opts;
+    } else if (Array.isArray(tableName)) {
+        srcTableName = tableName[0];
+        colName = tableName[1];
+    } else {
+        throw new Error(
+            'DLV_UNNEST_LOOKUP requires two parameters: table name and column name.\n' +
+            'Usage: FROM DLV_UNNEST_LOOKUP("TableName", "ColumnName")'
+        );
     }
 
-    if (!columnToExpand) {
+    // Only fetch the two columns we need for memory efficiency
+    var sourceData = alasql('SELECT [ID], [' + colName + '] FROM [' + srcTableName + ']');
+
+    if (!sourceData || sourceData.length === 0) {
         if (cb) return cb([], idx, query);
         return [];
     }
 
-    const whereClause = skipEmptyArrays
-        ? ' WHERE ' + columnToExpand + ' IS NOT NULL AND ' + columnToExpand + '->length > 0'
-        : '';
+    var rows = [];
 
-    const sqlQuery = 'SELECT COALESCE(' + (parentIdField ? parentIdField + ',' : '') + 'Id,ID) AS ParentId, ROWNUM() AS RowNumber, ' + columnToExpand + ' FROM ' + tableName + whereClause;
-    const data = alasql(sqlQuery);
-    const results = [];
+    for (var i = 0; i < sourceData.length; i++) {
+        var parentId = sourceData[i].ID;
+        var lookupArray = sourceData[i][colName];
 
-    data.forEach(row => {
-        const arr = row[columnToExpand];
-        const parentId = row['ParentId'];
-        const parentRowNumber = row['RowNumber'];
-
-        if (arr && Array.isArray(arr) && arr.length > 0) {
-            Array.prototype.push.apply(results, arr.map((child, i) => {
-                const childData = elements
-                    ? elements.reduce((acc, key) => { acc[key] = child[key]; return acc; }, {})
-                    : { ...child };
-                return { ParentId: parentId, ParentRowNumber: parentRowNumber, ChildRowNumber: i + 1, ...childData };
-            }));
-        } else if (!skipEmptyArrays) {
-            results.push({ ParentId: parentId, ParentRowNumber: parentRowNumber });
+        if (Array.isArray(lookupArray) && lookupArray.length > 0) {
+            for (var j = 0; j < lookupArray.length; j++) {
+                rows.push({
+                    _SourceID: parentId,
+                    _LookupId: lookupArray[j].Id != null ? lookupArray[j].Id : null,
+                    _LookupTitle: lookupArray[j].Title || null
+                });
+            }
+        } else {
+            // Placeholder row preserves parent in LEFT JOIN scenarios
+            rows.push({
+                _SourceID: parentId,
+                _LookupId: null,
+                _LookupTitle: null
+            });
         }
-    });
+    }
 
-    if (cb) return cb(results, idx, query);
-    return results;
+    if (cb) return cb(rows, idx, query);
+    return rows;
 };
+
+
+
+/**
+ * DLV_LOOKUP - Table-valued function for AlaSQL v4.17
+ *
+ * Returns the source table's scalar columns joined with the unnested
+ * multi-select lookup column, producing a flat, query-ready result.
+ *
+ * Usage in SQL:
+ *   FROM DLV_LOOKUP("DepresCen_EventSummary", "AttendeesData")
+ *
+ * Returns one row per lookup entry, with columns:
+ *   _SourceID     — the ID of the source/parent row
+ *   _LookupId     — the Id from each looked-up item (NULL if array was empty)
+ *   _LookupTitle  — the Title from each looked-up item (NULL if array was empty)
+ *   + every scalar column from the source table (excluding the lookup array column itself)
+ *
+ * Join patterns:
+ *
+ *   Direction A — "I have People, I want their Events via AttendeesData":
+ *     FROM DepresCen_People p
+ *     LEFT JOIN DLV_LOOKUP("DepresCen_EventSummary", "AttendeesData") e
+ *       ON e._LookupId = p.ID
+ *
+ *   Direction B — "I have Events, I want their Attendees' details":
+ *     FROM DepresCen_EventSummary e
+ *     LEFT JOIN DLV_LOOKUP("DepresCen_EventSummary", "AttendeesData") a
+ *       ON a._SourceID = e.ID
+ *     LEFT JOIN DepresCen_People p ON p.ID = a._LookupId
+ *
+ *   Direction B simplified (if you only need lookup Id and Title):
+ *     FROM DepresCen_EventSummary e
+ *     LEFT JOIN DLV_LOOKUP("DepresCen_EventSummary", "AttendeesData") a
+ *       ON a._SourceID = e.ID
+ *     -- a._LookupId and a._LookupTitle are already available
+ */
+alasql.from.DLV_LOOKUP = function (tableName, opts, cb, idx, query) {
+    var srcTableName, colName;
+
+    if (typeof tableName === 'string' && typeof opts === 'string') {
+        srcTableName = tableName;
+        colName = opts;
+    } else if (Array.isArray(tableName)) {
+        srcTableName = tableName[0];
+        colName = tableName[1];
+    } else {
+        throw new Error(
+            'DLV_LOOKUP requires two parameters: table name and column name.\n' +
+            'Usage: FROM DLV_LOOKUP("TableName", "LookupColumnName")'
+        );
+    }
+
+    // Fetch all rows but we will selectively copy scalar columns only
+    var sourceData = alasql('SELECT * FROM [' + srcTableName + ']');
+
+    if (!sourceData || sourceData.length === 0) {
+        if (cb) return cb([], idx, query);
+        return [];
+    }
+
+    // Identify scalar column names from the first row, excluding:
+    //   - the lookup column itself (array of objects)
+    //   - any other column whose value is a non-null object/array
+    //     (i.e., other multi-select lookup columns)
+    var firstRow = sourceData[0];
+    var scalarKeys = [];
+    for (var key in firstRow) {
+        if (!firstRow.hasOwnProperty(key)) continue;
+        if (key === colName) continue;
+        var val = firstRow[key];
+        if (val !== null && typeof val === 'object') continue;
+        scalarKeys.push(key);
+    }
+
+    var rows = [];
+
+    for (var i = 0; i < sourceData.length; i++) {
+        var parentRow = sourceData[i];
+        var parentId = parentRow.ID;
+        var lookupArray = parentRow[colName];
+
+        if (Array.isArray(lookupArray) && lookupArray.length > 0) {
+            for (var j = 0; j < lookupArray.length; j++) {
+                var row = {
+                    _SourceID: parentId,
+                    _LookupId: lookupArray[j].Id != null ? lookupArray[j].Id : null,
+                    _LookupTitle: lookupArray[j].Title || null
+                };
+                for (var k = 0; k < scalarKeys.length; k++) {
+                    row[scalarKeys[k]] = parentRow[scalarKeys[k]];
+                }
+                rows.push(row);
+            }
+        } else {
+            var row = {
+                _SourceID: parentId,
+                _LookupId: null,
+                _LookupTitle: null
+            };
+            for (var k = 0; k < scalarKeys.length; k++) {
+                row[scalarKeys[k]] = parentRow[scalarKeys[k]];
+            }
+            rows.push(row);
+        }
+    }
+
+    if (cb) return cb(rows, idx, query);
+    return rows;
+};
+
+
+/**
+ * MODE - Aggregate function for AlaSQL v4.17
+ *
+ * Returns the most frequently occurring non-NULL value in a group.
+ * Ties are broken by returning the smallest value (per ANSI SQL:2023
+ * ISO/IEC 9075-2:2023 inverse distribution function semantics).
+ * NULL inputs are ignored per standard aggregate NULL-handling.
+ * 
+ * Note: There's a subtlety in v4.17: in stage 2,
+ * the accumulator variable name in the function signature
+ * is what carries state. This accounts for that.
+ *
+ * Usage in SQL:
+ *   SELECT MODE(column) FROM table GROUP BY ...
+ */
+alasql.aggr.MODE = function (value, accumulator, stage) {
+    if (stage === 1) {
+        var acc = { counts: Object.create(null), values: [] };
+        if (value != null) {
+            var key = String(value);
+            acc.counts[key] = 1;
+            acc.values.push(value);
+        }
+        return acc;
+    } else if (stage === 2) {
+        if (value != null) {
+            var key = String(value);
+            if (accumulator.counts[key] == null) {
+                accumulator.counts[key] = 1;
+                accumulator.values.push(value);
+            } else {
+                accumulator.counts[key]++;
+            }
+        }
+        return accumulator;
+    } else if (stage === 3) {
+        var counts = accumulator.counts;
+        var values = accumulator.values;
+        var maxCount = 0;
+        var candidates = [];
+
+        for (var i = 0; i < values.length; i++) {
+            var key = String(values[i]);
+            var count = counts[key];
+            if (count > maxCount) {
+                maxCount = count;
+                candidates = [values[i]];
+            } else if (count === maxCount) {
+                candidates.push(values[i]);
+            }
+        }
+
+        if (candidates.length === 0) return null;
+        if (candidates.length === 1) return candidates[0];
+
+        candidates.sort(function (a, b) {
+            if (a < b) return -1;
+            if (a > b) return 1;
+            return 0;
+        });
+        return candidates[0];
+    }
+};
+
+
 
 /**
  * DLV_ARRAY_EXTRACT_ELEMENT
@@ -257,30 +655,31 @@ alasql.from.DLV_ARRAY_EXTRACT_ELEMENT = function(tableName, opts, cb, idx, query
     return results;
 };
 
+      // ── Shared label extractor used by DLV_DISPLAY and DLV_JOIN ─────────────
+      const _dlvLabel = o =>
+        o.Title || o.Label || o.Name || o.name || o.Value || o.value ||
+        o.lookupValue || o.LookupValue || o.displayValue || o.DisplayValue || null;
+
       // ── DLV_DISPLAY: human-readable display value from any field value ──────
       alasql.fn.DLV_DISPLAY = function(val) {
         if (val === null || val === undefined) return null;
         if (typeof val === 'string' || typeof val === 'number' || typeof val === 'boolean') return val;
         if (Array.isArray(val)) {
           const parts = val.map(v => {
-            if (typeof v === 'object' && v !== null) {
-              return v.Title || v.Label || v.Name || v.Value || v.lookupValue || v.displayValue || JSON.stringify(v);
-            }
+            if (typeof v === 'object' && v !== null) return _dlvLabel(v) || JSON.stringify(v);
             return v != null ? String(v) : null;
           }).filter(s => s != null && s !== '');
           return parts.length > 0 ? parts.join('; ') : null;
         }
         if (typeof val === 'object') {
-          // Un-expanded SP deferred reference — no data available yet
           if (val.__deferred) return null;
           if (val.TermGuid !== undefined) return val.Label || val.Title || null;
           if (val.results && Array.isArray(val.results)) {
-            const parts = val.results.map(r => r.Label || r.Title || r.Name || r.lookupValue || JSON.stringify(r)).filter(s => s);
+            const parts = val.results.map(r => _dlvLabel(r) || JSON.stringify(r)).filter(s => s);
             return parts.length > 0 ? parts.join('; ') : null;
           }
-          // SP URL field: return the URL, not the Description
           if (val.Url !== undefined) return val.Url || null;
-          return val.Title || val.Label || val.Name || val.lookupValue || val.Value || null;
+          return _dlvLabel(val) || JSON.stringify(val);
         }
         return String(val);
       };
@@ -290,11 +689,25 @@ alasql.from.DLV_ARRAY_EXTRACT_ELEMENT = function(tableName, opts, cb, idx, query
         if (!Array.isArray(arr)) return null;
         const ids = arr.map(v => {
           if (typeof v === 'object' && v !== null) {
-            return v.Id !== undefined ? v.Id : (v.ID !== undefined ? v.ID : null);
+            const id = v.Id !== undefined ? v.Id
+                     : v.ID !== undefined ? v.ID
+                     : v.id !== undefined ? v.id
+                     : v.Key !== undefined ? v.Key
+                     : v.key !== undefined ? v.key
+                     : null;
+            return id;
           }
           return null;
         }).filter(id => id != null);
-        return ids.length > 0 ? ids.join('; ') : null;
+        return ids.length > 0 ? ids : null;
+      };
+
+      // ── DLV_ARRAY_PROP: extract one property from every element of an array-of-objects ──
+      alasql.fn.DLV_ARRAY_PROP = function(arr, key) {
+        if (!Array.isArray(arr)) return null;
+        const vals = arr.map(obj => (obj && typeof obj === 'object' ? obj[key] : undefined))
+                        .filter(v => v !== undefined && v !== null);
+        return vals.length > 0 ? vals : null;
       };
 
       // ── DLV_JOIN: map array elements to a property and join with separator ('; ' by default)
@@ -302,37 +715,79 @@ alasql.from.DLV_ARRAY_EXTRACT_ELEMENT = function(tableName, opts, cb, idx, query
         if (!Array.isArray(arr)) return null;
         const parts = arr.map(v => {
           if (typeof v === 'object' && v !== null) {
-            if (prop) {
-              const pv = v[prop];
-              if (pv != null) return String(pv);
-            }
-            return v.Title || v.Label || v.Name || v.Value || v.lookupValue || JSON.stringify(v);
+            if (prop) { const pv = v[prop]; if (pv != null) return String(pv); }
+            return _dlvLabel(v) || JSON.stringify(v);
           }
           return v != null ? String(v) : null;
         }).filter(s => s != null && s !== '');
         return parts.length > 0 ? parts.join(separator) : null;
       };
 
-      // ── DLV_KEYS: return the keys of an object joined with '; ' ────────────────
-      alasql.fn.DLV_KEYS = function(obj, separator = '; ') {
-          if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return null;
-          const keys = Object.keys(obj);
-          return keys.length > 0 ? keys.join(separator) : null;
+      // ── DLV_KEYS: return the keys of an object (or array of objects) joined with '; ' ─
+      // Single object: DLV_KEYS(obj, separator)
+      // Array of objects: DLV_KEYS(arr, sampleSize) — scans first N objects, returns union of unique keys
+      alasql.fn.DLV_KEYS = function(obj, separatorOrN = '; ') {
+        if (!obj) return null;
+        if (Array.isArray(obj)) {
+          const n   = typeof separatorOrN === 'number' ? separatorOrN : 100;
+          const sep = typeof separatorOrN === 'string'  ? separatorOrN : '; ';
+          const keys = new Set();
+          for (let i = 0; i < Math.min(obj.length, n); i++) {
+            if (obj[i] && typeof obj[i] === 'object' && !Array.isArray(obj[i]))
+              Object.keys(obj[i]).forEach(k => keys.add(k));
+          }
+          return keys.size > 0 ? [...keys].join(sep) : null;
+        }
+        if (typeof obj !== 'object') return null;
+        const keys = Object.keys(obj);
+        return keys.length > 0 ? keys.join(typeof separatorOrN === 'string' ? separatorOrN : '; ') : null;
+      };
+
+      // ── DLV_ARRAY_AGG: aggregate values of a named field from an array of objects ──
+      // Usage: DLV_ARRAY_AGG(array, fieldName, aggType)
+      // aggType: 'GROUP_CONCAT' | 'COUNT' | 'COUNT_DISTINCT' | 'SUM' | 'SUM_SQ' | 'MIN' | 'MAX' | 'AVG'
+      // Returns a scalar — useful for aggregating local (non-SP) arrays without any JOIN.
+      alasql.fn.DLV_ARRAY_AGG = function(arr, fieldName, aggType = 'GROUP_CONCAT') {
+        if (!arr || !Array.isArray(arr) || !fieldName) return null;
+        const vals = arr
+          .map(el => (el && typeof el === 'object' ? el[fieldName] : undefined))
+          .filter(v => v != null);
+        if (!vals.length) return (aggType === 'COUNT' || aggType === 'COUNT_DISTINCT') ? 0 : null;
+        switch ((aggType || '').toUpperCase()) {
+          case 'GROUP_CONCAT':   return vals.join(';');
+          case 'COUNT':          return vals.length;
+          case 'COUNT_DISTINCT': return new Set(vals.map(String)).size;
+          case 'SUM':            return vals.reduce((s, v) => s + Number(v), 0);
+          case 'SUM_SQ':         return vals.reduce((s, v) => s + Number(v) * Number(v), 0);
+          case 'MIN':            return vals.reduce((m, v) => (v < m ? v : m), vals[0]);
+          case 'MAX':            return vals.reduce((m, v) => (v > m ? v : m), vals[0]);
+          case 'AVG':            return vals.reduce((s, v) => s + Number(v), 0) / vals.length;
+          default:               return vals.join(';');
+        }
       };
 
       // ── DLV_ARRAY_MATCH: filter scalar arrays with a comparison operator ──────────
       // e.g. DLV_ARRAY_MATCH(Tags, '=', 'Urgent')
       //      DLV_ARRAY_MATCH(Scores, '>=', 90)
       alasql.fn.DLV_ARRAY_MATCH = function (arr, operator, value, value2) {
-    if (!arr || !Array.isArray(arr)) return false;
-
-    if (operator === 'BETWEEN') {
-        if (value == null || value2 == null) return false;
-        return arr.some(item => sqlCompare(item, '>=', value) && sqlCompare(item, '<=', value2));
-    }
-
-    return arr.some(item => sqlCompare(item, operator, value));
-};
+        if (!arr || !Array.isArray(arr)) return false;
+        try {
+          if (operator === 'BETWEEN') {
+            if (value == null || value2 == null) return false;
+            return arr.some(item => sqlCompare(item, '>=', value) && sqlCompare(item, '<=', value2));
+          }
+          if (operator === 'contains') {
+            if (value == null) return false;
+            const needle = String(value);
+            return arr.some(item => {
+              const s = String(item);
+              const needleNum = Number(needle);
+              return s === needle || (!isNaN(item) && !isNaN(needleNum) && Number(item) === needleNum);
+            });
+          }
+          return arr.some(item => sqlCompare(item, operator, value));
+        } catch (e) { return false; }
+      };
 
       // ── DLV_EMAIL: extract email address from a SharePoint claims string ─────
       alasql.fn.DLV_EMAIL = function(claimsStr) {
@@ -349,7 +804,7 @@ alasql.from.DLV_ARRAY_EXTRACT_ELEMENT = function(tableName, opts, cb, idx, query
           const match = name.match(/([a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/i);
           return match ? match[1] : null;
         }).filter(e => e);
-        return emails.length > 0 ? emails.join('; ') : null;
+        return emails.length > 0 ? emails : null;
       };
 
       // ── DLV_PICTURE_URL: build SP user photo URL from claims string ──────────
@@ -359,22 +814,31 @@ alasql.from.DLV_ARRAY_EXTRACT_ELEMENT = function(tableName, opts, cb, idx, query
         return `${base}/_layouts/15/userphoto.aspx?size=L&accountname=${encodeURIComponent(claimsStr)}`;
       };
 
-      // ── DLV_NORMALIZE_DATE: normalize date strings to 'YYYY-MM-DD [HH:mm:ss]'─
+// ── DLV_NORMALIZE_DATE: normalize date strings to 'YYYY-MM-DD [HH:mm:ss]'─
       alasql.fn.DLV_NORMALIZE_DATE = function(val) {
         if (val === null || val === undefined || val === '') return val;
         const str = String(val).trim();
-        // ISO with T separator: 2026-01-15T14:30:00Z or 2026-01-15T00:00:00
-        if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(str)) {
-          let d = str.replace('T', ' ').replace('Z', '').replace(/\.\d+$/, '');
-          if (d.endsWith(' 00:00:00')) d = d.replace(' 00:00:00', '');
-          return d;
+        
+        // ISO with T separator: 2026-01-15T14:30:00Z / 2026-01-15T00:00:00.000 / 2026-01-15T14:30:00+05:00
+        const isoTM = str.match(/^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2}:\d{2})(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})?/);
+        if (isoTM) {
+          const datePart = isoTM[1]; 
+          const timePart = isoTM[2];
+          return `${datePart} ${timePart}`; // Changed: removed ternary check for '00:00:00'
         }
+        
         // Already ISO date: 2026-01-15
         if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
-        // Already ISO datetime without T: 2026-01-15 14:30:00
-        if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(str)) {
-          return str.endsWith(' 00:00:00') ? str.replace(' 00:00:00', '') : str;
+        
+        // ISO datetime without T: "2026-01-15 14:30:00" (pandas/numpy/datetime variants)
+        // Handles optional fractional seconds and optional timezone offset (+00:00 / -05:00 / Z)
+        const isoSpaceM = str.match(/^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2})(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})?$/);
+        if (isoSpaceM) { 
+          const datePart = isoSpaceM[1]; 
+          const timePart = isoSpaceM[2]; 
+          return `${datePart} ${timePart}`; // Changed: removed ternary check for '00:00:00'
         }
+        
         // Oracle: 15-JAN-2026 or 15-JAN-26
         const ORACLE_MONTHS = {JAN:1,FEB:2,MAR:3,APR:4,MAY:5,JUN:6,JUL:7,AUG:8,SEP:9,OCT:10,NOV:11,DEC:12};
         const oracleM = str.match(/^(\d{2})-([A-Z]{3})-(\d{2,4})$/i);
@@ -385,6 +849,7 @@ alasql.from.DLV_ARRAY_EXTRACT_ELEMENT = function(tableName, opts, cb, idx, query
           if (yr < 100) yr += yr < 30 ? 2000 : 1900;
           return `${yr}-${mon}-${day}`;
         }
+        
         // MM/DD/YYYY or M/D/YY
         const slashM = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
         if (slashM) {
@@ -394,31 +859,90 @@ alasql.from.DLV_ARRAY_EXTRACT_ELEMENT = function(tableName, opts, cb, idx, query
           const day = String(slashM[2]).padStart(2, '0');
           return `${yr}-${mon}-${day}`;
         }
+        
+        // Long-form: "April 19, 2026" or "April 19,2026"
+        const LONG_MONTHS_ND = {january:1,february:2,march:3,april:4,may:5,june:6,july:7,august:8,september:9,october:10,november:11,december:12};
+        const lfM = str.match(/^([A-Za-z]+)\s+(\d{1,2}),\s*(\d{4})$/);
+        if (lfM) {
+          const mon = String(LONG_MONTHS_ND[lfM[1].toLowerCase()] || 1).padStart(2, '0');
+          const day = String(parseInt(lfM[2], 10)).padStart(2, '0');
+          return `${lfM[3]}-${mon}-${day}`;
+        }
+        
         // Unix epoch (10 digits)
         if (/^\d{10}$/.test(str)) {
           const n = parseInt(str, 10);
           if (n > 946684800 && n < 9999999999) {
             let d = new Date(n * 1000).toISOString().replace('T', ' ').replace('Z', '').replace(/\.\d+$/, '');
-            return d.endsWith(' 00:00:00') ? d.replace(' 00:00:00', '') : d;
+            return d; // Changed: removed endsWith(' 00:00:00') check
           }
         }
+        
         // Unix epoch ms (13 digits)
         if (/^\d{13}$/.test(str)) {
           const n = parseInt(str, 10);
           if (n > 946684800000 && n < 9999999999999) {
             let d = new Date(n).toISOString().replace('T', ' ').replace('Z', '').replace(/\.\d+$/, '');
-            return d.endsWith(' 00:00:00') ? d.replace(' 00:00:00', '') : d;
+            return d; // Changed: removed endsWith(' 00:00:00') check
           }
         }
+        
         // Scientific notation epoch (e.g. 1.7116e+12 ms)
         if (/^\d+\.?\d*[eE][+-]?\d+$/.test(str)) {
           const n = parseFloat(str);
           if (n > 9.46e11 && n < 9.99e12) {
             let d = new Date(n).toISOString().replace('T', ' ').replace('Z', '').replace(/\.\d+$/, '');
-            return d.endsWith(' 00:00:00') ? d.replace(' 00:00:00', '') : d;
+            return d;  // Changed: removed endsWith(' 00:00:00') check
           }
         }
+        
         return val; // return original if no pattern matched
+      };
+      
+      // ── DLV_DATE_PART: extract a named part from a normalised date string ───────
+      // Expects val to already be in 'YYYY-MM-DD' or 'YYYY-MM-DD HH:mm:ss' format
+      // (i.e. pre-processed by DLV_NORMALIZE_DATE).  In SQL: DLV_DATE_PART(DLV_NORMALIZE_DATE(col), 'part')
+      // Parts: 'date', 'time', 'year', 'yearText', 'fiscalYear',
+      //        'month', 'monthText', 'monthName', 'day', 'dayName', 'hour', 'hourText'
+      alasql.fn.DLV_DATE_PART = function(val, part) {
+        if (val === null || val === undefined || val === '') return null;
+        const norm = String(val);
+        if (!norm) return null;
+
+        const spaceIdx = norm.indexOf(' ');
+        const datePart = spaceIdx >= 0 ? norm.substring(0, spaceIdx) : norm;
+        const timePart = spaceIdx >= 0 ? norm.substring(spaceIdx + 1) : null;
+
+        const [yr, mo, dy] = datePart.split('-').map(Number);
+        const hr = timePart ? parseInt(timePart, 10) : 0;
+
+        const MONTH_NAMES = ['January','February','March','April','May','June',
+                             'July','August','September','October','November','December'];
+        const DAY_NAMES   = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+
+        switch (part) {
+          case 'date':      return datePart;
+          case 'time':      return timePart ? norm : norm + ' 00:00:00';
+          case 'year':      return yr;
+          case 'yearText':  return String(yr);
+          case 'fiscalYear': {
+            const fyStart = (DataLaVistaState.FiscalYearStartMonth || 7);
+            const startYr = mo >= fyStart ? yr : yr - 1;
+            return 'FY' + startYr + '-' + (startYr + 1);
+          }
+          case 'month':     return mo;
+          case 'monthText': return String(mo).padStart(2, '0');
+          case 'monthName': return MONTH_NAMES[mo - 1] || null;
+          case 'day': {
+            // getDay() is 0=Sun…6=Sat; spec wants Sunday=1
+            const dow = new Date(yr, mo - 1, dy).getDay();
+            return dow + 1;
+          }
+          case 'dayName':   return DAY_NAMES[new Date(yr, mo - 1, dy).getDay()];
+          case 'hour':      return hr;
+          case 'hourText':  return String(hr).padStart(2, '0');
+          default:          return null;
+        }
       };
 
       // ── DLV_TAX_LABELS: get taxonomy labels joined with '; ' ─────────────────
@@ -450,13 +974,30 @@ alasql.from.DLV_ARRAY_EXTRACT_ELEMENT = function(tableName, opts, cb, idx, query
             }
             return String(v);
           }).filter(s => s && s !== '|');
-          return ids.length > 0 ? ids.join('; ') : null;
+          return ids.length > 0 ? ids : null;
         }
         if (typeof val === 'object' && val !== null) {
-          if (val.TermGuid !== undefined) return `${val.Label || ''}|${val.TermGuid || ''}`;
+          if (val.TermGuid !== undefined) return [`${val.Label || ''}|${val.TermGuid || ''}`];
           if (val.results && Array.isArray(val.results)) return alasql.fn.DLV_TAX_IDS(val.results);
         }
         return null;
+      };
+
+      // ── DLV_TAX_LABELS_ONLY: return array of label strings (no TermGuid) ─────
+      alasql.fn.DLV_TAX_LABELS_ONLY = function(val) {
+        if (val === null || val === undefined) return null;
+        if (Array.isArray(val)) {
+          const labels = val.map(v => (typeof v === 'object' && v !== null) ? (v.Label || v.Term || v.Title || '') : String(v)).filter(l => l);
+          return labels.length > 0 ? labels : null;
+        }
+        if (typeof val === 'object') {
+          if (val.TermGuid !== undefined) {
+            const l = val.Label || val.Title;
+            return l ? [l] : null;
+          }
+          if (val.results && Array.isArray(val.results)) return alasql.fn.DLV_TAX_LABELS_ONLY(val.results);
+        }
+        return typeof val === 'string' ? [val] : null;
       };
 
       // Safely parse strings to Booleans (handles SharePoint's "Yes"/"1"/etc.)
@@ -481,6 +1022,92 @@ alasql.from.DLV_ARRAY_EXTRACT_ELEMENT = function(tableName, opts, cb, idx, query
         
         // Return null if invalid to prevent NaN from breaking SQL math aggregates
         return isNaN(parsed) ? null : parsed;
+      };
+
+      // ── MEDIAN: type-safe median (numeric or lexicographic sort) ─────────────
+      // Overrides AlaSQL built-in to support dates and text strings.
+      alasql.aggr.MEDIAN = function(v, s, stage) {
+        if (stage === 1) { s = []; if (v != null) s.push(v); return s; }
+        if (stage === 2) { if (v != null) s.push(v); return s; }
+        if (!s || !s.length) return null;
+        const allNum = s.every(x => !isNaN(Number(x)));
+        const sorted = allNum
+          ? [...s].sort((a, b) => Number(a) - Number(b))
+          : [...s].sort((a, b) => String(a).localeCompare(String(b)));
+        const mid = Math.floor(sorted.length / 2);
+        if (sorted.length % 2 === 0 && allNum)
+          return (Number(sorted[mid - 1]) + Number(sorted[mid])) / 2;
+        return sorted[mid];
+      };
+
+      // ── CV: coefficient of variation (population) ────────────────────────────
+      alasql.aggr.CV = function(v, s, stage) { // TODO: Rename to DLV_CV
+        if (stage === 1) { s = { sum: 0, sumSq: 0, n: 0 }; }
+        if (stage <= 2 && v != null) {
+          const x = Number(v);
+          if (!isNaN(x)) { s.sum += x; s.sumSq += x * x; s.n++; }
+          return s;
+        }
+        if (!s || !s.n) return null;
+        const mean = s.sum / s.n;
+        const stdev = Math.sqrt(Math.max(0, s.sumSq / s.n - mean * mean));
+        return mean !== 0 ? stdev / mean : null;
+      };
+
+      // ── DLV_SQRT: safe square root (returns 0 for negatives/null) ───────────
+      alasql.fn.DLV_SQRT = function(x) { return (x != null && x > 0) ? Math.sqrt(x) : 0; };
+
+      // ── DLV_POW2: square a value ─────────────────────────────────────────────
+      alasql.fn.DLV_POW2 = function(x) { return (x != null) ? x * x : null; };
+
+      // ── DLV_MERGE_LIST: merge semicolon-joined strings → deduped sorted list ─
+      alasql.aggr.DLV_MERGE_LIST = function(v, s, stage) {
+        if (stage === 1) { s = new Set(); }
+        if (stage <= 2 && v != null)
+          String(v).split(';').forEach(x => { const t = x.trim(); if (t) s.add(t); });
+        if (stage === 3) return (s && s.size) ? [...s].sort().join('; ') : null;
+        return s;
+      };
+
+      // ── DLV_MERGE_COUNT_DISTINCT: count unique values across merged strings ──
+      alasql.aggr.DLV_MERGE_COUNT_DISTINCT = function(v, s, stage) {
+        if (stage === 1) { s = new Set(); }
+        if (stage <= 2 && v != null)
+          String(v).split(';').forEach(x => { const t = x.trim(); if (t) s.add(t); });
+        if (stage === 3) return (s && s.size) ? s.size : 0;
+        return s;
+      };
+
+      // ── DLV_MERGE_MEDIAN: median over merged semicolon-string values ─────────
+      alasql.aggr.DLV_MERGE_MEDIAN = function(v, s, stage) {
+        if (stage === 1) { s = []; }
+        if (stage <= 2 && v != null)
+          String(v).split(';').forEach(x => { const t = x.trim(); if (t) s.push(t); });
+        if (stage === 3) {
+          if (!s || !s.length) return null;
+          const allNum = s.every(x => !isNaN(Number(x)));
+          const sorted = allNum
+            ? [...s].sort((a, b) => Number(a) - Number(b))
+            : [...s].sort((a, b) => a.localeCompare(b));
+          const mid = Math.floor(sorted.length / 2);
+          if (sorted.length % 2 === 0 && allNum)
+            return (Number(sorted[mid - 1]) + Number(sorted[mid])) / 2;
+          return sorted[mid];
+        }
+        return s;
+      };
+
+      // ── DLV_MERGE_MODE: most frequent value across merged semicolon strings ──
+      alasql.aggr.DLV_MERGE_MODE = function(v, s, stage) {
+        if (stage === 1) { s = {}; }
+        if (stage <= 2 && v != null)
+          String(v).split(';').forEach(x => { const t = x.trim(); if (t) { s[t] = (s[t] || 0) + 1; } });
+        if (stage === 3) {
+          const entries = Object.entries(s || {});
+          if (!entries.length) return null;
+          return entries.reduce((best, cur) => cur[1] > best[1] ? cur : best, entries[0])[0];
+        }
+        return s;
       };
     }
 
@@ -522,7 +1149,14 @@ alasql.from.DLV_ARRAY_EXTRACT_ELEMENT = function(tableName, opts, cb, idx, query
      * two joined tables share a field name like "Title".
      */
     function preprocessSQL(sql) {
+      // Rewrite MIN/MAX → DLV_MIN/DLV_MAX so string-safe aggregates are used.
+      // Word boundary prevents double-rewriting DLV_MIN/DLV_MAX.
+      // Applied globally so subqueries (DLV_LOOKUP rollup, etc.) are also covered.
+      // TODO: Remove this once mainstream alasql fixes MIN/MAX issues.
+      sql = sql.replace(/\bMIN\s*\(/gi, 'DLV_MIN(').replace(/\bMAX\s*\(/gi, 'DLV_MAX(');
+      
       // Only process plain SELECT statements
+      // TODO: Why this restriction? Can we safely handle more complex queries (e.g. with CTEs, subqueries, unions) by applying this logic to each SELECT clause?
       const selectRe = /^(\s*SELECT\s+)([\s\S]+?)(\s+FROM\b)/i;
       const m = sql.match(selectRe);
       if (!m) return sql;

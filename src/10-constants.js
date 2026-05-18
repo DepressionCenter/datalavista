@@ -27,19 +27,15 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
   =============================================================== */
 const DataLaVistaCore = {
   /* ===== CONSTANTS ===== */
-  // Field type icons for display in field lists, query builder, etc.
-  FIELD_TYPE_ICONS: {
-    'text': { icon: '📝', cls: 'type-text' },
-    'number': { icon: '#️⃣', cls: 'type-number' },
-    'integer': { icon: '#️⃣', cls: 'type-number' },
-    'decimal': { icon: '#️⃣', cls: 'type-number' },
-    'currency': { icon: '#️⃣', cls: 'type-number' },
-    'date': { icon: '📅', cls: 'type-date' },
-    'bool': { icon: '✅', cls: 'type-bool' },
-    'boolean': { icon: '✅', cls: 'type-bool' },
-    'lookup': { icon: '🔍', cls: 'type-lookup' },
-    'array': { icon: '🍱', cls: 'type-array' },
-    'default': { icon: '🔡', cls: 'type-text' }
+
+  // Data Source icons (The origin or infrastructure hosting the data)
+  DATA_SOURCE_ICONS: {
+    sharepoint:  { icon: '☁️',  title: 'SharePoint Site' }, // Applies to lists, document libraries and files stored in SP/OneDrive
+    database:         { icon: '🛢️', title: 'Database' },
+    api:         { icon: '⇄',   title: 'API' },
+    remote_file: { icon: '☁︎',  title: 'Remote File' }, // Non-SP remote files. Append \uFE0E if OS tries to force it to an emoji
+    file_upload:      { icon: '💾',  title: 'File Upload' },
+    default:     { icon: '🧊',  title: 'Data Source' }
   },
 
   // Table/source type icons — SharePoint has sub-keys (list vs library); others are flat.
@@ -53,6 +49,41 @@ const DataLaVistaCore = {
     csv:     { icon: '📄', title: 'CSV Spreadsheet' },
     excel:   { icon: '📗', title: 'Excel Spreadsheet' },
     default: { icon: '⏹️', title: 'Table' }
+  },
+
+  // Queries and views
+  QUERY_ICONS: {
+    view:          { icon: '🪟', title: 'Data View', desc: 'Table wrapper with expanded fields' },
+    query_results: { icon: '✨',  title: 'Query Results', desc: 'Query results after user transformations' },
+    filtered_results: { icon: '⇶', title: 'Filtered Results', desc: 'Query results with global filters applied' }
+  },
+
+  // Field type icons for display in field lists, query builder, etc.
+  FIELD_TYPE_ICONS: {
+    'text':         { icon: '📝', cls: 'type-text' },      // data shown as text
+    'number':       { icon: '＃', cls: 'type-number' },   // data shown as numbers
+    'date':         { icon: '📅', cls: 'type-date' },      // data shown as date
+    'datetime':     { icon: '🕒', cls: 'type-date' },      // data shown as datetime
+    'boolean':      { icon: '✅', cls: 'type-bool' },      // data shown as true/false
+    'url':          { icon: '🌐', cls: 'type-url' },       // data shown as text or hyperlink
+    'user':         { icon: '👤', cls: 'type-user' },      // SP single user/person
+    'user-multi':   { icon: '👥', cls: 'type-user' },      // SP multi user/person
+    'lookup':       { icon: '🔍', cls: 'type-lookup' },    // SP single lookup / single taxonomy
+    'lookup-multi': { icon: '🔍', cls: 'type-lookup' },    // SP multi lookup / multi taxonomy / choice-multi
+    'object':       { icon: '🗂️', cls: 'type-object' },    // single generic object
+    'object-multi': { icon: '🗃️', cls: 'type-object' },  // array of objects (non-SharePoint)
+    'array':        { icon: '☷', cls: 'type-array' },     // array of primitives    
+    'default':      { icon: '❔', cls: 'type-text' }       // unknown/unclassified
+  },
+
+  DD_CATEGORIES: ['Data Source', 'Table', 'Query', 'View', 'Calculation', 'Transformation', 'Field', 'Widget', 'Dashboard'],
+
+  DASHBOARD_TYPES: {
+    datalavista: { icon: '📊', title: 'DataLaVista' },
+    powerbi:     { icon: '📊', title: 'Power BI' },
+    looker:      { icon: '📊', title: 'Looker' },
+    tableau:     { icon: '📊', title: 'Tableau' },
+    other:       { icon: '📊', title: 'Other' }
   },
 
   ALASQL_KEYWORDS: [
@@ -70,26 +101,16 @@ const DataLaVistaCore = {
   'MATRIX', 'OF', 'STRING', 'NUMBER', 'DATE', 'BOOLEAN', 'OBJECT', 'SEARCH',
   'REPLACE', 'REMOVE', 'RENAME', 'MODIFY', 'REINDEX', 'TRUNCATE', 'BEGIN',
   'COMMIT', 'ROLLBACK', 'TRANSACTION', 'SAVEPOINT', 'RELEASE',
-  'DLV_ARRAY_MATCH', 'DLV_ARRAY_EMPTY', 'DLV_INCLUDES', 'DLV_JOIN', 'DLV_KEYS',
-  'DLV_DROP', 'DLV_DISPLAY', 'DLV_IDS', 
-  'DLV_EMAIL','DLV_EMAILS', 'DLV_PICTURE_URL','DLV_NORMALIZE_DATE',
-  'DLV_TAX_LABELS','DLV_TAX_IDS','DLV_PARSE_BOOL', 'DLV_PARSE_DATE'
-],
-
-// Base Aggregation Options for Query Builder (used in field picker dropdowns and design-level aggregates)
-QB_AGGS: [
-  { val: '', label: '— none —', types: 'all' },
-  { val: 'COUNT', label: 'COUNT', types: 'all' },
-  { val: 'COUNT_DISTINCT', label: 'COUNT DISTINCT', types: 'all' },
-  { val: 'FIRST', label: 'FIRST', types: 'all' },
-  { val: 'LAST', label: 'LAST', types: 'all' },
-  { val: 'MAX', label: 'MAX  (Maximum)', types: 'ordered' },
-  { val: 'MIN', label: 'MIN  (Minimum)', types: 'ordered' },
-  { val: 'SUM', label: 'SUM  (Sum)', types: 'numeric' },
-  { val: 'AVG', label: 'AVG  (Average)', types: 'numeric' },
-  { val: 'MEDIAN', label: 'MEDIAN', types: 'numeric' },
-  { val: 'VAR', label: 'VAR  (Variance)', types: 'numeric' },
-  { val: 'STDEV', label: 'STDEV  (Std Dev)', types: 'numeric' }
+  'DLV_ARRAY_MATCH', 'DLV_ARRAY_EMPTY', 'DLV_ARRAY_EXTRACT_ELEMENT', 'DLV_ARRAY_INCLUDES', 'COUNT_LOOKUP_VALUES',
+  'DLV_JOIN', 'DLV_LOOKUP', 'DLV_UNNEST_LOOKUP', 'DLV_KEYS', 'DLV_DROP', 'DLV_DISPLAY', 'DLV_IDS',
+  'DLV_EMAIL', 'DLV_EMAILS', 'DLV_PICTURE_URL', 'DLV_NORMALIZE_DATE',
+  'DLV_TAX_LABELS', 'DLV_TAX_IDS', 'DLV_PARSE_BOOL', 'DLV_PARSE_DATE',
+  'MEDIAN', 'MODE', 'STDEV', 'VAR', 'CV',
+  'DLV_PERCENTILE_5', 'DLV_PERCENTILE_10', 'DLV_PERCENTILE_25', 'DLV_PERCENTILE_50',
+  'DLV_PERCENTILE_75', 'DLV_PERCENTILE_90', 'DLV_PERCENTILE_95', 'DLV_IQR',
+  'DLV_ARR_PERCENTILE_5', 'DLV_ARR_PERCENTILE_10', 'DLV_ARR_PERCENTILE_25', 'DLV_ARR_PERCENTILE_50',
+  'DLV_ARR_PERCENTILE_75', 'DLV_ARR_PERCENTILE_90', 'DLV_ARR_PERCENTILE_95', 'DLV_ARR_IQR',
+  'DLV_MERGE_LIST', 'DLV_MERGE_COUNT_DISTINCT', 'DLV_MERGE_MEDIAN', 'DLV_MERGE_MODE'
 ],
 
 // Base Filter Conditions
@@ -224,10 +245,94 @@ SKIP_FIELDS: new Set([
   "odata.type",
   "xd_ProgID",
   "xd_Signature"
-])
+]),
 
-  
+  // Widget types — single source of truth.
+  // category: 'builtin'=non-chart | 'echarts'=standard ECharts | 'echarts-custom'=ECharts custom series | 'custom'=fully custom render
+  // usesECharts:       renders via echarts.init()
+  // supportsDataset:   uses ECharts dataset+encode pattern (false for echarts-custom — their series don't support it)
+  // supportsInteraction: participates in cross-filter / cross-highlight
+  // optionBuilder:     fn name string → returns full ECharts option object (overrides generic dataset path)
+  // seriesBuilder:     fn name string → returns partial series config merged into generic series object
+  // sqlBuilder:        fn name string → returns { sql, fromSrc } (overrides standard buildWidgetSQL path)
+  // htmlRenderer:      fn name string → returns HTML string (for category:'custom' non-ECharts types)
+  // dimensionLabels:   labels for each dimension slot shown in properties panel
+  // seriesLabel:       label for the series/Y-fields section in properties panel
+  WIDGET_TYPES: [
+    { id: 'table',        label: 'Table',               icon: '▦',  category: 'builtin',       defaultTitle: 'Data Table',          usesECharts: false, supportsDataset: false, supportsInteraction: true,  optionBuilder: null,                  seriesBuilder: null,               sqlBuilder: null,               htmlRenderer: null, dimensionLabels: [],          seriesLabel: 'Columns'    },
+    { id: 'bar',          label: 'Bar',                 icon: '▮',  category: 'echarts',        defaultTitle: 'Bar Chart',           usesECharts: true,  supportsDataset: true,  supportsInteraction: true,  optionBuilder: null,                  seriesBuilder: null,               sqlBuilder: null,               htmlRenderer: null, dimensionLabels: ['X Axis'], seriesLabel: 'Y Values'   },
+    { id: 'line',         label: 'Line',                icon: '∿',  category: 'echarts',        defaultTitle: 'Line Chart',          usesECharts: true,  supportsDataset: true,  supportsInteraction: true,  optionBuilder: null,                  seriesBuilder: null,               sqlBuilder: null,               htmlRenderer: null, dimensionLabels: ['X Axis'], seriesLabel: 'Y Values'   },
+    { id: 'pie',          label: 'Pie',                 icon: '◕',  category: 'echarts',        defaultTitle: 'Pie Chart',           usesECharts: true,  supportsDataset: true,  supportsInteraction: true,  optionBuilder: null,                  seriesBuilder: null,               sqlBuilder: null,               htmlRenderer: null, dimensionLabels: ['Label'],  seriesLabel: 'Values'     },
+    { id: 'scatter',      label: 'Scatter',             icon: '⁙',  category: 'echarts',        defaultTitle: 'Scatter Plot',        usesECharts: true,  supportsDataset: true,  supportsInteraction: true,  optionBuilder: '_buildScatterOption', seriesBuilder: null,               sqlBuilder: null,               htmlRenderer: null, dimensionLabels: ['X Axis'], seriesLabel: 'Y Values'   },
+    { id: 'violin',       label: 'Violin',              icon: '⧖',  category: 'echarts-custom', defaultTitle: 'Violin Plot',         usesECharts: true,  supportsDataset: false, supportsInteraction: false, optionBuilder: '_buildViolinOption',  seriesBuilder: null,               sqlBuilder: null,               htmlRenderer: null, dimensionLabels: ['Group'],  seriesLabel: 'Values'     },
+    // { id: 'sleep_stages', label: 'Sleep Stages',        icon: '☾',  category: 'echarts-custom', defaultTitle: 'Sleep Stages',        usesECharts: true,  supportsDataset: false, supportsInteraction: false, optionBuilder: '_buildSleepStagesOption', seriesBuilder: null,            sqlBuilder: null,               htmlRenderer: null, dimensionLabels: ['Start'],  seriesLabel: 'Fields'     },
+    // { id: 'agp_overlay',  label: 'Glucose Overlay',     icon: '≋',  category: 'echarts-custom', defaultTitle: 'Glucose Overlay',     usesECharts: true,  supportsDataset: false, supportsInteraction: false, optionBuilder: '_buildAgpOverlayOption', seriesBuilder: null,            sqlBuilder: '_buildAgpOverlaySql',  htmlRenderer: null, dimensionLabels: ['Datetime'], seriesLabel: 'Glucose Value' },
+    // { id: 'agp_tir',      label: 'Time in Range',       icon: '▤',  category: 'echarts-custom', defaultTitle: 'Time in Range',       usesECharts: true,  supportsDataset: false, supportsInteraction: false, optionBuilder: '_buildAgpTirOption',  seriesBuilder: null,               sqlBuilder: '_buildAgpTirSql',      htmlRenderer: null, dimensionLabels: ['Datetime'], seriesLabel: 'Glucose Value' },
+    { id: 'kpi',          label: 'KPI',                 icon: '★',  category: 'builtin',       defaultTitle: 'KPI',                 usesECharts: false, supportsDataset: false, supportsInteraction: false, optionBuilder: null,                  seriesBuilder: null,               sqlBuilder: null,               htmlRenderer: null, dimensionLabels: [],          seriesLabel: 'Metric'     },
+    { id: 'text',         label: 'Text',                icon: 'T',   category: 'builtin',       defaultTitle: 'Text',                usesECharts: false, supportsDataset: false, supportsInteraction: false, optionBuilder: null,                  seriesBuilder: null,               sqlBuilder: null,               htmlRenderer: null, dimensionLabels: [],          seriesLabel: ''           },
+    { id: 'placeholder',  label: 'Blank',               icon: '⬚',  category: 'builtin',       defaultTitle: '',                    usesECharts: false, supportsDataset: false, supportsInteraction: false, optionBuilder: null,                  seriesBuilder: null,               sqlBuilder: null,               htmlRenderer: null, dimensionLabels: [],          seriesLabel: ''           },
+    { id: 'container',    label: 'Container',           icon: '⊟',  category: 'layout',        defaultTitle: 'Container',           usesECharts: false, supportsDataset: false, supportsInteraction: false, optionBuilder: null,                  seriesBuilder: null,               sqlBuilder: null,               htmlRenderer: null, dimensionLabels: [],          seriesLabel: ''           },
+  ], // End WIDGET_TYPES
+
+  // Computed from WIDGET_TYPES — no manual drift possible
+  get ECHARTS_WIDGET_IDS()  { return new Set(this.WIDGET_TYPES.filter(t => t.usesECharts).map(t => t.id)); },
+  get BUILTIN_CHART_IDS()   { return new Set(this.WIDGET_TYPES.filter(t => t.category === 'echarts').map(t => t.id)); },
+
+  // Widget types where SELECT DISTINCT is applied when no aggregation is present
+  DISTINCT_WIDGET_IDS: new Set(['table','bar','line','pie']),
+
+  // Single source of truth for all aggregate type metadata.
+  // label: full display name for dropdowns
+  // icon: short symbol for pills / buttons
+  // alias: SQL-safe PascalCase suffix appended to rollup column names (e.g. Contacts_Title_UniqueCount)
+  // sqlFn: SQL function keyword emitted by aggToSQL() — preprocessSQL() transparently rewrites MIN/MAX → DLV_MIN/DLV_MAX
+  // outputType: display type of the aggregate output, used for filter/sort panel display typing in rollup context
+  // category: 'row' = GROUP BY aggregate | 'array' = operates on a single cell's array value (not valid in GROUP BY)
+  AGG_META: {
+    COUNT:          { label: 'COUNT',                            icon: '#',   alias: 'Count',       sqlFn: 'COUNT',               outputType: 'number', category: 'row'   },
+    COUNT_DISTINCT: { label: 'COUNT DISTINCT',                   icon: '#*',  alias: 'UniqueCount',  sqlFn: 'COUNT_DISTINCT',       outputType: 'number', category: 'row'   },
+    SUM:            { label: 'SUM',                              icon: '∑',   alias: 'Sum',          sqlFn: 'SUM',                 outputType: 'number', category: 'row'   },
+    AVG:            { label: 'AVG',                              icon: 'x̄',   alias: 'Avg',          sqlFn: 'AVG',                 outputType: 'number', category: 'row'   },
+    MIN:            { label: 'MIN',                              icon: '↓',   alias: 'Min',          sqlFn: 'MIN',                 outputType: 'number', category: 'row'   },
+    MAX:            { label: 'MAX',                              icon: '↑',   alias: 'Max',          sqlFn: 'MAX',                 outputType: 'number', category: 'row'   },
+    MEDIAN:         { label: 'MEDIAN',                           icon: 'med', alias: 'Median',       sqlFn: 'MEDIAN',              outputType: 'number', category: 'row'   },
+    MODE:           { label: 'MODE',                             icon: 'Mo',  alias: 'Mode',         sqlFn: 'MODE',                outputType: 'text',   category: 'row'   },
+    STDEV:          { label: 'STD DEV',                          icon: 'σ',   alias: 'StdDev',       sqlFn: 'STDEV',               outputType: 'number', category: 'row'   },
+    VAR:            { label: 'VARIANCE',                         icon: 'σ²',  alias: 'Variance',     sqlFn: 'VAR',                 outputType: 'number', category: 'row'   },
+    CV:             { label: 'CV (Coeff. of Variation)',         icon: 'CV',  alias: 'CV',           sqlFn: 'CV',                  outputType: 'number', category: 'row'   },
+    LIST:           { label: 'LIST',                             icon: '≡',   alias: 'List',         sqlFn: 'GROUP_CONCAT',        outputType: 'text',   category: 'row'   },
+    EARLIEST:       { label: 'EARLIEST',                         icon: '↓',   alias: 'Earliest',     sqlFn: 'MIN',                 outputType: 'date',   category: 'row'   },
+    LATEST:         { label: 'LATEST',                           icon: '↑',   alias: 'Latest',       sqlFn: 'MAX',                 outputType: 'date',   category: 'row'   },
+    FIRST_ALPHA:    { label: 'FIRST ALPHABETICALLY',             icon: 'A↓',  alias: 'FirstAlpha',   sqlFn: 'MIN',                 outputType: 'text',   category: 'row'   },
+    LAST_ALPHA:     { label: 'LAST ALPHABETICALLY',              icon: 'A↑',  alias: 'LastAlpha',    sqlFn: 'MAX',                 outputType: 'text',   category: 'row'   },
+    DLV_PERCENTILE_5:    { label: 'PERCENTILE 5th',              icon: 'P5',  alias: 'P5',   sqlFn: 'DLV_PERCENTILE_5',   outputType: 'number', category: 'row'   },
+    DLV_PERCENTILE_10:   { label: 'PERCENTILE 10th',             icon: 'P10', alias: 'P10',  sqlFn: 'DLV_PERCENTILE_10',  outputType: 'number', category: 'row'   },
+    DLV_PERCENTILE_25:   { label: 'PERCENTILE 25th (Q1)',        icon: 'P25', alias: 'P25',  sqlFn: 'DLV_PERCENTILE_25',  outputType: 'number', category: 'row'   },
+    DLV_PERCENTILE_50:   { label: 'PERCENTILE 50th (Median)',    icon: 'P50', alias: 'P50',  sqlFn: 'DLV_PERCENTILE_50',  outputType: 'number', category: 'row'   },
+    DLV_PERCENTILE_75:   { label: 'PERCENTILE 75th (Q3)',        icon: 'P75', alias: 'P75',  sqlFn: 'DLV_PERCENTILE_75',  outputType: 'number', category: 'row'   },
+    DLV_PERCENTILE_90:   { label: 'PERCENTILE 90th',             icon: 'P90', alias: 'P90',  sqlFn: 'DLV_PERCENTILE_90',  outputType: 'number', category: 'row'   },
+    DLV_PERCENTILE_95:   { label: 'PERCENTILE 95th',             icon: 'P95', alias: 'P95',  sqlFn: 'DLV_PERCENTILE_95',  outputType: 'number', category: 'row'   },
+    DLV_IQR:             { label: 'IQR (Interquartile Range)',   icon: 'IQR', alias: 'IQR',  sqlFn: 'DLV_IQR',            outputType: 'number', category: 'row'   },
+    DLV_ARR_PERCENTILE_5:  { label: 'PERCENTILE 5th (of array)',         icon: 'P5',  alias: 'P5',  sqlFn: 'DLV_ARR_PERCENTILE_5',  outputType: 'number', category: 'array' },
+    DLV_ARR_PERCENTILE_10: { label: 'PERCENTILE 10th (of array)',        icon: 'P10', alias: 'P10', sqlFn: 'DLV_ARR_PERCENTILE_10', outputType: 'number', category: 'array' },
+    DLV_ARR_PERCENTILE_25: { label: 'PERCENTILE 25th of array (Q1)',     icon: 'P25', alias: 'P25', sqlFn: 'DLV_ARR_PERCENTILE_25', outputType: 'number', category: 'array' },
+    DLV_ARR_PERCENTILE_50: { label: 'PERCENTILE 50th of array (Median)', icon: 'P50', alias: 'P50', sqlFn: 'DLV_ARR_PERCENTILE_50', outputType: 'number', category: 'array' },
+    DLV_ARR_PERCENTILE_75: { label: 'PERCENTILE 75th of array (Q3)',     icon: 'P75', alias: 'P75', sqlFn: 'DLV_ARR_PERCENTILE_75', outputType: 'number', category: 'array' },
+    DLV_ARR_PERCENTILE_90: { label: 'PERCENTILE 90th (of array)',        icon: 'P90', alias: 'P90', sqlFn: 'DLV_ARR_PERCENTILE_90', outputType: 'number', category: 'array' },
+    DLV_ARR_PERCENTILE_95: { label: 'PERCENTILE 95th (of array)',        icon: 'P95', alias: 'P95', sqlFn: 'DLV_ARR_PERCENTILE_95', outputType: 'number', category: 'array' },
+    DLV_ARR_IQR:           { label: 'IQR of array',                      icon: 'IQR', alias: 'IQR', sqlFn: 'DLV_ARR_IQR',          outputType: 'number', category: 'array' },
+    // TODO: Legacy only. Remove later.
+    FIRST:        { label: 'FIRST',        icon: '⟨', alias: 'First', sqlFn: 'MIN',          outputType: 'text', category: 'row' },
+    LAST:         { label: 'LAST',         icon: '⟩', alias: 'Last',  sqlFn: 'MAX',          outputType: 'text', category: 'row' },
+    GROUP_CONCAT: { label: 'GROUP CONCAT', icon: '≡', alias: 'List',  sqlFn: 'GROUP_CONCAT', outputType: 'text', category: 'row' },
+  }
+
 } // End DataLaVistaCore
+
+/** Returns true if the widget type renders using an ECharts instance. @param {string} type */
+function isEChartsWidget(type) {
+  return DataLaVistaCore.ECHARTS_WIDGET_IDS.has(type);
+}
 
 
 /* ===== STATE ===== */
@@ -235,7 +340,7 @@ SKIP_FIELDS: new Set([
 const DataLaVistaState = {
   dataSources: {},   // dsName -> { type, url, auth, token, fileName, alias, tables: [internalTableKeys] },											  
   tables: {},        // internalName -> { displayName, alias, fields: [], data: [], loaded: false }
-  queryMode: 'basic',
+  queryMode: 'advanced',
   basicQB: { // Basic Query Builder
     tableName: null,
     selectedFields: [],
@@ -254,12 +359,15 @@ const DataLaVistaState = {
   sql: '',
   sqlLocked: false,
   queryColumns: [],
+  queryColumnMeta: {},
   design: {
     title: '',
     showDashboardTitle: true,   // whether the title bar is visible in preview/report mode
     dashboardTitleTooltip: '',  // optional HTML tooltip (sanitized) shown via info icon next to title
     widgets: [],     // widget objects
-    filters: []      // { field, label, position }  — preview filter bar chips
+    filters: [],     // { field, label, position }  — preview filter bar chips
+    interactionMode: /** @type {'cross-filter'|'cross-highlight'|'none'} */ ('cross-filter'), // report-level default
+    theme: /** @type {{palette:string[], fontFamily:string, fontSize:number|null, backgroundColor:string}} */ ({ palette: [], fontFamily: '', fontSize: null, backgroundColor: '' })
   },
   currentWidgetId: null,
   previewFilters: {},  // field -> value
@@ -274,6 +382,8 @@ const DataLaVistaState = {
   reportUrl: null, // if ?report=<url> param is provided, this holds the URL of the report being edited
   relationships: [], // auto-detected and manual relationships: [{ id, source, childTableKey, childField, parentTableKey, parentField, joinType, spLookupField }]
   drillFilters: {},  // cross-widget click filters: { fieldName: value } — rebuilt on every chart/table click
+  drillHighlight: null, // cross-highlight state: { field, value } — no re-query, pure ECharts dispatchAction
+  FiscalYearStartMonth: 7,  // 1=Jan … 12=Dec; month when the fiscal year starts (default: 7 = July)
   _initialized: false
 }; // End dlvRawState
 
@@ -322,7 +432,7 @@ function getFilterOps(displayType = 'text', options = {}) {
     return ops;
   }
 
-  if (dt === 'date') {
+  if (dt === 'date' || dt === 'datetime') {
     const ops = [
       { val: '=',   label: '= equals' },
       { val: '!=',  label: '≠ not equals' },
@@ -337,6 +447,39 @@ function getFilterOps(displayType = 'text', options = {}) {
       { val: 'NOTNULL', label: '✓ is not blank' },
     );
     if (!forArrayElement) ops.push(...DataLaVistaCore.DATE_MACRO_OPS);
+    return ops;
+  }
+
+  // Object — is blank / is not blank only
+  if (dt === 'object') {
+    return [
+      { val: 'NULL',    label: '∅ is blank' },
+      { val: 'NOTNULL', label: '✓ is not blank' },
+    ];
+  }
+
+  // Multi-value types — text ops on joined value + array-length ops
+  if (dt === 'user-multi' || dt === 'lookup-multi') {
+    const ops = [
+      { val: '=',   label: '= equals' },
+      { val: '!=',  label: '≠ not equals' },
+      { val: 'STARTS_WITH',     label: '↦ starts with' },
+      { val: 'NOT_STARTS_WITH', label: '↦ does not start with' },
+      { val: 'ENDS_WITH',       label: '⇥ ends with' },
+      { val: 'NOT_ENDS_WITH',   label: '⇥ does not end with' },
+      { val: 'CONTAINS',        label: '~ contains' },
+      { val: 'NOT_CONTAINS',    label: '≁ does not contain' },
+      { val: 'NULL',            label: '∅ is blank' },
+      { val: 'NOTNULL',         label: '✓ is not blank' },
+      { val: 'ARR_LEN_EQ',      label: '# of elements equal to' },
+      { val: 'ARR_LEN_NE',      label: '# of elements not equals' },
+      { val: 'ARR_LEN_GT',      label: '# of elements greater than' },
+      { val: 'ARR_LEN_GTE',     label: '# of elements greater or equal' },
+      { val: 'ARR_LEN_LT',      label: '# of elements less than' },
+      { val: 'ARR_LEN_LTE',     label: '# of elements less or equal' },
+      { val: 'ARR_EMPTY',       label: 'is empty',     noInput: true },
+      { val: 'ARR_NOT_EMPTY',   label: 'is not empty', noInput: true },
+    ];
     return ops;
   }
 
@@ -399,8 +542,31 @@ function getArrayScalarOps(scalarType) {
       { val: 'ARR_ANY_NE', label: 'any element not equals', group: 'By element value' },
     );
   }
+  const pctStats = [
+    { key: 'P5',  label: 'P5'  },
+    { key: 'P10', label: 'P10' },
+    { key: 'P25', label: 'P25 (Q1)' },
+    { key: 'P50', label: 'P50 (Median)' },
+    { key: 'P75', label: 'P75 (Q3)' },
+    { key: 'P90', label: 'P90' },
+    { key: 'P95', label: 'P95' },
+    { key: 'IQR', label: 'IQR' },
+  ];
+  const cmpOps = [
+    { sfx: 'EQ',  sym: '='  }, { sfx: 'NE',  sym: '≠' },
+    { sfx: 'GT',  sym: '>'  }, { sfx: 'GTE', sym: '≥' },
+    { sfx: 'LT',  sym: '<'  }, { sfx: 'LTE', sym: '≤' },
+  ];
+  const pctOps = (st === 'number' || st === 'date')
+    ? pctStats.flatMap(s => cmpOps.map(c => ({
+        val: `ARR_${s.key}_${c.sfx}`,
+        label: `${s.label} ${c.sym}`,
+        group: `By ${s.label}`,
+      })))
+    : [];
   return [
     ...group1,
+    { val: 'ARR_CONTAINS',  label: 'contains value',                  group: 'By element value' },
     { val: 'ARR_LEN_EQ',    label: '# of elements equal to',         group: 'By # of elements' },
     { val: 'ARR_LEN_NE',    label: '# of elements not equals',       group: 'By # of elements' },
     { val: 'ARR_LEN_GT',    label: '# of elements greater than',     group: 'By # of elements' },
@@ -409,6 +575,7 @@ function getArrayScalarOps(scalarType) {
     { val: 'ARR_LEN_LTE',   label: '# of elements less or equal',    group: 'By # of elements' },
     { val: 'ARR_EMPTY',     label: 'is empty',     noInput: true, group: 'Array' },
     { val: 'ARR_NOT_EMPTY', label: 'is not empty', noInput: true, group: 'Array' },
+    ...pctOps,
   ];
 }
 
@@ -417,16 +584,18 @@ function getArrayScalarOps(scalarType) {
  * Ops with a .group property are wrapped in <optgroup> elements.
  */
 function renderOpsOptions(ops, selectedVal) {
-  let html = '';
-  let currentGroup = null;
-  for (const o of ops) {
-    const grp = o.group || null;
+  var html = '';
+  var currentGroup = null;
+  for (var _roi = 0; _roi < ops.length; _roi++) {
+    var o = ops[_roi];
+    var grp = o.group || null;
     if (grp !== currentGroup) {
       if (currentGroup !== null) html += '</optgroup>';
-      if (grp !== null) html += `<optgroup label="${grp}">`;
+      if (grp !== null) html += '<optgroup label="' + grp + '">';
       currentGroup = grp;
     }
-    html += `<option value="${o.val}" ${o.val === selectedVal ? 'selected' : ''}>${o.label}</option>`;
+    var sel = (o.val === selectedVal) ? ' selected' : '';
+    html += '<option value="' + o.val + '"' + sel + '>' + o.label + '</option>';
   }
   if (currentGroup !== null) html += '</optgroup>';
   return html;
@@ -468,8 +637,8 @@ function buildFilterValueInput(displayType, isMacro, macroMeta, value, handlerJS
       : `<span class="qb-val-blank"></span>`;
   }
 
-  // Date
-  if (displayType === 'date') {
+  // Date / Datetime
+  if (displayType === 'date' || displayType === 'datetime') {
     if (op === 'BETWEEN') {
       return `<input type="date" class="form-input qb-val-input qb-between-input" value="${safeVal}" onchange="${handlerJS}"/>`
            + sep
@@ -538,13 +707,40 @@ function sniffArrayType(arr) {
 }
 
 /**
+ * Return up to `limit` raw rows from an alasql _raw_ table (empty array if none).
+ * @param {string} tableKey
+ * @param {number} [limit]
+ */
+function _sampleRawRows(tableKey, limit = 100) {
+  if (!tableKey) return [];
+  const alasqlName = '_raw_' + tableKey;
+  const /** @type {any} */ _alasql = (/** @type {any} */ (window)).alasql;
+  if (!_alasql) return [];
+  const existing = Object.keys(_alasql.tables).find(/** @param {string} k */ k => k.toLowerCase() === alasqlName.toLowerCase());
+  if (!existing) return [];
+  try { return _alasql(`SELECT TOP ${limit} * FROM [${existing}]`); } catch { return []; }
+}
+
+/** Load LZ-String from CDN once; no-op on subsequent calls. */
+async function _ensureLZString() {
+  if ((/** @type {any} */ (window)).LZString) return;
+  await new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.5.0/lz-string.min.js';
+    script.onload = resolve;
+    script.onerror = () => reject(new Error('Failed to load LZ-String'));
+    document.head.appendChild(script);
+  });
+}
+
+/**
  * Get a sample array value from a table's raw data for a given internal field name.
  * Returns null if data is not loaded or no array values are found.
+ * @param {string} tableKey
+ * @param {string} fieldInternalName
  */
 function getArraySampleForField(tableKey, fieldInternalName) {
-  const t = DataLaVistaState.tables[tableKey];
-  if (!t || !t.data || !t.data.length) return null;
-  for (const row of t.data) {
+  for (const row of _sampleRawRows(tableKey)) {
     const val = row[fieldInternalName];
     if (Array.isArray(val) && val.length > 0) return val;
   }
@@ -582,20 +778,19 @@ function getObjectKeysForField(tableKey, fieldAlias, displayType) {
   // SP lookup / person / taxonomy presets
   if (dt === 'lookup' || dt === 'lookup-multi')
     return [{ key: 'Id', type: 'number' }, { key: 'Title', type: 'text' }];
-  if (dt === 'person' || dt === 'person-multi')
+  if (dt === 'user' || dt === 'user-multi')
     return [{ key: 'Id', type: 'number' }, { key: 'Title', type: 'text' }, { key: 'Name', type: 'text' }, { key: 'Email', type: 'text' }];
   if (dt === 'taxonomyfieldtypemulti' || dt === 'taxonomyfieldtype' || dt === 'taxonomyfield' || dt === 'taxonomy' || dt === 'taxkeyword' || dt === 'taxonomy-multi' || dt === 'taxkeyword-multi')
     return [{ key: 'TermGuid', type: 'text' }, { key: 'Label', type: 'text' }];
 
   if (!tableKey) return [];
   const t = DataLaVistaState.tables[tableKey];
-  if (!t || !t.data || !t.data.length) return [];
 
   // Find internal name for alias
-  const fieldMeta = t.fields && t.fields.find(f => f.alias === fieldAlias);
+  const fieldMeta = t && t.fields && t.fields.find(/** @param {any} f */ f => f.alias === fieldAlias);
   const internalName = fieldMeta ? fieldMeta.internalName : fieldAlias;
 
-  for (const row of t.data) {
+  for (const row of _sampleRawRows(tableKey)) {
     const val = row[internalName];
     if (val == null) continue;
     // Array of objects
@@ -621,11 +816,12 @@ function classifyDisplayType(displayType, tableKey, fieldInternalName, fieldAlia
     { baseType: bt, isObject: false, isArrayObjects: false, isArrayScalar: false, scalarType: null, objectKeys: null },
     extra
   );
-  const _arrObjTypes = ['lookup','lookup-multi','person','person-multi','taxonomy','taxkeyword','taxonomy-multi','taxkeyword-multi'];
+  const _arrObjTypes = ['lookup','lookup-multi','user','user-multi','taxonomy','taxkeyword','taxonomy-multi','taxkeyword-multi'];
 
-  if (dt === 'boolean') return _base('boolean');
-  if (dt === 'number')  return _base('number');
-  if (dt === 'date')    return _base('date');
+  if (dt === 'boolean')  return _base('boolean');
+  if (dt === 'number')   return _base('number');
+  if (dt === 'date')     return _base('date');
+  if (dt === 'datetime') return _base('date');
 
   if (_arrObjTypes.includes(dt))
     return _base('array-objects', { isArrayObjects: true, objectKeys: getObjectKeysForField(tableKey, fieldAlias, dt) });
@@ -711,11 +907,19 @@ function condToSQL(c, colExpr, displayType) {
   const op  = c.op  || '=';
   const raw  = c.value  != null ? String(c.value)  : '';
   const raw2 = c.value2 != null ? String(c.value2) : '';
-  const ek   = c.elementKey || '';
   const dt   = (displayType || 'text').toLowerCase();
+
+  // ── lookup type: redirect to *Data column ────────────────────────────────
+  // colExpr is e.g. [alias].[FieldName] → dataColExpr = [alias].[FieldNameData]
+  const isLookup = dt === 'lookup';
+  const dataColExpr = isLookup ? colExpr.replace(/\]$/, 'Data]') : colExpr;
+  const ek   = c.elementKey || (isLookup ? 'Title' : '');
 
   // ── no-value ops ──────────────────────────────────────────────────────────
   if (op === 'NULL') {
+    if (isLookup) {
+      return `(${dataColExpr} IS NULL OR ${dataColExpr}->length = 0)`;
+    }
     if (dt === 'number' || dt === 'boolean' || dt === 'date') {
       return `${colExpr} IS NULL`;
     }
@@ -725,6 +929,9 @@ function condToSQL(c, colExpr, displayType) {
     return `${colExpr} IS NULL`;
   }
   if (op === 'NOTNULL') {
+    if (isLookup) {
+      return `(${dataColExpr} IS NOT NULL AND ${dataColExpr}->length > 0)`;
+    }
     if (dt === 'number' || dt === 'boolean' || dt === 'date') {
       return `${colExpr} IS NOT NULL`;
     }
@@ -777,6 +984,12 @@ function condToSQL(c, colExpr, displayType) {
   if (op === 'ARR_EMPTY')     return `DLV_ARRAY_EMPTY(${colExpr}) = true`;
   if (op === 'ARR_NOT_EMPTY') return `DLV_ARRAY_EMPTY(${colExpr}) = false`;
 
+  // ── array scalar — contains (substring/value match) ─────────────────────
+  if (op === 'ARR_CONTAINS') {
+    const v = _fmtSQLVal(raw, dt);
+    return `DLV_ARRAY_MATCH(${colExpr}, 'contains', ${v})`;
+  }
+
   // ── array scalar — any-element comparisons ────────────────────────────────
   if (op.startsWith('ARR_ANY_')) {
     const aop = { ARR_ANY_EQ:'=', ARR_ANY_NE:'!=', ARR_ANY_GT:'>', ARR_ANY_GTE:'>=', ARR_ANY_LT:'<', ARR_ANY_LTE:'<=' }[op] || '=';
@@ -791,11 +1004,24 @@ function condToSQL(c, colExpr, displayType) {
     return `${colExpr}->length ${lop} ${v}`;
   }
 
-  // ── array-of-objects — DLV_INCLUDES ──────────────────────────────────────
+  // ── array scalar — percentile / IQR comparisons ───────────────────────────
+  if (op.startsWith('ARR_P') || op.startsWith('ARR_IQR')) {
+    const m = op.match(/^ARR_(P\d+|IQR)_(EQ|NE|GT|GTE|LT|LTE)$/);
+    if (m) {
+      const cmpMap = { EQ:'=', NE:'!=', GT:'>', GTE:'>=', LT:'<', LTE:'<=' };
+      const cmp = cmpMap[/** @type {keyof typeof cmpMap} */ (m[2])];
+      const fn  = m[1] === 'IQR' ? 'DLV_ARR_IQR' : `DLV_ARR_PERCENTILE_${m[1].slice(1)}`;
+      const v   = _fmtSQLVal(raw, dt);
+      return `${fn}(${colExpr}) ${cmp} ${v}`;
+    }
+  }
+
+  // ── array-of-objects — DLV_ARRAY_INCLUDES ────────────────────────────────
   if (ek && ['=','!=','>','>=','<','<='].includes(op)) {
+    const arrExpr = isLookup ? dataColExpr : colExpr;
     const v = _fmtSQLVal(raw, dt);
-    if (op === '=') return `DLV_INCLUDES(${colExpr}, '${ek}', ${v})`;
-    return `DLV_INCLUDES(${colExpr}, '${ek}', ${v}, '${op}')`;
+    if (op === '=') return `DLV_ARRAY_INCLUDES(${arrExpr}, '${ek}', ${v})`;
+    return `DLV_ARRAY_INCLUDES(${arrExpr}, '${ek}', ${v}, '${op}')`;
   }
 
   // ── standard comparison ────────────────────────────────────────────────────
@@ -821,13 +1047,16 @@ function _dlvAcEvict(prefix) {
   }
 }
 
-function _dlvAcLoad(tableKey, fieldAlias, elementKey) {
+function _dlvAcLoad(tableKey, fieldAlias, elementKey, displayType) {
   const key = (tableKey || '') + '|' + (fieldAlias || '') + '|' + (elementKey || '');
   if (_dlvAcCache[key]) return _dlvAcCache[key]; // only populated entries are cached
   const values = [];
   try {
     const fa = fieldAlias || '';
-    const ek = elementKey || '';
+    // For lookup fields, default ek = 'Title' and expand the *Data column
+    const isLookup = (displayType || '').toLowerCase() === 'lookup';
+    const ek = elementKey || (isLookup ? 'Title' : '');
+    const columnToExpand = isLookup ? fa + 'Data' : fa;
 
     if (ek) {
       // ── Array-of-objects element key: use DLV_ARRAY_EXTRACT_ELEMENT ─────────
@@ -836,7 +1065,7 @@ function _dlvAcLoad(tableKey, fieldAlias, elementKey) {
         || tableKey;
       // Embed as SQL literals — FROM table-functions don't support ? parameters
       const vnameEsc = vname.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-      const opts = JSON.stringify({ columnToExpand: fa, element: ek }).replace(/'/g, "\\'");
+      const opts = JSON.stringify({ columnToExpand, element: ek }).replace(/'/g, "\\'");
       const rows = alasql('SELECT * FROM DLV_ARRAY_EXTRACT_ELEMENT("' + vnameEsc + '", \'' + opts + '\')');
       for (var ei = 0; ei < rows.length; ei++) {
         const v = rows[ei][ek];

@@ -119,12 +119,9 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           document.getElementById('qmt-' + t)?.classList.toggle('active', t === tab);
           document.getElementById('qm-panel-' + t)?.classList.toggle('active', t === tab);
         });
-        // Show subtabs only when QB is active
-        const subtabs = document.getElementById('qb-subtabs');
-        if (subtabs) subtabs.style.display = tab === 'qb' ? '' : 'none';
         if (tab === 'sql' && window._cmEditor) setTimeout(() => window._cmEditor.refresh(), 50);
-        // Switching to SQL editor lifts the advanced-QB join restriction
-        if (tab === 'sql' && DataLaVistaState.queryMode === 'advanced') setDesignTabsEnabled(true);
+        // Switching to SQL editor lifts the QB join restriction
+        if (tab === 'sql') setDesignTabsEnabled(true);
 
         const clearBtn = document.getElementById('btn-clear-query');
         if (clearBtn) clearBtn.disabled = (tab === 'dataPreview');
@@ -142,12 +139,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
             : !!(DataLaVistaState.sql || '').trim();
           btn.disabled = !hasSQL;
         } else {
-          // QB tab — enabled only when the active mode has at least one table loaded
-          const qmode = DataLaVistaState.queryMode || 'basic';
-          const hasTable = qmode === 'basic'
-            ? !!DataLaVistaState.basicQB.tableName
-            : Object.keys(DataLaVistaState.advancedQB.nodes || {}).length > 0;
-          btn.disabled = !hasTable;
+          // QB tab — enabled only when there is at least one node on the canvas
+          btn.disabled = Object.keys(DataLaVistaState.advancedQB.nodes || {}).length === 0;
         }
       }
 

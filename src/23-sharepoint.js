@@ -24,12 +24,18 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
     // SHAREPOINT REST API ADAPTER
     // ============================================================
     // Rule 1: Use application/json instead of verbose
-    async function spFetch(url, dsName) {
+    // All SharePoint fetches use direct fetch() — never routed through external CORS proxies.
+    async function spFetch(url, dsName, _throttleRetries = 5) {
       const headers = { 'Accept': 'application/json' };
       if (DataLaVistaState.dataSources[dsName] && DataLaVistaState.dataSources[dsName].auth === 'token' && DataLaVistaState.dataSources[dsName].token) {
         headers['Authorization'] = 'Bearer ' + DataLaVistaState.dataSources[dsName].token;
       }
       const res = await fetch(url, { headers, credentials: 'include' });
+      if (res.status === 429 && _throttleRetries > 0) {
+        const retryAfter = Math.max(parseInt(res.headers.get('Retry-After') || '10', 10), 2);
+        await new Promise(r => setTimeout(r, retryAfter * 1000));
+        return spFetch(url, dsName, _throttleRetries - 1);
+      }
       if (!res.ok) {
         // Will be caught by the retry logic later
         const errorText = await res.text();
@@ -216,16 +222,18 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
      */
     function registerTableInAlaSQL(tableKey) {
       const t = DataLaVistaState.tables[tableKey];
-      if (!t || !t.data) return;
+      if (!t) return;
       const alasqlName = '_raw_' + tableKey;
       const existing = Object.keys(alasql.tables).find(k => k.toLowerCase() === alasqlName.toLowerCase());
+      // If alasql already has rows for this table, nothing to do
+      if (existing && alasql.tables[existing].data && alasql.tables[existing].data.length > 0) return;
+      if (!t.data || !t.data.length) return;
       if (existing) {
-        // Update data in-place so any VIEW referencing this table stays valid
-        alasql.tables[existing].data = t.data;
+        alasql(`TRUNCATE TABLE [${existing}]`);
+        alasql(`INSERT INTO [${existing}] SELECT * FROM ?`, [t.data]);
       } else {
         alasql(`CREATE TABLE [${alasqlName}]`);
-        const actual = Object.keys(alasql.tables).find(k => k.toLowerCase() === alasqlName.toLowerCase()) || alasqlName;
-        alasql.tables[actual].data = t.data;
+        alasql(`INSERT INTO [${alasqlName}] SELECT * FROM ?`, [t.data]);
       }
     }
 
@@ -432,8 +440,8 @@ async function fetchTableData(tableName, fetchAll = false) {
   const limit = fetchAll ? 50000 : 10;
  
   // Skip if we already have enough data
-  if (fetchAll && t.loaded && t.data && t.data.length > 10) return; 
-  if (!fetchAll && t.data && t.data.length >= 10) return;          
+  if (fetchAll && t.loaded) return;
+  if (!fetchAll && t.itemCount >= 10) return;
  
   // *** PROMISE TRACKER: If a fetch is already running, return its promise ***
   if (t.fetchPromise) {
@@ -453,10 +461,28 @@ async function fetchTableData(tableName, fetchAll = false) {
         const spSiteUrl = t.url || t.siteUrl || (DataLaVistaState.dataSources[t.dataSource] && DataLaVistaState.dataSources[t.dataSource].siteUrl);
         const baseSelect = new Set(['ID', 'Title', 'Created', 'Modified', 'Author/Id', 'Author/Title', 'Author/Name', 'Editor/Id', 'Editor/Title', 'Editor/Name']);
         const baseExpand = new Set(['Author', 'Editor']);
-        
+
+        // Column pruning: skip fields with no presence in the SQL text (view mode, full fetch only).
+        // Safe because any used field must appear by name somewhere in the SQL.
+        // Skip if SQL contains any wildcard selector (SELECT *, t.*, [View].*).
+        let _pruneSql = null;
+        if (fetchAll && DataLaVistaState.reportMode === 'view') {
+          const _rawSql = (DataLaVistaState.sql || '').trim();
+          if (_rawSql && !/\.\*|\bSELECT\s*\*/i.test(_rawSql)) {
+            _pruneSql = _rawSql.toUpperCase();
+          }
+        }
+
         spFields.forEach(f => {
           const internalName = f.InternalName || f.internalName;
-          if (f.isAutoId || !internalName) return; 
+          if (f.isAutoId || !internalName) return;
+
+          // Skip field if neither its alias nor internalName appears anywhere in the SQL
+          if (_pruneSql) {
+            const aliasUp    = (f.alias    || internalName).toUpperCase();
+            const internalUp = internalName.toUpperCase();
+            if (!_pruneSql.includes(aliasUp) && !_pruneSql.includes(internalUp)) return;
+          }
           
           const typeStr = (f.TypeAsString || f.type || '').toLowerCase();
           const isPeople = typeStr.includes('user');
@@ -478,7 +504,7 @@ async function fetchTableData(tableName, fetchAll = false) {
             baseSelect.add(internalName);
           }
         });
-        
+
         rawData = await fetchSPItemsWithRetry(
           spSiteUrl,
           t.guid,
@@ -513,9 +539,9 @@ async function fetchTableData(tableName, fetchAll = false) {
 
             // Update state on the existing table entry (preserves viewName, aliases, etc.)
             if (tbState) {
-              tbState.data   = tb.data;
               tbState.loaded = fetchAll;
               tbState.itemCount = tb.data.length;
+              tbState.data = [];  // alasql owns the rows; no need to duplicate in state
             }
 
             // Rebuild the AlaSQL VIEW now that the raw table exists.
@@ -533,32 +559,31 @@ async function fetchTableData(tableName, fetchAll = false) {
         // Status and cleanup are handled by the finally block below — return early
         // so we don't fall through into the SP-only post-processing code.
         if (!fetchAll) setStatus(`Loaded preview for ${tableName}`, 'success');
-        if (fetchAll) setStatus(`Loaded data for ${tableName} (${(t.data && t.data.length) || 0} rows)`, 'success');
+        if (fetchAll) setStatus(`Loaded data for ${tableName} (${t.itemCount || 0} rows)`, 'success');
         return;
       } else {
         console.warn(`[fetchTableData] Unhandled sourceType "${t.sourceType}" for table "${tableName}"`);
         return;
       }
  
-      t.data = CyberdynePipeline.removeODataColumns(rawData);
+      const _spRows = CyberdynePipeline.removeODataColumns(rawData);
+      t.itemCount = _spRows.length;
       t.loaded = fetchAll;
- 
+
       // Register raw (un-processed) SP objects in the AlaSQL _raw_ table.
       // FieldExpander in _applyViewSQL generates all virtual columns from these objects.
-      if (t.data && t.data.length > 0) {
-        CyberdynePipeline._registerRawTable(tableName, t.data);
+      if (_spRows.length > 0) {
+        CyberdynePipeline._registerRawTable(tableName, _spRows);
       }
- 
-      // Preserve base SP field definitions on first load (preserves user-renamed aliases on refresh).
-      // spFields = t.originalFields (user's aliases) || t.fields (fresh from SP metadata).
+
+      // Preserve base SP field definitions. Always refresh on fetch so schema changes are reflected.
+      // setTableState carries originalFields forward across refreshes so $select/$expand stays valid.
       // We deliberately do NOT include synthetic fields here — FieldExpander derives them.
-      if (!t.originalFields) {
-        t.originalFields = [...spFields];
-      }
- 
+      t.originalFields = [...spFields];
+
       // Rebuild the VIEW using FieldExpander — generates display/Id/Data/Email/etc columns
       // from the raw SP objects now stored in _raw_tableName.
-      if (t.data && t.data.length > 0) {
+      if (_spRows.length > 0) {
         const viewName = t.viewName || CyberdynePipeline.getViewForTable(tableName);
         if (viewName) {
           try {
@@ -569,9 +594,12 @@ async function fetchTableData(tableName, fetchAll = false) {
           }
         }
       }
-      
+
+      // alasql owns the rows; no need to keep a duplicate copy in state
+      t.data = [];
+
       if (!fetchAll) setStatus(`Loaded preview for ${tableName}`, 'success');
-      if (fetchAll) setStatus(`Loaded data for ${tableName} (${t.data.length} rows)`, 'success');
+      if (fetchAll) setStatus(`Loaded data for ${tableName} (${t.itemCount} rows)`, 'success');
     } finally {
       // *** CLEANUP: Remove the promise once the fetch completes or fails ***
       t.fetchPromise = null;

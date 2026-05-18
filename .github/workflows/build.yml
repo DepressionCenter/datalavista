@@ -39,6 +39,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Cache esbuild
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/datalavista-build
+          key: esbuild-0.28.0-linux-x64
+
       - name: Build
         run: |
           chmod +x build.sh
@@ -47,7 +53,7 @@ jobs:
       - name: Stage build outputs
         id: changes
         run: |
-          git add DataLaVista.html DataLaVista-nojs.html DataLaVista-dev.html datalavista.js
+          git add DataLaVista.html DataLaVista-nojs.html datalavista.js
           echo "changed=$(git diff --staged --quiet && echo 'false' || echo 'true')" >> $GITHUB_OUTPUT
 
       - name: Commit and push

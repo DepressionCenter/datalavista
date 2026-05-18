@@ -53,7 +53,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           document.getElementById('preview-toolbar').classList.add('hidden');
         }
         const titleBarEl = document.getElementById('preview-title-bar');
-        const titleText  = DataLaVistaState.design.title || 'DataLaVista Report';
+        const titleText  = resolveTitleTemplate(DataLaVistaState.design.title || '') || 'DataLaVista Report';
         const titleTip   = DataLaVistaState.design.dashboardTitleTooltip || '';
 
         if (DataLaVistaState.design.showDashboardTitle === false) {
@@ -81,13 +81,24 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           filterBar.classList.remove('hidden');
           for (const filter of barFilters) {
             const _fRows = (alasql.tables && alasql.tables['dlv_results']) ? alasql('SELECT * FROM [dlv_results]') : [];
-            const values = ['(All)', ...[...new Set(_fRows.map(r => r[filter.field]).filter(v => v != null))].sort()];
+            const _rawVals = _fRows.map(r => r[filter.field]).filter(v => v != null);
+            const _isLookupF = typeof _filterFieldIsLookup === 'function' && _filterFieldIsLookup(filter.field);
+            let _flatVals;
+            if (_isLookupF) {
+              const _parts = [];
+              for (const v of _rawVals) { for (const p of String(v).split(';')) { const t = p.trim(); if (t) _parts.push(t); } }
+              _flatVals = [...new Set(_parts)].sort();
+            } else {
+              _flatVals = [...new Set(_rawVals)].sort();
+            }
+            const values = ['(All)', ..._flatVals];
             const wrap = document.createElement('div');
             wrap.className = 'filter-chip';
-            wrap.innerHTML = `<span style="font-size:11px;font-weight:600">${filter.label}:</span>
-        <select class="filter-chip-select" onchange="applyPreviewFilterAndRender('${filter.field}', this.value)">
-          ${values.map(v => `<option>${v}</option>`).join('')}
-        </select>`;
+            var _optHtml = '';
+            for (var _oi = 0; _oi < values.length; _oi++) { _optHtml += '<option>' + values[_oi] + '</option>'; }
+            wrap.innerHTML = '<span style="font-size:11px;font-weight:600">' + filter.label + ':</span>'
+              + '<select class="filter-chip-select" onchange="applyPreviewFilterAndRender(\'' + filter.field + '\', this.value)">'
+              + _optHtml + '</select>';
             filterBar.appendChild(wrap);
           }
         } else filterBar.classList.add('hidden');
@@ -97,6 +108,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 
         // Canvas
         const canvas = document.getElementById('preview-canvas');
+        if (canvas) canvas.style.background = (DataLaVistaState.design.theme && DataLaVistaState.design.theme.backgroundColor) || '';
         canvas.innerHTML = '';
 
         // Destroy old preview charts
@@ -105,25 +117,60 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         }
 
         for (const w of DataLaVistaState.design.widgets) {
+          if (w.parentContainerId) continue; // rendered inside container
           const el = document.createElement('div');
           el.className = 'widget';
           const titleHdrStyle  = `background:${w.titleBackgroundColor||'#fefefe'}`;
           const titleSpanStyle = `font-size:${w.titleFontSize||14}px;color:${w.titleFontColor||'#323130'}`;
-          el.style.cssText = `width:${w.widthPct}%;height:${w.heightVh}vh;min-height:120px;border-color:${w.borderColor};border-width:${w.borderSize}px;background:${w.widgetBackgroundColor||'#fefefe'}`;
-          el.innerHTML = `
-            <div class="widget-header${w.showTitle === false ? ' hidden' : ''}" style="${titleHdrStyle}"><span class="widget-title" style="${titleSpanStyle}">${w.title}</span></div>
-            <div class="widget-content${['bar','line','pie','scatter'].includes(w.type) ? ' widget-content-chart' : ''}" id="prev-wcontent-${w.id}">
-              ${getPrevWidgetContent(w)}
-            </div>
-          `;
+          var _prevHeightStyle = (w.type === 'container') ? ('min-height:' + (w.minHeightVh || 30) + 'vh;height:auto') : (w.heightVh + 'vh');
+          var _prevWidthStyle  = w.widthPct + '%';
+          var _isContainerP = (w.type === 'container');
+          var _minHtP = _isContainerP ? '' : ';min-height:120px';
+          var _ovfP   = _isContainerP ? ';overflow:visible' : '';
+          el.style.cssText = 'width:' + _prevWidthStyle + ';' + (_prevHeightStyle.indexOf('min-height') === 0 ? _prevHeightStyle : 'height:' + _prevHeightStyle) + _minHtP + ';border-color:' + w.borderColor + ';border-width:' + w.borderSize + 'px;background:' + (w.widgetBackgroundColor||'transparent') + _ovfP;
+          var _prevContentStyle = '';
+          if (w.type === 'container') {
+            var _alignMapP = { 'top': 'flex-start', 'space-between': 'space-between', 'stretch': 'stretch' };
+            var _justifyP = _alignMapP[w.containerAlign || 'top'] || 'flex-start';
+            _prevContentStyle = ' style="display:flex;flex-direction:column;gap:' + (w.containerGap || 8) + 'px;padding:' + (w.containerPadding || 8) + 'px;justify-content:' + _justifyP + ';height:auto;overflow:visible"';
+          }
+          el.innerHTML = '<div class="widget-header' + (w.showTitle === false ? ' hidden' : '') + '" style="' + titleHdrStyle + '"><span class="widget-title" style="' + titleSpanStyle + '">' + resolveTitleTemplate(w.title) + '</span></div>'
+            + '<div class="widget-content' + (isEChartsWidget(w.type) ? ' widget-content-chart' : '') + '" id="prev-wcontent-' + w.id + '"' + _prevContentStyle + '>'
+            + getPrevWidgetContent(w)
+            + '</div>';
           canvas.appendChild(el);
+        }
+
+        // Inject children into their containers
+        for (const w of DataLaVistaState.design.widgets) {
+          if (!w.parentContainerId) continue;
+          var _pContEl = document.getElementById('prev-wcontent-' + w.parentContainerId);
+          if (!_pContEl) continue;
+          var _childEl = document.createElement('div');
+          _childEl.className = 'widget';
+          var _cTitleHdrStyle  = 'background:' + (w.titleBackgroundColor || '#fefefe');
+          var _cTitleSpanStyle = 'font-size:' + (w.titleFontSize || 14) + 'px;color:' + (w.titleFontColor || '#323130');
+          _childEl.style.cssText = 'width:100%;height:' + w.heightVh + 'vh;min-height:80px;border-color:' + w.borderColor + ';border-width:' + w.borderSize + 'px;background:' + (w.widgetBackgroundColor || '#fefefe');
+          _childEl.innerHTML = '<div class="widget-header' + (w.showTitle === false ? ' hidden' : '') + '" style="' + _cTitleHdrStyle + '"><span class="widget-title" style="' + _cTitleSpanStyle + '">' + resolveTitleTemplate(w.title) + '</span></div>'
+            + '<div class="widget-content' + (isEChartsWidget(w.type) ? ' widget-content-chart' : '') + '" id="prev-wcontent-' + w.id + '">'
+            + getPrevWidgetContent(w)
+            + '</div>';
+          _pContEl.appendChild(_childEl);
         }
 
         requestAnimationFrame(() => {
           for (const w of DataLaVistaState.design.widgets) {
-            if (['bar', 'line', 'pie', 'scatter'].includes(w.type)) {
+            if (isEChartsWidget(w.type)) {
               renderPreviewChart(w);
             }
+          }
+          // Connect all preview charts for cross-tooltip sync
+          const _ec = /** @type {any} */ (window.echarts);
+          if (_ec && _ec.connect) {
+            const previewCharts = Object.entries(DataLaVistaState.charts)
+              .filter(([id]) => id.startsWith('prev_'))
+              .map(([, c]) => c);
+            if (previewCharts.length > 1) _ec.connect(previewCharts);
           }
         });
       }
@@ -131,11 +178,12 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       function getPrevWidgetContent(w) {
         // Note: text widgets don't have their html sanitized with sanitizeHTML() since they're meant to allow basic formatting via HTML tags.
         // If this becomes a problem, we can add a separate "allowHTML" flag to widget properties and sanitize conditionally.
-        if (w.type === 'text') return `<div class="text-widget" style="font-size:${w.fontSize}px;color:${w.fontColor}">${w.textContent}</div>`;
+        if (w.type === 'text') return '<div class="text-widget" style="font-size:' + w.fontSize + 'px;color:' + w.fontColor + '">' + w.textContent + '</div>';
         if (w.type === 'placeholder') return '';
+        if (w.type === 'container') return ''; // children injected by renderPreviewTab's second loop
         if (w.type === 'kpi') return renderPrevKPI(w);
         if (w.type === 'table') return renderPrevTable(w);
-        if (['bar', 'line', 'pie', 'scatter'].includes(w.type)) return `<div id="prevchart-${w.id}" style="width:100%;height:100%;min-height:200px"></div>`;
+        if (isEChartsWidget(w.type)) return '<div id="prevchart-' + w.id + '" style="width:100%;height:100%;min-height:200px"></div>';
         return '';
       }
 
@@ -171,15 +219,19 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
     chart.setOption({ backgroundColor: w.chartBackgroundColor || 'transparent', title: { text: 'No data', left: 'center', top: 'middle', textStyle: { color: '#a19f9d', fontSize: 13 } } });
     return;
   }
-  option.backgroundColor = w.chartBackgroundColor || 'transparent';
+  (/** @type {any} */ (option)).backgroundColor = w.chartBackgroundColor || 'transparent';
   chart.setOption(option);
-  // Cross-widget click filter
+  // Cross-widget click: filter or highlight depending on interactionMode
   chart.on('click', (params) => {
     if (params.componentType !== 'series') return;
-    const filterField = w.xField;
+    const dims = (Array.isArray(w.dimensions) && w.dimensions.length) ? w.dimensions : (w.xField ? [w.xField] : []);
+    const filterField = dims[0];
     let filterValue = params.name;
     if (w.type === 'scatter' && Array.isArray(params.data)) filterValue = String(params.data[0]);
-    if (filterField && filterValue != null) applyDrillFilter(filterField, String(filterValue));
+    if (!filterField || filterValue == null) return;
+    const mode = w.interactionMode || (DataLaVistaState.design && DataLaVistaState.design.interactionMode) || 'cross-filter';
+    if      (mode === 'cross-filter')    applyDrillFilter(filterField, String(filterValue));
+    else if (mode === 'cross-highlight') _applyDrillHighlight(filterField, String(filterValue));
   });
 }
 
@@ -190,7 +242,13 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         // Rebuild [dlv_active] using combined previewFilters + drillFilters
         alasql('DROP VIEW IF EXISTS [dlv_active]');
         const allFilters = { ...(DataLaVistaState.previewFilters || {}), ...(DataLaVistaState.drillFilters || {}) };
-        const whereClauses = Object.entries(allFilters).map(([f, v]) => `[${f}] = '${String(v).replace(/'/g, "''")}'`);
+        const whereClauses = Object.entries(allFilters).map(([f, v]) => {
+          const vEsc = String(v).replace(/'/g, "''");
+          if (typeof _filterFieldIsLookup === 'function' && _filterFieldIsLookup(f)) {
+            return `([${f}] = '${vEsc}' OR [${f}] LIKE '${vEsc};%' OR [${f}] LIKE '%;${vEsc}' OR [${f}] LIKE '%;${vEsc};%')`;
+          }
+          return `[${f}] = '${vEsc}'`;
+        });
         if (whereClauses.length) {
           alasql(`CREATE VIEW [dlv_active] AS SELECT * FROM [dlv_results] WHERE ${whereClauses.join(' AND ')}`);
         } else {
@@ -199,17 +257,16 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 
         DataLaVistaState.design.previewFilteredData = null;
 
-        // Re-render each widget
-        const canvas = document.getElementById('preview-canvas');
-        canvas.querySelectorAll('.widget').forEach((el, i) => {
-          const w = DataLaVistaState.design.widgets[i];
-          if (!w) return;
-          const content = el.querySelector('.widget-content');
-          content.innerHTML = getPrevWidgetContent(w);
-          if (['bar', 'line', 'pie', 'scatter'].includes(w.type)) {
+        // Re-render each widget by ID (skip containers — their layout is unchanged; children update below)
+        for (const w of DataLaVistaState.design.widgets) {
+          if (/** @type {any} */ (w).type === 'container') continue;
+          const contentEl = document.getElementById('prev-wcontent-' + /** @type {any} */ (w).id);
+          if (!contentEl) continue;
+          contentEl.innerHTML = getPrevWidgetContent(w);
+          if (isEChartsWidget(/** @type {any} */ (w).type)) {
             requestAnimationFrame(() => renderPreviewChart(w));
           }
-        });
+        }
       }
 
       // Lets users download the full query results as CSV, even if the preview only shows top 20 rows. If results aren't available in AlaSQL, try to run the query and populate [dlv_results] first.
@@ -231,7 +288,13 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         }
         if (!results || !results.length) { toast('No data to export', 'warning'); return; }
         const cols = Object.keys(results[0]);
-        const csv = [cols.join(','), ...results.map(r => cols.map(c => { const v = r[c]; return typeof v === 'string' && (v.includes(',') || v.includes('"') || v.includes('\n')) ? `"${v.replace(/"/g, '""')}"` : v ?? ''; }).join(','))].join('\n');
+        const csv = [cols.join(','), ...(/** @type {any[]} */ (results)).map(r => cols.map(c => {
+          var v = r[c];
+          if (typeof v === 'string' && (v.includes(',') || v.includes('"') || v.includes('\n'))) {
+            return '"' + v.replace(/"/g, '""') + '"';
+          }
+          return v != null ? v : '';
+        }).join(','))].join('\n');
         if(DataLaVistaState.design.title) {
           downloadText(csv, DataLaVistaState.design.title + '.csv', 'text/csv');
         } else {
@@ -276,6 +339,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         // Yield to the browser so the tab switch and toast paint before the heavy work
         await new Promise(resolve => setTimeout(resolve, 0));
 
+        await _ensureLZString();
         _lastGeneratedJson = JSON.stringify(buildConfig(), null, 2);
 
         /** @type {HTMLButtonElement} */ (document.getElementById('btn-copy-json')).disabled = false;
