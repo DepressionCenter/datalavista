@@ -3703,6 +3703,57 @@ This program is distributed in the hope that it will be useful, but WITHOUT ANY 
     </div><!-- end content -->
   </div><!-- end app -->
 
+  <!-- ═══════════════════════════════════════════════════════════════════════
+       PHASE 2 POPUP SHELLS — static containers; inner content rendered by JS.
+       Events on static buttons wired in 80-events.js attachEvents().
+       Events on dynamic inner content use delegateOn() registered in init().
+       NOTE: #dd-overlay shell will be removed+recreated by the current
+       openDataDictionaryPopup() until Phase 4 migrates that function.
+  ════════════════════════════════════════════════════════════════════════ -->
+
+  <!-- DATA DICTIONARY POPUP SHELL -->
+  <div id="dd-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;align-items:flex-start;justify-content:center;padding:40px 20px;overflow-y:auto">
+    <div id="dd-dialog" style="background:var(--surface);border-radius:var(--radius-lg);box-shadow:var(--shadow-lg);width:780px;max-width:calc(100vw - 40px);display:flex;flex-direction:column;max-height:calc(100vh - 100px)">
+      <div class="popup-header">
+        <div>
+          <h2 style="font-size:16px;font-weight:600;margin:0 0 2px">Data Dictionary</h2>
+          <div style="font-size:11px;color:var(--text-secondary)">Data sources, tables, views, and fields — read left to right</div>
+        </div>
+        <button class="btn btn-ghost btn-icon" id="dd-close-btn" title="Close">&#x2715;</button>
+      </div>
+      <div style="padding:12px 20px 0">
+        <input id="dd-search" type="text" class="form-input" placeholder="Search fields, tables, data sources, views..." style="width:100%" />
+      </div>
+      <div id="dd-body" style="padding:16px 20px;overflow-y:auto;flex:1;min-height:100px"></div>
+      <div class="popup-footer">
+        <button class="btn btn-ghost btn-sm" id="dd-csv-btn">Download CSV</button>
+        <button class="btn btn-primary btn-sm" id="dd-footer-close-btn">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SERIES ADVANCED PROPERTIES POPUP SHELL -->
+  <div id="series-props-dialog" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:9999;align-items:flex-start;justify-content:center;padding-top:80px">
+    <div style="background:var(--surface);border-radius:var(--radius-lg);box-shadow:var(--shadow-lg);width:460px;max-width:calc(100vw - 40px);overflow-y:auto;max-height:calc(100vh - 120px)">
+      <div id="series-adv-dialog-shell"></div>
+      <div class="popup-footer">
+        <button class="btn btn-ghost btn-sm" id="series-props-cancel-btn">Cancel</button>
+        <button class="btn btn-primary btn-sm" id="series-props-apply-btn">Apply</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- WIDGET FIELD ADVANCED PROPERTIES POPUP SHELL -->
+  <div id="widget-field-props-dialog" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:9999;align-items:flex-start;justify-content:center;padding-top:80px">
+    <div style="background:var(--surface);border-radius:var(--radius-lg);box-shadow:var(--shadow-lg);width:320px;max-width:calc(100vw - 40px);overflow-y:auto;max-height:calc(100vh - 120px)">
+      <div id="widget-field-props-body"></div>
+      <div class="popup-footer">
+        <button class="btn btn-ghost btn-sm" id="widget-field-props-cancel-btn">Cancel</button>
+        <button class="btn btn-primary btn-sm" id="widget-field-props-apply-btn">Apply</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Toast container -->
   <div id="toast-container"></div>
 

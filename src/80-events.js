@@ -22,6 +22,31 @@ You should have received a copy of the GNU General Public License along
 with this program. If not, see https://www.gnu.org/licenses.
 ================================================================ */
 
+/* ─────────────────────────────────────────────────────────────────────────
+   Phase 1-A: delegateOn — scoped event delegation helper.
+   Attaches one listener on `container` that fires `handler` when any
+   descendant matching `selector` triggers `eventName`.
+   Register once per popup container in init(); never re-register.
+───────────────────────────────────────────────────────────────────────── */
+function delegateOn(container, selector, eventName, handler) {
+  container.addEventListener(eventName, function(e) {
+    var target = e.target.closest(selector);
+    if (target && container.contains(target)) { handler(e, target); }
+  });
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Phase 1-B: _dlvActions registry + registerAction.
+   Any file may call registerAction(name, fn) to map a data-action value
+   to a handler fn(el, e).  The dispatcher in attachEvents() routes clicks
+   (and change / input) to this registry automatically.
+───────────────────────────────────────────────────────────────────────── */
+var _dlvActions = {};
+
+function registerAction(name, fn) {
+  _dlvActions[name] = fn;
+}
+
 function attachEvents() {
   'use strict';
 
@@ -57,6 +82,24 @@ function attachEvents() {
       if (cssClass) { el.classList.remove(cssClass); }
     });
   }
+
+
+  /* ─────────────────────────────────────────────────────────────────────────
+     Phase 1-B: Document-level data-action dispatcher.
+     Handles click, change, and input events on any element with data-action.
+     Popup-internal change/input actions use delegateOn() instead (Phase 4).
+  ───────────────────────────────────────────────────────────────────────── */
+  function dispatchAction(e) {
+    var el = e.target.closest('[data-action]');
+    if (el) {
+      var action = el.dataset.action;
+      var fn = _dlvActions[action];
+      if (fn) { fn(el, e); }
+    }
+  }
+  document.body.addEventListener('click',  dispatchAction);
+  document.body.addEventListener('change', dispatchAction);
+  document.body.addEventListener('input',  dispatchAction);
 
 
   /* =========================================================================
