@@ -985,7 +985,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
     <div class="qb-node-header">
       <span class="qb-node-join-icon" title="Drag to another table to create a join">⚯</span>
       <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin:0 4px">${nd.alias || nd.tableName}${(DataLaVistaState.advancedQB.nodeAliases?.[id] && DataLaVistaState.advancedQB.nodeAliases[id] !== (nd.alias || nd.tableName)) ? ` <span style="opacity:.6;font-size:11px">(${DataLaVistaState.advancedQB.nodeAliases[id]})</span>` : ''}</span>
-      <button style="background:none;border:none;color:rgba(255,255,255,.7);cursor:pointer;padding:0 2px;font-size:13px;line-height:1" onclick="removeAdvNode('${id}')">✕</button>
+      <button style="background:none;border:none;color:rgba(255,255,255,.7);cursor:pointer;padding:0 2px;font-size:13px;line-height:1" data-action="qb-remove-node" data-node-id="${id}">✕</button>
     </div>
     <div class="qb-node-body">
       ${descHTML}
@@ -1261,18 +1261,30 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
             const _cfJs = childField.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
             const _nidJs = nodeId.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
             html += '<span class="qb-node-pill agg-pill rollup-agg-pill"'
-              + ' data-parent-alias="' + parentAlias + '" data-child-field="' + childField + '"'
-              + ' draggable="true"'
-              + ' ondragstart="event.stopPropagation();safeDragSet(event,{type:\'adv-rollup-pill\',nodeId:\'' + _nidJs + '\',parentAlias:\'' + _paJs + '\',childField:\'' + _cfJs + '\'})">'
+              + ' data-drag-role="adv-rollup-pill"'
+              + ' data-node-id="' + nodeId + '"'
+              + ' data-parent-alias="' + parentAlias + '"'
+              + ' data-child-field="' + childField + '">'
               + alias + ' (' + getAggIcon(agg) + ')'
               + '<span class="rollup-pill-x" style="cursor:pointer"'
-              + ' onclick="event.stopPropagation();_toggleLookupChild(\'' + _nidJs + '\',\'' + _paJs + '\',\'' + _cfJs + '\',false)"'
+              + ' data-action="qb-toggle-lookup-child-off"'
+              + ' data-node-id="' + nodeId + '"'
+              + ' data-parent-alias="' + parentAlias + '"'
+              + ' data-child-field="' + childField + '"'
               + '>×</span>'
               + '</span>';
           }
         }
 
         pillsEl.innerHTML = html;
+
+        pillsEl.querySelectorAll('[data-drag-role="adv-rollup-pill"]').forEach(function(pill) {
+          var nid = pill.dataset.nodeId;
+          var pa  = pill.dataset.parentAlias;
+          var cf  = pill.dataset.childField;
+          pill.setAttribute('draggable', 'true');
+          pill.addEventListener('dragstart', function(e) { e.stopPropagation(); safeDragSet(e, {type:'adv-rollup-pill', nodeId:nid, parentAlias:pa, childField:cf}); });
+        });
 
         pillsEl.querySelectorAll('.qb-node-pill[data-field]').forEach(pill => {
           pill.addEventListener('dragstart', e => {
@@ -1527,8 +1539,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         }
         const _fieldRowHTML = (f, indent) => {
           const sel = nd.selectedFields.includes(f.alias);
-          return '<div class="basic-field-row' + (indent ? ' basic-field-synthetic' : '') + '" style="' + (indent ? 'padding-left:18px;border-left:2px solid var(--border);margin-left:8px' : '') + '" onclick="toggleAdvFieldInProps(\'' + nodeId + '\',\'' + f.alias + '\',this)">'
-            + '<input type="checkbox" ' + (sel ? 'checked' : '') + ' onclick="event.stopPropagation();" onchange="toggleAdvFieldInProps(\'' + nodeId + '\',\'' + f.alias + '\',this.closest(\'.basic-field-row\'))"/>'
+          return '<div class="basic-field-row' + (indent ? ' basic-field-synthetic' : '') + '" style="' + (indent ? 'padding-left:18px;border-left:2px solid var(--border);margin-left:8px' : '') + '" data-action="qb-toggle-field" data-node-id="' + nodeId + '" data-field="' + f.alias + '">'
+            + '<input type="checkbox" ' + (sel ? 'checked' : '') + '/>'
             + '<label>' + f.alias + '</label>'
             + '</div>';
         };
@@ -1540,7 +1552,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         body.innerHTML = `
     <div class="form-group">
       <label>Alias</label>
-      <input type="text" class="form-input" style="height:28px" value="${nd.alias}" oninput="DataLaVistaState.advancedQB.nodes['${nodeId}'].alias=this.value; if(DataLaVistaState.advancedQB.nodeAliases?.['${nodeId}']!==undefined) DataLaVistaState.advancedQB.nodeAliases['${nodeId}']=this.value; rebuildAdvancedSQL()"/>
+      <input type="text" class="form-input" style="height:28px" value="${nd.alias}" data-action="qb-set-alias" data-node-id="${nodeId}"/>
     </div>
     <div>
       <div style="font-size:11px;font-weight:700;color:var(--text-disabled);text-transform:uppercase;margin-bottom:4px">Fields — click to toggle</div>
@@ -1575,7 +1587,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
               <div class="adv-node-section-hdr">ROW COUNT (LIMIT)</div>
               <input type="number" class="form-input" style="height:28px;width:100%"
                 min="1" max="100000" value="${DataLaVistaState.advancedQB.rowLimit || 500}"
-                oninput="DataLaVistaState.advancedQB.rowLimit=parseInt(this.value)||500; rebuildAdvancedSQL()"/>
+                data-action="qb-set-row-limit"/>
               <div style="font-size:11px;color:var(--text-disabled);margin-top:4px">Applies LIMIT to the full query.</div>
             </div>`;
           return;
@@ -1640,19 +1652,26 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           const leftAlias  = displaySwapped ? toAlias   : fromAlias;
           const rightAlias = displaySwapped ? fromAlias : toAlias;
 
-          const keyPairRows = j.keys.map((kp, ki) => `
-            <div class="adv-join-key-row" style="display:grid;grid-template-columns:1fr auto 1fr auto;gap:4px;align-items:center;margin-bottom:4px">
-              <select class="form-input" style="height:26px" onchange="setActiveJoinKeyProp(${ki},'${displaySwapped ? 'toKey' : 'fromKey'}',this.value)">
-                ${displaySwapped ? makeToOpts(kp.toKey) : makeFromOpts(kp.fromKey)}
-              </select>
-              <span style="font-size:13px;color:var(--text-disabled);padding:0 2px">=</span>
-              <select class="form-input" style="height:26px" onchange="setActiveJoinKeyProp(${ki},'${displaySwapped ? 'fromKey' : 'toKey'}',this.value)">
-                ${displaySwapped ? makeFromOpts(kp.fromKey) : makeToOpts(kp.toKey)}
-              </select>
-              <button class="btn btn-sm" style="padding:0 5px;height:26px;min-width:24px;background:transparent;color:var(--text-disabled);font-size:14px;line-height:1"
-                title="Remove this key pair" ${j.keys.length <= 1 ? 'disabled style="opacity:.3;padding:0 5px;height:26px;min-width:24px"' : ''}
-                onclick="removeActiveJoinKey(${ki})">✕</button>
-            </div>`).join('');
+          const keyPairRows = j.keys.map(function(kp, ki) {
+            var _fromKey  = displaySwapped ? 'toKey'   : 'fromKey';
+            var _toKey    = displaySwapped ? 'fromKey' : 'toKey';
+            var _fromCb   = _dlvRegPopupCb(function(val) { setActiveJoinKeyProp(ki, _fromKey, val); });
+            var _toCb     = _dlvRegPopupCb(function(val) { setActiveJoinKeyProp(ki, _toKey,   val); });
+            var _removeCb = _dlvRegPopupCb(function()    { removeActiveJoinKey(ki); });
+            var _fromOpts = displaySwapped ? makeToOpts(kp.toKey)     : makeFromOpts(kp.fromKey);
+            var _toOpts   = displaySwapped ? makeFromOpts(kp.fromKey) : makeToOpts(kp.toKey);
+            var _btnStyle = j.keys.length <= 1
+              ? 'padding:0 5px;height:26px;min-width:24px;background:transparent;color:var(--text-disabled);font-size:14px;line-height:1;opacity:.3'
+              : 'padding:0 5px;height:26px;min-width:24px;background:transparent;color:var(--text-disabled);font-size:14px;line-height:1';
+            var _btnDisabled = j.keys.length <= 1 ? ' disabled' : '';
+            return '<div class="adv-join-key-row" style="display:grid;grid-template-columns:1fr auto 1fr auto;gap:4px;align-items:center;margin-bottom:4px">'
+              + '<select class="form-input" style="height:26px" data-action="dlv-cb" data-cb="' + _fromCb + '">' + _fromOpts + '</select>'
+              + '<span style="font-size:13px;color:var(--text-disabled);padding:0 2px">=</span>'
+              + '<select class="form-input" style="height:26px" data-action="dlv-cb" data-cb="' + _toCb + '">' + _toOpts + '</select>'
+              + '<button class="btn btn-sm" style="' + _btnStyle + '" title="Remove this key pair"' + _btnDisabled
+              + ' data-action="dlv-cb" data-cb="' + _removeCb + '">✕</button>'
+              + '</div>';
+          }).join('');
 
           setTitle('Join Options');
           var _keysConjCbKey = _dlvRegPopupCb(function(val) { setActiveJoinProp('keysConj', val); });
@@ -1667,12 +1686,12 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
               data-opts="${_attrEnc(JSON.stringify([{val:'AND',label:'AND'},{val:'OR',label:'OR'}]))}"
               data-cur="${_attrEnc(j.keysConj || 'AND')}"
               data-cb="${_keysConjCbKey}"
-              onclick="showPropPopup(this)">${j.keysConj || 'AND'}</span>`}
+              data-action="show-prop-popup">${j.keysConj || 'AND'}</span>`}
           </div>
             <div id="adv-join-key-pairs">
               ${keyPairRows}
             </div>
-            ${isLookupJoin ? '' : `<button class="btn btn-sm" style="width:100%;margin-bottom:10px;font-size:12px" onclick="addActiveJoinKey()">+ Add Key Pair</button>`}
+            ${isLookupJoin ? '' : `<button class="btn btn-sm" style="width:100%;margin-bottom:10px;font-size:12px" data-action="qb-add-join-key">+ Add Key Pair</button>`}
             <div class="form-group" style="margin-top:4px">
               <label>Join Type</label>
               <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
@@ -1680,7 +1699,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
                   data-opts="${_attrEnc(JSON.stringify(JOIN_TYPES.map(jt => ({ val: jt.val, label: jt.label }))))}"
                   data-cur="${_attrEnc(j.type)}"
                   data-cb="${_joinTypeCbKey}"
-                  onclick="showPropPopup(this)">${_attrEnc(JOIN_TYPES.find(jt => jt.val === j.type)?.label || j.type)}</span>
+                  data-action="show-prop-popup">${_attrEnc(JOIN_TYPES.find(jt => jt.val === j.type)?.label || j.type)}</span>
                 <span style="font-size:11px;color:var(--text-disabled)">${JOIN_TYPES.find(jt => jt.val === j.type)?.desc || ''}</span>
               </div>
             </div>
@@ -1688,7 +1707,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
               <div id="adv-join-venn">${getVennSVG(j.type, 72)}</div>
               <div style="font-size:11px;color:var(--text-disabled)">${JOIN_TYPES.find(jt=>jt.val===j.type)?.label||j.type}</div>
             </div>
-            <button class="btn btn-danger btn-sm" style="margin-top:8px;width:100%" onclick="removeActiveJoin()">✕ Remove Join</button>`;
+            <button class="btn btn-danger btn-sm" style="margin-top:8px;width:100%" data-action="qb-remove-join">✕ Remove Join</button>`;
           return;
         }
 
@@ -1713,11 +1732,12 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 
           // ── PRIMARY TABLE checkbox ───────────────────────────────
           const isPrimary = DataLaVistaState.advancedQB.primaryNodeId === id;
+          var _primaryCbKey = _dlvRegPopupCb(function(checked) { setPrimaryAdvNode(id, checked); });
           const primaryHTML = `
             <div class="adv-node-section">
               <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
                 <input type="checkbox" ${isPrimary ? 'checked' : ''}
-                  onchange="setPrimaryAdvNode('${id}', this.checked)"/>
+                  data-action="dlv-cb" data-cb="${_primaryCbKey}"/>
                 <span style="font-size:12px;font-weight:600">Primary Table</span>
               </label>
               <div style="font-size:11px;color:var(--text-disabled);margin-top:2px">Aggregates on this table are the outer grouping level.</div>
@@ -1754,20 +1774,20 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
             const aggBtn = hasObjChildren
               ? '<button class="adv-agg-btn' + (activeChildEntries.length ? ' has-agg' : '') + '" disabled title="' + childAggTitle + '">' + childAggSummary + '</button>'
               : '<button class="' + aggBtnCls + '" title="' + aggLabel + '"'
-                + ' onclick="event.stopPropagation();showAdvAggPopup(\'' + id + '\',\'' + f.alias + '\',this)">'
+                + ' data-action="qb-show-agg-popup" data-node-id="' + id + '" data-field="' + f.alias + '">'
                 + aggBtnContent + '</button>';
             const expandBtnCls = 'adv-expand-btn' + (expanded ? ' expanded' : '');
             const expandBtn = isExpandable
               ? '<button class="' + expandBtnCls + '" title="' + (expanded ? 'Collapse' : 'Expand') + '"'
-                + ' onclick="event.stopPropagation();_toggleLookupExpand(\'' + id + '\',\'' + f.alias + '\')">'
+                + ' data-action="qb-toggle-lookup-expand" data-node-id="' + id + '" data-field="' + f.alias + '">'
                 + (expanded ? '▼' : '▶') + '</button>'
               : '';
             const childRows = expanded
               ? (expandable ? _renderChildFieldRows(id, nd, f) : _renderDateChildRows(id, nd, f, t))
               : '';
             return `<div class="adv-field-row${sel ? ' selected' : ''}"
-                onclick="advNodeToggleField('${id}','${f.alias}')" draggable="true"
-                ondragstart="event.stopPropagation();safeDragSet(event,{type:'adv-field-pill',nodeId:'${id}',field:'${f.alias}'})">
+                data-action="qb-toggle-field" data-node-id="${id}" data-field="${f.alias}"
+                data-drag-role="adv-field-pill">
               <input type="checkbox" ${sel ? 'checked' : ''}/>
               <span class="field-type-icon ${ti.cls}">${ti.icon}</span>
               <span class="field-name">${f.userAlias || f.alias}</span>
@@ -1781,10 +1801,10 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
             if (fields.length > FIELDS_COLLAPSED_COUNT) {
               if (_advOptsFieldsExpanded) {
                 html += `<button class="btn btn-ghost btn-sm" style="width:100%;margin-top:4px;font-size:10px"
-                  onclick="_advShowLessFields('${id}')">▲ Show less</button>`;
+                  data-action="qb-show-less-fields" data-node-id="${id}">▲ Show less</button>`;
               } else {
                 html += `<button class="btn btn-ghost btn-sm" style="width:100%;margin-top:4px;font-size:10px"
-                  onclick="_advShowMoreFields('${id}')">▼ Show ${extra} more</button>`;
+                  data-action="qb-show-more-fields" data-node-id="${id}">▼ Show ${extra} more</button>`;
               }
             }
             return html;
@@ -1800,38 +1820,40 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           const renderNodeConditions = () => renderConditionRows(
             nd.conditions, condCols,
             function(ci, val) { advNodeCond(id, ci, 'conj', val); },
-            (ci, v) => `advNodeCond('${id}',${ci},'field',${v})`,
+            function(ci, val) { advNodeCond(id, ci, 'field', val); },
             function(ci, val) { advNodeCond(id, ci, 'op', val); },
-            (ci, v) => `advNodeCondValOnly('${id}',${ci},${v})`,
-            (ci)    => `advNodeRemoveCond('${id}',${ci})`,
-            (ci)    => `draggable="true" ondragstart="event.stopPropagation();safeDragSet(event,{type:'adv-node-cond',nodeId:'${id}',idx:${ci}})"`,
-            (ci, v) => `advNodeCondVal2Only('${id}',${ci},${v})`,
-            (ci, v) => `advNodeCond('${id}',${ci},'elementKey',${v})`
+            function(ci, val) { advNodeCondValOnly(id, ci, val); },
+            function(ci)      { advNodeRemoveCond(id, ci); },
+            function(ci)      { return 'draggable="true" data-drag-role="adv-node-cond" data-node-id="' + id + '" data-idx="' + ci + '"'; },
+            function(ci, val) { advNodeCondVal2Only(id, ci, val); },
+            function(ci, val) { advNodeCond(id, ci, 'elementKey', val); }
           );
 
           // ── SORT section ────────────────────────────────────────
           const sortCols = fields.map(f => f.alias);
           const renderNodeSorts = () => renderSortRows(
             nd.sorts, sortCols,
-            (si, v) => `advNodeSort('${id}',${si},'field',${v})`,
+            function(si, val) { advNodeSort(id, si, 'field', val); },
             function(si, val) { advNodeSort(id, si, 'dir', val); },
-            (si)    => `advNodeRemoveSort('${id}',${si})`,
-            (si)    => `draggable="true" ondragstart="event.stopPropagation();safeDragSet(event,{type:'adv-node-sort',nodeId:'${id}',idx:${si}})"`
+            function(si)      { advNodeRemoveSort(id, si); },
+            function(si)      { return 'draggable="true" data-drag-role="adv-node-sort" data-node-id="' + id + '" data-idx="' + si + '"'; }
           );
 
           // ── GROUP BY section ────────────────────────────────────
           const renderNodeGroupBy = () => {
             if (!nd.groupBy.length)
               return '<div style="font-size:11px;color:var(--text-disabled);padding:2px 0">No grouping — click + Add</div>';
-            return nd.groupBy.map((g, gi) => {
+            return nd.groupBy.map(function(g, gi) {
               const gField = _gbField(g);
-              return `<div class="qb-sort-row" draggable="true"
-                  ondragstart="event.stopPropagation();safeDragSet(event,{type:'adv-node-gb',nodeId:'${id}',idx:${gi}})">
-                <select class="form-input qb-field-select" onchange="advNodeGB('${id}',${gi},this.value)">
-                  ${fields.map(f=>'<option value="' + f.alias + '"' + (f.alias===gField?' selected':'') + '>' + f.alias + '</option>').join('')}
-                </select>
-                <button class="btn btn-ghost btn-sm btn-icon" onclick="advNodeRemoveGB('${id}',${gi})">✕</button>
-              </div>`;
+              var _gbCbKey     = _dlvRegPopupCb(function(val) { advNodeGB(id, gi, val); });
+              var _gbRemoveCbKey = _dlvRegPopupCb(function()  { advNodeRemoveGB(id, gi); });
+              var _colOpts = fields.map(function(f) {
+                return '<option value="' + f.alias + '"' + (f.alias === gField ? ' selected' : '') + '>' + f.alias + '</option>';
+              }).join('');
+              return '<div class="qb-sort-row" draggable="true" data-drag-role="adv-node-gb" data-node-id="' + id + '" data-idx="' + gi + '">'
+                + '<select class="form-input qb-field-select" data-action="dlv-cb" data-cb="' + _gbCbKey + '">' + _colOpts + '</select>'
+                + '<button class="btn btn-ghost btn-sm btn-icon" data-action="dlv-cb" data-cb="' + _gbRemoveCbKey + '">✕</button>'
+                + '</div>';
             }).join('');
           };
 
@@ -1897,8 +1919,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
             <div class="adv-node-section">
               <div class="adv-node-section-hdr"><span>FIELDS</span>
                 <div style="display:flex;gap:4px">
-                  <button class="btn btn-ghost btn-sm" onclick="advNodeClearFields('${id}')">- Clear all</button>
-                  <button class="btn btn-ghost btn-sm" onclick="advNodeAddAllFields('${id}')">+ Add all</button>
+                  <button class="btn btn-ghost btn-sm" data-action="qb-clear-fields" data-node-id="${id}">- Clear all</button>
+                  <button class="btn btn-ghost btn-sm" data-action="qb-add-all-fields" data-node-id="${id}">+ Add all</button>
                 </div>
               </div>
               <div id="adv-node-fields">${renderFieldsSection()}</div>
@@ -1906,24 +1928,43 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
             <div class="adv-node-section">
               <div class="adv-node-section-hdr">
                 <span>FILTER CONDITIONS</span>
-                <button class="btn btn-ghost btn-sm" onclick="advNodeAddCond('${id}')">+ Add</button>
+                <button class="btn btn-ghost btn-sm" data-action="qb-add-cond" data-node-id="${id}">+ Add</button>
               </div>
               <div id="adv-node-conds" class="adv-drop-zone">${renderNodeConditions()}</div>
             </div>
             <div class="adv-node-section">
               <div class="adv-node-section-hdr">
                 <span>SORT ORDER</span>
-                <button class="btn btn-ghost btn-sm" onclick="advNodeAddSort('${id}')">+ Add</button>
+                <button class="btn btn-ghost btn-sm" data-action="qb-add-sort" data-node-id="${id}">+ Add</button>
               </div>
               <div id="adv-node-sorts" class="adv-drop-zone">${renderNodeSorts()}</div>
             </div>
             <div class="adv-node-section">
               <div class="adv-node-section-hdr">
                 <span>${gbLocked ? 'GROUP BY (auto)' : 'GROUP BY'}</span>
-                ${gbLocked ? '' : `<button class="btn btn-ghost btn-sm" onclick="advNodeAddGB('${id}')">+ Add</button>`}
+                ${gbLocked ? '' : `<button class="btn btn-ghost btn-sm" data-action="qb-add-gb" data-node-id="${id}">+ Add</button>`}
               </div>
               <div id="adv-node-groupby" class="adv-drop-zone">${gbLocked ? gbAutoHTML : renderNodeGroupBy()}</div>
             </div>`;
+
+          // Post-process drag roles in the options panel
+          body.querySelectorAll('[data-drag-role="adv-field-pill"]').forEach(function(row) {
+            var nid = row.dataset.nodeId; var fld = row.dataset.field;
+            row.setAttribute('draggable', 'true');
+            row.addEventListener('dragstart', function(e) { e.stopPropagation(); safeDragSet(e, {type:'adv-field-pill', nodeId:nid, field:fld}); });
+          });
+          body.querySelectorAll('[data-drag-role="adv-node-cond"]').forEach(function(row) {
+            var nid = row.dataset.nodeId; var idx = +row.dataset.idx;
+            row.addEventListener('dragstart', function(e) { e.stopPropagation(); safeDragSet(e, {type:'adv-node-cond', nodeId:nid, idx:idx}); });
+          });
+          body.querySelectorAll('[data-drag-role="adv-node-sort"]').forEach(function(row) {
+            var nid = row.dataset.nodeId; var idx = +row.dataset.idx;
+            row.addEventListener('dragstart', function(e) { e.stopPropagation(); safeDragSet(e, {type:'adv-node-sort', nodeId:nid, idx:idx}); });
+          });
+          body.querySelectorAll('[data-drag-role="adv-node-gb"]').forEach(function(row) {
+            var nid = row.dataset.nodeId; var idx = +row.dataset.idx;
+            row.addEventListener('dragstart', function(e) { e.stopPropagation(); safeDragSet(e, {type:'adv-node-gb', nodeId:nid, idx:idx}); });
+          });
 
           // Wire drop zones to accept field pills / field rows dropped onto them
           const condZone  = body.querySelector('#adv-node-conds');
@@ -2471,13 +2512,13 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           const aggTitle = aggActive ? agg : 'No aggregate';
           const aggContent = aggActive ? getAggIcon(agg) : '∑';
           const aggBtn = '<button class="' + aggCls + '" title="' + aggTitle + '"'
-            + ' onclick="event.stopPropagation();showAdvAggPopup(\'' + nodeId + '\',\'' + cf.alias + '\',this)">'
+            + ' data-action="qb-show-agg-popup" data-node-id="' + nodeId + '" data-field="' + cf.alias + '">'
             + aggContent + '</button>';
           const rowCls = 'adv-field-row adv-child-field-row' + (sel ? ' selected' : '');
           return '<div class="' + rowCls + '" style="padding-left:22px"'
-            + ' onclick="advNodeToggleField(\'' + nodeId + '\',\'' + cf.alias + '\')" draggable="true"'
-            + ' ondragstart="event.stopPropagation();safeDragSet(event,{type:\'adv-field-pill\',nodeId:\'' + nodeId + '\',field:\'' + cf.alias + '\'})">'
-            + '<input type="checkbox" ' + (sel ? 'checked' : '') + ' onclick="event.stopPropagation();" onchange="advNodeToggleField(\'' + nodeId + '\',\'' + cf.alias + '\')"/>'
+            + ' data-action="qb-toggle-field" data-node-id="' + nodeId + '" data-field="' + cf.alias + '"'
+            + ' data-drag-role="adv-field-pill">'
+            + '<input type="checkbox" ' + (sel ? 'checked' : '') + '/>'
             + '<span class="field-type-icon ' + ti.cls + '">' + ti.icon + '</span>'
             + '<span class="field-name" style="font-size:11px">' + (cf.userAlias || cf.alias) + '</span>'
             + aggBtn
@@ -2681,43 +2722,44 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         const childFields = _getChildFieldsForLookup(parentField, nd.tableName);
         if (!childFields.length) return '<div class="adv-child-fields"><span style="font-size:10px;color:var(--text-disabled)">No child fields found</span></div>';
         const entries = nd.lookupAggFields?.[parentField.alias] || [];
-        const rows = childFields.map(cf => {
+        const rows = childFields.map(function(cf) {
           const ti = DataLaVistaCore.FIELD_TYPE_ICONS[cf.displayType] || DataLaVistaCore.FIELD_TYPE_ICONS.default;
           if (cf._isRemoteRollup) {
             const entry = entries.find(x => x.field === cf.alias);
             const checked = !!entry;
-            const currentAgg = entry?.agg || 'COUNT_DISTINCT';
+            const currentAgg = entry ? entry.agg : 'COUNT_DISTINCT';
             const aggs = _childAggsForType(cf.displayType);
             const aggOptions = aggs.map(a =>
               '<option value="' + a.val + '"' + (currentAgg === a.val ? ' selected' : '') + '>' + a.label + '</option>'
             ).join('');
+            var _toggleCbKey = _dlvRegPopupCb(function(val) { _toggleLookupChild(nodeId, parentField.alias, cf.alias, val); });
+            var _aggCbKey    = _dlvRegPopupCb(function(val) { _setLookupChildAgg(nodeId, parentField.alias, cf.alias, val); });
             return '<div class="adv-field-row adv-child-field-row' + (checked ? ' selected' : '') + '" style="padding-left:22px">'
               + '<input type="checkbox" ' + (checked ? 'checked' : '')
-              + ' onclick="event.stopPropagation();_toggleLookupChild(\'' + nodeId + '\',\'' + parentField.alias + '\',\'' + cf.alias + '\',this.checked)"/>'
+              + ' data-action="dlv-cb" data-cb="' + _toggleCbKey + '"/>'
               + '<span class="field-type-icon ' + ti.cls + '">' + ti.icon + '</span>'
               + '<span class="field-name" style="font-size:11px">' + (parentField.userAlias || parentField.alias) + ' \u2192 ' + (cf.userAlias || cf.alias) + '</span>'
               + '<select class="form-input" style="height:22px;font-size:10px;padding:0 2px;min-width:0;width:auto"'
               + (checked ? '' : ' disabled')
-              + ' onchange="_setLookupChildAgg(\'' + nodeId + '\',\'' + parentField.alias + '\',\'' + cf.alias + '\',this.value)"'
-              + ' onclick="event.stopPropagation()">' + aggOptions + '</select>'
+              + ' data-action="dlv-cb" data-cb="' + _aggCbKey + '">' + aggOptions + '</select>'
               + '</div>';
           }
           if (cf._isRemoteJoin) {
-            const dirEntries = nd.lookupDirectFields?.[parentField.alias] || [];
+            const dirEntries = (nd.lookupDirectFields && nd.lookupDirectFields[parentField.alias]) ? nd.lookupDirectFields[parentField.alias] : [];
             const dirChecked = dirEntries.some(e => e.field === cf.alias);
+            var _dirToggleCbKey = _dlvRegPopupCb(function(val) { _toggleLookupDirectField(nodeId, parentField.alias, cf.alias, cf._relParentKey || '', val); });
             return '<div class="adv-field-row adv-child-field-row' + (dirChecked ? ' selected' : '') + '" style="padding-left:22px">'
               + '<input type="checkbox" ' + (dirChecked ? 'checked' : '')
-              + ' onclick="event.stopPropagation();_toggleLookupDirectField(\'' + nodeId + '\',\'' + parentField.alias + '\',\'' + cf.alias + '\',\'' + (cf._relParentKey || '') + '\',this.checked)"/>'
+              + ' data-action="dlv-cb" data-cb="' + _dirToggleCbKey + '"/>'
               + '<span class="field-type-icon ' + ti.cls + '">' + ti.icon + '</span>'
               + '<span class="field-name" style="font-size:11px">' + (cf.userAlias || cf.alias) + '</span>'
               + '</div>';
           }
           const sel = nd.selectedFields.includes(cf.alias);
           return '<div class="adv-field-row adv-child-field-row' + (sel ? ' selected' : '') + '" style="padding-left:22px"'
-            + ' onclick="advNodeToggleField(\'' + nodeId + '\',\'' + cf.alias + '\')" draggable="true"'
-            + ' ondragstart="event.stopPropagation();safeDragSet(event,{type:\'adv-field-pill\',nodeId:\'' + nodeId + '\',field:\'' + cf.alias + '\'})">'
-            + '<input type="checkbox" ' + (sel ? 'checked' : '')
-            + ' onclick="event.stopPropagation();" onchange="advNodeToggleField(\'' + nodeId + '\',\'' + cf.alias + '\')">'
+            + ' data-action="qb-toggle-field" data-node-id="' + nodeId + '" data-field="' + cf.alias + '"'
+            + ' data-drag-role="adv-field-pill">'
+            + '<input type="checkbox" ' + (sel ? 'checked' : '') + '/>'
             + '<span class="field-type-icon ' + ti.cls + '">' + ti.icon + '</span>'
             + '<span class="field-name" style="font-size:11px">' + (cf.userAlias || cf.alias) + '</span>'
             + '</div>';

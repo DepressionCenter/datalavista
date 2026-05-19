@@ -57,7 +57,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
             <span>${this._fileIcon(item.type)}</span>
             <span class="queue-name" title="${item.file.name}">${item.file.name}</span>
             <span class="queue-badge">${item.type.toUpperCase()}</span>
-            <button class="queue-remove" onclick="ConnectQueue.removeUploadedFile(${i})" title="Remove">✕</button>
+            <button class="queue-remove" data-action="queue-remove-upload" data-index="${i}" title="Remove">✕</button>
             ${errMsg}
           </div>`;
         }).join('');
@@ -74,7 +74,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
             <span>${this._fileIcon(item.type)}</span>
             <span class="queue-name" title="${item.url}">${fname}</span>
             <span class="queue-badge">${item.type.toUpperCase()}</span>
-            <button class="queue-remove" onclick="ConnectQueue.removeRemoteUrl(${i})" title="Remove">✕</button>
+            <button class="queue-remove" data-action="queue-remove-remote-url" data-index="${i}" title="Remove">✕</button>
             ${errMsg}
           </div>`;
         }).join('');

@@ -291,16 +291,13 @@ function rankSuggestions(rules, cols, meta) {
       '  <div class="adv-node-section-hdr">DASHBOARD TITLE</div>',
       '  <div class="props-row">',
       '    <label>Show title bar</label>',
-      '    <input type="checkbox" ' + (show ? 'checked' : '') + ' onchange="updateDashboardTitleProp(\'showDashboardTitle\',this.checked)"/>',
+      '    <input type="checkbox" ' + (show ? 'checked' : '') + ' data-action="dash-show-title"/>',
       '  </div>',
       '  <div class="props-row" style="flex-direction:column;align-items:flex-start;gap:4px">',
       '    <label>Title</label>',
-      '    <input class="form-input" style="width:100%" value="' + titleTpl + '"',
+      '    <input class="form-input dlv-title-prop-input" style="width:100%" value="' + titleTpl + '"',
       '      placeholder="DataLaVista Report"',
-      '      ondragover="event.preventDefault()"',
-      '      ondrop="insertTitleToken(event)"',
-      '      oninput="DataLaVistaState.design.title=this.value"',
-      '      onblur="updateDashboardTitleProp(\'title\',this.value)">',
+      '      data-action="dash-title-input">',
       '    <div style="font-size:10px;color:var(--text-secondary)">Drop a field to embed <code>{{FIRST(Field)}}</code>. Supports any aggregate: <code>{{SUM(Field)}}</code>, <code>{{COUNT(Field)}}</code>, etc.</div>',
       (DataLaVistaState.design.title && DataLaVistaState.design.title.includes('{{'))
         ? '    <div style="font-size:10px;color:var(--accent)">→ ' + resolveTitleTemplate(DataLaVistaState.design.title) + '</div>'
@@ -314,14 +311,14 @@ function rankSuggestions(rules, cols, meta) {
       '    <label style="margin-bottom:4px">Tooltip HTML</label>',
       '    <textarea class="form-input" rows="5" style="width:100%;font-size:11px;font-family:monospace"',
       '      placeholder="<b>About this dashboard:</b><br>..."',
-      '      onblur="updateDashboardTitleProp(\'dashboardTitleTooltip\',this.value)">' + (DataLaVistaState.design.dashboardTitleTooltip || '').replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</textarea>',
+      '      data-action="dash-tooltip-change">' + (DataLaVistaState.design.dashboardTitleTooltip || '').replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</textarea>',
       '  </div>',
       '</div>',
       '<div class="adv-node-section">',
       '  <div class="adv-node-section-hdr">REPORT SETTINGS</div>',
       '  <div class="props-row">',
       '    <label>Chart interaction</label>',
-      '    <select class="form-input" style="width:140px" onchange="updateDashboardTitleProp(\'interactionMode\',this.value)">',
+      '    <select class="form-input" style="width:140px" data-action="dash-interaction">',
       '      <option value="cross-filter"    ' + (intMode==='cross-filter'    ? 'selected' : '') + '>Cross-filter</option>',
       '      <option value="cross-highlight" ' + (intMode==='cross-highlight' ? 'selected' : '') + '>Cross-highlight</option>',
       '      <option value="none"            ' + (intMode==='none'            ? 'selected' : '') + '>None</option>',
@@ -330,15 +327,22 @@ function rankSuggestions(rules, cols, meta) {
       '  <div class="props-row">',
       '    <label>Canvas background</label>',
       '    <input type="color" value="' + (bgColor || '#f5f5f5') + '" style="width:36px;height:24px;padding:1px;border:1px solid #ccc;border-radius:3px;cursor:pointer"',
-      '      onchange="updateDashboardTitleProp(\'themeBackgroundColor\',this.value)">',
+      '      data-action="dash-bg-color">',
       '  </div>',
       '  <div class="props-row">',
       '    <label>Font family</label>',
       '    <input class="form-input" style="width:160px" value="' + fontFam.replace(/"/g,'&quot;') + '" placeholder="e.g. Segoe UI, sans-serif"',
-      '      onblur="updateDashboardTitleProp(\'themeFontFamily\',this.value)">',
+      '      data-action="dash-font-family">',
       '  </div>',
       '</div>'
     ].join('\n');
+
+    // Post-process: wire drag/drop on the title prop input (can't do via delegation)
+    var _titlePropEl = section.querySelector('.dlv-title-prop-input');
+    if (_titlePropEl) {
+      _titlePropEl.addEventListener('dragover', function(e) { e.preventDefault(); });
+      _titlePropEl.addEventListener('drop', function(e) { insertTitleToken(e); });
+    }
 
     document.querySelectorAll('.widget').forEach(w => w.classList.remove('selected'));
     DataLaVistaState.currentWidgetId = null;
@@ -822,9 +826,9 @@ function rankSuggestions(rules, cols, meta) {
         el.style.cssText = 'width:' + widthValue + ';' + heightStyle + _minHtEl + ';border-color:' + w.borderColor + ';border-width:' + w.borderSize + 'px;background:' + (w.widgetBackgroundColor || 'transparent') + _ovfEl;
 
         const actions = '<div class="widget-actions">'
-          + '<button class="btn btn-ghost btn-icon btn-sm" onclick="moveWidget(\'' + w.id + '\', -1)" title="Move left">\u2190</button>'
-          + '<button class="btn btn-ghost btn-icon btn-sm" onclick="moveWidget(\'' + w.id + '\', 1)" title="Move right">\u2192</button>'
-          + '<button class="btn btn-danger btn-icon btn-sm" onclick="deleteWidget(\'' + w.id + '\')" title="Delete">\u2715</button>'
+          + '<button class="btn btn-ghost btn-icon btn-sm" data-action="widget-move" data-wid="' + w.id + '" data-dir="-1" title="Move left">\u2190</button>'
+          + '<button class="btn btn-ghost btn-icon btn-sm" data-action="widget-move" data-wid="' + w.id + '" data-dir="1" title="Move right">\u2192</button>'
+          + '<button class="btn btn-danger btn-icon btn-sm" data-action="widget-delete" data-wid="' + w.id + '" title="Delete">\u2715</button>'
           + '</div>';
 
         const titleHdrStyle  = 'background:' + (w.titleBackgroundColor || '#fefefe');
@@ -1249,11 +1253,11 @@ function rankSuggestions(rules, cols, meta) {
             var _cellStr = String(_cellRaw);
             var _cellEsc = _cellStr.replace(/'/g, "\\'").replace(/"/g, '&quot;');
             var _colEsc  = _col.replace(/'/g, "\\'");
-            var _cellFn = _tblMode === 'cross-highlight'
-              ? '_applyDrillHighlight(\'' + _colEsc + '\',\'' + _cellEsc + '\')'
-              : 'applyDrillFilter(\'' + _colEsc + '\',\'' + _cellEsc + '\')';
             var _cellAction = _tblMode === 'cross-highlight' ? 'highlight' : 'filter';
-            html += '<td style="cursor:pointer" title="Click to ' + _cellAction + ' by ' + _col + '" onclick="' + _cellFn + '">' + _cellStr + '</td>';
+            html += '<td style="cursor:pointer" title="Click to ' + _cellAction + ' by ' + _col + '"'
+              + ' data-action="table-cell-click" data-mode="' + _tblMode + '"'
+              + ' data-field="' + _attrEnc(_col) + '" data-value="' + _attrEnc(String(_cellRaw)) + '">'
+              + _cellStr + '</td>';
           }
           html += '</tr>';
         }
@@ -1867,7 +1871,6 @@ function _buildChartOption(w, rows) {
           _widgetRefresh(wid);
         };
         _fa.close = () => { const ov = document.getElementById('_wfa-overlay'); if (ov) ov.remove(); };
-        /** @type {any} */ (window)._wfa = _fa;
 
         const overlay = document.createElement('div');
         overlay.id = '_wfa-overlay';
@@ -1876,27 +1879,65 @@ function _buildChartOption(w, rows) {
 
         const dialog = document.createElement('div');
         dialog.style.cssText = 'background:var(--surface);border-radius:var(--radius-lg);box-shadow:var(--shadow-lg);width:320px;max-width:calc(100vw - 40px);overflow-y:auto;animation:popIn 200ms ease';
-        dialog.innerHTML = `
-          <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--border)">
-            <span style="font-weight:600;font-size:13px">${esc(fieldName)} — Field Properties</span>
-            <button class="btn btn-ghost btn-sm btn-icon" onclick="_wfa.close()">✕</button>
-          </div>
-          <div style="padding:12px 16px">
-            <div class="adv-node-section-hdr">GENERAL</div>
-            <div class="props-row"><label>Display label</label>
-              <input type="text" class="form-input" id="_wfa-label" value="${esc(local.label)}"
-                placeholder="${esc(fieldName)}" oninput="_wfa.prop('label',this.value)"/></div>
-            <div class="adv-node-section-hdr" style="margin-top:10px">APPEARANCE</div>
-            <div class="props-row"><label>Color</label>
-              <div class="color-input-wrap">
-                <input type="color" value="${local.color || '#323130'}" oninput="_wfa.prop('color',this.value);document.getElementById('_wfa-colortxt').value=this.value"/>
-                <input type="text" class="form-input" id="_wfa-colortxt" value="${esc(local.color)}" oninput="_wfa.prop('color',this.value)"/>
-              </div></div>
-            <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px">
-              <button class="btn btn-ghost" onclick="_wfa.close()">Cancel</button>
-              <button class="btn btn-primary" onclick="_wfa.apply()">Apply</button>
-            </div>
-          </div>`;
+
+        // Phase 4-D-1: build dialog with DOM builder + addEventListener (no inline handlers)
+        var _wfaHdr = dlvEl('div', {'style': 'display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--border)'});
+        var _wfaTitle = dlvEl('span', {'style': 'font-weight:600;font-size:13px'});
+        _wfaTitle.textContent = esc(fieldName) + ' — Field Properties';
+        var _wfaCloseBtn = dlvEl('button', {'class': 'btn btn-ghost btn-sm btn-icon'});
+        _wfaCloseBtn.textContent = '✕';
+        _wfaCloseBtn.addEventListener('click', function() { _fa.close(); });
+        _wfaHdr.appendChild(_wfaTitle);
+        _wfaHdr.appendChild(_wfaCloseBtn);
+
+        var _wfaBody = dlvEl('div', {'style': 'padding:12px 16px'});
+
+        var _wfaGenHdr = dlvEl('div', {'class': 'adv-node-section-hdr'});
+        _wfaGenHdr.textContent = 'GENERAL';
+        var _wfaLabelRow = dlvEl('div', {'class': 'props-row'});
+        var _wfaLabelLbl = dlvEl('label');
+        _wfaLabelLbl.textContent = 'Display label';
+        var _wfaLabelInput = dlvEl('input', {'type': 'text', 'class': 'form-input', 'id': '_wfa-label', 'placeholder': esc(fieldName)});
+        _wfaLabelInput.value = local.label;
+        _wfaLabelInput.addEventListener('input', function() { _fa.prop('label', this.value); });
+        _wfaLabelRow.appendChild(_wfaLabelLbl);
+        _wfaLabelRow.appendChild(_wfaLabelInput);
+
+        var _wfaAppHdr = dlvEl('div', {'class': 'adv-node-section-hdr', 'style': 'margin-top:10px'});
+        _wfaAppHdr.textContent = 'APPEARANCE';
+        var _wfaColorRow = dlvEl('div', {'class': 'props-row'});
+        var _wfaColorLbl = dlvEl('label');
+        _wfaColorLbl.textContent = 'Color';
+        var _wfaColorWrap = dlvEl('div', {'class': 'color-input-wrap'});
+        var _wfaColorPicker = dlvEl('input', {'type': 'color'});
+        _wfaColorPicker.value = local.color || '#323130';
+        var _wfaColorTxt = dlvEl('input', {'type': 'text', 'class': 'form-input', 'id': '_wfa-colortxt'});
+        _wfaColorTxt.value = local.color || '';
+        _wfaColorPicker.addEventListener('input', function() { _fa.prop('color', this.value); _wfaColorTxt.value = this.value; });
+        _wfaColorTxt.addEventListener('input', function() { _fa.prop('color', this.value); _wfaColorPicker.value = this.value || '#323130'; });
+        _wfaColorWrap.appendChild(_wfaColorPicker);
+        _wfaColorWrap.appendChild(_wfaColorTxt);
+        _wfaColorRow.appendChild(_wfaColorLbl);
+        _wfaColorRow.appendChild(_wfaColorWrap);
+
+        var _wfaFooter = dlvEl('div', {'style': 'display:flex;justify-content:flex-end;gap:8px;margin-top:14px'});
+        var _wfaCancelBtn = dlvEl('button', {'class': 'btn btn-ghost'});
+        _wfaCancelBtn.textContent = 'Cancel';
+        _wfaCancelBtn.addEventListener('click', function() { _fa.close(); });
+        var _wfaApplyBtn = dlvEl('button', {'class': 'btn btn-primary'});
+        _wfaApplyBtn.textContent = 'Apply';
+        _wfaApplyBtn.addEventListener('click', function() { _fa.apply(); });
+        _wfaFooter.appendChild(_wfaCancelBtn);
+        _wfaFooter.appendChild(_wfaApplyBtn);
+
+        _wfaBody.appendChild(_wfaGenHdr);
+        _wfaBody.appendChild(_wfaLabelRow);
+        _wfaBody.appendChild(_wfaAppHdr);
+        _wfaBody.appendChild(_wfaColorRow);
+        _wfaBody.appendChild(_wfaFooter);
+
+        dialog.appendChild(_wfaHdr);
+        dialog.appendChild(_wfaBody);
 
         overlay.appendChild(dialog);
         document.body.appendChild(overlay);
@@ -1923,22 +1964,19 @@ function _buildChartOption(w, rows) {
             const hasSeriesConds = !!(spEntry.conditions && spEntry.conditions.length);
 
             return '<div class="adv-field-row selected" draggable="true"'
-              + ' ondragstart="_wpDragStart(\'yfield\',\'' + wid + '\',' + yi + ',event)"'
-              + ' ondragover="_wpDragOver(event)"'
-              + ' ondragleave="_wpDragLeave(event)"'
-              + ' ondrop="_wpDrop(\'yfield\',\'' + wid + '\',' + yi + ',event)">'
+              + ' data-drag-role="yfield" data-wid="' + wid + '" data-yi="' + yi + '">'
               + '<span style="cursor:grab;padding:0 4px;color:var(--text-disabled)" title="Drag to reorder">⠿</span>'
               + '<span class="field-type-icon ' + ti.cls + '">' + ti.icon + '</span>'
               + '<select class="form-input" style="flex:1;height:22px;font-size:11px"'
-              + ' onchange="widgetUpdateYField(\'' + wid + '\',' + yi + ',this.value)">'
+              + ' data-action="widget-update-yfield" data-wid="' + wid + '" data-yi="' + yi + '">'
               + colOptions + '</select>'
               + '<button class="btn btn-ghost btn-sm btn-icon' + (hasSeriesConds ? ' has-agg' : '') + '" title="Series properties" style="padding:0 4px"'
-              + ' onclick="event.stopPropagation();openSeriesAdvancedProps(\'' + wid + '\',\'' + escapedYf + '\',' + yi + ')">⚙️</button>'
+              + ' data-action="widget-series-props" data-wid="' + wid + '" data-yf="' + escapedYf + '" data-yi="' + yi + '">⚙️</button>'
               + '<button class="adv-agg-btn' + (agg ? ' has-agg' : '') + '" title="' + (agg || 'No aggregate') + '"'
-              + ' onclick="event.stopPropagation();showWidgetFieldAggPopup(\'' + wid + '\',\'' + escapedYf + '\',this,' + yi + ')">'
+              + ' data-action="widget-field-agg" data-wid="' + wid + '" data-yf="' + escapedYf + '" data-yi="' + yi + '">'
               + (agg ? getAggIcon(agg) : '∑') + '</button>'
               + '<button class="btn btn-ghost btn-sm btn-icon" style="padding:0 4px"'
-              + ' onclick="widgetRemoveYField(\'' + wid + '\',' + yi + ')">✕</button>'
+              + ' data-action="widget-remove-yfield" data-wid="' + wid + '" data-yi="' + yi + '">✕</button>'
               + '</div>';
           }).join('');
         }
@@ -1953,13 +1991,13 @@ function _renderScatterOptionsHTML(w, wid, cols) {
     const agg  = currentField ? ((w.fieldAggs || {})[currentField] || '') : '';
     const aggBtn = currentField
       ? '<button class="adv-agg-btn' + (agg ? ' has-agg' : '') + '" title="' + (agg || 'No aggregate') + '"'
-        + ' onclick="event.stopPropagation();showWidgetFieldAggPopup(\'' + wid + '\',\'' + currentField.replace(/'/g, "\\'") + '\',this)">'
+        + ' data-action="widget-field-agg" data-wid="' + wid + '" data-yf="' + currentField.replace(/'/g, "\\'") + '" data-yi="-1">'
         + (agg ? getAggIcon(agg) : '∑') + '</button>'
       : '';
     return '<div class="props-row"><label>' + label + '</label>'
       + '<div style="display:flex;gap:4px;flex:1">'
       + '<select class="form-input" style="flex:1;height:22px;font-size:11px"'
-      + ' onchange="updateWidgetProp(\'' + wid + '\',\'' + propName + '\',this.value);renderWidgetProperties(\'' + wid + '\')">'
+      + ' data-action="widget-update-prop-rerender" data-wid="' + wid + '" data-prop="' + propName + '">'
       + '<option value="">(none)</option>' + opts + '</select>'
       + aggBtn + '</div></div>';
   };
@@ -1967,16 +2005,16 @@ function _renderScatterOptionsHTML(w, wid, cols) {
     + _scatterFieldRow('Size field',  'bubbleSizeField',  w.bubbleSizeField)
     + _scatterFieldRow('Color field', 'bubbleColorField', w.bubbleColorField)
     + '<div class="props-row"><label>Trend lines</label>'
-    + '<input type="checkbox"' + (w.showTrendLine ? ' checked' : '') + ' onchange="updateWidgetProp(\'' + wid + '\',\'showTrendLine\',this.checked)"/></div>';
+    + '<input type="checkbox"' + (w.showTrendLine ? ' checked' : '') + ' data-action="widget-update-bool" data-wid="' + wid + '" data-prop="showTrendLine"/></div>';
 }
 
 function _renderBarLineOptionsHTML(w, wid) {
   if (w.type !== 'bar' && w.type !== 'line') return '';
   return '<div class="adv-node-section-hdr" style="margin-top:8px"><span>CHART OPTIONS</span></div>'
     + '<div class="props-row"><label>Stacked</label>'
-    + '<input type="checkbox"' + (w.stacked ? ' checked' : '') + ' onchange="updateWidgetProp(\'' + wid + '\',\'stacked\',this.checked)"/></div>'
+    + '<input type="checkbox"' + (w.stacked ? ' checked' : '') + ' data-action="widget-update-bool" data-wid="' + wid + '" data-prop="stacked"/></div>'
     + '<div class="props-row"><label>Trend lines</label>'
-    + '<input type="checkbox"' + (w.showTrendLine ? ' checked' : '') + ' onchange="updateWidgetProp(\'' + wid + '\',\'showTrendLine\',this.checked)"/></div>';
+    + '<input type="checkbox"' + (w.showTrendLine ? ' checked' : '') + ' data-action="widget-update-bool" data-wid="' + wid + '" data-prop="showTrendLine"/></div>';
 }
 
       /**
@@ -2086,51 +2124,68 @@ function _renderBarLineOptionsHTML(w, wid) {
         };
         _s.close = () => {
           const ov = document.getElementById('series-adv-overlay');
-          if (ov) ov.remove();
-          delete window['_dlvSeries'];
+          if (ov) { ov.remove(); }
         };
 
-        // Expose single handle on window for inline HTML handlers
-        window['_dlvSeries'] = _s;
+        // Static per-dialog keys (registered once; referenced by renderHeader/renderBody)
+        var _seriesCloseKey   = _dlvRegPopupCb(function() { _s.close(); });
+        var _seriesCondAddKey = _dlvRegPopupCb(function() { _s.condAdd(); });
+        var _seriesClearKey   = _dlvRegPopupCb(function() { _s.clearAll(); });
+        var _seriesApplyKey   = _dlvRegPopupCb(function() { _s.apply(); });
+        var _seriesColorPickerKey = _dlvRegPopupCb(function(val) {
+          _s.prop('color', val);
+          var _dlg = document.getElementById('series-adv-dialog');
+          if (_dlg) { var _txt = _dlg.querySelector('[data-series-color-txt]'); if (_txt) { _txt.value = val; } }
+        });
+        var _seriesColorTxtKey = _dlvRegPopupCb(function(val) {
+          _s.prop('color', val);
+          var _dlg = document.getElementById('series-adv-dialog');
+          if (_dlg) { var _p = _dlg.querySelector('[data-series-color-picker]'); if (_p) { _p.value = val || '#000000'; } }
+        });
 
         const isLineType = () => !local.seriesType || local.seriesType === 'line' || (local.seriesType === '' && w.type === 'line');
 
-        _s.renderHeader = () => {
-          const aggLabel = agg ? ((DataLaVistaCore.AGG_META[agg] || {}).label || agg) : 'RAW';
-          return `<div class="popup-header panel-header">
-            <h3 style="font-size:15px;font-weight:600;margin:0">Advanced Properties</h3>
-            <button class="btn btn-ghost btn-icon" onclick="_dlvSeries.close()">✕</button>
-          </div>
-          <span class="toolbox-section-label" style="display:block;padding:8px 20px 4px">
-            Series: ${aggLabel} of ${fieldName}
-          </span>`;
+        _s.renderHeader = function() {
+          var aggLabel = agg ? ((DataLaVistaCore.AGG_META[agg] || {}).label || agg) : 'RAW';
+          return '<div class="popup-header panel-header">'
+            + '<h3 style="font-size:15px;font-weight:600;margin:0">Advanced Properties</h3>'
+            + '<button class="btn btn-ghost btn-icon" data-action="dlv-cb" data-cb="' + _seriesCloseKey + '">✕</button>'
+            + '</div>'
+            + '<span class="toolbox-section-label" style="display:block;padding:8px 20px 4px">'
+            + 'Series: ' + aggLabel + ' of ' + fieldName
+            + '</span>';
         };
 
         _s.renderBody = function() {
           var lineOpts = isLineType();
+          var _lineWidthKey = _dlvRegPopupCb(function(val) { _s.prop('lineWidth', +val); });
+          var _smoothKey    = _dlvRegPopupCb(function(val) { _s.prop('smooth', val); });
+          var _labelKey     = _dlvRegPopupCb(function(val) { _s.prop('label', val); });
+          var _opacityKey   = _dlvRegPopupCb(function(val) { _s.prop('opacity', +val); });
+          var _typeKey      = _dlvRegPopupCb(function(val) { _s.prop('seriesType', val); _s.rerender(); });
           var condRows = renderConditionRows(
             local.conditions, enrichedSeriesCols,
             function(ci, val) { _s.condUpdate(ci, 'conj', val); },
-            (ci, v) => `_dlvSeries.condUpdate(${ci},'field',${v})`,
+            function(ci, val) { _s.condUpdate(ci, 'field', val); },
             function(ci, val) { _s.condUpdate(ci, 'op', val); },
-            (ci, v) => `_dlvSeries.condUpdate(${ci},'value',${v})`,
-            (ci)    => `_dlvSeries.condRemove(${ci})`,
+            function(ci, val) { _s.condUpdate(ci, 'value', val); },
+            function(ci)      { _s.condRemove(ci); },
             null,
-            (ci, v) => `_dlvSeries.condUpdate(${ci},'value2',${v})`,
-            (ci, v) => `_dlvSeries.condUpdate(${ci},'elementKey',${v})`
+            function(ci, val) { _s.condUpdate(ci, 'value2', val); },
+            function(ci, val) { _s.condUpdate(ci, 'elementKey', val); }
           );
           var _lineWidthHTML = '';
           if (lineOpts) {
             _lineWidthHTML = '<div class="props-row"><label>Line width</label>'
               + '<input type="number" class="form-input" min="1" max="10" style="width:60px"'
-              + ' value="' + local.lineWidth + '" oninput="_dlvSeries.prop(\'lineWidth\',+this.value)"/></div>';
+              + ' value="' + local.lineWidth + '" data-action="dlv-cb" data-cb="' + _lineWidthKey + '"/></div>';
           }
           var _smoothHTML = '';
           if (lineOpts) {
             var _smoothChecked = local.smooth ? 'checked' : '';
             _smoothHTML = '<div class="props-row"><label>Smooth</label>'
               + '<input type="checkbox" ' + _smoothChecked
-              + ' onchange="_dlvSeries.prop(\'smooth\',this.checked)"/></div>';
+              + ' data-action="dlv-cb" data-cb="' + _smoothKey + '"/></div>';
           }
           var _stAutoSel  = !local.seriesType ? 'selected' : '';
           var _stBarSel   = local.seriesType === 'bar'  ? 'selected' : '';
@@ -2143,34 +2198,34 @@ function _renderBarLineOptionsHTML(w, wid) {
             + '<div class="adv-node-section-hdr">GENERAL</div>'
             + '<div class="props-row"><label>Display label</label>'
             + '<input type="text" class="form-input" value="' + _localLabelEsc + '"'
-            + ' oninput="_dlvSeries.prop(\'label\',this.value)" placeholder="' + fieldName + '"/></div>'
+            + ' data-action="dlv-cb" data-cb="' + _labelKey + '" placeholder="' + fieldName + '"/></div>'
             + '</div>'
             + '<div class="adv-node-section">'
             + '<div class="adv-node-section-hdr">APPEARANCE</div>'
             + '<div class="props-row"><label>Color</label>'
             + '<div class="color-input-wrap">'
             + '<input type="color" value="' + _localColor + '"'
-            + ' oninput="_dlvSeries.prop(\'color\',this.value);this.nextElementSibling.value=this.value"/>'
+            + ' data-action="dlv-cb" data-cb="' + _seriesColorPickerKey + '" data-series-color-picker="1"/>'
             + '<input type="text" class="form-input" value="' + _localColorTxt + '"'
-            + ' oninput="_dlvSeries.prop(\'color\',this.value);this.previousElementSibling.value=this.value||\'#000000\'" placeholder="(palette)"/>'
+            + ' data-action="dlv-cb" data-cb="' + _seriesColorTxtKey + '" data-series-color-txt="1" placeholder="(palette)"/>'
             + '</div></div>'
             + _lineWidthHTML
             + '<div class="props-row"><label>Opacity</label>'
             + '<input type="number" class="form-input" min="0" max="1" step="0.05" style="width:60px"'
-            + ' value="' + local.opacity + '" oninput="_dlvSeries.prop(\'opacity\',+this.value)"/></div>'
+            + ' value="' + local.opacity + '" data-action="dlv-cb" data-cb="' + _opacityKey + '"/></div>'
             + _smoothHTML
             + '</div>'
             + '<div class="adv-node-section">'
             + '<div class="adv-node-section-hdr">'
             + '<span>FILTER CONDITIONS</span>'
-            + '<button class="btn btn-ghost btn-sm" onclick="_dlvSeries.condAdd()">+ Add</button>'
+            + '<button class="btn btn-ghost btn-sm" data-action="dlv-cb" data-cb="' + _seriesCondAddKey + '">+ Add</button>'
             + '</div>'
             + '<div id="series-cond-rows">' + condRows + '</div>'
             + '</div>'
             + '<div class="adv-node-section">'
             + '<div class="adv-node-section-hdr">SERIES TYPE</div>'
             + '<div class="props-row"><label>Type</label>'
-            + '<select class="form-input" onchange="_dlvSeries.prop(\'seriesType\',this.value);_dlvSeries.rerender()">'
+            + '<select class="form-input" data-action="dlv-cb" data-cb="' + _typeKey + '">'
             + '<option value="" ' + _stAutoSel + '>auto</option>'
             + '<option value="bar" ' + _stBarSel + '>bar</option>'
             + '<option value="line" ' + _stLineSel + '>line</option>'
@@ -2178,8 +2233,8 @@ function _renderBarLineOptionsHTML(w, wid) {
             + '</div>'
             + '</div>'
             + '<div class="popup-footer" style="justify-content:space-between">'
-            + '<button class="btn btn-ghost btn-sm" onclick="_dlvSeries.clearAll()">Clear All</button>'
-            + '<button class="btn btn-primary btn-sm" onclick="_dlvSeries.apply()">Apply</button>'
+            + '<button class="btn btn-ghost btn-sm" data-action="dlv-cb" data-cb="' + _seriesClearKey + '">Clear All</button>'
+            + '<button class="btn btn-primary btn-sm" data-action="dlv-cb" data-cb="' + _seriesApplyKey + '">Apply</button>'
             + '</div>';
         };
 
@@ -2331,19 +2386,19 @@ function _renderBarLineOptionsHTML(w, wid) {
           var _frGearBtn = '';
           if (gearIdx != null) {
             _frGearBtn = '<button class="btn btn-ghost btn-sm btn-icon" style="padding:0 4px" title="Field properties"'
-              + ' onclick="event.stopPropagation();openWidgetFieldAdvProps(\'' + wid + '\',\'' + escapedFv + '\',' + gearIdx + ',\'x\')">⚙️</button>';
+              + ' data-action="widget-xfield-props" data-wid="' + wid + '" data-yf="' + escapedFv + '" data-gear-idx="' + gearIdx + '">⚙️</button>';
           }
           var _frAggClass = agg ? ' has-agg' : '';
           var _frAggIcon  = agg ? getAggIcon(agg) : '∑';
           return '<div class="adv-field-row selected">'
             + '<span class="field-type-icon ' + ti.cls + '">' + ti.icon + '</span>'
             + '<span style="font-size:11px;color:var(--text-disabled);flex-shrink:0;min-width:16px">' + roleLabel + '</span>'
-            + '<select class="form-input" style="flex:1;height:22px;font-size:11px" onchange="' + onChangeExpr + '">'
+            + '<select class="form-input" style="flex:1;height:22px;font-size:11px" data-action="widget-update-arr-prop-rerender" data-wid="' + wid + '" data-prop="' + onChangeExpr + '">'
             + _fieldRowColOpts(cols, fieldVal)
             + '</select>'
             + _frGearBtn
             + '<button class="adv-agg-btn' + _frAggClass + '" title="' + (agg || 'No aggregate') + '"'
-            + ' onclick="event.stopPropagation();showWidgetFieldAggPopup(\'' + wid + '\',\'' + escapedFv + '\',this)">' + _frAggIcon + '</button>'
+            + ' data-action="widget-field-agg" data-wid="' + wid + '" data-yf="' + escapedFv + '" data-yi="-1">' + _frAggIcon + '</button>'
             + '</div>';
         };
 
@@ -2358,18 +2413,16 @@ function _renderBarLineOptionsHTML(w, wid) {
           var _tfAggClass = agg ? ' has-agg' : '';
           var _tfAggIcon  = agg ? getAggIcon(agg) : '∑';
           return '<div class="adv-field-row selected" draggable="true"'
-            + ' ondragstart="_wpDragStart(\'field\',\'' + wid + '\',' + idx + ',event)"'
-            + ' ondragover="_wpDragOver(event)"'
-            + ' ondragleave="_wpDragLeave(event)"'
-            + ' ondrop="_wpDrop(\'field\',\'' + wid + '\',' + idx + ',event)">'
+            + ' data-drag-role="tablefield" data-wid="' + wid + '" data-yi="' + idx + '">'
             + '<span style="cursor:grab;padding:0 4px;color:var(--text-disabled)" title="Drag to reorder">⠿</span>'
             + '<span class="field-type-icon ' + ti.cls + '">' + ti.icon + '</span>'
             + '<span class="field-name" style="flex:1" title="' + escapedFn + '">' + _tfLabel + '</span>'
             + '<button class="btn btn-ghost btn-sm btn-icon" style="padding:0 4px" title="Field properties"'
-            + ' onclick="event.stopPropagation();openWidgetFieldAdvProps(\'' + wid + '\',\'' + escapedFn + '\',' + idx + ',\'field\')">⚙️</button>'
+            + ' data-action="widget-tablefield-props" data-wid="' + wid + '" data-yf="' + escapedFn + '" data-yi="' + idx + '">⚙️</button>'
             + '<button class="adv-agg-btn' + _tfAggClass + '" title="' + (agg || 'No aggregate') + '"'
-            + ' onclick="event.stopPropagation();showWidgetFieldAggPopup(\'' + wid + '\',\'' + escapedFn + '\',this,' + idx + ')">' + _tfAggIcon + '</button>'
-            + '<button class="btn btn-ghost btn-sm btn-icon" style="padding:0 4px" onclick="removeWidgetField(\'' + wid + '\',' + idx + ')">✕</button>'
+            + ' data-action="widget-field-agg" data-wid="' + wid + '" data-yf="' + escapedFn + '" data-yi="' + idx + '">' + _tfAggIcon + '</button>'
+            + '<button class="btn btn-ghost btn-sm btn-icon" style="padding:0 4px"'
+            + ' data-action="widget-remove-tablefield" data-wid="' + wid + '" data-yi="' + idx + '">✕</button>'
             + '</div>';
         };
 
@@ -2377,22 +2430,22 @@ function _renderBarLineOptionsHTML(w, wid) {
         const renderConditions = () => renderConditionRows(
           conditions, enrichedCols,
           function(ci, val) { widgetUpdateCond(wid, ci, 'conj', val); },
-          (ci, v) => `widgetUpdateCond('${wid}',${ci},'field',${v})`,
+          function(ci, val) { widgetUpdateCond(wid, ci, 'field', val); },
           function(ci, val) { widgetUpdateCond(wid, ci, 'op', val); },
-          (ci, v) => `widgetUpdateCond('${wid}',${ci},'value',${v})`,
-          (ci)    => `widgetRemoveCond('${wid}',${ci})`,
-          (ci)    => `draggable="true" ondragstart="_wpDragStart('cond','${wid}',${ci},event)" ondragover="_wpDragOver(event)" ondragleave="_wpDragLeave(event)" ondrop="_wpDrop('cond','${wid}',${ci},event)"`,
-          (ci, v) => `widgetUpdateCond('${wid}',${ci},'value2',${v})`,
-          (ci, v) => `widgetUpdateCond('${wid}',${ci},'elementKey',${v})`
+          function(ci, val) { widgetUpdateCond(wid, ci, 'value', val); },
+          function(ci)      { widgetRemoveCond(wid, ci); },
+          function(ci)      { return 'draggable="true" data-drag-role="wp-cond" data-wid="' + wid + '" data-idx="' + ci + '"'; },
+          function(ci, val) { widgetUpdateCond(wid, ci, 'value2', val); },
+          function(ci, val) { widgetUpdateCond(wid, ci, 'elementKey', val); }
         );
 
         // ── Sort rows ────────────────────────────────────────────────────
         const renderSorts = () => renderSortRows(
           sorts, cols,
-          (si, v) => `widgetUpdateSort('${wid}',${si},'field',${v})`,
+          function(si, val) { widgetUpdateSort(wid, si, 'field', val); },
           function(si, val) { widgetUpdateSort(wid, si, 'dir', val); },
-          (si)    => `widgetRemoveSort('${wid}',${si})`,
-          (si)    => `draggable="true" ondragstart="_wpDragStart('sort','${wid}',${si},event)" ondragover="_wpDragOver(event)" ondragleave="_wpDragLeave(event)" ondrop="_wpDrop('sort','${wid}',${si},event)"`
+          function(si)      { widgetRemoveSort(wid, si); },
+          function(si)      { return 'draggable="true" data-drag-role="wp-sort" data-wid="' + wid + '" data-idx="' + si + '"'; }
         );
 
         // ── Group-by (auto-derived, read-only display) ───────────────────
@@ -2418,7 +2471,7 @@ function _renderBarLineOptionsHTML(w, wid) {
         }).join('');
         const _showHdrsRow = isTable
           ? '<div class="props-row"><label>Show headers</label>'
-            + '<input type="checkbox" ' + (_wa.showHeaders!==false?'checked':'') + ' onchange="updateWidgetProp(\'' + wid + '\',\'showHeaders\',this.checked)"/></div>'
+            + '<input type="checkbox" ' + (_wa.showHeaders!==false?'checked':'') + ' data-action="widget-update-bool" data-wid="' + wid + '" data-prop="showHeaders"/></div>'
           : '';
         const _titleHint = (w.title && w.title.includes('{{')) ? ('→ ' + resolveTitleTemplate(w.title)) : '';
         var _interactionVals = ['','cross-filter','cross-highlight','none'];
@@ -2430,18 +2483,18 @@ function _renderBarLineOptionsHTML(w, wid) {
         }
         var _wtDef = (/** @type {any[]} */ (DataLaVistaCore.WIDGET_TYPES)).find(function(t) { return t.id === _wa.type; });
         var _interactionRow = (_wtDef && _wtDef.supportsInteraction)
-          ? '<div class="props-row"><label>Interaction</label><select class="form-input" onchange="updateWidgetProp(\'' + wid + '\',\'interactionMode\',this.value)">' + _interactionOpts + '</select></div>'
+          ? '<div class="props-row"><label>Interaction</label><select class="form-input" data-action="widget-update-prop" data-wid="' + wid + '" data-prop="interactionMode">' + _interactionOpts + '</select></div>'
           : '';
         // Width row: hidden for container children
         var _widthRow = w.parentContainerId
           ? ''
-          : '<div class="props-row"><label>Width %</label><input type="number" class="form-input" min="10" max="100" step="0.25" value="' + w.widthPct + '" oninput="updateWidgetProp(\'' + wid + '\',\'widthPct\',Math.round(+this.value*4)/4)"/></div>';
+          : '<div class="props-row"><label>Width %</label><input type="number" class="form-input" min="10" max="100" step="0.25" value="' + w.widthPct + '" data-action="widget-update-num-rounded" data-wid="' + wid + '" data-prop="widthPct"/></div>';
         // Height row: containers use minHeightVh, others use heightVh
         var _heightRow;
         if (w.type === 'container') {
-          _heightRow = '<div class="props-row"><label>Min Height vh</label><input type="number" class="form-input" min="5" max="200" step="0.25" value="' + (w.minHeightVh || 30) + '" oninput="updateWidgetProp(\'' + wid + '\',\'minHeightVh\',Math.round(+this.value*4)/4)"/></div>';
+          _heightRow = '<div class="props-row"><label>Min Height vh</label><input type="number" class="form-input" min="5" max="200" step="0.25" value="' + (w.minHeightVh || 30) + '" data-action="widget-update-num-rounded" data-wid="' + wid + '" data-prop="minHeightVh"/></div>';
         } else {
-          _heightRow = '<div class="props-row"><label>Height vh</label><input type="number" class="form-input" min="5" max="100" step="0.25" value="' + w.heightVh + '" oninput="updateWidgetProp(\'' + wid + '\',\'heightVh\',Math.round(+this.value*4)/4)"/></div>';
+          _heightRow = '<div class="props-row"><label>Height vh</label><input type="number" class="form-input" min="5" max="100" step="0.25" value="' + w.heightVh + '" data-action="widget-update-num-rounded" data-wid="' + wid + '" data-prop="heightVh"/></div>';
         }
         // Container-specific layout section
         var _containerSection = '';
@@ -2454,9 +2507,9 @@ function _renderBarLineOptionsHTML(w, wid) {
           }
           _containerSection = '<div class="adv-node-section">'
             + '<div class="adv-node-section-hdr">CONTAINER LAYOUT</div>'
-            + '<div class="props-row"><label>Gap (px)</label><input type="number" class="form-input" min="0" max="64" value="' + (w.containerGap != null ? w.containerGap : 8) + '" oninput="updateWidgetProp(\'' + wid + '\',\'containerGap\',+this.value)"/></div>'
-            + '<div class="props-row"><label>Padding (px)</label><input type="number" class="form-input" min="0" max="64" value="' + (w.containerPadding != null ? w.containerPadding : 8) + '" oninput="updateWidgetProp(\'' + wid + '\',\'containerPadding\',+this.value)"/></div>'
-            + '<div class="props-row"><label>Align</label><select class="form-input" onchange="updateWidgetProp(\'' + wid + '\',\'containerAlign\',this.value)">' + _alignOpts + '</select></div>'
+            + '<div class="props-row"><label>Gap (px)</label><input type="number" class="form-input" min="0" max="64" value="' + (w.containerGap != null ? w.containerGap : 8) + '" data-action="widget-update-num" data-wid="' + wid + '" data-prop="containerGap"/></div>'
+            + '<div class="props-row"><label>Padding (px)</label><input type="number" class="form-input" min="0" max="64" value="' + (w.containerPadding != null ? w.containerPadding : 8) + '" data-action="widget-update-num" data-wid="' + wid + '" data-prop="containerPadding"/></div>'
+            + '<div class="props-row"><label>Align</label><select class="form-input" data-action="widget-update-prop" data-wid="' + wid + '" data-prop="containerAlign">' + _alignOpts + '</select></div>'
             + '<div style="font-size:11px;color:var(--text-secondary);padding:4px 0">Drag widget headers into this container. Drag out onto canvas to un-parent.</div>'
             + '</div>';
         }
@@ -2477,8 +2530,8 @@ function _renderBarLineOptionsHTML(w, wid) {
           var _cbc = w.chartBackgroundColor || '#fefefe';
           _chartBgRowHTML = '<div class="props-row"><label>Chart bg</label>'
             + '<div class="color-input-wrap">'
-            + '<input type="color" value="' + _cbc + '" oninput="updateWidgetProp(\'' + wid + '\',\'chartBackgroundColor\',this.value)"/>'
-            + '<input type="text" class="form-input" value="' + _cbc + '" oninput="updateWidgetProp(\'' + wid + '\',\'chartBackgroundColor\',this.value)"/>'
+            + '<input type="color" value="' + _cbc + '" data-action="widget-update-prop" data-wid="' + wid + '" data-prop="chartBackgroundColor"/>'
+            + '<input type="text" class="form-input" value="' + _cbc + '" data-action="widget-update-prop" data-wid="' + wid + '" data-prop="chartBackgroundColor"/>'
             + '</div></div>';
         }
         var _tableHeaderRowsHTML = '';
@@ -2488,43 +2541,41 @@ function _renderBarLineOptionsHTML(w, wid) {
           var _hfc = w.headersFontColor || '#323130';
           _tableHeaderRowsHTML = '<div class="props-row"><label>Header bg</label>'
             + '<div class="color-input-wrap">'
-            + '<input type="color" value="' + _hbc + '" oninput="updateWidgetProp(\'' + wid + '\',\'headersBackgroundColor\',this.value)"/>'
-            + '<input type="text" class="form-input" value="' + _hbc + '" oninput="updateWidgetProp(\'' + wid + '\',\'headersBackgroundColor\',this.value)"/>'
+            + '<input type="color" value="' + _hbc + '" data-action="widget-update-prop" data-wid="' + wid + '" data-prop="headersBackgroundColor"/>'
+            + '<input type="text" class="form-input" value="' + _hbc + '" data-action="widget-update-prop" data-wid="' + wid + '" data-prop="headersBackgroundColor"/>'
             + '</div></div>'
             + '<div class="props-row"><label>Header font</label>'
             + '<div class="color-input-wrap">'
-            + '<input type="number" class="form-input" min="8" max="32" value="' + _hfs + '" oninput="updateWidgetProp(\'' + wid + '\',\'headersFontSize\',+this.value)" style="width:50px" title="Header font size"/>'
-            + '<input type="color" value="' + _hfc + '" oninput="updateWidgetProp(\'' + wid + '\',\'headersFontColor\',this.value)" title="Header font color"/>'
-            + '<input type="text" class="form-input" value="' + _hfc + '" oninput="updateWidgetProp(\'' + wid + '\',\'headersFontColor\',this.value)"/>'
+            + '<input type="number" class="form-input" min="8" max="32" value="' + _hfs + '" data-action="widget-update-num" data-wid="' + wid + '" data-prop="headersFontSize" style="width:50px" title="Header font size"/>'
+            + '<input type="color" value="' + _hfc + '" data-action="widget-update-prop" data-wid="' + wid + '" data-prop="headersFontColor" title="Header font color"/>'
+            + '<input type="text" class="form-input" value="' + _hfc + '" data-action="widget-update-prop" data-wid="' + wid + '" data-prop="headersFontColor"/>'
             + '</div></div>';
         }
         var _textPropsHTML = '';
         if (isText) {
           _textPropsHTML = '<div class="props-row"><label>Font size</label>'
-            + '<input type="number" class="form-input" min="8" max="72" value="' + w.fontSize + '" oninput="updateWidgetProp(\'' + wid + '\',\'fontSize\',+this.value)"/></div>'
+            + '<input type="number" class="form-input" min="8" max="72" value="' + w.fontSize + '" data-action="widget-update-num" data-wid="' + wid + '" data-prop="fontSize"/></div>'
             + '<div class="props-row"><label>Font color</label>'
             + '<div class="color-input-wrap">'
-            + '<input type="color" value="' + w.fontColor + '" oninput="updateWidgetProp(\'' + wid + '\',\'fontColor\',this.value)"/>'
-            + '<input type="text" class="form-input" value="' + w.fontColor + '" oninput="updateWidgetProp(\'' + wid + '\',\'fontColor\',this.value)"/>'
+            + '<input type="color" value="' + w.fontColor + '" data-action="widget-update-prop" data-wid="' + wid + '" data-prop="fontColor"/>'
+            + '<input type="text" class="form-input" value="' + w.fontColor + '" data-action="widget-update-prop" data-wid="' + wid + '" data-prop="fontColor"/>'
             + '</div></div>'
             + '<div class="props-row" style="flex-direction:column;align-items:flex-start"><label>Content</label>'
-            + '<textarea class="form-input" rows="4" onblur="updateWidgetProp(\'' + wid + '\',\'textContent\',this.value)">' + w.textContent + '</textarea></div>';
+            + '<textarea class="form-input" rows="4" data-action="widget-update-prop" data-wid="' + wid + '" data-prop="textContent">' + w.textContent + '</textarea></div>';
         }
         var _dataSectionHTML = '';
         if (isData) {
           var _chartFieldsHTML = '';
           if (isChart) {
             var _xFVal = (Array.isArray(w.dimensions) && w.dimensions.length) ? w.dimensions[0] : (w.xField || '');
-            _chartFieldsHTML = fieldRow('X', _xFVal, "updateWidgetProp('" + wid + "','dimensions',[this.value]);renderWidgetProperties('" + wid + "')", 0)
+            _chartFieldsHTML = fieldRow('X', _xFVal, 'dimensions', 0)
               + '<div class="adv-drop-zone" style="margin-top:2px;margin-bottom:4px;text-align:center;padding:4px;font-size:11px"'
-              + ' ondragover="event.preventDefault();this.classList.add(\'drag-over\')" ondragleave="this.classList.remove(\'drag-over\')"'
-              + ' ondrop="_wpDropFieldToSection(\'' + wid + '\',\'x\',event)">Drop to set X field</div>'
+              + ' data-drag-role="wp-drop-zone" data-wid="' + wid + '" data-section="x">Drop to set X field</div>'
               + '<div class="adv-node-section-hdr" style="margin-top:6px"><span>Y FIELDS</span>'
-              + '<button class="btn btn-ghost btn-sm" onclick="widgetAddYField(\'' + wid + '\')">+ Add</button></div>'
+              + '<button class="btn btn-ghost btn-sm" data-action="widget-add-yfield" data-wid="' + wid + '">+ Add</button></div>'
               + _renderYFieldsHTML(w, wid, cols)
               + '<div class="adv-drop-zone" style="margin-top:4px;text-align:center;padding:4px;font-size:11px"'
-              + ' ondragover="event.preventDefault();this.classList.add(\'drag-over\')" ondragleave="this.classList.remove(\'drag-over\')"'
-              + ' ondrop="_wpDropFieldToSection(\'' + wid + '\',\'y\',event)">Drop to add Y field</div>'
+              + ' data-drag-role="wp-drop-zone" data-wid="' + wid + '" data-section="y">Drop to add Y field</div>'
               + _renderBarLineOptionsHTML(w, wid)
               + _renderScatterOptionsHTML(w, wid, cols);
           }
@@ -2532,14 +2583,14 @@ function _renderBarLineOptionsHTML(w, wid) {
           if (isKPI) {
             var _kpiLabelEsc = (w.kpiLabelOverride || '').replace(/"/g, '&quot;');
             var _kpiPlaceholderEsc = (w.fields[0] || 'field name').replace(/"/g, '&quot;');
-            _kpiFieldsHTML = fieldRow('', w.fields[0] || cols[0] || '', "updateWidgetProp('" + wid + "','fields',[this.value]);renderWidgetProperties('" + wid + "')")
+            _kpiFieldsHTML = fieldRow('', w.fields[0] || cols[0] || '', 'fields')
               + '<div class="adv-node-section-hdr" style="margin-top:8px"><span>KPI DISPLAY</span></div>'
               + '<div class="props-row"><label>Metric size</label>'
-              + '<input type="number" class="form-input" min="8" max="120" value="' + (w.kpiMetricFontSize || 36) + '" oninput="updateWidgetProp(\'' + wid + '\',\'kpiMetricFontSize\',+this.value)" style="width:60px"/></div>'
+              + '<input type="number" class="form-input" min="8" max="120" value="' + (w.kpiMetricFontSize || 36) + '" data-action="widget-update-num" data-wid="' + wid + '" data-prop="kpiMetricFontSize" style="width:60px"/></div>'
               + '<div class="props-row"><label>Label size</label>'
-              + '<input type="number" class="form-input" min="8" max="48" value="' + (w.kpiLabelFontSize || 13) + '" oninput="updateWidgetProp(\'' + wid + '\',\'kpiLabelFontSize\',+this.value)" style="width:60px"/></div>'
+              + '<input type="number" class="form-input" min="8" max="48" value="' + (w.kpiLabelFontSize || 13) + '" data-action="widget-update-num" data-wid="' + wid + '" data-prop="kpiLabelFontSize" style="width:60px"/></div>'
               + '<div class="props-row"><label>Label text</label>'
-              + '<input type="text" class="form-input" value="' + _kpiLabelEsc + '" placeholder="' + _kpiPlaceholderEsc + '" oninput="updateWidgetProp(\'' + wid + '\',\'kpiLabelOverride\',this.value)"/></div>';
+              + '<input type="text" class="form-input" value="' + _kpiLabelEsc + '" placeholder="' + _kpiPlaceholderEsc + '" data-action="widget-update-prop" data-wid="' + wid + '" data-prop="kpiLabelOverride"/></div>';
           }
           var _tableFieldsHTML = '';
           if (isTable) {
@@ -2554,9 +2605,7 @@ function _renderBarLineOptionsHTML(w, wid) {
           var _tableDropZoneHTML = '';
           if (isTable) {
             _tableDropZoneHTML = '<div class="adv-drop-zone" style="margin-top:4px;text-align:center;padding:5px;font-size:11px"'
-              + ' ondragover="event.preventDefault();this.classList.add(\'drag-over\')"'
-              + ' ondragleave="this.classList.remove(\'drag-over\')"'
-              + ' ondrop="onDropFieldToWidget(\'' + wid + '\',event)">Drop field to add column</div>';
+              + ' data-drag-role="wp-drop-zone" data-wid="' + wid + '" data-section="table-field">Drop field to add column</div>';
           }
           _dataSectionHTML = '<div class="adv-node-section">'
             + '<div class="adv-node-section-hdr"><span>FIELDS</span></div>'
@@ -2567,40 +2616,36 @@ function _renderBarLineOptionsHTML(w, wid) {
             + '</div>'
             + '<div class="adv-node-section">'
             + '<div class="adv-node-section-hdr"><span>FILTER CONDITIONS</span>'
-            + '<button class="btn btn-ghost btn-sm" onclick="widgetAddCond(\'' + wid + '\')">+ Add</button></div>'
+            + '<button class="btn btn-ghost btn-sm" data-action="widget-add-cond" data-wid="' + wid + '">+ Add</button></div>'
             + '<div>' + renderConditions() + '</div>'
             + '<div class="adv-drop-zone" style="margin-top:4px;text-align:center;padding:4px;font-size:11px"'
-            + ' ondragover="event.preventDefault();this.classList.add(\'drag-over\')"'
-            + ' ondragleave="this.classList.remove(\'drag-over\')"'
-            + ' ondrop="_wpDropFieldToSection(\'' + wid + '\',\'cond\',event)">Drop to add filter</div>'
+            + ' data-drag-role="wp-drop-zone" data-wid="' + wid + '" data-section="cond">Drop to add filter</div>'
             + '</div>'
             + '<div class="adv-node-section">'
             + '<div class="adv-node-section-hdr"><span>SORT ORDER</span>'
-            + '<button class="btn btn-ghost btn-sm" onclick="widgetAddSort(\'' + wid + '\')">+ Add</button></div>'
+            + '<button class="btn btn-ghost btn-sm" data-action="widget-add-sort" data-wid="' + wid + '">+ Add</button></div>'
             + '<div>' + renderSorts() + '</div>'
             + '<div class="adv-drop-zone" style="margin-top:4px;text-align:center;padding:4px;font-size:11px"'
-            + ' ondragover="event.preventDefault();this.classList.add(\'drag-over\')"'
-            + ' ondragleave="this.classList.remove(\'drag-over\')"'
-            + ' ondrop="_wpDropFieldToSection(\'' + wid + '\',\'sort\',event)">Drop to add sort</div>'
+            + ' data-drag-role="wp-drop-zone" data-wid="' + wid + '" data-section="sort">Drop to add sort</div>'
             + '</div>'
             + '<div class="adv-node-section">'
             + '<div class="adv-node-section-hdr"><span>GROUP BY</span></div>'
             + '<div>' + renderGroupBy() + '</div>'
             + '</div>'
             + '<div style="display:flex;justify-content:flex-end;padding:4px 0 8px">'
-            + '<button class="btn btn-ghost btn-sm" aria-label="Peek at SQL Code" onclick="peekWidgetSQL(\'' + wid + '\',this)">📜</button>'
+            + '<button class="btn btn-ghost btn-sm" aria-label="Peek at SQL Code" data-action="widget-peek-sql" data-wid="' + wid + '">📜</button>'
             + '</div>';
         }
         section.innerHTML = '<div class="adv-node-section">'
           + '<div class="adv-node-section-hdr">GENERAL</div>'
           + '<div class="props-row"><label>Title</label>'
-          + '<input type="text" class="form-input" value="' + _wTitleEsc + '" onblur="updateWidgetProp(\'' + wid + '\',\'title\',this.value)"/>'
+          + '<input type="text" class="form-input" value="' + _wTitleEsc + '" data-action="widget-update-prop" data-wid="' + wid + '" data-prop="title"/>'
           + '<div id="dlv-title-template-hint-' + wid + '" style="font-size:10px;color:var(--text-secondary,#605e5c);font-style:italic;margin-top:2px">' + _titleHint + '</div></div>'
           + '<div class="props-row"><label>Show title</label>'
-          + '<input type="checkbox" ' + _showTitleChecked + ' onchange="updateWidgetProp(\'' + wid + '\',\'showTitle\',this.checked)"/></div>'
+          + '<input type="checkbox" ' + _showTitleChecked + ' data-action="widget-update-bool" data-wid="' + wid + '" data-prop="showTitle"/></div>'
           + _showHdrsRow
           + '<div class="props-row"><label>Type</label>'
-          + '<select class="form-input" onchange="changeWidgetType(\'' + wid + '\',this.value)">' + _wtypeOpts + '</select></div>'
+          + '<select class="form-input" data-action="widget-change-type" data-wid="' + wid + '">' + _wtypeOpts + '</select></div>'
           + _interactionRow
           + _widthRow
           + _heightRow
@@ -2610,36 +2655,81 @@ function _renderBarLineOptionsHTML(w, wid) {
           + '<div class="adv-node-section-hdr">APPEARANCE</div>'
           + '<div class="props-row"><label>Widget bg</label>'
           + '<div class="color-input-wrap">'
-          + (_wWidgetBgIsTransparent ? '' : '<input type="color" value="' + _wWidgetBg + '" oninput="updateWidgetProp(\'' + wid + '\',\'widgetBackgroundColor\',this.value)"/>')
-          + '<input type="text" class="form-input" value="' + _wWidgetBgText + '" placeholder="transparent" oninput="updateWidgetProp(\'' + wid + '\',\'widgetBackgroundColor\',this.value)"/>'
-          + '<button type="button" title="Set transparent" style="padding:0 4px;line-height:1;cursor:pointer" onclick="updateWidgetProp(\'' + wid + '\',\'widgetBackgroundColor\',\'\')">×</button>'
+          + (_wWidgetBgIsTransparent ? '' : '<input type="color" value="' + _wWidgetBg + '" data-action="widget-update-prop" data-wid="' + wid + '" data-prop="widgetBackgroundColor"/>')
+          + '<input type="text" class="form-input" value="' + _wWidgetBgText + '" placeholder="transparent" data-action="widget-update-prop" data-wid="' + wid + '" data-prop="widgetBackgroundColor"/>'
+          + '<button type="button" title="Set transparent" style="padding:0 4px;line-height:1;cursor:pointer" data-action="widget-clear-prop" data-wid="' + wid + '" data-prop="widgetBackgroundColor">×</button>'
           + '</div></div>'
           + '<div class="props-row"><label>Title bg</label>'
           + '<div class="color-input-wrap">'
-          + '<input type="color" value="' + _wTitleBg + '" oninput="updateWidgetProp(\'' + wid + '\',\'titleBackgroundColor\',this.value)"/>'
-          + '<input type="text" class="form-input" value="' + _wTitleBg + '" oninput="updateWidgetProp(\'' + wid + '\',\'titleBackgroundColor\',this.value)"/>'
+          + '<input type="color" value="' + _wTitleBg + '" data-action="widget-update-prop" data-wid="' + wid + '" data-prop="titleBackgroundColor"/>'
+          + '<input type="text" class="form-input" value="' + _wTitleBg + '" data-action="widget-update-prop" data-wid="' + wid + '" data-prop="titleBackgroundColor"/>'
           + '</div></div>'
           + '<div class="props-row"><label>Title font</label>'
           + '<div class="color-input-wrap">'
-          + '<input type="number" class="form-input" min="8" max="48" value="' + _wTitleFs + '" oninput="updateWidgetProp(\'' + wid + '\',\'titleFontSize\',+this.value)" style="width:50px" title="Title font size"/>'
-          + '<input type="color" value="' + _wTitleFc + '" oninput="updateWidgetProp(\'' + wid + '\',\'titleFontColor\',this.value)" title="Title font color"/>'
-          + '<input type="text" class="form-input" value="' + _wTitleFc + '" oninput="updateWidgetProp(\'' + wid + '\',\'titleFontColor\',this.value)"/>'
+          + '<input type="number" class="form-input" min="8" max="48" value="' + _wTitleFs + '" data-action="widget-update-num" data-wid="' + wid + '" data-prop="titleFontSize" style="width:50px" title="Title font size"/>'
+          + '<input type="color" value="' + _wTitleFc + '" data-action="widget-update-prop" data-wid="' + wid + '" data-prop="titleFontColor" title="Title font color"/>'
+          + '<input type="text" class="form-input" value="' + _wTitleFc + '" data-action="widget-update-prop" data-wid="' + wid + '" data-prop="titleFontColor"/>'
           + '</div></div>'
           + '<div class="props-row"><label>Fill/Accent</label>'
           + '<div class="color-input-wrap">'
-          + '<input type="color" value="' + _wFillColor + '" oninput="updateWidgetProp(\'' + wid + '\',\'fillColor\',this.value)"/>'
-          + '<input type="text" class="form-input" value="' + _wFillColor + '" oninput="updateWidgetProp(\'' + wid + '\',\'fillColor\',this.value)"/>'
+          + '<input type="color" value="' + _wFillColor + '" data-action="widget-update-prop" data-wid="' + wid + '" data-prop="fillColor"/>'
+          + '<input type="text" class="form-input" value="' + _wFillColor + '" data-action="widget-update-prop" data-wid="' + wid + '" data-prop="fillColor"/>'
           + '</div></div>'
           + '<div class="props-row"><label>Border</label>'
           + '<div class="color-input-wrap">'
-          + '<input type="color" value="' + _wBorderColor + '" oninput="updateWidgetProp(\'' + wid + '\',\'borderColor\',this.value)"/>'
-          + '<input type="number" class="form-input" value="' + _wBorderSize + '" min="0" max="10" oninput="updateWidgetProp(\'' + wid + '\',\'borderSize\',+this.value)" style="width:50px"/>'
+          + '<input type="color" value="' + _wBorderColor + '" data-action="widget-update-prop" data-wid="' + wid + '" data-prop="borderColor"/>'
+          + '<input type="number" class="form-input" value="' + _wBorderSize + '" min="0" max="10" data-action="widget-update-num" data-wid="' + wid + '" data-prop="borderSize" style="width:50px"/>'
           + '</div></div>'
           + _chartBgRowHTML
           + _tableHeaderRowsHTML
           + _textPropsHTML
           + '</div>'
           + _dataSectionHTML;
+
+        // Phase 4-D-2 / 4-F: Post-process drag handlers after innerHTML is set
+        (function() {
+          var _ps = section;
+          _ps.querySelectorAll('[data-drag-role="yfield"]').forEach(function(row) {
+            var _rWid = row.dataset.wid; var _rYi = +row.dataset.yi;
+            row.addEventListener('dragstart', function(e) { e.stopPropagation(); _wpDragStart('yfield', _rWid, _rYi, e); });
+            row.addEventListener('dragover',  function(e) { _wpDragOver(e); });
+            row.addEventListener('dragleave', function(e) { _wpDragLeave(e); });
+            row.addEventListener('drop',      function(e) { _wpDrop('yfield', _rWid, _rYi, e); });
+          });
+          _ps.querySelectorAll('[data-drag-role="tablefield"]').forEach(function(row) {
+            var _rWid = row.dataset.wid; var _rYi = +row.dataset.yi;
+            row.addEventListener('dragstart', function(e) { e.stopPropagation(); _wpDragStart('field', _rWid, _rYi, e); });
+            row.addEventListener('dragover',  function(e) { _wpDragOver(e); });
+            row.addEventListener('dragleave', function(e) { _wpDragLeave(e); });
+            row.addEventListener('drop',      function(e) { _wpDrop('field', _rWid, _rYi, e); });
+          });
+          _ps.querySelectorAll('[data-drag-role="wp-drop-zone"]').forEach(function(zone) {
+            var _zWid = zone.dataset.wid; var _zSec = zone.dataset.section;
+            if (_zSec === 'table-field') {
+              zone.addEventListener('dragover',  function(e) { e.preventDefault(); zone.classList.add('drag-over'); });
+              zone.addEventListener('dragleave', function() { zone.classList.remove('drag-over'); });
+              zone.addEventListener('drop',      function(e) { onDropFieldToWidget(_zWid, e); });
+            } else {
+              zone.addEventListener('dragover',  function(e) { e.preventDefault(); zone.classList.add('drag-over'); });
+              zone.addEventListener('dragleave', function() { zone.classList.remove('drag-over'); });
+              zone.addEventListener('drop',      function(e) { _wpDropFieldToSection(_zWid, _zSec, e); });
+            }
+          });
+          _ps.querySelectorAll('[data-drag-role="wp-cond"]').forEach(function(row) {
+            var _rWid = row.dataset.wid; var _rIdx = +row.dataset.idx;
+            row.addEventListener('dragstart', function(e) { e.stopPropagation(); _wpDragStart('cond', _rWid, _rIdx, e); });
+            row.addEventListener('dragover',  function(e) { _wpDragOver(e); });
+            row.addEventListener('dragleave', function(e) { _wpDragLeave(e); });
+            row.addEventListener('drop',      function(e) { _wpDrop('cond', _rWid, _rIdx, e); });
+          });
+          _ps.querySelectorAll('[data-drag-role="wp-sort"]').forEach(function(row) {
+            var _rWid = row.dataset.wid; var _rIdx = +row.dataset.idx;
+            row.addEventListener('dragstart', function(e) { e.stopPropagation(); _wpDragStart('sort', _rWid, _rIdx, e); });
+            row.addEventListener('dragover',  function(e) { _wpDragOver(e); });
+            row.addEventListener('dragleave', function(e) { _wpDragLeave(e); });
+            row.addEventListener('drop',      function(e) { _wpDrop('sort', _rWid, _rIdx, e); });
+          });
+        }());
       }
 
 
@@ -3143,11 +3233,12 @@ function _renderBarLineOptionsHTML(w, wid) {
           const safeField = field.replace(/</g,'&lt;').replace(/>/g,'&gt;');
           const safeValue = String(value).replace(/</g,'&lt;').replace(/>/g,'&gt;');
           const escField  = field.replace(/'/g,"\\'");
-          chip.innerHTML = `<span style="font-size:10px">🔍</span>`
-            + `<span style="font-size:12px;font-weight:600;color:var(--accent,#0078d4)">${safeField}</span>`
-            + `<span style="font-size:11px;color:var(--text-secondary)">=</span>`
-            + `<span style="font-size:11px;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${safeValue}">${safeValue}</span>`
-            + `<button class="btn btn-ghost btn-sm btn-icon" style="padding:0 2px;font-size:10px" title="Clear drill filter for ${safeField}" onclick="clearDrillFilter('${escField}')">✕</button>`;
+          chip.innerHTML = '<span style="font-size:10px">🔍</span>'
+            + '<span style="font-size:12px;font-weight:600;color:var(--accent,#0078d4)">' + safeField + '</span>'
+            + '<span style="font-size:11px;color:var(--text-secondary)">=</span>'
+            + '<span style="font-size:11px;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + safeValue + '">' + safeValue + '</span>'
+            + '<button class="btn btn-ghost btn-sm btn-icon" style="padding:0 2px;font-size:10px" title="Clear drill filter for ' + safeField + '"'
+            + ' data-action="drill-clear-filter" data-field="' + _attrEnc(field) + '">✕</button>';
           bar.appendChild(chip);
         }
         // Highlight chip (👁 amber) — no re-query, purely visual
@@ -3157,11 +3248,12 @@ function _renderBarLineOptionsHTML(w, wid) {
           chip.style.cssText = 'display:flex;align-items:center;gap:5px;background:#fff4ce;border:1px solid #ffb900;padding:4px 8px;border-radius:var(--radius,4px)';
           const safeField = highlight.field.replace(/</g,'&lt;').replace(/>/g,'&gt;');
           const safeValue = String(highlight.value).replace(/</g,'&lt;').replace(/>/g,'&gt;');
-          chip.innerHTML = `<span style="font-size:10px">👁</span>`
-            + `<span style="font-size:12px;font-weight:600;color:#8a6914">${safeField}</span>`
-            + `<span style="font-size:11px;color:var(--text-secondary)">=</span>`
-            + `<span style="font-size:11px;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${safeValue}">${safeValue}</span>`
-            + `<button class="btn btn-ghost btn-sm btn-icon" style="padding:0 2px;font-size:10px" title="Clear highlight" onclick="_clearDrillHighlight()">✕</button>`;
+          chip.innerHTML = '<span style="font-size:10px">👁</span>'
+            + '<span style="font-size:12px;font-weight:600;color:#8a6914">' + safeField + '</span>'
+            + '<span style="font-size:11px;color:var(--text-secondary)">=</span>'
+            + '<span style="font-size:11px;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + safeValue + '">' + safeValue + '</span>'
+            + '<button class="btn btn-ghost btn-sm btn-icon" style="padding:0 2px;font-size:10px" title="Clear highlight"'
+            + ' data-action="drill-clear-highlight">✕</button>';
           bar.appendChild(chip);
         }
         // "Clear all" only for multiple drill filters
