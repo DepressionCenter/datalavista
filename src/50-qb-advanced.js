@@ -1655,6 +1655,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
             </div>`).join('');
 
           setTitle('Join Options');
+          var _keysConjCbKey = _dlvRegPopupCb(function(val) { setActiveJoinProp('keysConj', val); });
+          var _joinTypeCbKey = _dlvRegPopupCb(function(val) { setActiveJoinProp('type', val); renderAdvOptionsPanel('join', id); });
           body.innerHTML = `
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
               <div style="font-size:11px;font-weight:600;color:var(--text-disabled)">LEFT: ${leftAlias}</div>
@@ -1664,7 +1666,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
             ${isLookupJoin ? '' : `<span class="qb-badge" style="font-size:10px;padding:2px 8px;cursor:pointer;margin-left:4px"
               data-opts="${_attrEnc(JSON.stringify([{val:'AND',label:'AND'},{val:'OR',label:'OR'}]))}"
               data-cur="${_attrEnc(j.keysConj || 'AND')}"
-              data-js="${_attrEnc("setActiveJoinProp('keysConj',__V__)")}"
+              data-cb="${_keysConjCbKey}"
               onclick="showPropPopup(this)">${j.keysConj || 'AND'}</span>`}
           </div>
             <div id="adv-join-key-pairs">
@@ -1677,7 +1679,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
                 <span class="qb-badge" style="font-size:11px;padding:3px 10px"
                   data-opts="${_attrEnc(JSON.stringify(JOIN_TYPES.map(jt => ({ val: jt.val, label: jt.label }))))}"
                   data-cur="${_attrEnc(j.type)}"
-                  data-js="${_attrEnc("setActiveJoinProp('type',__V__); renderAdvOptionsPanel('join'," + id + ")")}"
+                  data-cb="${_joinTypeCbKey}"
                   onclick="showPropPopup(this)">${_attrEnc(JOIN_TYPES.find(jt => jt.val === j.type)?.label || j.type)}</span>
                 <span style="font-size:11px;color:var(--text-disabled)">${JOIN_TYPES.find(jt => jt.val === j.type)?.desc || ''}</span>
               </div>
@@ -1797,9 +1799,9 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           }));
           const renderNodeConditions = () => renderConditionRows(
             nd.conditions, condCols,
-            (ci, v) => `advNodeCond('${id}',${ci},'conj',${v})`,
+            function(ci, val) { advNodeCond(id, ci, 'conj', val); },
             (ci, v) => `advNodeCond('${id}',${ci},'field',${v})`,
-            (ci, v) => `advNodeCond('${id}',${ci},'op',${v})`,
+            function(ci, val) { advNodeCond(id, ci, 'op', val); },
             (ci, v) => `advNodeCondValOnly('${id}',${ci},${v})`,
             (ci)    => `advNodeRemoveCond('${id}',${ci})`,
             (ci)    => `draggable="true" ondragstart="event.stopPropagation();safeDragSet(event,{type:'adv-node-cond',nodeId:'${id}',idx:${ci}})"`,
@@ -1812,7 +1814,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           const renderNodeSorts = () => renderSortRows(
             nd.sorts, sortCols,
             (si, v) => `advNodeSort('${id}',${si},'field',${v})`,
-            (si, v) => `advNodeSort('${id}',${si},'dir',${v})`,
+            function(si, val) { advNodeSort(id, si, 'dir', val); },
             (si)    => `advNodeRemoveSort('${id}',${si})`,
             (si)    => `draggable="true" ondragstart="event.stopPropagation();safeDragSet(event,{type:'adv-node-sort',nodeId:'${id}',idx:${si}})"`
           );

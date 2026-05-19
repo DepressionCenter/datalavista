@@ -131,15 +131,9 @@ function attachEvents() {
 
   /* =========================================================================
      TOP TOOLBAR
-     Note: #btn-connect retains its HTML onclick="ensureInit();showConnectPopup()"
-     as a fallback in case scripts load late. Once 80-events.js executes, we
-     replace the handler so only showConnectPopup() fires (ensureInit already ran).
   ========================================================================= */
 
-  var btnConnect = document.getElementById('btn-connect');
-  if (btnConnect) {
-    btnConnect.onclick = function () { showConnectPopup(); };
-  }
+  on('btn-connect', 'click', function () { showConnectPopup(); });
 
   on('btn-save-config', 'click', function () { saveConfig(); });
 

@@ -2110,9 +2110,9 @@ function _renderBarLineOptionsHTML(w, wid) {
           var lineOpts = isLineType();
           var condRows = renderConditionRows(
             local.conditions, enrichedSeriesCols,
-            (ci, v) => `_dlvSeries.condUpdate(${ci},'conj',${v})`,
+            function(ci, val) { _s.condUpdate(ci, 'conj', val); },
             (ci, v) => `_dlvSeries.condUpdate(${ci},'field',${v})`,
-            (ci, v) => `_dlvSeries.condUpdate(${ci},'op',${v})`,
+            function(ci, val) { _s.condUpdate(ci, 'op', val); },
             (ci, v) => `_dlvSeries.condUpdate(${ci},'value',${v})`,
             (ci)    => `_dlvSeries.condRemove(${ci})`,
             null,
@@ -2376,9 +2376,9 @@ function _renderBarLineOptionsHTML(w, wid) {
         // ── Filter conditions ────────────────────────────────────────────
         const renderConditions = () => renderConditionRows(
           conditions, enrichedCols,
-          (ci, v) => `widgetUpdateCond('${wid}',${ci},'conj',${v})`,
+          function(ci, val) { widgetUpdateCond(wid, ci, 'conj', val); },
           (ci, v) => `widgetUpdateCond('${wid}',${ci},'field',${v})`,
-          (ci, v) => `widgetUpdateCond('${wid}',${ci},'op',${v})`,
+          function(ci, val) { widgetUpdateCond(wid, ci, 'op', val); },
           (ci, v) => `widgetUpdateCond('${wid}',${ci},'value',${v})`,
           (ci)    => `widgetRemoveCond('${wid}',${ci})`,
           (ci)    => `draggable="true" ondragstart="_wpDragStart('cond','${wid}',${ci},event)" ondragover="_wpDragOver(event)" ondragleave="_wpDragLeave(event)" ondrop="_wpDrop('cond','${wid}',${ci},event)"`,
@@ -2390,7 +2390,7 @@ function _renderBarLineOptionsHTML(w, wid) {
         const renderSorts = () => renderSortRows(
           sorts, cols,
           (si, v) => `widgetUpdateSort('${wid}',${si},'field',${v})`,
-          (si, v) => `widgetUpdateSort('${wid}',${si},'dir',${v})`,
+          function(si, val) { widgetUpdateSort(wid, si, 'dir', val); },
           (si)    => `widgetRemoveSort('${wid}',${si})`,
           (si)    => `draggable="true" ondragstart="_wpDragStart('sort','${wid}',${si},event)" ondragover="_wpDragOver(event)" ondragleave="_wpDragLeave(event)" ondrop="_wpDrop('sort','${wid}',${si},event)"`
         );

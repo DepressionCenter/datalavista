@@ -36,6 +36,18 @@ function _attrEnc(s) {
 }
 
 // ============================================================
+// PROP-POPUP CALLBACK REGISTRY
+// Stores real closures for showPropPopup — no new Function() / eval needed.
+// ============================================================
+var _dlvPopupCbs = {};
+var _dlvPopupCbId = 0;
+function _dlvRegPopupCb(fn) {
+  var id = 'pc' + (++_dlvPopupCbId);
+  _dlvPopupCbs[id] = fn;
+  return id;
+}
+
+// ============================================================
 // OP SYMBOL HELPER
 // ============================================================
 function getOpSymbol(label) {
@@ -55,18 +67,18 @@ function getOpSymbol(label) {
 // Generic floating picker popup. The trigger element stores its config in data-* attributes:
 //   data-opts  JSON array of {val, label} objects
 //   data-cur   current selected value (string)
-//   data-js    JS handler template — __V__ is replaced with JSON.stringify(selectedVal)
+//   data-cb    key into _dlvPopupCbs — callback(selectedVal) is called on pick (CSP-safe)
 //   data-fmt   optional "symbol" → badge text is set via getOpSymbol(label)
 function showPropPopup(btn) {
   document.querySelectorAll('.dlv-prop-popup').forEach(p => { p['_dlvCleanup'] && p['_dlvCleanup'](); p.remove(); });
 
-  let opts, cur, tpl;
+  var opts, cur, cb;
   try {
     opts = JSON.parse(btn.dataset.opts || '[]');
     cur  = btn.dataset.cur || '';
-    tpl  = btn.dataset.js  || '';
+    cb   = btn.dataset.cb ? _dlvPopupCbs[btn.dataset.cb] : null;
   } catch (e) { return; }
-  if (!opts.length || !tpl) return;
+  if (!opts.length || !cb) return;
 
   const isSym = btn.dataset.fmt === 'symbol';
 
@@ -88,8 +100,7 @@ function showPropPopup(btn) {
         popup.remove();
         btn.textContent = isSym ? getOpSymbol(o.label || String(o.val)) : (o.label || String(o.val));
         btn.dataset.cur = String(o.val);
-        const js = tpl.replace(/__V__/g, JSON.stringify(o.val));
-        try { new Function(js)(); } catch (ex) { console.error('[DLV] prop popup handler error:', ex, js); }
+        cb(o.val);
       });
       colDiv.appendChild(item);
     });
@@ -142,16 +153,16 @@ function showPropPopup(btn) {
  * @param {Array}    conditions   Array of {conj, field, op, value, value2?, elementKey?}
  * @param {Array}    cols         Column options — string alias OR
  *                                {alias, displayType, tableKey?, fieldInternalName?}
- * @param {Function} conjJS       (ci, jsValExpr) => string   inline JS for conjunction change
+ * @param {Function} conjFn       (ci, val) => void   handler for conjunction change
  * @param {Function} fieldJS      (ci, jsValExpr) => string   inline JS for field change
- * @param {Function} opJS         (ci, jsValExpr) => string   inline JS for op change
+ * @param {Function} opFn         (ci, val) => void   handler for op change
  * @param {Function} valJS        (ci, jsValExpr) => string   inline JS for value change
  * @param {Function} removeJS     (ci) => string              inline JS for remove click
  * @param {Function} [rowAttrs]   (ci) => string              optional extra attrs on the row div
  * @param {Function} [val2JS]     (ci, jsValExpr) => string   inline JS for BETWEEN second value
  * @param {Function} [elementKeyJS] (ci, jsValExpr) => string inline JS for object/array element key change
  */
-function renderConditionRows(conditions, cols, conjJS, fieldJS, opJS, valJS, removeJS, rowAttrs, val2JS, elementKeyJS) {
+function renderConditionRows(conditions, cols, conjFn, fieldJS, opFn, valJS, removeJS, rowAttrs, val2JS, elementKeyJS) {
   if (!conditions.length)
     return '<div style="font-size:11px;color:var(--text-disabled);padding:2px 0">No filters — click + Add</div>';
 
@@ -224,13 +235,13 @@ function renderConditionRows(conditions, cols, conjJS, fieldJS, opJS, valJS, rem
     const selectedOp = ops.find(o => o.val === c.op) || ops[0];
     const opSymbol   = getOpSymbol(selectedOp ? selectedOp.label : c.op);
     const opTitle    = selectedOp ? selectedOp.label : '';
-    const opTpl      = opJS(ci, '__V__');
     const opOpts     = JSON.stringify(ops.map(o => ({ val: o.val, label: o.label })));
+    const _opCbKey   = _dlvRegPopupCb(function(val) { opFn(ci, val); });
     const opSelectHTML =
       '<span class="qb-badge qb-op-badge" title="' + _attrEnc(opTitle) + '" data-fmt="symbol"'
       + ' data-opts="' + _attrEnc(opOpts) + '"'
       + ' data-cur="' + _attrEnc(selectedOp ? selectedOp.val : c.op) + '"'
-      + ' data-js="' + _attrEnc(opTpl) + '"'
+      + ' data-cb="' + _opCbKey + '"'
       + ' onclick="showPropPopup(this)">' + _attrEnc(opSymbol) + '</span>';
 
     // ── value input ───────────────────────────────────────────────────────────
@@ -251,13 +262,13 @@ function renderConditionRows(conditions, cols, conjJS, fieldJS, opJS, valJS, rem
     if (ci === 0) {
       rowPrefix = '';
     } else {
-      const conjTpl  = conjJS(ci, '__V__');
-      const conjOpts = JSON.stringify([{ val: 'AND', label: 'AND' }, { val: 'OR', label: 'OR' }]);
+      const _conjCbKey = _dlvRegPopupCb(function(val) { conjFn(ci, val); });
+      const conjOpts   = JSON.stringify([{ val: 'AND', label: 'AND' }, { val: 'OR', label: 'OR' }]);
       rowPrefix =
         '<span class="qb-badge qb-conj-badge"'
         + ' data-opts="' + _attrEnc(conjOpts) + '"'
         + ' data-cur="' + _attrEnc(c.conj || 'AND') + '"'
-        + ' data-js="' + _attrEnc(conjTpl) + '"'
+        + ' data-cb="' + _conjCbKey + '"'
         + ' onclick="showPropPopup(this)">' + _attrEnc(c.conj || 'AND') + '</span>';
     }
 
@@ -281,12 +292,12 @@ function renderConditionRows(conditions, cols, conjJS, fieldJS, opJS, valJS, rem
  *
  * @param {Array}    sorts      Array of {field, dir}
  * @param {Array}    cols       Available column options (strings or {alias} objects)
- * @param {Function} fieldJS   (si, jsValExpr) => string
- * @param {Function} dirJS     (si, jsValExpr) => string
- * @param {Function} removeJS  (si) => string
+ * @param {Function} fieldJS  (si, jsValExpr) => string
+ * @param {Function} dirFn    (si, val) => void   handler for direction change
+ * @param {Function} removeJS (si) => string
  * @param {Function} [rowAttrs] (si) => string  optional extra attrs on the row div
  */
-function renderSortRows(sorts, cols, fieldJS, dirJS, removeJS, rowAttrs) {
+function renderSortRows(sorts, cols, fieldJS, dirFn, removeJS, rowAttrs) {
   if (!sorts.length)
     return '<div style="font-size:11px;color:var(--text-disabled);padding:2px 0">No sorts — click + Add</div>';
 
@@ -303,13 +314,13 @@ function renderSortRows(sorts, cols, fieldJS, dirJS, removeJS, rowAttrs) {
       return `<option value="${alias}" ${alias === s.field ? 'selected' : ''}>${alias}</option>`;
     }).join('');
 
-    const dirTpl  = dirJS(si, '__V__');
-    const dirOpts = JSON.stringify([{ val: 'ASC', label: 'ASC' }, { val: 'DESC', label: 'DESC' }]);
+    const _dirCbKey = _dlvRegPopupCb(function(val) { dirFn(si, val); });
+    const dirOpts   = JSON.stringify([{ val: 'ASC', label: 'ASC' }, { val: 'DESC', label: 'DESC' }]);
     const dirBadge =
       '<span class="qb-badge qb-dir-badge"'
       + ' data-opts="' + _attrEnc(dirOpts) + '"'
       + ' data-cur="' + _attrEnc(s.dir || 'ASC') + '"'
-      + ' data-js="' + _attrEnc(dirTpl) + '"'
+      + ' data-cb="' + _dirCbKey + '"'
       + ' onclick="showPropPopup(this)">' + _attrEnc(s.dir || 'ASC') + '</span>';
 
     return `<div class="qb-sort-row" ${extraAttrs}>
