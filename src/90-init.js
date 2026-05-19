@@ -225,6 +225,15 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
     try { applyDlvEChartsTheme(); } catch(err) { console.warn('Unable to initialize eCharts theme.', err); }
     try { attachEvents(); } catch(err) { console.error('Unable to initialize event handling.', err); }
 
+    // Phase 4-B: scoped delegation for data-dd-action clicks inside the DD popup.
+    // Registered once here so _ddSetSearch (IIFE-scoped) is reachable without a global.
+    var _ddOverlayEl = document.getElementById('dd-overlay');
+    if (_ddOverlayEl) {
+      delegateOn(_ddOverlayEl, '[data-dd-action]', 'click', function(e, el) {
+        _ddSetSearch(el.dataset.value || '');
+      });
+    }
+
     if (DataLaVistaState.reportMode === 'view') {
         /* *** DATALAVISTA REPORT VIEW MODE *** */
         swapReportMode('view'); // Apply report mode UI classes and button visibility

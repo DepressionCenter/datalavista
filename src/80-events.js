@@ -196,6 +196,21 @@ function attachEvents() {
 
 
   /* =========================================================================
+     DATA DICTIONARY POPUP
+  ========================================================================= */
+  var ddOverlay = document.getElementById('dd-overlay');
+  if (ddOverlay) {
+    ddOverlay.addEventListener('click', function(e) {
+      if (e.target === ddOverlay) { ddOverlay.style.display = 'none'; }
+    });
+  }
+  on('dd-close-btn',        'click', function() { var o = document.getElementById('dd-overlay'); if (o) o.style.display = 'none'; });
+  on('dd-footer-close-btn', 'click', function() { var o = document.getElementById('dd-overlay'); if (o) o.style.display = 'none'; });
+  on('dd-csv-btn',          'click', function() { _ddDownloadCSV(); });
+  on('dd-search',           'input', function(e) { _ddFilterCards(/** @type {HTMLInputElement} */ (e.target).value); });
+
+
+  /* =========================================================================
      FIELDS PANEL (Query tab — left panel)
   ========================================================================= */
   on('btn-expand-all-tables',   'click', function () { expandAllTables(); });

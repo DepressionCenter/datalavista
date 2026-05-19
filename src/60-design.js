@@ -3278,11 +3278,9 @@ function _ddSectionHeader(label) {
 }
 
 function _ddChips(category, entryType) {
-  const catJs = category.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-  const etJs  = entryType.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
   return '<div class="dd-card-meta" style="margin-bottom:6px">'
-    + '<span class="dd-cat-chip dd-clickable" onclick="_ddSetSearch(\'' + catJs + '\')">' + _attrEnc(category) + '</span>'
-    + '<span class="dd-type-chip dd-clickable" onclick="_ddSetSearch(\'' + etJs + '\')">' + _attrEnc(entryType) + '</span>'
+    + '<span class="dd-cat-chip dd-clickable" data-dd-action="search" data-value="' + _attrEnc(category) + '">' + _attrEnc(category) + '</span>'
+    + '<span class="dd-type-chip dd-clickable" data-dd-action="search" data-value="' + _attrEnc(entryType) + '">' + _attrEnc(entryType) + '</span>'
     + '</div>';
 }
 
@@ -3548,8 +3546,7 @@ function _ddRenderCards(filterText) {
           const dsTipPart1  = _dsSiteTitle ? '<strong>' + _attrEnc(_dsSiteTitle) + '</strong><br>' : '';
           const dsTipPart2  = _dsDesc ? _attrEnc(_dsDesc) : '';
           const _dsTipAttr  = (dsTipPart1 || dsTipPart2) ? ' data-dlv-tip="' + _attrEnc(dsTipPart1 + dsTipPart2) + '"' : '';
-          const _dsJs       = _dsAlias.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-          crumbs.push('<span class="dd-crumb dd-crumb-ds dd-clickable" onclick="_ddSetSearch(\'' + _dsJs + '\')"'
+          crumbs.push('<span class="dd-crumb dd-crumb-ds dd-clickable" data-dd-action="search" data-value="' + _attrEnc(_dsAlias) + '"'
             + _dsTipAttr + '>Data Source: ' + _dsNameHtml + '</span>');
         }
         if (m.sourceTableName) {
@@ -3561,8 +3558,7 @@ function _ddRenderCards(filterText) {
           const _tblNameHtml = _attrEnc(_tblDisplay)
             + (hasTblDiff ? ' <span style="opacity:.6;font-size:10px">[' + _attrEnc(_tblInt) + ']</span>' : '');
           const _tblTipAttr  = _tblDesc ? ' data-dlv-tip="' + _attrEnc(_tblDesc) + '"' : '';
-          const _tblJs       = _tblDisplay.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-          crumbs.push('<span class="dd-crumb dd-crumb-table dd-clickable" onclick="_ddSetSearch(\'' + _tblJs + '\')"'
+          crumbs.push('<span class="dd-crumb dd-crumb-table dd-clickable" data-dd-action="search" data-value="' + _attrEnc(_tblDisplay) + '"'
             + _tblTipAttr + '>Table: ' + _tblNameHtml + '</span>');
         }
         if (m.viewName) {
@@ -3576,15 +3572,13 @@ function _ddRenderCards(filterText) {
           const vTipPart1     = _viewTxtDesc ? _attrEnc(_viewTxtDesc) + '<br><br>' : '';
           const vTipContent   = vTipPart1 + '<em>' + _attrEnc(viewNote) + '</em>';
           const _viewTipAttr  = ' data-dlv-tip="' + _attrEnc(vTipContent) + '"';
-          const _viewJs       = _viewAlias.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-          crumbs.push('<span class="dd-crumb dd-crumb-view dd-clickable" onclick="_ddSetSearch(\'' + _viewJs + '\')"'
+          crumbs.push('<span class="dd-crumb dd-crumb-view dd-clickable" data-dd-action="search" data-value="' + _attrEnc(_viewAlias) + '"'
             + _viewTipAttr + '>View: ' + _viewNameHtml + '</span>');
         }
         const _fieldDisplay = m.sourceDisplayName || m.sourceInternalName || col;
         const _intSuffix    = (m.sourceInternalName && m.sourceInternalName !== _fieldDisplay)
           ? ' <span style="opacity:.6;font-size:10px">[' + _attrEnc(m.sourceInternalName) + ']</span>' : '';
-        const _fieldJs      = _fieldDisplay.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-        crumbs.push('<span class="dd-crumb dd-crumb-field dd-clickable" onclick="_ddSetSearch(\'' + _fieldJs + '\')">'
+        crumbs.push('<span class="dd-crumb dd-crumb-field dd-clickable" data-dd-action="search" data-value="' + _attrEnc(_fieldDisplay) + '">'
           + 'Field: ' + _attrEnc(_fieldDisplay) + _intSuffix + '</span>');
         breadcrumbHtml = '<div class="dd-breadcrumb">'
           + crumbs.join('<span class="dd-arrow">&#x203A;</span>') + '</div>';
@@ -3828,45 +3822,10 @@ function _ddDownloadCSV() {
 }
 
 function openDataDictionaryPopup() {
-  const _ddExisting = document.getElementById('dd-overlay');
-  if (_ddExisting) _ddExisting.remove();
-
-  const overlay = document.createElement('div');
-  overlay.id = 'dd-overlay';
-  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:flex-start;justify-content:center;padding:40px 20px;overflow-y:auto';
-  overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
-
-  const dialog = document.createElement('div');
-  dialog.style.cssText = 'background:var(--surface);border-radius:var(--radius-lg);box-shadow:var(--shadow-lg);width:780px;max-width:calc(100vw - 40px);display:flex;flex-direction:column;animation:popIn 200ms ease;max-height:calc(100vh - 100px)';
-
-  const searchRow = '<div style="padding:12px 20px 0">'
-    + '<input id="dd-search" type="text" class="form-input" placeholder="Search fields, tables, data sources, views..." '
-    + 'style="width:100%" />'
-    + '</div>';
-
-  dialog.innerHTML =
-    '<div class="popup-header">'
-    + '<div><h2 style="font-size:16px;font-weight:600;margin:0 0 2px">Data Dictionary</h2>'
-    + '<div style="font-size:11px;color:var(--text-secondary)">Data sources, tables, views, and fields — read left to right</div></div>'
-    + '<button class="btn btn-ghost btn-icon" onclick="document.getElementById(\'dd-overlay\').remove()">&#x2715;</button>'
-    + '</div>'
-    + searchRow
-    + '<div id="dd-body" style="padding:16px 20px;overflow-y:auto;flex:1;min-height:100px"></div>'
-    + '<div class="popup-footer">'
-    + '<button class="btn btn-primary btn-sm" onclick="document.getElementById(\'dd-overlay\').remove()">Close</button>'
-    + '</div>';
-
-  var _ddSearchEl = dialog.querySelector('#dd-search');
-  if (_ddSearchEl) _ddSearchEl.addEventListener('input', function(e) { _ddFilterCards(/** @type {HTMLInputElement} */ (e.target).value); });
-
-  var _ddCsvBtn = document.createElement('button');
-  _ddCsvBtn.className = 'btn btn-ghost btn-sm';
-  _ddCsvBtn.textContent = 'Download CSV';
-  _ddCsvBtn.addEventListener('click', _ddDownloadCSV);
-  var _ddFooter = dialog.querySelector('.popup-footer');
-  if (_ddFooter) _ddFooter.prepend(_ddCsvBtn);
-
-  overlay.appendChild(dialog);
-  document.body.appendChild(overlay);
+  var overlay = document.getElementById('dd-overlay');
+  if (!overlay) return;
+  overlay.style.display = 'flex';
+  var searchEl = document.getElementById('dd-search');
+  if (searchEl) /** @type {HTMLInputElement} */ (searchEl).value = '';
   _ddRenderCards('');
 }
