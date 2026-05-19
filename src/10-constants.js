@@ -924,7 +924,7 @@ function condToSQL(c, colExpr, displayType) {
       return `${colExpr} IS NULL`;
     }
     if (dt === 'text' || dt === 'default' || dt === '') {
-      return `TRIM(COALESCE(${colExpr}, '')) IN ('', 'null', 'NULL', '\\N', 'undefined', '#N/A', '#NA', '#VALUE!', '#REF!', 'NaN')`;
+      return `(${colExpr} IS NULL OR TRIM(COALESCE(${colExpr}, '')) IN ('', 'null', 'NULL', 'undefined', '#N/A', '#NA', '#VALUE!', '#REF!', 'NaN'))`;
     }
     return `${colExpr} IS NULL`;
   }
@@ -936,7 +936,7 @@ function condToSQL(c, colExpr, displayType) {
       return `${colExpr} IS NOT NULL`;
     }
     if (dt === 'text' || dt === 'default' || dt === '') {
-      return `TRIM(COALESCE(${colExpr}, '')) NOT IN ('', 'null', 'NULL', '\\N', 'undefined', '#N/A', '#NA', '#VALUE!', '#REF!', 'NaN')`;
+      return `(${colExpr} IS NOT NULL AND TRIM(COALESCE(${colExpr}, '')) NOT IN ('', 'null', 'NULL', 'undefined', '#N/A', '#NA', '#VALUE!', '#REF!', 'NaN'))`;
     }
     return `${colExpr} IS NOT NULL`;
   }
