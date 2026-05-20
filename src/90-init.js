@@ -148,9 +148,57 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 
 
 
+  // Injects the app shell HTML into #dlv-root when running from the minimal shell
+  // (DataLaVista.html / DataLaVista-nojs.html). _DLV_SHELL_HTML is set by the build script.
+  // No-ops when running from 00-full-page.html (no #dlv-root present).
+  function _dlvInjectShell() {
+    var root = document.getElementById('dlv-root');
+    if (!root || root.dataset.dlvReady) { return; }
+    if (typeof _DLV_SHELL_HTML === 'undefined') { return; }
+    if (typeof _DLV_HEAD_CSS !== 'undefined' && !document.getElementById('dlv-styles')) {
+      document.head.insertAdjacentHTML('beforeend', _DLV_HEAD_CSS);
+    }
+    root.innerHTML = _DLV_SHELL_HTML;
+    root.dataset.dlvReady = '1';
+  }
+
+  function _dlvLoadScript(src, integrity, crossOrigin) {
+    return new Promise(function(resolve) {
+      var s = document.createElement('script');
+      s.src = src;
+      if (integrity) { s.integrity = integrity; }
+      if (crossOrigin) { s.crossOrigin = crossOrigin; }
+      s.onload = resolve;
+      s.onerror = function() { console.warn('DLV: failed to load ' + src); resolve(); };
+      document.head.appendChild(s);
+    });
+  }
+
+  async function _dlvLoadCdnDeps() {
+    if (!document.getElementById('dlv-root')) { return; }
+    if (typeof _DLV_CDN_DEPS === 'undefined') { return; }
+    if (typeof alasql !== 'undefined') { return; }
+    var groups = _DLV_CDN_DEPS;
+    // Suppress SharePoint's AMD/RequireJS define() so UMD scripts (alasql, xlsx)
+    // fall back to global mode instead of conflicting with SP's anonymous define check.
+    var savedDefine = window.define;
+    window.define = undefined;
+    for (var i = 0; i < groups[0].length; i++) {
+      await _dlvLoadScript(groups[0][i].src, groups[0][i].integrity, groups[0][i].crossorigin);
+    }
+    window.define = savedDefine;
+    if (groups[1] && groups[1].length) {
+      Promise.all(groups[1].map(function(d) {
+        return _dlvLoadScript(d.src, d.integrity, d.crossorigin);
+      }));
+    }
+  }
+
   /* *** INIT FUNCTION *** */
   // Main initialization function to set up event listeners, resizers, and default states.
   async function init() {
+    _dlvInjectShell();
+    await _dlvLoadCdnDeps();
     if (DataLaVistaState && DataLaVistaState._initialized) return;
     // If a different build already ran init (e.g. CDN + SiteAssets both loaded),
     // window.DataLaVistaState points to the other build's state object.
@@ -224,6 +272,15 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 
     try { applyDlvEChartsTheme(); } catch(err) { console.warn('Unable to initialize eCharts theme.', err); }
     try { attachEvents(); } catch(err) { console.error('Unable to initialize event handling.', err); }
+
+    // Phase 4-B: scoped delegation for data-dd-action clicks inside the DD popup.
+    // Registered once here so _ddSetSearch (IIFE-scoped) is reachable without a global.
+    var _ddOverlayEl = document.getElementById('dd-overlay');
+    if (_ddOverlayEl) {
+      delegateOn(_ddOverlayEl, '[data-dd-action]', 'click', function(e, el) {
+        _ddSetSearch(el.dataset.value || '');
+      });
+    }
 
     if (DataLaVistaState.reportMode === 'view') {
         /* *** DATALAVISTA REPORT VIEW MODE *** */

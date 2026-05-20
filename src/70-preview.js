@@ -97,7 +97,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
             var _optHtml = '';
             for (var _oi = 0; _oi < values.length; _oi++) { _optHtml += '<option>' + values[_oi] + '</option>'; }
             wrap.innerHTML = '<span style="font-size:11px;font-weight:600">' + filter.label + ':</span>'
-              + '<select class="filter-chip-select" onchange="applyPreviewFilterAndRender(\'' + filter.field + '\', this.value)">'
+              + '<select class="filter-chip-select" data-action="preview-filter-change" data-field="' + _attrEnc(filter.field) + '">'
               + _optHtml + '</select>';
             filterBar.appendChild(wrap);
           }

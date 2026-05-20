@@ -23,7 +23,6 @@
 
 $ErrorActionPreference = 'Stop'
 $SRC = 'src'
-$PlaceholderPattern = '(?s)<!-- DATALAVISTA_SCRIPTS_PLACEHOLDER_OPEN -->.*?<!-- DATALAVISTA_SCRIPTS_PLACEHOLDER_CLOSE -->'
 
 # Read license template and substitute {GIT_HASH} placeholder if present
 $SourceHash = (& git rev-parse --short HEAD 2>$null)
@@ -69,19 +68,34 @@ function Strip-LicenseHtml {
 }
 
 # ── Strip license from HTML template once; reuse the clean copy ───────────────
-$CleanTemplate = Strip-LicenseHtml ([System.IO.File]::ReadAllText("$SRC\00-full-page.html", [System.Text.Encoding]::UTF8))
+$RawHtml = [System.IO.File]::ReadAllText("$SRC\00-full-page.html", [System.Text.Encoding]::UTF8)
+$CleanTemplate = Strip-LicenseHtml $RawHtml
 $HtmlLicenseComment = "<!--`n$LicenseText`n-->`n"
 
-# ── Helper: replace placeholder and write HTML output with license prepended ──
-function Write-HtmlOutput {
-    param([string]$Snippet, [string]$OutputPath)
-    $result = [regex]::Replace(
-        $CleanTemplate,
-        $PlaceholderPattern,
-        [System.Text.RegularExpressions.MatchEvaluator]{ param($m) $Snippet }
-    )
-    [System.IO.File]::WriteAllText($OutputPath, ($HtmlLicenseComment + $result), [System.Text.Encoding]::UTF8)
-}
+# ── Extract body content for _DLV_SHELL_HTML ─────────────────────────────────
+# Extract inner body content (between <body> and </body>), strip the scripts placeholder block.
+$bodyMatch = [regex]::Match($RawHtml, '(?s)<body>(.*)</body>')
+$bodyRaw = $bodyMatch.Groups[1].Value
+$bodyContent = [regex]::Replace($bodyRaw, '(?s)\s*<!-- DATALAVISTA_SCRIPTS_PLACEHOLDER_OPEN -->.*?<!-- DATALAVISTA_SCRIPTS_PLACEHOLDER_CLOSE -->', '')
+$ShellHtmlJson = $bodyContent | ConvertTo-Json -Compress
+$ShellHtmlVar = 'var _DLV_SHELL_HTML = ' + $ShellHtmlJson + ';'
+
+# ── Extract CSS head content for _DLV_HEAD_CSS ───────────────────────────────
+# Collect <link rel="stylesheet"> tags and the <style>...</style> block from the source head.
+$linkTagMatches = [regex]::Matches($RawHtml, '<link[^>]+rel=["\x27]stylesheet["\x27][^>]*/>')
+$styleContent   = [regex]::Match($RawHtml, '(?s)<style>(.*?)</style>').Groups[1].Value
+$headCssHtml    = ($linkTagMatches | ForEach-Object { $_.Value }) -join "`n"
+$headCssHtml   += "`n<style id=`"dlv-styles`">$styleContent</style>"
+$DlvHeadCssJson = $headCssHtml | ConvertTo-Json -Compress
+$DlvHeadCssVar  = 'var _DLV_HEAD_CSS = ' + $DlvHeadCssJson + ';'
+
+# ── Extract <head>...</head> for the minimal shell output ─────────────────────
+# Strip the CSS (link tags + style block) so the shell head only has CDN scripts.
+$headEnd = $CleanTemplate.IndexOf('</head>') + '</head>'.Length
+$HeadSection = $CleanTemplate.Substring(0, $headEnd)
+$HeadSection = [regex]::Replace($HeadSection, '\s*<link[^>]+rel=["\x27]stylesheet["\x27][^>]*/>', '')
+$HeadSection = [regex]::Replace($HeadSection, '(?s)\s*<!--[^-]*Custom styles[^-]*-->\s*<style>.*?</style>', '')
+
 
 
 # ── 1. Build datalavista.js ──────────────────────────────────────────────────
@@ -104,20 +118,21 @@ $minifiedPath = "$env:TEMP\dlv_js_minified.js"
 [System.IO.File]::WriteAllText($bodyPath, $bodySb.ToString(), [System.Text.Encoding]::UTF8)
 & $EsBuild $bodyPath --bundle=false --platform=browser --minify-whitespace --minify-syntax --log-level=error "--outfile=$minifiedPath"
 $minifiedBody = [System.IO.File]::ReadAllText($minifiedPath, [System.Text.Encoding]::UTF8)
-$finalJs = "/* ============================================================`n$LicenseText`n================================================================ */`n`n" + $minifiedBody
+$finalJs = "/* ============================================================`n$LicenseText`n================================================================ */`n`n" + $ShellHtmlVar + "`n" + $DlvHeadCssVar + "`n`n" + $minifiedBody
 [System.IO.File]::WriteAllText('datalavista.js', $finalJs, [System.Text.Encoding]::UTF8)
 $lineCount = (Get-Content 'datalavista.js').Count
 Write-Host "  -> datalavista.js ($lineCount lines)"
 
 # ── 2. Build DataLaVista-nojs.html ─────────────────────────────────────────
 Write-Host 'Building DataLaVista-nojs.html...'
-[System.IO.File]::WriteAllText('DataLaVista-nojs.html', ($HtmlLicenseComment + $CleanTemplate), [System.Text.Encoding]::UTF8)
+$noJsShell = "<!DOCTYPE html>`n" + $HeadSection + "`n<body>`n  <div id=`"dlv-root`"></div>`n  <script src=`"datalavista.js`"></script>`n</body>`n</html>"
+[System.IO.File]::WriteAllText('DataLaVista-nojs.html', ($HtmlLicenseComment + $noJsShell), [System.Text.Encoding]::UTF8)
 Write-Host '  -> DataLaVista-nojs.html'
 
 # ── 3. Build DataLaVista.html (inline) ──────────────────────────────────────
 Write-Host 'Building DataLaVista.html (inline)...'
-$inlineSnippet = "  <script>`n" + $minifiedBody.TrimEnd() + "`n  </script>"
-Write-HtmlOutput $inlineSnippet 'DataLaVista.html'
+$inlineShell = "<!DOCTYPE html>`n" + $HeadSection + "`n<body>`n  <div id=`"dlv-root`"></div>`n  <script>`n" + $ShellHtmlVar + "`n" + $DlvHeadCssVar + "`n" + $minifiedBody.TrimEnd() + "`n  </script>`n</body>`n</html>"
+[System.IO.File]::WriteAllText('DataLaVista.html', ($HtmlLicenseComment + $inlineShell), [System.Text.Encoding]::UTF8)
 Write-Host '  -> DataLaVista.html'
 
 Write-Host ''

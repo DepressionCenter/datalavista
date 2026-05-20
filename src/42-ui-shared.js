@@ -153,16 +153,16 @@ function showPropPopup(btn) {
  * @param {Array}    conditions   Array of {conj, field, op, value, value2?, elementKey?}
  * @param {Array}    cols         Column options — string alias OR
  *                                {alias, displayType, tableKey?, fieldInternalName?}
- * @param {Function} conjFn       (ci, val) => void   handler for conjunction change
- * @param {Function} fieldJS      (ci, jsValExpr) => string   inline JS for field change
- * @param {Function} opFn         (ci, val) => void   handler for op change
- * @param {Function} valJS        (ci, jsValExpr) => string   inline JS for value change
- * @param {Function} removeJS     (ci) => string              inline JS for remove click
- * @param {Function} [rowAttrs]   (ci) => string              optional extra attrs on the row div
- * @param {Function} [val2JS]     (ci, jsValExpr) => string   inline JS for BETWEEN second value
- * @param {Function} [elementKeyJS] (ci, jsValExpr) => string inline JS for object/array element key change
+ * @param {Function} conjFn         (ci, val) => void   handler for conjunction change
+ * @param {Function} fieldFn        (ci, val) => void   handler for field change
+ * @param {Function} opFn           (ci, val) => void   handler for op change
+ * @param {Function} valFn          (ci, val) => void   handler for value change
+ * @param {Function} removeFn       (ci) => void        handler for remove click
+ * @param {Function} [rowAttrs]     (ci) => string      optional extra attrs on the row div
+ * @param {Function} [val2Fn]       (ci, val) => void   handler for BETWEEN second value
+ * @param {Function} [elementKeyFn] (ci, val) => void   handler for element key change
  */
-function renderConditionRows(conditions, cols, conjFn, fieldJS, opFn, valJS, removeJS, rowAttrs, val2JS, elementKeyJS) {
+function renderConditionRows(conditions, cols, conjFn, fieldFn, opFn, valFn, removeFn, rowAttrs, val2Fn, elementKeyFn) {
   if (!conditions.length)
     return '<div style="font-size:11px;color:var(--text-disabled);padding:2px 0">No filters — click + Add</div>';
 
@@ -225,10 +225,13 @@ function renderConditionRows(conditions, cols, conjFn, fieldJS, opFn, valJS, rem
     }).join('');
 
     // ── element key dropdown ──────────────────────────────────────────────────
+    const _ekCbKey = (needsElementKey && elementKeyFn) ? _dlvRegPopupCb(function(val) { elementKeyFn(ci, val); }) : '';
     const elemKeyDropdown = needsElementKey
-      ? `<select class="form-input qb-element-key-select" style="max-width:110px" onchange="${elementKeyJS ? elementKeyJS(ci, 'this.value') : ''}">
-          ${objectKeys.map(k => `<option value="${k.key}" ${k.key === selectedElemKey ? 'selected' : ''}>${k.key}</option>`).join('')}
-        </select>`
+      ? '<select class="form-input qb-element-key-select" style="max-width:110px"'
+        + (_ekCbKey ? ' data-action="dlv-cb" data-cb="' + _ekCbKey + '"' : '')
+        + '>'
+        + objectKeys.map(k => '<option value="' + _attrEnc(k.key) + '"' + (k.key === selectedElemKey ? ' selected' : '') + '>' + k.key + '</option>').join('')
+        + '</select>'
       : '';
 
     // ── op badge (floating popup) ─────────────────────────────────────────────
@@ -242,19 +245,19 @@ function renderConditionRows(conditions, cols, conjFn, fieldJS, opFn, valJS, rem
       + ' data-opts="' + _attrEnc(opOpts) + '"'
       + ' data-cur="' + _attrEnc(selectedOp ? selectedOp.val : c.op) + '"'
       + ' data-cb="' + _opCbKey + '"'
-      + ' onclick="showPropPopup(this)">' + _attrEnc(opSymbol) + '</span>';
+      + ' data-action="show-prop-popup">' + _attrEnc(opSymbol) + '</span>';
 
     // ── value input ───────────────────────────────────────────────────────────
     const valInputOptions = {
-      op:            c.op,
-      value2:        c.value2  || '',
-      val2HandlerJS: val2JS ? val2JS(ci, 'this.value') : '',
+      op:        c.op,
+      value2:    c.value2 || '',
+      val2Fn:    val2Fn ? function(v) { val2Fn(ci, v); } : null,
       tableKey,
-      fieldAlias:    c.field,
-      elementKey:    selectedElemKey,
+      fieldAlias:  c.field,
+      elementKey:  selectedElemKey,
     };
     const valueHTML = needsVal
-      ? buildFilterValueInput(valDisplayType, isMacro, macroMeta, c.value, valJS(ci, 'this.value'), valInputOptions)
+      ? buildFilterValueInput(valDisplayType, isMacro, macroMeta, c.value, function(v) { valFn(ci, v); }, valInputOptions)
       : `<span class="qb-val-blank"></span>`;
 
     // ── conj badge (floating popup) ───────────────────────────────────────────
@@ -269,16 +272,18 @@ function renderConditionRows(conditions, cols, conjFn, fieldJS, opFn, valJS, rem
         + ' data-opts="' + _attrEnc(conjOpts) + '"'
         + ' data-cur="' + _attrEnc(c.conj || 'AND') + '"'
         + ' data-cb="' + _conjCbKey + '"'
-        + ' onclick="showPropPopup(this)">' + _attrEnc(c.conj || 'AND') + '</span>';
+        + ' data-action="show-prop-popup">' + _attrEnc(c.conj || 'AND') + '</span>';
     }
 
+    const _fieldCbKey  = _dlvRegPopupCb(function(val) { fieldFn(ci, val); });
+    const _removeCbKey = _dlvRegPopupCb(function() { removeFn(ci); });
     return '<div class="qb-condition-row"' + (extraAttrs ? ' ' + extraAttrs : '') + '>'
       + rowPrefix
-      + '<select class="form-input qb-field-select" onchange="' + fieldJS(ci, 'this.value') + '">' + colOptions + '</select>'
+      + '<select class="form-input qb-field-select" data-action="dlv-cb" data-cb="' + _fieldCbKey + '">' + colOptions + '</select>'
       + elemKeyDropdown
       + opSelectHTML
       + valueHTML
-      + '<button class="btn btn-ghost btn-sm btn-icon qb-remove-btn" onclick="' + removeJS(ci) + '">\u2715</button>'
+      + '<button class="btn btn-ghost btn-sm btn-icon qb-remove-btn" data-action="dlv-cb" data-cb="' + _removeCbKey + '">\u2715</button>'
       + '</div>';
   }).join('');
 }
@@ -292,12 +297,12 @@ function renderConditionRows(conditions, cols, conjFn, fieldJS, opFn, valJS, rem
  *
  * @param {Array}    sorts      Array of {field, dir}
  * @param {Array}    cols       Available column options (strings or {alias} objects)
- * @param {Function} fieldJS  (si, jsValExpr) => string
- * @param {Function} dirFn    (si, val) => void   handler for direction change
- * @param {Function} removeJS (si) => string
- * @param {Function} [rowAttrs] (si) => string  optional extra attrs on the row div
+ * @param {Function} fieldFn    (si, val) => void   handler for field change
+ * @param {Function} dirFn      (si, val) => void   handler for direction change
+ * @param {Function} removeFn   (si) => void        handler for remove click
+ * @param {Function} [rowAttrs] (si) => string      optional extra attrs on the row div
  */
-function renderSortRows(sorts, cols, fieldJS, dirFn, removeJS, rowAttrs) {
+function renderSortRows(sorts, cols, fieldFn, dirFn, removeFn, rowAttrs) {
   if (!sorts.length)
     return '<div style="font-size:11px;color:var(--text-disabled);padding:2px 0">No sorts — click + Add</div>';
 
@@ -321,15 +326,17 @@ function renderSortRows(sorts, cols, fieldJS, dirFn, removeJS, rowAttrs) {
       + ' data-opts="' + _attrEnc(dirOpts) + '"'
       + ' data-cur="' + _attrEnc(s.dir || 'ASC') + '"'
       + ' data-cb="' + _dirCbKey + '"'
-      + ' onclick="showPropPopup(this)">' + _attrEnc(s.dir || 'ASC') + '</span>';
+      + ' data-action="show-prop-popup">' + _attrEnc(s.dir || 'ASC') + '</span>';
 
-    return `<div class="qb-sort-row" ${extraAttrs}>
-      <select class="form-input qb-field-select" onchange="${fieldJS(si, 'this.value')}">
-        ${colOptions}
-      </select>
-      ${dirBadge}
-      <button class="btn btn-ghost btn-sm btn-icon qb-remove-btn" onclick="${removeJS(si)}">✕</button>
-    </div>`;
+    const _sfldCbKey    = _dlvRegPopupCb(function(val) { fieldFn(si, val); });
+    const _sremoveCbKey = _dlvRegPopupCb(function() { removeFn(si); });
+    return '<div class="qb-sort-row"' + (extraAttrs ? ' ' + extraAttrs : '') + '>'
+      + '<select class="form-input qb-field-select" data-action="dlv-cb" data-cb="' + _sfldCbKey + '">'
+      + colOptions
+      + '</select>'
+      + dirBadge
+      + '<button class="btn btn-ghost btn-sm btn-icon qb-remove-btn" data-action="dlv-cb" data-cb="' + _sremoveCbKey + '">✕</button>'
+      + '</div>';
   }).join('');
 }
 

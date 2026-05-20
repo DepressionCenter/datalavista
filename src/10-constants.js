@@ -616,15 +616,17 @@ function renderOpsOptions(ops, selectedVal) {
  * @param {string}  [options.fieldAlias]    For autosuggestions
  * @param {string}  [options.elementKey]    For autosuggestions on array element keys
  */
-function buildFilterValueInput(displayType, isMacro, macroMeta, value, handlerJS, options = {}) {
-  const { op = '', value2 = '', val2HandlerJS = '', tableKey = '', fieldAlias = '', elementKey = '' } = options;
+function buildFilterValueInput(displayType, isMacro, macroMeta, value, valFn, options = {}) {
+  const { op = '', value2 = '', val2Fn = null, tableKey = '', fieldAlias = '', elementKey = '' } = options;
   const safeVal  = (value  != null ? String(value)  : '').replace(/"/g, '&quot;');
   const safeVal2 = (value2 != null ? String(value2) : '').replace(/"/g, '&quot;');
   const sep = `<span class="qb-between-sep" style="font-size:11px;color:var(--text-secondary);white-space:nowrap;padding:0 2px">and</span>`;
+  var _cbKey  = valFn  ? _dlvRegPopupCb(function(v) { valFn(v);  }) : '';
+  var _cb2Key = val2Fn ? _dlvRegPopupCb(function(v) { val2Fn(v); }) : '';
 
   // Boolean — true/false only, default true
   if (displayType === 'boolean') {
-    return `<select class="form-input qb-val-input" onchange="${handlerJS}">
+    return `<select class="form-input qb-val-input" data-action="dlv-cb" data-cb="${_cbKey}">
       <option value="true"  ${(!value || value === 'true')  ? 'selected' : ''}>True</option>
       <option value="false" ${value === 'false' ? 'selected' : ''}>False</option>
     </select>`;
@@ -633,55 +635,56 @@ function buildFilterValueInput(displayType, isMacro, macroMeta, value, handlerJS
   // Date-macro with numeric input
   if (isMacro) {
     return macroMeta?.hasInput
-      ? `<input type="number" class="form-input qb-val-input" placeholder="e.g. 3" min="1" value="${safeVal}" oninput="${handlerJS}"/>`
+      ? `<input type="number" class="form-input qb-val-input" placeholder="e.g. 3" min="1" value="${safeVal}" data-action="dlv-cb" data-cb="${_cbKey}"/>`
       : `<span class="qb-val-blank"></span>`;
   }
 
   // Date / Datetime
   if (displayType === 'date' || displayType === 'datetime') {
     if (op === 'BETWEEN') {
-      return `<input type="date" class="form-input qb-val-input qb-between-input" value="${safeVal}" onchange="${handlerJS}"/>`
+      return `<input type="date" class="form-input qb-val-input qb-between-input" value="${safeVal}" data-action="dlv-cb" data-cb="${_cbKey}"/>`
            + sep
-           + `<input type="date" class="form-input qb-val-input qb-between-input" value="${safeVal2}" onchange="${val2HandlerJS}"/>`;
+           + `<input type="date" class="form-input qb-val-input qb-between-input" value="${safeVal2}" data-action="dlv-cb" data-cb="${_cb2Key}"/>`;
     }
-    return `<input type="date" class="form-input qb-val-input" value="${safeVal}" onchange="${handlerJS}"/>`;
+    return `<input type="date" class="form-input qb-val-input" value="${safeVal}" data-action="dlv-cb" data-cb="${_cbKey}"/>`;
   }
 
   // Number
   if (displayType === 'number') {
     if (op === 'BETWEEN') {
-      return `<input type="number" class="form-input qb-val-input qb-between-input" step="any" value="${safeVal}" oninput="${handlerJS}"/>`
+      return `<input type="number" class="form-input qb-val-input qb-between-input" step="any" value="${safeVal}" data-action="dlv-cb" data-cb="${_cbKey}"/>`
            + sep
-           + `<input type="number" class="form-input qb-val-input qb-between-input" step="any" value="${safeVal2}" oninput="${val2HandlerJS}"/>`;
+           + `<input type="number" class="form-input qb-val-input qb-between-input" step="any" value="${safeVal2}" data-action="dlv-cb" data-cb="${_cb2Key}"/>`;
     }
-    return `<input type="number" class="form-input qb-val-input" step="any" value="${safeVal}" oninput="${handlerJS}"/>`;
+    return `<input type="number" class="form-input qb-val-input" step="any" value="${safeVal}" data-action="dlv-cb" data-cb="${_cbKey}"/>`;
   }
 
   // Array-length ops — integer only
   if (op && op.startsWith('ARR_LEN_')) {
-    return `<input type="number" class="form-input qb-val-input" min="0" step="1" value="${safeVal}" oninput="${handlerJS}"/>`;
+    return `<input type="number" class="form-input qb-val-input" min="0" step="1" value="${safeVal}" data-action="dlv-cb" data-cb="${_cbKey}"/>`;
   }
 
   // Array any-element ops — numeric/date input for number or date scalar
   if (op && op.startsWith('ARR_ANY_')) {
     if (displayType === 'number') {
-      return `<input type="number" class="form-input qb-val-input" step="any" value="${safeVal}" oninput="${handlerJS}"/>`;
+      return `<input type="number" class="form-input qb-val-input" step="any" value="${safeVal}" data-action="dlv-cb" data-cb="${_cbKey}"/>`;
     }
     if (displayType === 'date') {
-      return `<input type="date" class="form-input qb-val-input" value="${safeVal}" onchange="${handlerJS}"/>`;
+      return `<input type="date" class="form-input qb-val-input" value="${safeVal}" data-action="dlv-cb" data-cb="${_cbKey}"/>`;
     }
   }
 
   // Text — with optional custom autosuggest dropdown
   if (tableKey && fieldAlias) {
-    const tkSafe = tableKey.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-    const faSafe = fieldAlias.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-    const ekSafe = elementKey.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-    return `<input type="text" class="form-input qb-val-input" placeholder="value" value="${safeVal}"`
-         + ` onfocus="dlvAcShow(this,'${tkSafe}','${faSafe}','${ekSafe}')" oninput="dlvAcFilter(this);${handlerJS}" onblur="dlvAcBlur(this)" onkeydown="dlvAcKeydown(this,event)"/>`;
+    var tkAttr = tableKey.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+    var faAttr = fieldAlias.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+    var ekAttr = elementKey.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+    return '<input type="text" class="form-input qb-val-input" placeholder="value" value="' + safeVal + '"'
+         + ' data-action="dlv-ac-cb" data-cb="' + _cbKey + '"'
+         + ' data-dlv-ac="1" data-dlv-ac-tk="' + tkAttr + '" data-dlv-ac-fa="' + faAttr + '" data-dlv-ac-ek="' + ekAttr + '"/>';
   }
 
-  return `<input type="text" class="form-input qb-val-input" placeholder="value" value="${safeVal}" oninput="${handlerJS}"/>`;
+  return `<input type="text" class="form-input qb-val-input" placeholder="value" value="${safeVal}" data-action="dlv-cb" data-cb="${_cbKey}"/>`;
 }
 
 // ============================================================

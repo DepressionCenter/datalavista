@@ -69,26 +69,6 @@ sys.stdout.write(text)
 PYEOF
 }
 
-# ── Helper: replace placeholder in template using Python (portable) ───────────
-replace_placeholder() {
-  local template="$1"
-  local replacement_file="$2"
-  local output="$3"
-  python3 - "$template" "$replacement_file" "$output" <<'PYEOF'
-import sys, re
-template_path, replacement_file, output_path = sys.argv[1], sys.argv[2], sys.argv[3]
-template = open(template_path, encoding='utf-8').read()
-replacement = open(replacement_file, encoding='utf-8').read()
-result = re.sub(
-    r'<!-- DATALAVISTA_SCRIPTS_PLACEHOLDER_OPEN -->.*?<!-- DATALAVISTA_SCRIPTS_PLACEHOLDER_CLOSE -->',
-    lambda m: replacement,
-    template,
-    count=1,
-    flags=re.DOTALL
-)
-open(output_path, 'w', encoding='utf-8').write(result)
-PYEOF
-}
 
 # ── Helper: prepend HTML license comment to an already-written output file ────
 prepend_html_license() {
@@ -102,6 +82,46 @@ prepend_html_license() {
 # ── Strip license from HTML template once; reuse the clean copy ───────────────
 strip_license "$SRC/00-full-page.html" "html" > /tmp/dlv_clean_template.html
 
+# ── Extract body content for _DLV_SHELL_HTML ─────────────────────────────────
+# Extract inner body (between <body> and </body>), strip the scripts placeholder block.
+DLV_SHELL_VAR=$(python3 - "$SRC/00-full-page.html" <<'PYEOF'
+import sys, re, json
+html = open(sys.argv[1], encoding='utf-8').read()
+body_match = re.search(r'(?s)<body>(.*)</body>', html)
+body_raw = body_match.group(1)
+body_content = re.sub(
+    r'(?s)\s*<!-- DATALAVISTA_SCRIPTS_PLACEHOLDER_OPEN -->.*?<!-- DATALAVISTA_SCRIPTS_PLACEHOLDER_CLOSE -->',
+    '',
+    body_raw
+)
+sys.stdout.write('var _DLV_SHELL_HTML = ' + json.dumps(body_content) + ';')
+PYEOF
+)
+
+# ── Extract CSS head content for _DLV_HEAD_CSS ───────────────────────────────
+DLV_HEAD_CSS_VAR=$(python3 - "$SRC/00-full-page.html" <<'PYEOF'
+import sys, re, json
+html = open(sys.argv[1], encoding='utf-8').read()
+link_tags = re.findall(r'<link[^>]+rel=[\'"]stylesheet[\'"][^>]*/>', html)
+style_content = re.search(r'(?s)<style>(.*?)</style>', html).group(1)
+head_css_html = '\n'.join(link_tags) + '\n<style id="dlv-styles">' + style_content + '</style>'
+sys.stdout.write('var _DLV_HEAD_CSS = ' + json.dumps(head_css_html) + ';')
+PYEOF
+)
+
+# ── Extract <head>...</head> for the minimal shell output ─────────────────────
+# Strip link stylesheet tags and <style> block so only CDN scripts remain.
+DLV_HEAD_SECTION=$(python3 - /tmp/dlv_clean_template.html <<'PYEOF'
+import sys, re
+html = open(sys.argv[1], encoding='utf-8').read()
+m = re.search(r'(?s)^.*?</head>', html)
+head = m.group(0)
+head = re.sub(r'\s*<link[^>]+rel=[\'"]stylesheet[\'"][^>]*/>', '', head)
+head = re.sub(r'(?s)\s*<!--[^-]*Custom styles[^-]*-->\s*<style>.*?</style>', '', head)
+sys.stdout.write(head)
+PYEOF
+)
+
 # ── 1. Build datalavista.js ──────────────────────────────────────────────────
 echo "Building datalavista.js..."
 {
@@ -111,6 +131,7 @@ echo "Building datalavista.js..."
     echo ""
     echo "  /* === $(basename "$f") === */"
     strip_license "$f" "js"
+    echo ""
   done
   echo ""
   echo "})();"
@@ -126,27 +147,35 @@ echo "Building datalavista.js..."
   printf '%s\n' "$LICENSE_TEXT"
   echo "================================================================ */"
   echo ""
+  echo "$DLV_SHELL_VAR"
+  echo "$DLV_HEAD_CSS_VAR"
+  echo ""
   cat /tmp/dlv_js_minified.js
 } > datalavista.js
 echo "  -> datalavista.js ($(wc -l < datalavista.js) lines)"
 
 # ── 2. Build DataLaVista-nojs.html ─────────────────────────────────────────
 echo "Building DataLaVista-nojs.html..."
-cp /tmp/dlv_clean_template.html DataLaVista-nojs.html
+{
+  printf '<!DOCTYPE html>\n'
+  printf '%s\n' "$DLV_HEAD_SECTION"
+  printf '<body>\n  <div id="dlv-root"></div>\n  <script src="datalavista.js"></script>\n</body>\n</html>\n'
+} > DataLaVista-nojs.html
 prepend_html_license DataLaVista-nojs.html
 echo "  -> DataLaVista-nojs.html"
 
 # ── 3. Build DataLaVista.html (inline) ──────────────────────────────────────
 echo "Building DataLaVista.html (inline)..."
 {
-  echo "  <script>"
+  printf '<!DOCTYPE html>\n'
+  printf '%s\n' "$DLV_HEAD_SECTION"
+  printf '<body>\n  <div id="dlv-root"></div>\n  <script>\n'
   cat /tmp/dlv_js_minified.js
-  echo "  </script>"
-} > /tmp/dlv_snippet.txt
-replace_placeholder /tmp/dlv_clean_template.html /tmp/dlv_snippet.txt DataLaVista.html
+  printf '  </script>\n</body>\n</html>\n'
+} > DataLaVista.html
 prepend_html_license DataLaVista.html
 echo "  -> DataLaVista.html"
 
-rm -f /tmp/dlv_snippet.txt /tmp/dlv_clean_template.html /tmp/dlv_js_body.js /tmp/dlv_js_minified.js
+rm -f /tmp/dlv_clean_template.html /tmp/dlv_js_body.js /tmp/dlv_js_minified.js
 echo ""
 echo "Build completed at $(date '+%Y-%m-%d %I:%M:%S %p')."
