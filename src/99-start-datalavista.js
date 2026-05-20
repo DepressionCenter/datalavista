@@ -24,9 +24,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 // Self-init
 (function startDataLaVista() {
   console.log("*** Starting DataLaVista™ ***");
-  try {
-    init();
-  } catch (e) {
+  init().catch(function(e) {
     console.error('DataLaVista init crashed:', e);
-  }
+  });
 })();
