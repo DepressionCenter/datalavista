@@ -133,8 +133,9 @@ with this program. If not, see https://www.gnu.org/licenses/.
    LAYOUT
    ============================================================ */
     #app {
-      /* Shrink to fit comfortably under SharePoint's header without double-scrollbars */
-      height: calc(100vh - 200px);
+      /* --dlv-top-chrome is set by dlvUpdateAppHeight() to the measured distance from
+         the viewport top to #app (0 standalone, ~SP header height when embedded). */
+      height: calc(100vh - var(--dlv-top-chrome, 0px));
       min-height: 500px;
       display: flex;
       flex-direction: column;

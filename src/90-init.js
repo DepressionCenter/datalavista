@@ -32,6 +32,15 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       try { return window.self !== window.top; } catch (e) { return true; }
   }
 
+  function dlvUpdateAppHeight() {
+    requestAnimationFrame(function() {
+      var app = document.getElementById('app');
+      if (!app) return;
+      var top = Math.max(0, Math.round(app.getBoundingClientRect().top));
+      document.documentElement.style.setProperty('--dlv-top-chrome', top + 'px');
+    });
+  }
+
   function initAdvOptsResizer() {
     const resizer = document.getElementById('adv-opts-resizer');
     const panel   = document.getElementById('adv-options-panel');
@@ -208,6 +217,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
     console.log('Initializing...');
     DataLaVistaState._initialized = true;
     console.log("Come with me if you want to query...");
+    dlvUpdateAppHeight();
+    window.addEventListener('resize', dlvUpdateAppHeight);
     setupAlaSQL();
     
 
