@@ -33,16 +33,13 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         \___________/         🕶️ "The BI Terminator" ™ 🕶️
 ```
 
-# 🕶️ DataLaVista™
+# 🕶️ DataLaVista™ <a href="https://doi.org/10.5281/zenodo.19245606"><img align="right" src="https://img.shields.io/badge/Cite%20this%20Code%20-10.5281%2Fzenodo.19245606-blue" alt="Cite this Code: 10.5281/zenodo.19245606"></a>
 
 ## Description
-<div style="display: flex; justify-content: flex-end;" align="right"><a href="https://doi.org/10.5281/zenodo.19245606" title="DOI" target="_blank" style="align: right;"><img alt="10.5281/zenodo.19245606" src="https://zenodo.org/badge/DOI/10.5281/zenodo.19245606.svg" style="float: right; width: 191px; height: 20px;" /></a></div>
 
 **🕶️ Tell your expensive BI tools: "Data la vista, baby!"** ™
 
-
 **DataLaVista**™ is a lightweight, client-side reporting and dashboard toolkit (no data leaves the tool's installed environment). It brings the full power of SQL directly to your browser, allowing you to build high-performance visualizations without the need for expensive server-side licenses or complex backend infrastructure.
-
 <a href="https://code.depressioncenter.org/datalavista/DataLaVista.html" title="Click to try it live!" target="_blank"><img src="images/datalavista-screenshot-1.png" 
     alt="Screenshot of Data La Vista in action, terminating a data silo, displaying a SQL query with auto-completion dropdown menu and a dashboard designer with a table and pie chart with filters." 
     style="max-width:800px; width:100%; display:block; margin:auto;" /></a>
