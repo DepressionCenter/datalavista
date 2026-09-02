@@ -37,14 +37,14 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 
 ## Description
 
-**🕶️ Tell your expensive BI tools: "Data la vista, baby!"** ™
+DataLaVista™ is an open-source, client-side JavaScript dashboard and reporting toolkit that brings SQL queries and interactive data visualization into the browser. It is designed to create high-performance business-intelligence dashboards without expensive server licenses or complex backend infrastructure.
 
-**DataLaVista**™ is a lightweight, client-side reporting and dashboard toolkit (no data leaves the tool's installed environment). It brings the full power of SQL directly to your browser, allowing you to build high-performance visualizations without the need for expensive server-side licenses or complex backend infrastructure.
+The initial integration targets SharePoint Lists with browser-based JavaScript widgets. Its framework-agnostic architecture is designed to expand to webpages and data from REST services, JSON, Excel, and CSV while keeping data within the tool's installed environment.
 <a href="https://code.depressioncenter.org/datalavista/DataLaVista.html" title="Click to try it live!" target="_blank"><img src="images/datalavista-screenshot-1.png" 
     alt="Screenshot of Data La Vista in action, terminating a data silo, displaying a SQL query with auto-completion dropdown menu and a dashboard designer with a table and pie chart with filters." 
     style="max-width:800px; width:100%; display:block; margin:auto;" /></a>
 
-While it was initially designed to dominate SharePoint List items with pure JavaScript widgets that run directly in the browser, Data La Vista is built to be a universal survivor. It aims to be framework-agnostic and designed to plug into any webpage to terminate data silos across REST services, JSON, Excel, and CSV files.
+Tell your expensive BI tools: “Data la vista, baby!” ™
 
 ### Come with me if you want to query™
 Most enterprise data is trapped behind bloated frameworks or expensive BI tools. Data La Vista terminates them to free your data:
