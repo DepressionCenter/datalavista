@@ -122,12 +122,14 @@ If you need assistance identifying a contact person, email the EFDC's Mobile Tec
 
 
 ## Credits
+#### Authors:
++ [Gabriel Mongefranco](https://gabriel.mongefranco.com) [(@gabrielmongefranco)](https://github.com/gabrielmongefranco) - Mobile Data Architect Staff Specialist, Eisenberg Family Depression Center, Medical School, University of Michigan
++ [Jeremy Gluskin](https://mcommunity.umich.edu/person/jgluskin) [(@jerm-ops)](https://github.com/jerm-ops) - Revenue Lifecycle System Administrator, Quality & Patient Safety, Academic Medical Center, Michigan Medicine.
++ [Shelley Boa](https://mcommunity.umich.edu/person/sboa) [(@blondilox-ai)](https://github.com/blondilox-ai) - Program Manager, Internal Medicine / Pulmonary & Critical Care, Academic Medical Center, Michigan Medicine.
+
 #### Contributors:
 + [Eisenberg Family Depression Center](https://depressioncenter.org) [(@DepressionCenter)](https://github.com/DepressionCenter)
-+ [Gabriel Mongefranco](https://gabriel.mongefranco.com) [(@gabrielmongefranco)](https://github.com/gabrielmongefranco)
-+ [Jeremy Gluskin](https://mcommunity.umich.edu/person/jgluskin) [(@jerm-ops)](https://github.com/jerm-ops) - Revenue Lifecycle System Coordinator, Quality - Patient Safety, Michigan Medicine.
-+ [Shelley Boa](https://mcommunity.umich.edu/person/sboa) [(@blondilox-ai)](https://github.com/blondilox-ai) - Program Manager, Internal Medicine / Pulmonology & Critical Care, Michigan Medicine.
-+ The [Automators Anonumous™](https://github.com/DepressionCenter/AutomatorsAnonymous) group.
++ [Automators Anonumous™](https://github.com/DepressionCenter/AutomatorsAnonymous) community of practice.
 
 
 #### This work is based in part on the following projects, libraries and/or studies:
