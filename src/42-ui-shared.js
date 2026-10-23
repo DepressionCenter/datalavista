@@ -221,7 +221,7 @@ function renderConditionRows(conditions, cols, conjFn, fieldFn, opFn, valFn, rem
     // ── column options ────────────────────────────────────────────────────────
     const colOptions = cols.map(col => {
       const alias = typeof col === 'string' ? col : col.alias;
-      return `<option value="${alias}" ${alias === c.field ? 'selected' : ''}>${alias}</option>`;
+      return `<option value="${_attrEnc(alias)}" ${alias === c.field ? 'selected' : ''}>${_attrEnc(alias)}</option>`;
     }).join('');
 
     // ── element key dropdown ──────────────────────────────────────────────────
@@ -230,7 +230,7 @@ function renderConditionRows(conditions, cols, conjFn, fieldFn, opFn, valFn, rem
       ? '<select class="form-input qb-element-key-select" style="max-width:110px"'
         + (_ekCbKey ? ' data-action="dlv-cb" data-cb="' + _ekCbKey + '"' : '')
         + '>'
-        + objectKeys.map(k => '<option value="' + _attrEnc(k.key) + '"' + (k.key === selectedElemKey ? ' selected' : '') + '>' + k.key + '</option>').join('')
+        + objectKeys.map(k => '<option value="' + _attrEnc(k.key) + '"' + (k.key === selectedElemKey ? ' selected' : '') + '>' + _attrEnc(k.key) + '</option>').join('')
         + '</select>'
       : '';
 
@@ -316,7 +316,7 @@ function renderSortRows(sorts, cols, fieldFn, dirFn, removeFn, rowAttrs) {
     const extraAttrs = rowAttrs ? rowAttrs(si) : '';
     const colOptions = cols.map(col => {
       const alias = typeof col === 'string' ? col : col.alias;
-      return `<option value="${alias}" ${alias === s.field ? 'selected' : ''}>${alias}</option>`;
+      return `<option value="${_attrEnc(alias)}" ${alias === s.field ? 'selected' : ''}>${_attrEnc(alias)}</option>`;
     }).join('');
 
     const _dirCbKey = _dlvRegPopupCb(function(val) { dirFn(si, val); });

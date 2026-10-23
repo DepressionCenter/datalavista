@@ -52,10 +52,10 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         if (!this.uploadedFiles.length) { c.innerHTML = '<div class="queue-empty">No files queued</div>'; return; }
         c.innerHTML = this.uploadedFiles.map((item, i) => {
           const errClass = item.error ? ' queue-item-error' : '';
-          const errMsg = item.error ? `<span class="queue-error-msg" title="${item.error}">⚠ ${item.error}</span>` : '';
+          const errMsg = item.error ? `<span class="queue-error-msg" title="${_attrEnc(item.error)}">⚠ ${_attrEnc(item.error)}</span>` : '';
           return `<div class="queue-item${errClass}" style="flex-wrap:wrap">
             <span>${this._fileIcon(item.type)}</span>
-            <span class="queue-name" title="${item.file.name}">${item.file.name}</span>
+            <span class="queue-name" title="${_attrEnc(item.file.name)}">${_attrEnc(item.file.name)}</span>
             <span class="queue-badge">${item.type.toUpperCase()}</span>
             <button class="queue-remove" data-action="queue-remove-upload" data-index="${i}" title="Remove">✕</button>
             ${errMsg}
@@ -69,10 +69,10 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         c.innerHTML = this.remoteUrls.map((item, i) => {
           const fname = item.url.split('/').pop() || 'remote file';
           const errClass = item.error ? ' queue-item-error' : '';
-          const errMsg = item.error ? `<span class="queue-error-msg" title="${item.error}">⚠ ${item.error}</span>` : '';
+          const errMsg = item.error ? `<span class="queue-error-msg" title="${_attrEnc(item.error)}">⚠ ${_attrEnc(item.error)}</span>` : '';
           return `<div class="queue-item${errClass}" style="flex-wrap:wrap">
             <span>${this._fileIcon(item.type)}</span>
-            <span class="queue-name" title="${item.url}">${fname}</span>
+            <span class="queue-name" title="${_attrEnc(item.url)}">${_attrEnc(fname)}</span>
             <span class="queue-badge">${item.type.toUpperCase()}</span>
             <button class="queue-remove" data-action="queue-remove-remote-url" data-index="${i}" title="Remove">✕</button>
             ${errMsg}
