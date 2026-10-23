@@ -275,9 +275,13 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 
         const cols  = Object.keys(results[0]);
         const top20 = results.slice(0, 20);
-        let html = '<table><thead><tr>' + cols.map(c => `<th>${c}</th>`).join('') + '</tr></thead><tbody>';
+        // Column names and cell values come from the data source — escape them so markup in a cell shows as text
+        let html = '<table><thead><tr>' + cols.map(c => '<th>' + _attrEnc(c) + '</th>').join('') + '</tr></thead><tbody>';
         for (const row of top20) {
-          html += '<tr>' + cols.map(c => `<td title="${row[c] ?? ''}">${row[c] ?? ''}</td>`).join('') + '</tr>';
+          html += '<tr>' + cols.map(function(c) {
+            var cell = _attrEnc(row[c] ?? '');
+            return '<td title="' + cell + '">' + cell + '</td>';
+          }).join('') + '</tr>';
         }
         html += '</tbody></table>';
         wrap.innerHTML = html;

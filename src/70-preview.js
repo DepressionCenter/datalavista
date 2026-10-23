@@ -62,7 +62,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           titleBarEl.classList.remove('hidden');
           // Build title HTML — add info icon if tooltip is configured
           if (titleTip.trim()) {
-            const safeTitle = titleText.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            const safeTitle = _attrEnc(titleText);
             titleBarEl.innerHTML = `${safeTitle}<sup id="prev-title-tip-icon" style="font-size:60%;margin-left:5px;cursor:help;opacity:0.8">ℹ️</sup>`;
             // Wire tooltip after DOM settles
             requestAnimationFrame(() => {
@@ -95,8 +95,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
             const wrap = document.createElement('div');
             wrap.className = 'filter-chip';
             var _optHtml = '';
-            for (var _oi = 0; _oi < values.length; _oi++) { _optHtml += '<option>' + values[_oi] + '</option>'; }
-            wrap.innerHTML = '<span style="font-size:11px;font-weight:600">' + filter.label + ':</span>'
+            for (var _oi = 0; _oi < values.length; _oi++) { _optHtml += '<option>' + _attrEnc(values[_oi]) + '</option>'; }
+            wrap.innerHTML = '<span style="font-size:11px;font-weight:600">' + _attrEnc(filter.label) + ':</span>'
               + '<select class="filter-chip-select" data-action="preview-filter-change" data-field="' + _attrEnc(filter.field) + '">'
               + _optHtml + '</select>';
             filterBar.appendChild(wrap);
@@ -134,7 +134,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
             var _justifyP = _alignMapP[w.containerAlign || 'top'] || 'flex-start';
             _prevContentStyle = ' style="display:flex;flex-direction:column;gap:' + (w.containerGap || 8) + 'px;padding:' + (w.containerPadding || 8) + 'px;justify-content:' + _justifyP + ';height:auto;overflow:visible"';
           }
-          el.innerHTML = '<div class="widget-header' + (w.showTitle === false ? ' hidden' : '') + '" style="' + titleHdrStyle + '"><span class="widget-title" style="' + titleSpanStyle + '">' + resolveTitleTemplate(w.title) + '</span></div>'
+          el.innerHTML = '<div class="widget-header' + (w.showTitle === false ? ' hidden' : '') + '" style="' + titleHdrStyle + '"><span class="widget-title" style="' + titleSpanStyle + '">' + _attrEnc(resolveTitleTemplate(w.title)) + '</span></div>'
             + '<div class="widget-content' + (isEChartsWidget(w.type) ? ' widget-content-chart' : '') + '" id="prev-wcontent-' + w.id + '"' + _prevContentStyle + '>'
             + getPrevWidgetContent(w)
             + '</div>';
@@ -151,7 +151,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           var _cTitleHdrStyle  = 'background:' + (w.titleBackgroundColor || '#fefefe');
           var _cTitleSpanStyle = 'font-size:' + (w.titleFontSize || 14) + 'px;color:' + (w.titleFontColor || '#323130');
           _childEl.style.cssText = 'width:100%;height:' + w.heightVh + 'vh;min-height:80px;border-color:' + w.borderColor + ';border-width:' + w.borderSize + 'px;background:' + (w.widgetBackgroundColor || '#fefefe');
-          _childEl.innerHTML = '<div class="widget-header' + (w.showTitle === false ? ' hidden' : '') + '" style="' + _cTitleHdrStyle + '"><span class="widget-title" style="' + _cTitleSpanStyle + '">' + resolveTitleTemplate(w.title) + '</span></div>'
+          _childEl.innerHTML = '<div class="widget-header' + (w.showTitle === false ? ' hidden' : '') + '" style="' + _cTitleHdrStyle + '"><span class="widget-title" style="' + _cTitleSpanStyle + '">' + _attrEnc(resolveTitleTemplate(w.title)) + '</span></div>'
             + '<div class="widget-content' + (isEChartsWidget(w.type) ? ' widget-content-chart' : '') + '" id="prev-wcontent-' + w.id + '">'
             + getPrevWidgetContent(w)
             + '</div>';

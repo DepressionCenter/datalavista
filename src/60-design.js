@@ -284,7 +284,7 @@ function rankSuggestions(rules, cols, meta) {
     const intMode = DataLaVistaState.design.interactionMode || 'cross-filter';
     const fontFam = (DataLaVistaState.design.theme && DataLaVistaState.design.theme.fontFamily) || '';
     const bgColor = (DataLaVistaState.design.theme && DataLaVistaState.design.theme.backgroundColor) || '';
-    const titleTpl = (DataLaVistaState.design.title || '').replace(/"/g, '&quot;');
+    const titleTpl = _attrEnc(DataLaVistaState.design.title || '');
 
     section.innerHTML = [
       '<div class="adv-node-section">',
@@ -388,7 +388,7 @@ function rankSuggestions(rules, cols, meta) {
       row.draggable = true;
       row.innerHTML = `
         <span class="field-type-icon ${ti.cls}" style="font-size:10px">${ti.icon}</span>
-        <span class="field-label" title="${col}">${col}</span>
+        <span class="field-label" title="${_attrEnc(col)}">${_attrEnc(col)}</span>
       `;
       row.addEventListener('dragstart', e => {
         safeDragSet(e, { type: 'result-field', field: col, dataType: dt });
@@ -396,16 +396,16 @@ function rankSuggestions(rules, cols, meta) {
       const m = (/** @type {Record<string,any>} */ (DataLaVistaState.queryColumnMeta))[col];
       if (m) {
         const parts = [];
-        if (m.sourceDataSource) parts.push('<div><strong>Data Source:</strong> ' + m.sourceDataSource + '</div>');
-        if (m.sourceTableName)  parts.push('<div><strong>Table:</strong> ' + m.sourceTableName + '</div>');
-        if (m.viewName)         parts.push('<div><strong>View:</strong> ' + m.viewName + '</div>');
+        if (m.sourceDataSource) parts.push('<div><strong>Data Source:</strong> ' + _attrEnc(m.sourceDataSource) + '</div>');
+        if (m.sourceTableName)  parts.push('<div><strong>Table:</strong> ' + _attrEnc(m.sourceTableName) + '</div>');
+        if (m.viewName)         parts.push('<div><strong>View:</strong> ' + _attrEnc(m.viewName) + '</div>');
         const srcField = m.sourceDisplayName || m.sourceInternalName || col;
         const intSuffix = m.sourceInternalName && m.sourceInternalName !== srcField ? ' [' + m.sourceInternalName + ']' : '';
-        parts.push('<div><strong>Source field:</strong> ' + srcField + intSuffix + '</div>');
-        if (m.agg) parts.push('<div><strong>Aggregate:</strong> ' + m.agg + '</div>');
-        if (m.sourceFieldDescription) parts.push('<div style="margin-top:4px;font-style:italic;opacity:.85">' + m.sourceFieldDescription + '</div>');
+        parts.push('<div><strong>Source field:</strong> ' + _attrEnc(srcField + intSuffix) + '</div>');
+        if (m.agg) parts.push('<div><strong>Aggregate:</strong> ' + _attrEnc(m.agg) + '</div>');
+        if (m.sourceFieldDescription) parts.push('<div style="margin-top:4px;font-style:italic;opacity:.85">' + _attrEnc(m.sourceFieldDescription) + '</div>');
         const tipHtml = '<div style="font-size:11px;line-height:1.9;min-width:180px">'
-          + '<div style="font-weight:700;margin-bottom:5px;font-size:12px;padding-bottom:4px;border-bottom:1px solid rgba(255,255,255,.25)">' + col + '</div>'
+          + '<div style="font-weight:700;margin-bottom:5px;font-size:12px;padding-bottom:4px;border-bottom:1px solid rgba(255,255,255,.25)">' + _attrEnc(col) + '</div>'
           + parts.join('')
           + '</div>';
         dlvTooltip.attach(row, tipHtml, { html: true, placement: 'right', delay: 400 });
@@ -845,7 +845,7 @@ function rankSuggestions(rules, cols, meta) {
           contentStyle = ' style="display:flex;flex-direction:column;gap:' + (w.containerGap || 8) + 'px;padding:' + (w.containerPadding || 8) + 'px;justify-content:' + justifyVal + ';flex-wrap:wrap;height:auto;overflow:visible"';
         }
 
-        el.innerHTML = '<div class="widget-header" style="' + titleHdrStyle + '"><span class="widget-title" style="' + titleSpanStyle + '">' + (w.title || '') + '</span>' + actions + '</div>'
+        el.innerHTML = '<div class="widget-header" style="' + titleHdrStyle + '"><span class="widget-title" style="' + titleSpanStyle + '">' + _attrEnc(w.title || '') + '</span>' + actions + '</div>'
           + '<div class="' + contentClass + '" id="wcontent-' + w.id + '"' + contentStyle + '>' + getWidgetContentHTML(w) + '</div>'
           + '<div class="widget-resize-handle"></div>';
 
@@ -1205,7 +1205,7 @@ function rankSuggestions(rules, cols, meta) {
         const metricSize  = w.kpiMetricFontSize || 36;
         const labelSize   = w.kpiLabelFontSize  || 13;
         const labelText   = (w.kpiLabelOverride && w.kpiLabelOverride.trim()) ? w.kpiLabelOverride : field;
-        return `<div class="kpi-card"><div class="kpi-value" style="color:${w.fillColor};font-size:${metricSize}px">${value}</div><div class="kpi-label" style="font-size:${labelSize}px">${labelText}</div></div>`;
+        return `<div class="kpi-card"><div class="kpi-value" style="color:${w.fillColor};font-size:${metricSize}px">${_attrEnc(value)}</div><div class="kpi-label" style="font-size:${labelSize}px">${_attrEnc(labelText)}</div></div>`;
       }
 
 
@@ -1228,7 +1228,7 @@ function rankSuggestions(rules, cols, meta) {
           if (_thsp && _thsp.label) { _thlabel = _thsp.label; }
           else if (_thc === '__dlv_count__') { _thlabel = '✦ Count'; }
           else { _thlabel = _thc; }
-          thHtml += '<th style="' + hdrStyle + '">' + _thlabel + '</th>';
+          thHtml += '<th style="' + hdrStyle + '">' + _attrEnc(_thlabel) + '</th>';
         }
         var theadHtml = w.showHeaders === false ? '' : '<thead><tr>' + thHtml + '</tr></thead>';
         var _tblMode = (w.interactionMode) || (DataLaVistaState.design && DataLaVistaState.design.interactionMode) || 'cross-filter';
@@ -1250,13 +1250,14 @@ function rankSuggestions(rules, cols, meta) {
           for (var _tci = 0; _tci < cols.length; _tci++) {
             var _col = cols[_tci];
             var _cellRaw = _trow[_col] != null ? _trow[_col] : '';
-            var _cellStr = String(_cellRaw);
-            var _cellEsc = _cellStr.replace(/'/g, "\\'").replace(/"/g, '&quot;');
-            var _colEsc  = _col.replace(/'/g, "\\'");
+            // Escape once for both text and attributes: the click handler reads data-field/data-value
+            // through el.dataset, which returns the decoded value, so filtering still matches the raw data.
+            var _cellStr = _attrEnc(_cellRaw);
+            var _colStr  = _attrEnc(_col);
             var _cellAction = _tblMode === 'cross-highlight' ? 'highlight' : 'filter';
-            html += '<td style="cursor:pointer" title="Click to ' + _cellAction + ' by ' + _col + '"'
+            html += '<td style="cursor:pointer" title="Click to ' + _cellAction + ' by ' + _colStr + '"'
               + ' data-action="table-cell-click" data-mode="' + _tblMode + '"'
-              + ' data-field="' + _attrEnc(_col) + '" data-value="' + _attrEnc(String(_cellRaw)) + '">'
+              + ' data-field="' + _colStr + '" data-value="' + _cellStr + '">'
               + _cellStr + '</td>';
           }
           html += '</tr>';
@@ -1361,7 +1362,8 @@ function _buildDatasetOption(w, rows) {
           ? (raw.Title || raw.title || raw.name || raw.Name || raw.label || raw.Label || String(raw))
           : String(raw);
         var val = p.data && p.data['__dlvy_0'] != null ? p.data['__dlvy_0'] : '';
-        return name + ': ' + val + ' (' + p.percent.toFixed(1) + '%)';
+        // The tooltip is rendered as HTML, so escape the data values
+        return _attrEnc(name) + ': ' + _attrEnc(val) + ' (' + p.percent.toFixed(1) + '%)';
       } },
       series  : [{ type: 'pie', encode: { itemName: xDim, value: '__dlvy_0' }, radius: ['30%', '65%'], label: { fontSize: 11, formatter: function(p) {
         var raw = p.data ? p.data[xDim] : p.name;
@@ -1956,10 +1958,10 @@ function _buildChartOption(w, rows) {
             const ti = DataLaVistaCore.FIELD_TYPE_ICONS[sniffType(yf)] || DataLaVistaCore.FIELD_TYPE_ICONS.default;
             const spEntry = sp[yi] || {};
             const agg = spEntry.agg || '';
-            const escapedYf = yf.replace(/'/g, "\\'");
+            const escapedYf = _attrEnc(yf);
             const colOptions = '<option value="__dlv_count__"' + (yf === '__dlv_count__' ? ' selected' : '') + '>✦ Count</option>'
               + cols.map(c =>
-                '<option value="' + c + '"' + (c === yf ? ' selected' : '') + '>' + c + '</option>'
+                '<option value="' + _attrEnc(c) + '"' + (c === yf ? ' selected' : '') + '>' + _attrEnc(c) + '</option>'
               ).join('');
             const hasSeriesConds = !!(spEntry.conditions && spEntry.conditions.length);
 
@@ -1987,11 +1989,11 @@ function _buildChartOption(w, rows) {
 function _renderScatterOptionsHTML(w, wid, cols) {
   if (w.type !== 'scatter') return '';
   const _scatterFieldRow = (label, propName, currentField) => {
-    const opts = cols.map(c => '<option value="' + c + '"' + (c === currentField ? ' selected' : '') + '>' + c + '</option>').join('');
+    const opts = cols.map(c => '<option value="' + _attrEnc(c) + '"' + (c === currentField ? ' selected' : '') + '>' + _attrEnc(c) + '</option>').join('');
     const agg  = currentField ? ((w.fieldAggs || {})[currentField] || '') : '';
     const aggBtn = currentField
       ? '<button class="adv-agg-btn' + (agg ? ' has-agg' : '') + '" title="' + (agg || 'No aggregate') + '"'
-        + ' data-action="widget-field-agg" data-wid="' + wid + '" data-yf="' + currentField.replace(/'/g, "\\'") + '" data-yi="-1">'
+        + ' data-action="widget-field-agg" data-wid="' + wid + '" data-yf="' + _attrEnc(currentField) + '" data-yi="-1">'
         + (agg ? getAggIcon(agg) : '∑') + '</button>'
       : '';
     return '<div class="props-row"><label>' + label + '</label>'
@@ -2152,7 +2154,7 @@ function _renderBarLineOptionsHTML(w, wid) {
             + '<button class="btn btn-ghost btn-icon" data-action="dlv-cb" data-cb="' + _seriesCloseKey + '">✕</button>'
             + '</div>'
             + '<span class="toolbox-section-label" style="display:block;padding:8px 20px 4px">'
-            + 'Series: ' + aggLabel + ' of ' + fieldName
+            + 'Series: ' + aggLabel + ' of ' + _attrEnc(fieldName)
             + '</span>';
         };
 
@@ -2409,14 +2411,14 @@ function _renderBarLineOptionsHTML(w, wid) {
           const agg = (_wsp[idx] || {}).agg || '';
           const sp  = _wsp[idx] || {};
           var _tfLabel = sp.label || (fieldName === '__dlv_count__' ? '✦ Count' : fieldName);
-          const escapedFn = fieldName.replace(/'/g, "\\'");
+          const escapedFn = _attrEnc(fieldName);
           var _tfAggClass = agg ? ' has-agg' : '';
           var _tfAggIcon  = agg ? getAggIcon(agg) : '∑';
           return '<div class="adv-field-row selected" draggable="true"'
             + ' data-drag-role="tablefield" data-wid="' + wid + '" data-yi="' + idx + '">'
             + '<span style="cursor:grab;padding:0 4px;color:var(--text-disabled)" title="Drag to reorder">⠿</span>'
             + '<span class="field-type-icon ' + ti.cls + '">' + ti.icon + '</span>'
-            + '<span class="field-name" style="flex:1" title="' + escapedFn + '">' + _tfLabel + '</span>'
+            + '<span class="field-name" style="flex:1" title="' + escapedFn + '">' + _attrEnc(_tfLabel) + '</span>'
             + '<button class="btn btn-ghost btn-sm btn-icon" style="padding:0 4px" title="Field properties"'
             + ' data-action="widget-tablefield-props" data-wid="' + wid + '" data-yf="' + escapedFn + '" data-yi="' + idx + '">⚙️</button>'
             + '<button class="adv-agg-btn' + _tfAggClass + '" title="' + (agg || 'No aggregate') + '"'
@@ -2473,7 +2475,7 @@ function _renderBarLineOptionsHTML(w, wid) {
           ? '<div class="props-row"><label>Show headers</label>'
             + '<input type="checkbox" ' + (_wa.showHeaders!==false?'checked':'') + ' data-action="widget-update-bool" data-wid="' + wid + '" data-prop="showHeaders"/></div>'
           : '';
-        const _titleHint = (w.title && w.title.includes('{{')) ? ('→ ' + resolveTitleTemplate(w.title)) : '';
+        const _titleHint = (w.title && w.title.includes('{{')) ? ('→ ' + _attrEnc(resolveTitleTemplate(w.title))) : '';
         var _interactionVals = ['','cross-filter','cross-highlight','none'];
         var _interactionLabels = ['(inherit report)','cross-filter','cross-highlight','none'];
         var _interactionOpts = '';
@@ -2515,7 +2517,7 @@ function _renderBarLineOptionsHTML(w, wid) {
         }
         // Pre-compute conditional HTML blocks (no nested backtick or ternary in template)
         var _showTitleChecked = (w.showTitle !== false) ? 'checked' : '';
-        var _wTitleEsc   = w.title.replace(/"/g, '&quot;');
+        var _wTitleEsc   = _attrEnc(w.title);
         var _wWidgetBg              = w.widgetBackgroundColor || '#fefefe';
         var _wWidgetBgText          = w.widgetBackgroundColor || '';
         var _wWidgetBgIsTransparent = !w.widgetBackgroundColor;
@@ -3013,7 +3015,7 @@ function _renderBarLineOptionsHTML(w, wid) {
             var _uOpts = '<option value="(All)">(All)</option>';
             for (var _ui = 0; _ui < uniqueVals.length; _ui++) {
               var _uv = uniqueVals[_ui];
-              _uOpts += '<option value="' + _uv + '">' + _uv + '</option>';
+              _uOpts += '<option value="' + _attrEnc(_uv) + '">' + _attrEnc(_uv) + '</option>';
             }
             input.innerHTML = _uOpts;
             input.value = _pf[_f.field] || '(All)';
@@ -3230,9 +3232,8 @@ function _renderBarLineOptionsHTML(w, wid) {
           const chip = document.createElement('div');
           chip.className = 'filter-pill dlv-drill-chip';
           chip.style.cssText = 'display:flex;align-items:center;gap:5px;background:var(--accent-light,#deecf9);border:1px solid var(--accent,#0078d4);padding:4px 8px;border-radius:var(--radius,4px)';
-          const safeField = field.replace(/</g,'&lt;').replace(/>/g,'&gt;');
-          const safeValue = String(value).replace(/</g,'&lt;').replace(/>/g,'&gt;');
-          const escField  = field.replace(/'/g,"\\'");
+          const safeField = _attrEnc(field);
+          const safeValue = _attrEnc(value);
           chip.innerHTML = '<span style="font-size:10px">🔍</span>'
             + '<span style="font-size:12px;font-weight:600;color:var(--accent,#0078d4)">' + safeField + '</span>'
             + '<span style="font-size:11px;color:var(--text-secondary)">=</span>'
@@ -3246,8 +3247,8 @@ function _renderBarLineOptionsHTML(w, wid) {
           const chip = document.createElement('div');
           chip.className = 'filter-pill dlv-drill-chip';
           chip.style.cssText = 'display:flex;align-items:center;gap:5px;background:#fff4ce;border:1px solid #ffb900;padding:4px 8px;border-radius:var(--radius,4px)';
-          const safeField = highlight.field.replace(/</g,'&lt;').replace(/>/g,'&gt;');
-          const safeValue = String(highlight.value).replace(/</g,'&lt;').replace(/>/g,'&gt;');
+          const safeField = _attrEnc(highlight.field);
+          const safeValue = _attrEnc(highlight.value);
           chip.innerHTML = '<span style="font-size:10px">👁</span>'
             + '<span style="font-size:12px;font-weight:600;color:#8a6914">' + safeField + '</span>'
             + '<span style="font-size:11px;color:var(--text-secondary)">=</span>'

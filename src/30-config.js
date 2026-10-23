@@ -811,7 +811,7 @@ function renderFieldsPanel() {
     dsHeader.title = dsTitle;
     dsHeader.innerHTML = `
       <span class="ds-group-toggle open" id="ds-toggle-${CSS.escape(dsName)}">▶</span>
-      <span class="ds-group-name" id="ds-label-${CSS.escape(dsName)}">${dsAlias}</span>
+      <span class="ds-group-name" id="ds-label-${CSS.escape(dsName)}">${_attrEnc(dsAlias)}</span>
       <span style="font-size:10px;color:var(--text-disabled);margin-left:2px">${tableKeys.length}</span>
     `;
     // Click toggle
@@ -843,10 +843,10 @@ function renderFieldsPanel() {
       node.className = 'table-node';
 
       node.innerHTML = `
-        <div class="table-node-header" draggable="true" data-table="${tkey}" style="padding-left:6px">
+        <div class="table-node-header" draggable="true" data-table="${_attrEnc(tkey)}" style="padding-left:6px">
           <span class="toggle-arrow" id="arrow-${CSS.escape(tkey)}">▶</span>
           <span class="table-icon" title="${tIcon.title}" style="font-size:12px">${tIcon.icon}</span>
-          <span class="table-name" id="tlabel-${CSS.escape(tkey)}" title="${tkey}" style="font-size:11px;font-weight:700">${tAlias}</span>
+          <span class="table-name" id="tlabel-${CSS.escape(tkey)}" title="${_attrEnc(tkey)}" style="font-size:11px;font-weight:700">${_attrEnc(tAlias)}</span>
           <span class="table-count">${t.itemCount || 0}</span>
         </div>
         <div class="fields-list hidden" id="fields-${CSS.escape(tkey)}"></div>
@@ -883,8 +883,8 @@ function renderFieldsPanel() {
         fitem.draggable = true;
         fitem.style.paddingLeft = '14px';
         fitem.innerHTML = `
-          <span class="field-type-icon ${ti.cls}" title="${f.displayName || f.alias}">${ti.icon}</span>
-          <span class="field-label" id="flabel-${CSS.escape(tkey)}-${CSS.escape(f.alias)}" title="${f.displayName || f.alias}">${f.alias}</span>
+          <span class="field-type-icon ${ti.cls}" title="${_attrEnc(f.displayName || f.alias)}">${ti.icon}</span>
+          <span class="field-label" id="flabel-${CSS.escape(tkey)}-${CSS.escape(f.alias)}" title="${_attrEnc(f.displayName || f.alias)}">${_attrEnc(f.alias)}</span>
         `;
         fitem.addEventListener('dragstart', e => {
           safeDragSet(e, { type: 'field', table: tkey, field: f.alias, internalName: f.internalName });
@@ -910,8 +910,8 @@ function renderFieldsPanel() {
           fitem.style.paddingLeft = '14px';
           fitem.innerHTML = `
             <span class="field-item-parent-toggle" title="Show/hide sub-fields">▶</span>
-            <span class="field-type-icon ${ti.cls}" title="${f.displayName || f.alias}">${ti.icon}</span>
-            <span class="field-label" id="flabel-${CSS.escape(tkey)}-${CSS.escape(f.alias)}" title="${f.displayName || f.alias}">${f.alias}</span>
+            <span class="field-type-icon ${ti.cls}" title="${_attrEnc(f.displayName || f.alias)}">${ti.icon}</span>
+            <span class="field-label" id="flabel-${CSS.escape(tkey)}-${CSS.escape(f.alias)}" title="${_attrEnc(f.displayName || f.alias)}">${_attrEnc(f.alias)}</span>
           `;
           fitem.addEventListener('dragstart', e => {
             safeDragSet(e, { type: 'field', table: tkey, field: f.alias, internalName: f.internalName });

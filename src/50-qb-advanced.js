@@ -947,7 +947,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
               const _nd = DataLaVistaState.advancedQB.nodes[newNodeId];
               const _a  = DataLaVistaState.advancedQB.nodeAliases?.[newNodeId];
               const _b  = _nd?.alias || _nd?.tableName || '';
-              _hdrSpan.innerHTML = _b + (_a && _a !== _b ? ` <span style="opacity:.6;font-size:11px">(${_a})</span>` : '');
+              _hdrSpan.innerHTML = _attrEnc(_b) + (_a && _a !== _b ? ` <span style="opacity:.6;font-size:11px">(${_attrEnc(_a)})</span>` : '');
             }
             close();
             document.removeEventListener('keydown', onKey);
@@ -978,13 +978,13 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         el.id = 'adv-' + id;
         el.style.cssText = `left:${nd.x}px;top:${nd.y}px;min-width:160px;max-width:280px`;
 
-        const descHTML = t.description ? `<div class="qb-node-desc" title="${t.description.replace(/"/g,'&quot;')}">${t.description}</div>` : '';
+        const descHTML = t.description ? `<div class="qb-node-desc" title="${_attrEnc(t.description)}">${_attrEnc(t.description)}</div>` : '';
         const rowCount = (t.itemCount || 0).toLocaleString();
 
         el.innerHTML = `
     <div class="qb-node-header">
       <span class="qb-node-join-icon" title="Drag to another table to create a join">⚯</span>
-      <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin:0 4px">${nd.alias || nd.tableName}${(DataLaVistaState.advancedQB.nodeAliases?.[id] && DataLaVistaState.advancedQB.nodeAliases[id] !== (nd.alias || nd.tableName)) ? ` <span style="opacity:.6;font-size:11px">(${DataLaVistaState.advancedQB.nodeAliases[id]})</span>` : ''}</span>
+      <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin:0 4px">${_attrEnc(nd.alias || nd.tableName)}${(DataLaVistaState.advancedQB.nodeAliases?.[id] && DataLaVistaState.advancedQB.nodeAliases[id] !== (nd.alias || nd.tableName)) ? ` <span style="opacity:.6;font-size:11px">(${_attrEnc(DataLaVistaState.advancedQB.nodeAliases[id])})</span>` : ''}</span>
       <button style="background:none;border:none;color:rgba(255,255,255,.7);cursor:pointer;padding:0 2px;font-size:13px;line-height:1" data-action="qb-remove-node" data-node-id="${id}">✕</button>
     </div>
     <div class="qb-node-body">
@@ -1244,9 +1244,9 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         let html = visible.map(f => {
           const agg = fieldAggs[f];
           const isAgg = agg && agg !== '';
-          const label = isAgg ? (f + ' (' + getAggIcon(agg) + ')') : f;
-          return '<span class="qb-node-pill' + (isAgg ? ' agg-pill' : '') + '" data-field="' + f + '" draggable="true">'
-            + label + '<span class="pill-x" data-node-id="' + nodeId + '" data-field="' + f + '">×</span></span>';
+          const label = isAgg ? (_attrEnc(f) + ' (' + getAggIcon(agg) + ')') : _attrEnc(f);
+          return '<span class="qb-node-pill' + (isAgg ? ' agg-pill' : '') + '" data-field="' + _attrEnc(f) + '" draggable="true">'
+            + label + '<span class="pill-x" data-node-id="' + nodeId + '" data-field="' + _attrEnc(f) + '">×</span></span>';
         }).join('');
 
         if (extra > 0) {
@@ -1263,14 +1263,14 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
             html += '<span class="qb-node-pill agg-pill rollup-agg-pill"'
               + ' data-drag-role="adv-rollup-pill"'
               + ' data-node-id="' + nodeId + '"'
-              + ' data-parent-alias="' + parentAlias + '"'
-              + ' data-child-field="' + childField + '">'
-              + alias + ' (' + getAggIcon(agg) + ')'
+              + ' data-parent-alias="' + _attrEnc(parentAlias) + '"'
+              + ' data-child-field="' + _attrEnc(childField) + '">'
+              + _attrEnc(alias) + ' (' + getAggIcon(agg) + ')'
               + '<span class="rollup-pill-x" style="cursor:pointer"'
               + ' data-action="qb-toggle-lookup-child-off"'
               + ' data-node-id="' + nodeId + '"'
-              + ' data-parent-alias="' + parentAlias + '"'
-              + ' data-child-field="' + childField + '"'
+              + ' data-parent-alias="' + _attrEnc(parentAlias) + '"'
+              + ' data-child-field="' + _attrEnc(childField) + '"'
               + '>×</span>'
               + '</span>';
           }
@@ -1539,9 +1539,9 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         }
         const _fieldRowHTML = (f, indent) => {
           const sel = nd.selectedFields.includes(f.alias);
-          return '<div class="basic-field-row' + (indent ? ' basic-field-synthetic' : '') + '" style="' + (indent ? 'padding-left:18px;border-left:2px solid var(--border);margin-left:8px' : '') + '" data-action="qb-toggle-field" data-node-id="' + nodeId + '" data-field="' + f.alias + '">'
+          return '<div class="basic-field-row' + (indent ? ' basic-field-synthetic' : '') + '" style="' + (indent ? 'padding-left:18px;border-left:2px solid var(--border);margin-left:8px' : '') + '" data-action="qb-toggle-field" data-node-id="' + nodeId + '" data-field="' + _attrEnc(f.alias) + '">'
             + '<input type="checkbox" ' + (sel ? 'checked' : '') + '/>'
-            + '<label>' + f.alias + '</label>'
+            + '<label>' + _attrEnc(f.alias) + '</label>'
             + '</div>';
         };
         const _fieldsHTML = _baseFields.map(f => {
@@ -1552,7 +1552,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         body.innerHTML = `
     <div class="form-group">
       <label>Alias</label>
-      <input type="text" class="form-input" style="height:28px" value="${nd.alias}" data-action="qb-set-alias" data-node-id="${nodeId}"/>
+      <input type="text" class="form-input" style="height:28px" value="${_attrEnc(nd.alias)}" data-action="qb-set-alias" data-node-id="${nodeId}"/>
     </div>
     <div>
       <div style="font-size:11px;font-weight:700;color:var(--text-disabled);text-transform:uppercase;margin-bottom:4px">Fields — click to toggle</div>
@@ -1647,8 +1647,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           const filteredToFields = isLookupJoin
             ? (fromIsChild ? toFields.filter(_isIdField) : toFields.filter(_isLookupField))
             : toFields;
-          const makeFromOpts = (selectedKey) => filteredFromFields.map(f => `<option value="${f.alias}" ${f.alias === selectedKey ? 'selected' : ''}>${f.alias}${f.isAutoId ? ' [auto]' : ''}</option>`).join('');
-          const makeToOpts   = (selectedKey) => filteredToFields.map(f => `<option value="${f.alias}" ${f.alias === selectedKey ? 'selected' : ''}>${f.alias}${f.isAutoId ? ' [auto]' : ''}</option>`).join('');
+          const makeFromOpts = (selectedKey) => filteredFromFields.map(f => `<option value="${_attrEnc(f.alias)}" ${f.alias === selectedKey ? 'selected' : ''}>${_attrEnc(f.alias)}${f.isAutoId ? ' [auto]' : ''}</option>`).join('');
+          const makeToOpts   = (selectedKey) => filteredToFields.map(f => `<option value="${_attrEnc(f.alias)}" ${f.alias === selectedKey ? 'selected' : ''}>${_attrEnc(f.alias)}${f.isAutoId ? ' [auto]' : ''}</option>`).join('');
           const leftAlias  = displaySwapped ? toAlias   : fromAlias;
           const rightAlias = displaySwapped ? fromAlias : toAlias;
 
@@ -1678,8 +1678,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           var _joinTypeCbKey = _dlvRegPopupCb(function(val) { setActiveJoinProp('type', val); renderAdvOptionsPanel('join', id); });
           body.innerHTML = `
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-              <div style="font-size:11px;font-weight:600;color:var(--text-disabled)">LEFT: ${leftAlias}</div>
-              <div style="font-size:11px;color:var(--text-disabled)">RIGHT: ${rightAlias}</div>
+              <div style="font-size:11px;font-weight:600;color:var(--text-disabled)">LEFT: ${_attrEnc(leftAlias)}</div>
+              <div style="font-size:11px;color:var(--text-disabled)">RIGHT: ${_attrEnc(rightAlias)}</div>
             </div>
             <div class="adv-node-section-hdr" style="margin-bottom:6px">KEY FIELDS
             ${isLookupJoin ? '' : `<span class="qb-badge" style="font-size:10px;padding:2px 8px;cursor:pointer;margin-left:4px"
@@ -1772,25 +1772,25 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
               ? activeChildEntries.map(e => e.alias).join(', ')
               : 'Expand ▼ to select child field aggregates';
             const aggBtn = hasObjChildren
-              ? '<button class="adv-agg-btn' + (activeChildEntries.length ? ' has-agg' : '') + '" disabled title="' + childAggTitle + '">' + childAggSummary + '</button>'
-              : '<button class="' + aggBtnCls + '" title="' + aggLabel + '"'
-                + ' data-action="qb-show-agg-popup" data-node-id="' + id + '" data-field="' + f.alias + '">'
+              ? '<button class="adv-agg-btn' + (activeChildEntries.length ? ' has-agg' : '') + '" disabled title="' + _attrEnc(childAggTitle) + '">' + childAggSummary + '</button>'
+              : '<button class="' + aggBtnCls + '" title="' + _attrEnc(aggLabel) + '"'
+                + ' data-action="qb-show-agg-popup" data-node-id="' + id + '" data-field="' + _attrEnc(f.alias) + '">'
                 + aggBtnContent + '</button>';
             const expandBtnCls = 'adv-expand-btn' + (expanded ? ' expanded' : '');
             const expandBtn = isExpandable
               ? '<button class="' + expandBtnCls + '" title="' + (expanded ? 'Collapse' : 'Expand') + '"'
-                + ' data-action="qb-toggle-lookup-expand" data-node-id="' + id + '" data-field="' + f.alias + '">'
+                + ' data-action="qb-toggle-lookup-expand" data-node-id="' + id + '" data-field="' + _attrEnc(f.alias) + '">'
                 + (expanded ? '▼' : '▶') + '</button>'
               : '';
             const childRows = expanded
               ? (expandable ? _renderChildFieldRows(id, nd, f) : _renderDateChildRows(id, nd, f, t))
               : '';
             return `<div class="adv-field-row${sel ? ' selected' : ''}"
-                data-action="qb-toggle-field" data-node-id="${id}" data-field="${f.alias}"
+                data-action="qb-toggle-field" data-node-id="${id}" data-field="${_attrEnc(f.alias)}"
                 data-drag-role="adv-field-pill">
               <input type="checkbox" ${sel ? 'checked' : ''}/>
               <span class="field-type-icon ${ti.cls}">${ti.icon}</span>
-              <span class="field-name">${f.userAlias || f.alias}</span>
+              <span class="field-name">${_attrEnc(f.userAlias || f.alias)}</span>
               ${expandBtn}${aggBtn}
             </div>${childRows}`;
           };
@@ -1848,7 +1848,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
               var _gbCbKey     = _dlvRegPopupCb(function(val) { advNodeGB(id, gi, val); });
               var _gbRemoveCbKey = _dlvRegPopupCb(function()  { advNodeRemoveGB(id, gi); });
               var _colOpts = fields.map(function(f) {
-                return '<option value="' + f.alias + '"' + (f.alias === gField ? ' selected' : '') + '>' + f.alias + '</option>';
+                return '<option value="' + _attrEnc(f.alias) + '"' + (f.alias === gField ? ' selected' : '') + '>' + _attrEnc(f.alias) + '</option>';
               }).join('');
               return '<div class="qb-sort-row" draggable="true" data-drag-role="adv-node-gb" data-node-id="' + id + '" data-idx="' + gi + '">'
                 + '<select class="form-input qb-field-select" data-action="dlv-cb" data-cb="' + _gbCbKey + '">' + _colOpts + '</select>'
@@ -1881,7 +1881,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           const nonAggFields = nd.selectedFields.filter(f => !(nd.fieldAggs || {})[f]);
           const gbAutoMsg = hasAggs
             ? (nonAggFields.length
-                ? 'Auto: ' + nonAggFields.join(', ')
+                ? 'Auto: ' + _attrEnc(nonAggFields.join(', '))
                 : 'All fields aggregated — no GROUP BY needed')
             : 'Managed automatically (aggregated lookup joins active)';
           const gbAutoHTML = gbLocked
@@ -2512,15 +2512,15 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           const aggTitle = aggActive ? agg : 'No aggregate';
           const aggContent = aggActive ? getAggIcon(agg) : '∑';
           const aggBtn = '<button class="' + aggCls + '" title="' + aggTitle + '"'
-            + ' data-action="qb-show-agg-popup" data-node-id="' + nodeId + '" data-field="' + cf.alias + '">'
+            + ' data-action="qb-show-agg-popup" data-node-id="' + nodeId + '" data-field="' + _attrEnc(cf.alias) + '">'
             + aggContent + '</button>';
           const rowCls = 'adv-field-row adv-child-field-row' + (sel ? ' selected' : '');
           return '<div class="' + rowCls + '" style="padding-left:22px"'
-            + ' data-action="qb-toggle-field" data-node-id="' + nodeId + '" data-field="' + cf.alias + '"'
+            + ' data-action="qb-toggle-field" data-node-id="' + nodeId + '" data-field="' + _attrEnc(cf.alias) + '"'
             + ' data-drag-role="adv-field-pill">'
             + '<input type="checkbox" ' + (sel ? 'checked' : '') + '/>'
             + '<span class="field-type-icon ' + ti.cls + '">' + ti.icon + '</span>'
-            + '<span class="field-name" style="font-size:11px">' + (cf.userAlias || cf.alias) + '</span>'
+            + '<span class="field-name" style="font-size:11px">' + _attrEnc(cf.userAlias || cf.alias) + '</span>'
             + aggBtn
             + '</div>';
         }).join('');
@@ -2738,7 +2738,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
               + '<input type="checkbox" ' + (checked ? 'checked' : '')
               + ' data-action="dlv-cb" data-cb="' + _toggleCbKey + '"/>'
               + '<span class="field-type-icon ' + ti.cls + '">' + ti.icon + '</span>'
-              + '<span class="field-name" style="font-size:11px">' + (parentField.userAlias || parentField.alias) + ' \u2192 ' + (cf.userAlias || cf.alias) + '</span>'
+              + '<span class="field-name" style="font-size:11px">' + _attrEnc(parentField.userAlias || parentField.alias) + ' \u2192 ' + _attrEnc(cf.userAlias || cf.alias) + '</span>'
               + '<select class="form-input" style="height:22px;font-size:10px;padding:0 2px;min-width:0;width:auto"'
               + (checked ? '' : ' disabled')
               + ' data-action="dlv-cb" data-cb="' + _aggCbKey + '">' + aggOptions + '</select>'
@@ -2752,16 +2752,16 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
               + '<input type="checkbox" ' + (dirChecked ? 'checked' : '')
               + ' data-action="dlv-cb" data-cb="' + _dirToggleCbKey + '"/>'
               + '<span class="field-type-icon ' + ti.cls + '">' + ti.icon + '</span>'
-              + '<span class="field-name" style="font-size:11px">' + (cf.userAlias || cf.alias) + '</span>'
+              + '<span class="field-name" style="font-size:11px">' + _attrEnc(cf.userAlias || cf.alias) + '</span>'
               + '</div>';
           }
           const sel = nd.selectedFields.includes(cf.alias);
           return '<div class="adv-field-row adv-child-field-row' + (sel ? ' selected' : '') + '" style="padding-left:22px"'
-            + ' data-action="qb-toggle-field" data-node-id="' + nodeId + '" data-field="' + cf.alias + '"'
+            + ' data-action="qb-toggle-field" data-node-id="' + nodeId + '" data-field="' + _attrEnc(cf.alias) + '"'
             + ' data-drag-role="adv-field-pill">'
             + '<input type="checkbox" ' + (sel ? 'checked' : '') + '/>'
             + '<span class="field-type-icon ' + ti.cls + '">' + ti.icon + '</span>'
-            + '<span class="field-name" style="font-size:11px">' + (cf.userAlias || cf.alias) + '</span>'
+            + '<span class="field-name" style="font-size:11px">' + _attrEnc(cf.userAlias || cf.alias) + '</span>'
             + '</div>';
         }).join('');
         return '<div class="adv-child-fields">' + rows + '</div>';

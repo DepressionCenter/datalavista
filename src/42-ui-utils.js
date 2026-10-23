@@ -422,7 +422,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         const el = document.createElement('div');
         el.className = 'sp-picker-item';
         if (dataName) el.dataset.spName = dataName;
-        el.innerHTML = `<span class="sp-item-icon">${icon}</span><span class="sp-item-name" title="${name}">${name}</span>${size ? `<span class="sp-item-size">${size}</span>` : ''}`;
+        el.innerHTML = `<span class="sp-item-icon">${icon}</span><span class="sp-item-name" title="${_attrEnc(name)}">${_attrEnc(name)}</span>${size ? `<span class="sp-item-size">${size}</span>` : ''}`;
         if (!isFile) el.innerHTML += `<span style="font-size:10px;color:var(--text-disabled);margin-left:auto">▶</span>`;
         el.addEventListener('click', onClick);
         return el;
