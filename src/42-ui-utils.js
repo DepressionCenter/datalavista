@@ -175,7 +175,14 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         const container = document.getElementById('toast-container');
         const t = document.createElement('div');
         t.className = 'toast ' + type;
-        t.innerHTML = `<span>${icon}</span><span>${msg}</span>`;
+        // Messages often include text from outside the app (error messages, file names, file contents),
+        // so the message is set as text, never as HTML.
+        const iconEl = document.createElement('span');
+        iconEl.textContent = icon;
+        const msgEl = document.createElement('span');
+        msgEl.textContent = String(msg);
+        t.appendChild(iconEl);
+        t.appendChild(msgEl);
         container.appendChild(t);
         setTimeout(() => { t.style.opacity = '0'; t.style.transition = 'opacity 400ms'; setTimeout(() => t.remove(), 400); }, 4400);
       }
@@ -348,7 +355,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           }
         } catch(e) {
           console.error('[DLV SP Picker]', e);
-          body.innerHTML = `<div style="padding:16px;color:var(--error);font-size:12px">Error: ${e.message}</div>`;
+          body.innerHTML = `<div style="padding:16px;color:var(--error);font-size:12px">Error: ${_attrEnc(e.message)}</div>`;
         }
         spinner.classList.remove('active');
       }

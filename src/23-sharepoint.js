@@ -1084,7 +1084,7 @@ const SharePointFileDialog = {
       }
       SharePointFileDialog._renderFileView(state);
     } catch(e) {
-      state.bodyEl.innerHTML = `<div style="padding:16px;font-size:12px;color:var(--error,#d32f2f)">Error: ${e.message}</div>`;
+      state.bodyEl.innerHTML = `<div style="padding:16px;font-size:12px;color:var(--error,#d32f2f)">Error: ${_attrEnc(e.message)}</div>`;
     }
   },
 
@@ -1192,7 +1192,7 @@ const SharePointFileDialog = {
       state.currentData = { items: state.cachedLists }; // cache for lists root view
       SharePointFileDialog._renderListsView(state, true);
     } catch(e) {
-      state.bodyEl.innerHTML = `<div style="padding:16px;font-size:12px;color:var(--error,#d32f2f)">Error: ${e.message}</div>`;
+      state.bodyEl.innerHTML = `<div style="padding:16px;font-size:12px;color:var(--error,#d32f2f)">Error: ${_attrEnc(e.message)}</div>`;
     }
   },
 
@@ -1209,7 +1209,7 @@ const SharePointFileDialog = {
       state.currentData = { items: extractRows(json) };
       SharePointFileDialog._renderListsView(state, false);
     } catch(e) {
-      state.bodyEl.innerHTML = `<div style="padding:16px;font-size:12px;color:var(--error,#d32f2f)">Error: ${e.message}</div>`;
+      state.bodyEl.innerHTML = `<div style="padding:16px;font-size:12px;color:var(--error,#d32f2f)">Error: ${_attrEnc(e.message)}</div>`;
     }
   },
 
