@@ -1,3 +1,23 @@
+# This file is part of DataLaVista™
+# .gitignore
+# Author(s): Gabriel Mongefranco.
+# Created: 2026-03-10
+# Last Modified: 2026-10-25
+# Summary: Excludes local settings, environment files, caches, and temporary artifacts.
+# Notes: See README file for documentation and full license information.
+#
+# Copyright © 2026 The Regents of the University of Michigan
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+# You should have received a copy of the GNU General Public License along
+# with this program. If not, see <https://www.gnu.org/licenses/>.
+
 # .gitignore - special file for Git telling it which files to ignore when committing changes to the repository
 
 # Ignore log files
@@ -22,6 +42,7 @@ src/_gen/
 # Ignore environment variable files
 .env
 .env.*
+!.env.example
 /env/**
 
 # Ignore all data files except the one that's tracked
@@ -32,3 +53,49 @@ src/_gen/
 .xlsx
 .json
 !/samples/**
+
+# Ignore RStudio project files and R session history
+.Rproj.user/
+*.Rproj
+.RData
+.RHistory
+.Rhistory
+.Ruserdata
+.Rapp.history
+
+# Ignore OS, editor, and lint artifacts
+.DS_Store
+Thumbs.db
+.idea/
+*.swp
+log.txt
+logs.txt
+logs/*
+.coverage
+*-lint-report*
+
+# Ignore local coding tool settings
+.claude
+.claude/*
+.claudecode/*
+.gemini
+.gemini/*
+.github-copilot
+.github-copilot/*
+.kimi
+CLAUDECODE.md
+CHATGPT.md
+
+# Keep shared project instructions under version control
+!AGENTS.md
+!CLAUDE.md
+!CODEX.md
+!CONVENTIONS.md
+!GEMINI.md
+!KIMI.md
+!.github/copilot-instructions.md
+
+# Ignore cache files
+*.cache
+__pycache__/
+.venv/

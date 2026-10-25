@@ -1,0 +1,41 @@
+# This file is part of DataLaVista™
+# CITATION.cff
+# Author(s): Gabriel Mongefranco.
+# Created: 2026-08-05
+# Last Modified: 2026-10-25
+# Summary: Provides citation metadata using the established project authors and DOI.
+# Notes: See README file for documentation and full license information.
+#
+# Copyright © 2026 The Regents of the University of Michigan
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+# You should have received a copy of the GNU General Public License along
+# with this program. If not, see <https://www.gnu.org/licenses/>.
+
+cff-version: 1.2.0
+message: "If you find this repository, code or paper useful for your research, please cite it. DataLaVista™ is licensed under the GNU General Public License v3.0 or later. Copyright © 2026 The Regents of the University of Michigan | Eisenberg Family Depression Center (https://depressioncenter.org)."
+type: software
+title: "DataLaVista™"
+doi: "10.5281/zenodo.19245606"
+url: "https://github.com/DepressionCenter/datalavista" # project website or repository URL
+repository-code: "https://github.com/DepressionCenter/datalavista"
+license: "GPL-3.0-or-later"
+contact:
+  - name: "Eisenberg Family Depression Center, University of Michigan"
+    website: "https://depressioncenter.org"
+authors:
+  - family-names: "Mongefranco"
+    given-names: "Gabriel"
+    affiliation: "University of Michigan"
+  - family-names: "Gluskin"
+    given-names: "Jeremy"
+    affiliation: "University of Michigan"
+  - family-names: "Boa"
+    given-names: "Shelley"
+    affiliation: "University of Michigan"

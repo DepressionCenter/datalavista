@@ -1,0 +1,107 @@
+<!--
+This file is part of DataLaVista™
+docs/repository-maintenance.md
+Author(s): Gabriel Mongefranco.
+Created: 2026-10-25
+Last Modified: 2026-10-25
+Summary: Explains the application build, shared instructions, citation metadata, and previews.
+Notes: See README file for documentation and full license information.
+
+Copyright © 2026 The Regents of the University of Michigan
+
+Licensed under the GNU Free Documentation License v1.3 or later.
+See <https://www.gnu.org/licenses/fdl-1.3.html>. See README for full license information.
+-->
+
+# DataLaVista™
+
+## Repository maintenance
+
+[Back to project README](../README.md)
+
+This guide helps maintainers find the application source and build its browser
+files. It also explains the shared repository instructions, citation metadata,
+and preview images.
+
+### Application files and builds
+
+The numbered JavaScript fragments and HTML under `src/` are application source.
+The build scripts combine them into `datalavista.js`, `DataLaVista.html`, and
+`DataLaVista-nojs.html`. The last file loads the separate JavaScript file.
+
+From the repository root, run the shell build with Bash and Python 3 available:
+
+```sh
+bash build.sh
+```
+
+The script uses an installed or cached esbuild executable. If neither exists, it
+downloads esbuild 0.28.0. Windows maintainers can use `build.ps1`.
+
+Review all three generated outputs after a source change. The existing build
+workflow runs on pushes to `main` that change `src/` or `build.sh`, and on manual
+dispatch. It commits generated outputs when the build changes them.
+
+Documentation and metadata changes do not need a rebuild. Confirm that the source,
+stylesheet, build workflow, and generated browser files remain unchanged.
+
+### Shared instructions and documentation
+
+Start with [AGENTS.md](../AGENTS.md), then read the
+[project preferences](../skills/project-preferences/SKILL.md) and applicable
+guides in [SKILLS.md](../SKILLS.md). The root instruction files and
+`.github/copilot-instructions.md` direct each supported client to `AGENTS.md`.
+
+The shared guidance comes from the
+[EFDC repository template](https://github.com/DepressionCenter/EFDC-Repo-Template).
+The template's `src/code-sample-*` files are omitted because this repository
+already has application source. Use the exact header text in `AGENTS.md` when
+adding source files.
+
+Preserve the existing main README. Add detailed guides under `docs/` and link
+them from [the documentation index](README.md). The
+[documentation template](doc-template.md) intentionally retains page-specific
+placeholders for future guides. Replace those fields when copying it to a real page.
+
+### Citation and licenses
+
+[CITATION.cff](../CITATION.cff) uses the title, authors, and DOI already credited in
+the README. `.zenodo.json` uses the same authors and identifies JavaScript as the
+programming language. No unverified author identifiers are included.
+
+Preserve the software license in [LICENSE](../LICENSE) and the software and
+documentation notices in [NOTICE](../NOTICE).
+
+### Preview images
+
+The previews use [screenshot 2](../images/datalavista-screenshot-2.png), which shows
+the data connection dialog, query builder, SQL editor, and dashboard designer.
+The original screenshot stays unchanged.
+
+- [Repository preview](../images/Repo-preview.png): 912×512 pixels.
+- [Repository thumbnail](../images/Repo-preview-thumb.png): 360×202 pixels.
+
+Keep the screenshot centered and preserve its proportions when cropping and
+resizing. Use the same composition at both sizes.
+
+### Conclusion
+
+Use the source files for application changes and the local guides for repository
+maintenance. Review generated outputs only when a source change requires a build.
+
+### Additional resources
+
+- [Project instructions](../AGENTS.md)
+- [Project preferences](../skills/project-preferences/SKILL.md)
+- [Skills index](../SKILLS.md)
+- [Documentation index](README.md)
+- [Documentation template](doc-template.md)
+- [EFDC repository template](https://github.com/DepressionCenter/EFDC-Repo-Template)
+- [Citation metadata](../CITATION.cff)
+- [Software license](../LICENSE)
+- [License notices](../NOTICE)
+- [Original screenshot 2](../images/datalavista-screenshot-2.png)
+- [Repository preview](../images/Repo-preview.png)
+- [Repository thumbnail](../images/Repo-preview-thumb.png)
+
+[Back to project README](../README.md)
