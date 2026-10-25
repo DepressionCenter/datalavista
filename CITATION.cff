@@ -1,6 +1,11 @@
-cff-version: 1.2.0
-# This file is part of DataLaVista™.
+# This file is part of DataLaVista™
 # CITATION.cff
+# Author(s): Gabriel Mongefranco.
+# Created: 2026-08-05
+# Last Modified: 2026-10-25
+# Summary: Provides citation metadata using the established project authors and DOI.
+# Notes: See README file for documentation and full license information.
+#
 # Copyright © 2026 The Regents of the University of Michigan
 #
 # This program is free software: you can redistribute it and/or modify
@@ -11,7 +16,9 @@ cff-version: 1.2.0
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 # GNU General Public License for more details.
 # You should have received a copy of the GNU General Public License along
-# with this program. If not, see https://www.gnu.org/licenses/.
+# with this program. If not, see <https://www.gnu.org/licenses/>.
+
+cff-version: 1.2.0
 message: "If you find this repository, code or paper useful for your research, please cite it. DataLaVista™ is licensed under the GNU General Public License v3.0 or later. Copyright © 2026 The Regents of the University of Michigan | Eisenberg Family Depression Center (https://depressioncenter.org)."
 type: software
 title: "DataLaVista™"

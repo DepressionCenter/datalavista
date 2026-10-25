@@ -5,7 +5,15 @@ description: Write and maintain the /docs knowledge base. Apply when adding or c
 
 <!--
 This file is part of DataLaVista™
+skills/documentation/SKILL.md
+Author(s): Gabriel Mongefranco.
+Created: 2026-09-10
+Last Modified: 2026-10-25
+Summary: Defines the required structure and maintenance of the documentation folder.
+Notes: See README file for documentation and full license information.
+
 Copyright © 2026 The Regents of the University of Michigan
+
 Licensed under the GNU Free Documentation License v1.3 or later.
 See <https://www.gnu.org/licenses/fdl-1.3.html>. See README for full license information.
 -->
@@ -49,7 +57,15 @@ Every page uses this order.
 
        <!--
        This file is part of DataLaVista™
+       docs/<filename>.md
+       Author(s): Gabriel Mongefranco.
+       Created: YYYY-MM-DD
+       Last Modified: YYYY-MM-DD
+       Summary: < SUMMARY OF WHAT THIS FILE OR MODULE DOES >
+       Notes: See README file for documentation and full license information.
+
        Copyright © YYYY The Regents of the University of Michigan
+
        Licensed under the GNU Free Documentation License v1.3 or later.
        See <https://www.gnu.org/licenses/fdl-1.3.html>. See README for full license information.
        -->

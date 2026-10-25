@@ -1,6 +1,14 @@
 <!--
 This file is part of DataLaVista™
+docs/skill-examples.md
+Author(s): Gabriel Mongefranco.
+Created: 2026-09-05
+Last Modified: 2026-10-25
+Summary: Provides optional examples for authoring reusable project skills.
+Notes: See README file for documentation and full license information.
+
 Copyright © 2026 The Regents of the University of Michigan
+
 Licensed under the GNU Free Documentation License v1.3 or later.
 See <https://www.gnu.org/licenses/fdl-1.3.html>. See README for full license information.
 -->
@@ -21,7 +29,8 @@ choices; they do not certify these recipes or replace testing in your project.
 1. Choose only the recipe relevant to your recurring task.
 2. Copy [skill-template.md](../skills/skill-template.md) into
    `skills/<skill-name>/SKILL.md`. Replace its example name and description with
-   the selected recipe's values. Update its links to `../../AGENTS.md` and
+   the selected recipe's values. Set the header's filename, authors, dates, and
+   summary for the new file. Update its links to `../../AGENTS.md` and
    `../project-preferences/SKILL.md`; the skeleton below uses these destination paths.
 3. Replace the example workflow with that recipe's bullets. Add actual project
    paths, supported versions, and verification commands after inspecting the repo.
@@ -45,7 +54,15 @@ description: Complete a defined recurring project task when its specific inputs 
 
 <!--
 This file is part of DataLaVista™
+skills/project-task/SKILL.md
+Author(s): Gabriel Mongefranco.
+Created: YYYY-MM-DD
+Last Modified: YYYY-MM-DD
+Summary: < SUMMARY OF WHAT THIS FILE OR MODULE DOES >
+Notes: See README file for documentation and full license information.
+
 Copyright © 2026 The Regents of the University of Michigan
+
 Licensed under the GNU Free Documentation License v1.3 or later.
 See <https://www.gnu.org/licenses/fdl-1.3.html>. See README for full license information.
 -->

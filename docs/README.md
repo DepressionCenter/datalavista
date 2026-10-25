@@ -1,6 +1,14 @@
 <!--
 This file is part of DataLaVista™
+docs/README.md
+Author(s): Gabriel Mongefranco.
+Created: 2026-09-05
+Last Modified: 2026-10-25
+Summary: Indexes setup instructions, maintenance guides, and documentation templates.
+Notes: See README file for documentation and full license information.
+
 Copyright © 2026 The Regents of the University of Michigan
+
 Licensed under the GNU Free Documentation License v1.3 or later.
 See <https://www.gnu.org/licenses/fdl-1.3.html>. See README for full license information.
 -->

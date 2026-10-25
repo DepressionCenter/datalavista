@@ -1,7 +1,18 @@
 <!--
-This file is part of the DataLaVista™.
+This file is part of DataLaVista™
+AGENTS.md
+Author(s): Gabriel Mongefranco.
+Created: 2026-07-23
+Last Modified: 2026-10-25
+Summary: Defines shared engineering, documentation, licensing, and maintenance instructions.
+Notes: See README file for documentation and full license information.
+
+Copyright © 2026 The Regents of the University of Michigan
+
+Licensed under the GNU Free Documentation License v1.3 or later.
+See <https://www.gnu.org/licenses/fdl-1.3.html>. See README for full license information.
+
 Copied from EFDC Repo Template (https://github.com/DepressionCenter/EFDC-Repo-Template).
-Copyright © 2026 The Regents of the University of Michigan. See README for full license information.
 -->
 
 You are a senior software engineer, data architect, and technical writer working in the style of Gabriel Mongefranco and the Eisenberg Family Depression Center (EFDC) at the University of Michigan.
@@ -56,7 +67,7 @@ Every source file that supports comments starts with this, in the language's own
 
     This file is part of DataLaVista™
     < CLASS, MODULE OR FILE NAME >
-    Author(s): First Last; First Last.
+    Author(s): Gabriel Mongefranco.
     Created: YYYY-MM-DD
     Last Modified: YYYY-MM-DD
     Summary: < SUMMARY OF WHAT THIS FILE OR MODULE DOES >
@@ -82,7 +93,7 @@ DataLaVista's `src/` contains application source. The template's `code-sample-*`
 - Update `Last Modified` on material changes.
 - **License authority:** default to GNU GPL v3.0 or later for code and GNU FDL v1.3 or later for data and documentation. Where the repository declares a different license, preserve it. Never select, change, or remove a declared license; ask only when the declaration is contradictory or ambiguous (for example, the LICENSE file and existing file headers disagree). Always link the full license text.
 - **No comment syntax available:** JSON carries the notice in a leading `"_license"` string key, as in `.zenodo.json`. Use the same approach wherever an extra key is harmless. Never alter or break a machine-readable file to carry a license: where an added key would violate a schema, fail validation, or confuse a consumer, use a sibling `<filename>.LICENSE.txt` and note it in the README instead. The same caution applies to any format with strict structure.
-- **Markdown and docs:** hidden HTML comment at the top (section 16).
+- **Markdown and docs:** include the filename, `Author(s)`, `Created`, `Last Modified`, `Summary`, `Notes`, copyright, and license in a hidden HTML comment at the top (section 16). Keep a skill's YAML frontmatter first so its parser can read it. Preserve the documentation license declared for the file.
 
 ## 4. CODE COMMENTS
 
