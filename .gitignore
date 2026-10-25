@@ -22,6 +22,7 @@ src/_gen/
 # Ignore environment variable files
 .env
 .env.*
+!.env.example
 /env/**
 
 # Ignore all data files except the one that's tracked
@@ -32,3 +33,49 @@ src/_gen/
 .xlsx
 .json
 !/samples/**
+
+# Ignore RStudio project files and R session history
+.Rproj.user/
+*.Rproj
+.RData
+.RHistory
+.Rhistory
+.Ruserdata
+.Rapp.history
+
+# Ignore OS, editor, and lint artifacts
+.DS_Store
+Thumbs.db
+.idea/
+*.swp
+log.txt
+logs.txt
+logs/*
+.coverage
+*-lint-report*
+
+# Ignore local coding tool settings
+.claude
+.claude/*
+.claudecode/*
+.gemini
+.gemini/*
+.github-copilot
+.github-copilot/*
+.kimi
+CLAUDECODE.md
+CHATGPT.md
+
+# Keep shared project instructions under version control
+!AGENTS.md
+!CLAUDE.md
+!CODEX.md
+!CONVENTIONS.md
+!GEMINI.md
+!KIMI.md
+!.github/copilot-instructions.md
+
+# Ignore cache files
+*.cache
+__pycache__/
+.venv/

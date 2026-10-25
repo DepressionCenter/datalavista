@@ -1,0 +1,46 @@
+{
+  "_license": "This file is part of DataLaVista™. Copyright © 2026 The Regents of the University of Michigan. This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version. This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details. You should have received a copy of the GNU General Public License along with this program. If not, see https://www.gnu.org/licenses/.",
+  "upload_type": "software",
+  "access_right": "open",
+  "license": "gpl-3.0-or-later",
+  "creators": [
+    {
+      "name": "Mongefranco, Gabriel",
+      "affiliation": "University of Michigan"
+    },
+    {
+      "name": "Gluskin, Jeremy",
+      "affiliation": "University of Michigan"
+    },
+    {
+      "name": "Boa, Shelley",
+      "affiliation": "University of Michigan"
+    }
+  ],
+  "imprint_publisher": "Eisenberg Family Depression Center",
+  "copyright": "Copyright © 2026 The Regents of the University of Michigan",
+  "additional_titles": [
+    {
+      "title": "DataLaVista™",
+      "type": {
+        "id": "alternative-title"
+      }
+    }
+  ],
+  "custom": {
+    "code:codeRepository": "https://github.com/DepressionCenter/datalavista",
+    "code:developmentStatus": {
+      "id": "active"
+    },
+    "code:programmingLanguage": [
+      {
+        "id": "javascript"
+      }
+    ]
+  },
+  "communities": [
+    {
+      "identifier": "depressioncenter"
+    }
+  ]
+}
