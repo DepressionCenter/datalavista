@@ -3,7 +3,7 @@ This file is part of DataLaVista™
 docs/README.md
 Author(s): Gabriel Mongefranco.
 Created: 2026-09-05
-Last Modified: 2026-10-25
+Last Modified: 2026-10-26
 Summary: Indexes setup instructions, maintenance guides, and documentation templates.
 Notes: See README file for documentation and full license information.
 
@@ -28,6 +28,7 @@ for the repository layout, build process, and shared instructions.
 - [Setup and dashboard use](../README.md#quick-start-guide): live demos, SharePoint installation, data loading, and dashboard design.
 - [DataLaVista knowledge base article](https://teamdynamix.umich.edu/TDClient/210/DepressionCenter/KB/ArticleDet?ID=15179): the existing project documentation.
 - [Repository maintenance](repository-maintenance.md): source files, generated outputs, build commands, and template conventions.
+- [Compliance](compliance.md): security and accessibility controls in the code today, where data goes, and known gaps.
 - [Documentation template](doc-template.md): starting structure for a knowledge base page.
 - [Skill authoring examples](skill-examples.md): optional recipes for common project types.
 
@@ -40,6 +41,7 @@ Start with the guide that matches your task and follow the project instructions.
 - [Setup and dashboard use](../README.md#quick-start-guide)
 - [DataLaVista knowledge base article](https://teamdynamix.umich.edu/TDClient/210/DepressionCenter/KB/ArticleDet?ID=15179)
 - [Repository maintenance](repository-maintenance.md)
+- [Compliance](compliance.md)
 - [Documentation template](doc-template.md)
 - [Skill authoring examples](skill-examples.md)
 - [Project instructions](../AGENTS.md)
