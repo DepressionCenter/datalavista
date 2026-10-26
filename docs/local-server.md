@@ -26,7 +26,7 @@ project together so the server can find the application and its supporting files
 1. On Windows x86-64, double-click `run.bat`.
    On Linux x86-64 or macOS Intel/Apple silicon, open a terminal in the project
    folder and run `bash run.sh`.
-2. Open <http://127.0.0.1:8010> in your browser. Keep the terminal open.
+2. Open <http://127.0.0.1:8010/DataLaVista.html> in your browser. Keep the terminal open.
 3. Press Ctrl+C in that terminal when you finish.
 
 On Linux and macOS, choose another port with `bash run.sh 9000` if port 8010 is
@@ -39,7 +39,7 @@ software approval process. Do not disable system security controls.
 
 ### Connect data
 
-The root address opens `DataLaVista.html`. Supporting files and samples use the
+Open `/DataLaVista.html` explicitly; the root address may show the README. Supporting files and samples use the
 same HTTP origin. For example, open
 <http://127.0.0.1:8010/samples/data/studies.csv> or load that URL in the app.
 Local hosting avoids the `file://` origin, but remote servers still control their

@@ -44,6 +44,6 @@ if [[ ! -f "$SCRIPT_DIR/DataLaVista.html" ]]; then
     echo "DataLaVista.html is missing. Restore it from the project download." >&2
     exit 1
 fi
-printf 'Open http://127.0.0.1:%s in your browser. Press Ctrl+C to stop.
+printf 'Open http://127.0.0.1:%s/DataLaVista.html in your browser. Press Ctrl+C to stop.
 ' "$PORT"
 exec "$SCRIPT_DIR/bin/$EXE" -port "$PORT" -index "$SCRIPT_DIR/DataLaVista.html"

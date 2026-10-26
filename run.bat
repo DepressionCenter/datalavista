@@ -30,6 +30,6 @@ if not exist "%~dp0DataLaVista.html" (
     echo DataLaVista.html is missing. Restore it from the project download.
     exit /b 1
 )
-echo Open http://127.0.0.1:8010 in your browser. Press Ctrl+C to stop.
+echo Open http://127.0.0.1:8010/DataLaVista.html in your browser. Press Ctrl+C to stop.
 "%~dp0bin\ZippyServe.exe" -port 8010 -index "%~dp0DataLaVista.html"
 exit /b %errorlevel%

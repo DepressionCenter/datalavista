@@ -90,8 +90,10 @@ class LauncherTests(unittest.TestCase):
                     url = f"http://127.0.0.1:{port}"
                     for attempt in range(50):
                         try:
-                            response = urllib.request.urlopen(url, timeout=1)
+                            response = urllib.request.urlopen(url + "/DataLaVista.html", timeout=1)
                             break
+                        except urllib.error.HTTPError:
+                            raise
                         except urllib.error.URLError:
                             if process.poll() is not None:
                                 self.fail("Server exited before accepting HTTP requests")
@@ -106,6 +108,7 @@ class LauncherTests(unittest.TestCase):
                         with self.subTest(path=path), self.assertRaises(urllib.error.HTTPError) as error:
                             urllib.request.urlopen(url + path)
                         self.assertIn(error.exception.code, (400, 403, 404))
+                        error.exception.close()
                 finally:
                     process.terminate()
                     process.wait(timeout=10)
