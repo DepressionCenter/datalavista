@@ -75,6 +75,11 @@ The target is WCAG 2.2 AA. The code today provides this evidence:
 - The question popup is marked as a dialog and is labeled by its title. It keeps
   keyboard focus inside while open, closes on Escape, and returns focus to where
   it was.
+- The four tabs at the top of the Connect to Data Source popup are a tab list.
+  Press Tab to reach the selected tab, use the arrow keys, Home, or End to move
+  between the available tabs, and press Enter or Space to open one. A screen
+  reader announces which tab is selected. Outside SharePoint, the SharePoint
+  Lists tab is announced as unavailable and can't be opened.
 - Status messages appear in a polite live region, so a screen reader announces
   them without interrupting.
 - No automated accessibility scan has been recorded for the application yet.
