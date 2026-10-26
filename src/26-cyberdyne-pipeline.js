@@ -321,15 +321,61 @@ const CyberdynePipeline = {
     isFileUpload: true, 
     url: null 
   };
+  let result;
   switch (normalizedExt) {
-    case 'csv': case 'tsv': return await this.loadCSVFile(file, dsName, metadata);
-    case 'json': case 'json5': return await this.loadJSONFile(file, dsName, metadata);
-    case 'xlsx': case 'xls': return await this.loadExcelFile(file, dsName, metadata);
-    case 'xml': return await this.loadXMLFile(file, dsName, metadata);
-    case 'sqlite': case 'db': case 'sqlite3': return await this.loadSQLiteFile(file, dsName, metadata);
+    case 'csv': case 'tsv': result = await this.loadCSVFile(file, dsName, metadata); break;
+    case 'json': case 'json5': result = await this.loadJSONFile(file, dsName, metadata); break;
+    case 'xlsx': case 'xls': result = await this.loadExcelFile(file, dsName, metadata); break;
+    case 'xml': result = await this.loadXMLFile(file, dsName, metadata); break;
+    case 'sqlite': case 'db': case 'sqlite3': result = await this.loadSQLiteFile(file, dsName, metadata); break;
     default: throw new Error(`Unsupported file type: .${ext}`);
   }
+  return this.makeColumnNamesQueryable(result);
 },
+
+  /**
+   * Rename imported columns whose names AlaSQL cannot read inside [brackets].
+   * A bracketed name cannot contain ] or ', so "Weight [kg]" becomes "Weight (kg)"
+   * and "Participant's Name" becomes "Participant_s Name". Other names are left
+   * unchanged so saved dashboards that use them keep working. The original
+   * header stays in displayName.
+   * @param {object} result - { data, fields } or { tables: [...], foreignKeys } from a loader
+   * @returns {object} the same result, with row keys and field names renamed in place
+   */
+  makeColumnNamesQueryable(result) {
+    const tables = (result && Array.isArray(result.tables)) ? result.tables : [result];
+    const renamesByTable = {};
+    for (const table of tables) {
+      if (!table || !Array.isArray(table.data) || !Array.isArray(table.fields)) continue;
+      const renames = {};
+      const taken = new Set(table.fields.map(f => f.internalName));
+      for (const f of table.fields) {
+        const name = String(f.internalName);
+        if (!/[\]']/.test(name)) continue;
+        const base = name.replace(/\[/g, '(').replace(/\]/g, ')').replace(/'/g, '_');
+        let safe = base;
+        for (let n = 2; taken.has(safe); n++) safe = base + '_' + n;
+        taken.add(safe);
+        renames[name] = safe;
+        f.internalName = safe;
+        // toPascalCase() returns '' for names made only of symbols, and the alias then falls back to the raw name
+        if (/[\]']/.test(String(f.alias))) { f.alias = safe; f.userAlias = safe; }
+      }
+      if (!Object.keys(renames).length) continue;
+      table.data = table.data.map(row => {
+        const out = {};
+        for (const [k, v] of Object.entries(row)) out[renames[k] || k] = v;
+        return out;
+      });
+      renamesByTable[(table.metadata && table.metadata.internalTableName) || table.tableName] = renames;
+    }
+    // SQLite foreign keys refer to columns by their original names
+    for (const fk of (result && result.foreignKeys) || []) {
+      fk.fromCol = (renamesByTable[fk.fromTable] || {})[fk.fromCol] || fk.fromCol;
+      fk.toCol   = (renamesByTable[fk.toTable]   || {})[fk.toCol]   || fk.toCol;
+    }
+    return result;
+  },
 
   /** Load uploaded CSV/TSV file */
   async loadCSVFile(file, dsName, metadata) {
@@ -594,12 +640,14 @@ async loadSQLiteFile(file, dsName, metadata) {
       isFileUpload: false,
       url
     };
+    let result;
     try {
-      return await this.loadWithAlaSQL(url, dsName, fileType, metadata);
+      result = await this.loadWithAlaSQL(url, dsName, fileType, metadata);
     } catch (alasqlErr) {
       console.warn('[CyberdynePipeline] AlaSQL loading failed, trying fetch fallback:', alasqlErr.message);
-      return await this.loadWithFetch(url, dsName, fileType, metadata);
+      result = await this.loadWithFetch(url, dsName, fileType, metadata);
     }
+    return this.makeColumnNamesQueryable(result);
   },
 
   /** Try loading with AlaSQL built-in mechanisms */

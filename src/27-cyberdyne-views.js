@@ -3,7 +3,7 @@ This file is part of DataLaVista™
 27-cyberdyne-views.js: View management for CyberdynePipeline
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 Created: 2026-03-28
-Last Modified: 2026-04-06
+Last Modified: 2026-10-26
 Summary: AlaSQL view creation and management — maps raw tables to user-friendly aliases
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
@@ -155,7 +155,7 @@ validateAliasUniqueness(fields) {
         try { alasql(`DROP VIEW IF EXISTS [${viewName}]`); } catch (_) {}
         try {
           alasql(`CREATE VIEW [${viewName}] AS SELECT ${selectParts.join(', ')} FROM ${rawTableRef}`);
-        } catch (e) { console.warn(`[CyberdynePipeline] Failed to create view ${viewName}:`, e.message); }
+        } catch (e) { this._reportViewFailure(viewName, rawTable, e); }
 
         // Rebuild view metadata from expanded virtual columns
         const _baseDescMap = {};
@@ -201,8 +201,17 @@ validateAliasUniqueness(fields) {
       try { alasql(`DROP VIEW IF EXISTS [${viewName}]`); } catch (_) {}
       try {
         alasql(`CREATE VIEW [${viewName}] AS SELECT ${cols.join(', ')} FROM ${rawTableRef}`);
-      } catch (e) { console.warn(`[CyberdynePipeline] Failed to create view ${viewName}:`, e.message); }
+      } catch (e) { this._reportViewFailure(viewName, rawTable, e); }
     },
+
+  /** Log a failed CREATE VIEW and tell the person, unless the table's rows are not loaded yet. */
+  _reportViewFailure(viewName, rawTable, err) {
+    console.warn(`[CyberdynePipeline] Failed to create view ${viewName}:`, err.message);
+    // Views restored from a saved dashboard are rebuilt again once their rows load
+    const rawName = ('_raw_' + rawTable).toLowerCase();
+    if (!Object.keys(alasql.tables).some(k => k.toLowerCase() === rawName)) return;
+    toast(`Couldn't set up the table "${viewName}" for queries. Check its column names, then load the file again.`, 'error');
+  },
 
   /** Recreate the AlaSQL view with current column mappings (call after alias changes) */
   updateViewSQL(viewName) {
@@ -896,7 +905,7 @@ validateAliasUniqueness(fields) {
         const keySuffix = toPascalCase(key) || key;
         if (!keySuffix || reservedSuffixes.has(keySuffix)) continue;
         reservedSuffixes.add(keySuffix);
-        cols.push(this._vc(outKey + keySuffix, field.internalName, `DLV_PROP(${rawCol}, '${key}')`, 'text', 'text', true, field.internalName));
+        cols.push(this._vc(outKey + keySuffix, field.internalName, `DLV_PROP(${rawCol}, '${String(key).replace(/'/g, "''")}')`, 'text', 'text', true, field.internalName));
       }
       cols.push(this._vcRaw(outKey + 'Data', field.internalName, rawCol, 'object', 'object', field.internalName));
       return cols;
@@ -928,7 +937,7 @@ validateAliasUniqueness(fields) {
         const keySuffix = toPascalCase(key) || key;
         if (!keySuffix || usedSuffixes.has(keySuffix)) continue;
         usedSuffixes.add(keySuffix);
-        cols.push(this._vc(outKey + keySuffix, field.internalName, `DLV_ARRAY_PROP(${rawCol}, '${key}')`, 'array', 'array', true, field.internalName));
+        cols.push(this._vc(outKey + keySuffix, field.internalName, `DLV_ARRAY_PROP(${rawCol}, '${String(key).replace(/'/g, "''")}')`, 'array', 'array', true, field.internalName));
       }
 
       cols.push(this._vcRaw(outKey + 'Data', field.internalName, rawCol, 'array', 'array', field.internalName));
