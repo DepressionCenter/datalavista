@@ -143,8 +143,8 @@ If you need assistance identifying a contact person, email the EFDC's Mobile Tec
 
 ## License
 ### Copyright Notice
-<small><strong>DataLaVista™</strong>, "Come with me if you want to query"™, "The BI Tool Terminator"™, "I'll be back... with a better report"™, "Skynet UI Toolkit"™, "CyberdynePipeline", "I'll be pipeline"™, and "I'll be data processing"™</small> are all trademarks of The Regents of the University of Michigan.
-<small>Microsoft, SharePoint, Script Editor, DOI, Zenodo, GNU, GPL, Free Software Foundation, Apache ECharts, AlaSQL, CodeMirror, and other external libraries</small> are all registred marks or trademarks of their respective owners.
+<small><strong>DataLaVista™</strong>, "Come with me if you want to query"™, "The BI Tool Terminator"™, "Skynet UI Toolkit"™, and "CyberdynePipeline"</small> are all trademarks of The Regents of the University of Michigan.
+<small>Microsoft, SharePoint, Zenodo, Apache ECharts, AlaSQL, CodeMirror, and other external libraries</small> are all registred marks or trademarks of their respective owners.
 Copyright © 2026 The Regents of the University of Michigan
 
 
