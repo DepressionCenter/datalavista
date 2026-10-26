@@ -442,6 +442,19 @@ function buildConfig() {
 }
 
 // Load a config file (saved report) into the current state. This is called on initial load if a config URL or file param is detected, and can also be used to load a local config file via the "Load Config" button in the UI.
+// Widget style values a dashboard file may supply, with the default used when a value is not a plain color or number.
+const WIDGET_COLOR_PROPS = {
+  fillColor: '#0078d4', borderColor: '#edebe9', widgetBackgroundColor: '', chartBackgroundColor: '#fefefe',
+  titleBackgroundColor: '#fefefe', titleFontColor: '#323130', fontColor: '#323130',
+  headersBackgroundColor: '#f3f2f1', headersFontColor: '#323130'
+};
+// Each entry is [min, max, default].
+const WIDGET_NUMBER_PROPS = {
+  borderSize: [0, 10, 1], titleFontSize: [4, 200, 14], fontSize: [4, 200, 13], headersFontSize: [4, 200, 12],
+  kpiMetricFontSize: [4, 400, 36], kpiLabelFontSize: [4, 200, 13], containerGap: [0, 64, 8], containerPadding: [0, 64, 8],
+  minHeightVh: [1, 500, 30], heightVh: [1, 500, 33], widthPct: [1, 100, 48]
+};
+
 async function loadConfig(cfg) {
   if (!cfg.dataSources || typeof cfg.dataSources != 'object'|| !cfg.tables || typeof cfg.tables != 'object') throw new Error('Invalid report config — missing data sources or tables.');
   // If the config provided is a string, try parsing it safely as JSON
@@ -508,10 +521,10 @@ async function loadConfig(cfg) {
     dashboardTitleTooltip: loadedDesign.dashboardTitleTooltip || '',
     interactionMode: loadedDesign.interactionMode || 'cross-filter',
     theme: {
-      palette:         (loadedDesign.theme && loadedDesign.theme.palette)         || [],
+      palette:         Array.isArray(loadedDesign.theme && loadedDesign.theme.palette) ? loadedDesign.theme.palette.map(c => _safeCssColor(c, '')) : [],
       fontFamily:      (loadedDesign.theme && loadedDesign.theme.fontFamily)      || '',
       fontSize:        (loadedDesign.theme && loadedDesign.theme.fontSize)        || null,
-      backgroundColor: (loadedDesign.theme && loadedDesign.theme.backgroundColor) || ''
+      backgroundColor: _safeCssColor((loadedDesign.theme && loadedDesign.theme.backgroundColor) || '', '')
     },
     widgets: loadedDesign.widgets || [],
     filters: loadedDesign.filters || []
@@ -604,6 +617,18 @@ async function loadConfig(cfg) {
     if (w.kpiLabelFontSize == null)       w.kpiLabelFontSize = 13;
     if (w.kpiLabelOverride == null)       w.kpiLabelOverride = '';
     if (w.textContent      == null)       w.textContent = '';
+    // The file is untrusted: text content must be a string, and every color or size that
+    // ends up inside a style or value attribute must have a plain form or it is reset.
+    if (typeof w.textContent !== 'string') w.textContent = '';
+    if (typeof w.typeConfig.textContent !== 'string') w.typeConfig.textContent = '';
+    for (const [prop, fallback] of Object.entries(WIDGET_COLOR_PROPS)) {
+      w[prop] = _safeCssColor(w[prop], fallback);
+      if (prop in w.typeConfig) w.typeConfig[prop] = _safeCssColor(w.typeConfig[prop], fallback);
+    }
+    for (const [prop, [min, max, fallback]] of Object.entries(WIDGET_NUMBER_PROPS)) {
+      w[prop] = _safeCssNumber(w[prop], min, max, fallback);
+      if (prop in w.typeConfig) w.typeConfig[prop] = _safeCssNumber(w.typeConfig[prop], min, max, fallback);
+    }
     if (!w.fieldAggs)                     w.fieldAggs = {};
     if (!w.conditions)                    w.conditions = [];
     w.conditions = w.conditions.map(c => ({

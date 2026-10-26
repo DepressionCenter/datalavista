@@ -3,7 +3,7 @@ This file is part of DataLaVista™
 70-preview.js: Preview tab, CSV download, and report generation.
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 Created: 2026-03-24
-Last Modified: 2026-04-06
+Last Modified: 2026-10-26
 Summary: Preview tab, CSV download, and report generation.
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
@@ -120,8 +120,9 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           if (w.parentContainerId) continue; // rendered inside container
           const el = document.createElement('div');
           el.className = 'widget';
-          const titleHdrStyle  = `background:${w.titleBackgroundColor||'#fefefe'}`;
-          const titleSpanStyle = `font-size:${w.titleFontSize||14}px;color:${w.titleFontColor||'#323130'}`;
+          // Checked before use because these values come from the dashboard file and end up inside a style attribute
+          const titleHdrStyle  = 'background:' + (_safeCssColor(w.titleBackgroundColor, '#fefefe') || '#fefefe');
+          const titleSpanStyle = 'font-size:' + _safeCssNumber(w.titleFontSize, 4, 200, 14) + 'px;color:' + (_safeCssColor(w.titleFontColor, '#323130') || '#323130');
           var _prevHeightStyle = (w.type === 'container') ? ('min-height:' + (w.minHeightVh || 30) + 'vh;height:auto') : (w.heightVh + 'vh');
           var _prevWidthStyle  = w.widthPct + '%';
           var _isContainerP = (w.type === 'container');
@@ -132,7 +133,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           if (w.type === 'container') {
             var _alignMapP = { 'top': 'flex-start', 'space-between': 'space-between', 'stretch': 'stretch' };
             var _justifyP = _alignMapP[w.containerAlign || 'top'] || 'flex-start';
-            _prevContentStyle = ' style="display:flex;flex-direction:column;gap:' + (w.containerGap || 8) + 'px;padding:' + (w.containerPadding || 8) + 'px;justify-content:' + _justifyP + ';height:auto;overflow:visible"';
+            _prevContentStyle = ' style="display:flex;flex-direction:column;gap:' + _safeCssNumber(w.containerGap, 0, 64, 8) + 'px;padding:' + _safeCssNumber(w.containerPadding, 0, 64, 8) + 'px;justify-content:' + _justifyP + ';height:auto;overflow:visible"';
           }
           el.innerHTML = '<div class="widget-header' + (w.showTitle === false ? ' hidden' : '') + '" style="' + titleHdrStyle + '"><span class="widget-title" style="' + titleSpanStyle + '">' + _attrEnc(resolveTitleTemplate(w.title)) + '</span></div>'
             + '<div class="widget-content' + (isEChartsWidget(w.type) ? ' widget-content-chart' : '') + '" id="prev-wcontent-' + w.id + '"' + _prevContentStyle + '>'
@@ -148,8 +149,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           if (!_pContEl) continue;
           var _childEl = document.createElement('div');
           _childEl.className = 'widget';
-          var _cTitleHdrStyle  = 'background:' + (w.titleBackgroundColor || '#fefefe');
-          var _cTitleSpanStyle = 'font-size:' + (w.titleFontSize || 14) + 'px;color:' + (w.titleFontColor || '#323130');
+          var _cTitleHdrStyle  = 'background:' + (_safeCssColor(w.titleBackgroundColor, '#fefefe') || '#fefefe');
+          var _cTitleSpanStyle = 'font-size:' + _safeCssNumber(w.titleFontSize, 4, 200, 14) + 'px;color:' + (_safeCssColor(w.titleFontColor, '#323130') || '#323130');
           _childEl.style.cssText = 'width:100%;height:' + w.heightVh + 'vh;min-height:80px;border-color:' + w.borderColor + ';border-width:' + w.borderSize + 'px;background:' + (w.widgetBackgroundColor || '#fefefe');
           _childEl.innerHTML = '<div class="widget-header' + (w.showTitle === false ? ' hidden' : '') + '" style="' + _cTitleHdrStyle + '"><span class="widget-title" style="' + _cTitleSpanStyle + '">' + _attrEnc(resolveTitleTemplate(w.title)) + '</span></div>'
             + '<div class="widget-content' + (isEChartsWidget(w.type) ? ' widget-content-chart' : '') + '" id="prev-wcontent-' + w.id + '">'
@@ -176,9 +177,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       }
 
       function getPrevWidgetContent(w) {
-        // Note: text widgets don't have their html sanitized with sanitizeHTML() since they're meant to allow basic formatting via HTML tags.
-        // If this becomes a problem, we can add a separate "allowHTML" flag to widget properties and sanitize conditionally.
-        if (w.type === 'text') return '<div class="text-widget" style="font-size:' + w.fontSize + 'px;color:' + w.fontColor + '">' + w.textContent + '</div>';
+        if (w.type === 'text') return renderTextWidgetHTML(w);
         if (w.type === 'placeholder') return '';
         if (w.type === 'container') return ''; // children injected by renderPreviewTab's second loop
         if (w.type === 'kpi') return renderPrevKPI(w);
