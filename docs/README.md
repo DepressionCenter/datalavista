@@ -19,6 +19,8 @@ See <https://www.gnu.org/licenses/fdl-1.3.html>. See README for full license inf
 
 [Back to project README](../README.md)
 
+- [Local server](local-server.md): run DataLaVista on your computer with ZippyServe.
+
 Find DataLaVista's setup and dashboard instructions in the project README and
 the Health Research Resource Library. Maintainers can use the local guides below
 for the repository layout, build process, and shared instructions.
