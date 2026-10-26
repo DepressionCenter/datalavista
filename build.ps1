@@ -3,7 +3,7 @@
 #  build.ps1: DataLaVista™ build script (Windows PowerShell).
 #  Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 #  Created: 2026-03-24
-#  Last Modified: 2026-04-27
+#  Last Modified: 2026-10-26
 #  Summary: Generates datalavista.js, DataLaVista.html, DataLaVista-nojs.html.
 #  Notes: See README file for documentation and full license information.
 #  Website: https://github.com/DepressionCenter/datalavista
@@ -134,6 +134,18 @@ Write-Host 'Building DataLaVista.html (inline)...'
 $inlineShell = "<!DOCTYPE html>`n" + $HeadSection + "`n<body>`n  <div id=`"dlv-root`"></div>`n  <script>`n" + $ShellHtmlVar + "`n" + $DlvHeadCssVar + "`n" + $minifiedBody.TrimEnd() + "`n  </script>`n</body>`n</html>"
 [System.IO.File]::WriteAllText('DataLaVista.html', ($HtmlLicenseComment + $inlineShell), [System.Text.Encoding]::UTF8)
 Write-Host '  -> DataLaVista.html'
+
+# ── 4. Check the outputs that run the application ─────────────────────────────
+# Without these values the application cannot draw its interface inside dlv-root.
+foreach ($output in @('datalavista.js', 'DataLaVista.html')) {
+    $outputText = [System.IO.File]::ReadAllText($output, [System.Text.Encoding]::UTF8)
+    foreach ($definition in @('_DLV_SHELL_HTML', '_DLV_HEAD_CSS')) {
+        if (-not $outputText.Contains("var $definition = ")) {
+            Write-Error "Build failed: $output is missing $definition, so the page would show nothing."
+            exit 1
+        }
+    }
+}
 
 Write-Host ''
 Write-Host ("Build completed at {0:yyyy-MM-dd hh:mm:ss tt}." -f (Get-Date))

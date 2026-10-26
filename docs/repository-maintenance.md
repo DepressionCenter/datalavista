@@ -3,7 +3,7 @@ This file is part of DataLaVista™
 docs/repository-maintenance.md
 Author(s): Gabriel Mongefranco.
 Created: 2026-10-25
-Last Modified: 2026-10-25
+Last Modified: 2026-10-26
 Summary: Explains the application build, shared instructions, citation metadata, and previews.
 Notes: See README file for documentation and full license information.
 
@@ -37,6 +37,9 @@ bash build.sh
 
 The script uses an installed or cached esbuild executable. If neither exists, it
 downloads esbuild 0.28.0. Windows maintainers can use `build.ps1`.
+
+Both scripts stop with an error if `datalavista.js` or `DataLaVista.html` is
+missing the page layout or the styles. Without them, the page opens blank.
 
 Review all three generated outputs after a source change. The existing build
 workflow runs on pushes to `main` that change `src/` or `build.sh`, and on manual
