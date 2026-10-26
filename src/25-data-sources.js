@@ -3,7 +3,7 @@ This file is part of DataLaVista™
 25-data-sources.js: Data source connection popup, remote fetch guards, and source loaders.
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 Created: 2026-03-24
-Last Modified: 2026-04-06
+Last Modified: 2026-10-26
 Summary: Data source connection popup, remote fetch guards, and source loaders.
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
@@ -721,6 +721,43 @@ function _fetchSPSiteMeta(siteUrl, dsName) {
 // ============================================================
 // SHAREPOINT SOURCE LOADER
 // ============================================================
+
+/**
+ * Make sure a SharePoint data source that signs in with a bearer token has one in memory.
+ *
+ * Asks the person for their own token when none is present. The token lives only in
+ * DataLaVistaState for this page load; buildConfig never writes it into a dashboard file
+ * and loadConfig never reads one in.
+ *
+ * @param {string} dsName Internal data source name.
+ * @returns {Promise<boolean>} true when a token is available, false when the person skipped it.
+ */
+async function ensureSharePointToken(dsName) {
+  const ds = /** @type {any} */ (DataLaVistaState.dataSources[dsName]);
+  if (!ds || ds.type !== 'sharepoint' || ds.auth !== 'token') return true;
+  if (ds.token) return true;
+  const label = ds.alias || dsName;
+  const answer = await dlvAskDialog({
+    title: 'Bearer token needed',
+    sections: [
+      { text: 'The data source "' + label + '" reads lists from this SharePoint site:' },
+      { detail: ds.siteUrl || ds.url || '' },
+      { text: 'Dashboards never store bearer tokens. Paste your own token to load the data.' },
+      { input: { label: 'Your bearer token', type: 'password', placeholder: 'eyJ...' } },
+      { note: 'The token stays in this browser tab until you close or reload the page.' }
+    ],
+    okLabel: 'Load with my token',
+    cancelLabel: 'Skip this data source'
+  });
+  const token = (answer.value || '').trim();
+  if (answer.confirmed && token) {
+    ds.token = token;
+    return true;
+  }
+  toast('Skipped "' + label + '" because no bearer token was entered. Right-click it in the fields panel and choose Refresh Source to enter one.', 'warning');
+  return false;
+}
+
 async function loadSharePointListsSource(siteUrl, dsName, newAuth='current', newToken='', description='') {
   setStatus('Loading SharePoint lists from ' + siteUrl + '...', 'loading');
 
@@ -739,6 +776,10 @@ async function loadSharePointListsSource(siteUrl, dsName, newAuth='current', new
       isFileUpload: false,
       keepRawData: false
     };
+  } else {
+    // Connecting again replaces the sign-in choice and the in-memory token for this source
+    DataLaVistaState.dataSources[dsName].auth = newAuth || 'current';
+    DataLaVistaState.dataSources[dsName].token = newToken || '';
   }
 
   // Best-effort: fetch SP site title and description for the data dictionary (fire-and-forget)
@@ -756,7 +797,7 @@ async function loadSharePointListsSource(siteUrl, dsName, newAuth='current', new
   for (const list of lists) {
     try {
       const isDocLib = list.BaseType === 1;
-      const fields = await fetchSPFields(siteUrl, list.Id, isDocLib);
+      const fields = await fetchSPFields(siteUrl, list.Id, isDocLib, dsName);
 
       // Strip SharePoint's "List" / "ListItem" suffix from EntityTypeName for cleaner keys
       const rawEntityType = list.EntityTypeName || (list.Title || 'List').replace(/[^A-Za-z0-9_]/g, '');

@@ -3,7 +3,7 @@ This file is part of DataLaVista™
 23-sharepoint.js: SharePoint REST API adapter and field structure loader.
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 Created: 2026-03-24
-Last Modified: 2026-04-06
+Last Modified: 2026-10-26
 Summary: SharePoint REST API adapter and field structure loader.
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
@@ -304,12 +304,13 @@ function stripODataMetadata(rows, quickCheck = false) {
 
     // Fetch field structure for a given SP list.
     // Excludes Hidden, Computed, underscore-prefixed, and dependent lookup fields
-    async function fetchSPFields(siteUrl, listGuid, isDocLib = false) {
+    // dsName lets spFetch add the source's bearer token when that sign-in method is in use.
+    async function fetchSPFields(siteUrl, listGuid, isDocLib = false, dsName = '') {
     const filter = `(Hidden eq false and TypeAsString ne 'Computed' and startswith(InternalName,'_') eq false and (TypeAsString ne 'LookupMulti' or (TypeAsString eq 'LookupMulti' and ReadOnlyField eq false and IsDependentLookup eq false))) or InternalName eq 'Editor' or InternalName eq 'Author' or InternalName eq 'Created' or InternalName eq 'Modified' or InternalName eq 'ID' or InternalName eq 'Title' or InternalName eq 'TaxKeyword'`;
     const select = `Id,InternalName,Title,TypeAsString,Description,Required,MaxLength,Choices,LookupField,LookupList,IsHidden,Hidden,ReadOnlyField,IsDependentLookup`;
     const url = `${siteUrl}/_api/web/lists(guid'${listGuid}')/fields?$select=${select}&$filter=${filter}`;
 
-    const json = await spFetch(url);
+    const json = await spFetch(url, dsName);
     let rows = extractRows(json);
     let fields = stripODataMetadata(rows);
 
@@ -328,7 +329,7 @@ function stripODataMetadata(rows, quickCheck = false) {
     const hasCalculatedFields = fields.some(f => f.TypeAsString === 'Calculated');
     if (hasCalculatedFields) {
       const calcUrl = `${siteUrl}/_api/web/lists(guid'${listGuid}')/fields?$filter=FieldTypeKind eq 17&$select=InternalName,OutputType`;
-      const calcJson = await spFetch(calcUrl);
+      const calcJson = await spFetch(calcUrl, dsName);
       const calcRows = extractRows(calcJson);
       const calcFields = stripODataMetadata(calcRows);
       const calcMap = new Map();
@@ -380,7 +381,8 @@ function stripODataMetadata(rows, quickCheck = false) {
   }
 
 // Rule 4 (Retrieval): Retry logic for missing columns + Pagination
-async function fetchSPItemsWithRetry(siteUrl, listGuid, selectStr, expandStr, top, retries = 10) {
+// dsName lets spFetch add the source's bearer token when that sign-in method is in use.
+async function fetchSPItemsWithRetry(siteUrl, listGuid, selectStr, expandStr, top, retries = 10, dsName = '') {
   let currentSelect = selectStr.split(',').filter(s => s.trim());
   let currentExpand = expandStr.split(',').filter(s => s.trim());
 
@@ -393,7 +395,7 @@ async function fetchSPItemsWithRetry(siteUrl, listGuid, selectStr, expandStr, to
 
       // PAGINATION LOOP: Keep fetching until SharePoint says we have everything
       while (nextUrl) {
-        const json = await spFetch(nextUrl);
+        const json = await spFetch(nextUrl, dsName);
         
         // Scrub OData artifacts
         let rows = extractRows(json);
@@ -510,7 +512,9 @@ async function fetchTableData(tableName, fetchAll = false) {
           t.guid,
           Array.from(baseSelect).join(','),
           Array.from(baseExpand).join(','),
-          limit
+          limit,
+          10,
+          t.dataSource || ''
         );
       } else if (['csv', 'json', 'json5', 'tsv', 'xlsx', 'xls', 'xml', 'sqlite', 'db'].includes(t.sourceType)) {
         // ── Remote file source (sqlite, csv, xlsx, xml, json) ──────────────

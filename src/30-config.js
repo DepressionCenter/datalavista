@@ -3,7 +3,7 @@ This file is part of DataLaVista™
 30-config.js: Widget SQL generation, configuration save/load, and fields panel rendering.
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 Created: 2026-03-24
-Last Modified: 2026-04-06
+Last Modified: 2026-10-26
 Summary: Widget SQL generation, configuration save/load, and fields panel rendering.
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
@@ -186,7 +186,7 @@ function buildConfig() {
       internalName: ds.internalName || dsName,
       siteTitle: ds.siteTitle || '',
       tables: ds.tables || [],
-      token: ds.token || '',
+      // The bearer token is deliberately left out: a dashboard file is shared, a credential is not.
       type: ds.type || 'sharepoint',
       url: ds.url || '',
       siteUrl: ds.siteUrl || '',
@@ -485,6 +485,15 @@ async function loadConfig(cfg) {
   // [END REMOVE AFTER]
   DataLaVistaState.currentWidgetId = null;
   DataLaVistaState.dataSources = cfg.dataSources || {};
+  // A dashboard file never supplies a credential. Any token in the file is dropped, and a
+  // SharePoint source that signs in with a token asks the person opening the dashboard for their own.
+  for (const [_dsName, _ds] of Object.entries(DataLaVistaState.dataSources)) {
+    const _dsCast = /** @type {any} */ (_ds);
+    _dsCast.token = '';
+    if (_dsCast.type === 'sharepoint' && _dsCast.auth === 'token') {
+      await ensureSharePointToken(_dsName);
+    }
+  }
   // Background-refresh SP site title/description for all SP data sources (fire-and-forget)
   for (const [_dsName, _ds] of Object.entries(DataLaVistaState.dataSources)) {
     const _dsCast = /** @type {any} */ (_ds);
