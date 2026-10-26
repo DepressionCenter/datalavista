@@ -149,8 +149,8 @@ function rankSuggestions(rules, cols, meta) {
 
   // ============================================================
   // HTML SANITIZER  (strip scripts / event handlers; allow safe markup)
-  // Used for the dashboard title tooltip and for text widgets. Both accept HTML
-  // that may have arrived in a shared dashboard file, so only formatting survives.
+  // Used for the dashboard title tooltip and text widgets, whose HTML may come
+  // from a shared dashboard file, so only formatting survives.
   // ============================================================
   function sanitizeHTML(html) {
     if (!html) return '';
@@ -165,15 +165,13 @@ function rankSuggestions(rules, cols, meta) {
       'thead','tbody','small','sup','sub','mark','blockquote','img']);
     const BLOCKED = new Set(['script','iframe','object','embed','form','input','button',
       'style','link','meta','base','frame','frameset','noscript','template']);
-    // No id attribute: a dashboard file must not be able to take over an element id the app looks up.
+    // The id attribute is left out so a dashboard file cannot take over an element id the app looks up
     const SAFE_ATTRS = new Set(['href','src','title','target','class','style','rel',
       'colspan','rowspan','width','height','alt']);
-    // Inline styles are allowed for formatting. These forms could run code in old browsers
-    // or cover the whole page, so a style that contains one is dropped.
+    // These style forms could run code in old browsers or cover the whole page, so such a style is dropped
     const UNSAFE_STYLE = /expression\s*\(|behavior\s*:|-moz-binding|javascript\s*:|position\s*:\s*fixed/i;
 
-    // Links may point at web, mail, or phone addresses, or at a place on this page.
-    // Images may only be loaded from web addresses.
+    // Other address types, such as javascript: or data:, could run code or hide where a link leads
     function hasSafeProtocol(value, allowed) {
       try {
         return allowed.includes(new URL(value, document.baseURI).protocol);
@@ -727,10 +725,8 @@ function rankSuggestions(rules, cols, meta) {
       // DESIGN CANVAS RENDERING
       // ============================================================
       /**
-       * Render a text widget for the designer and the preview.
-       * The content may come from a shared dashboard file, so it is cleaned by sanitizeHTML
-       * (formatting tags survive, scripts and event handlers do not), and the font size and
-       * color are checked before they go into the style attribute.
+       * Render a text widget for the designer and the preview. The content, size, and color
+       * may come from a shared dashboard file, so they are cleaned before they reach the page.
        * @param {any} w Widget record.
        * @returns {string} HTML for the widget body.
        */
@@ -853,7 +849,7 @@ function rankSuggestions(rules, cols, meta) {
           + '<button class="btn btn-danger btn-icon btn-sm" data-action="widget-delete" data-wid="' + w.id + '" title="Delete">\u2715</button>'
           + '</div>';
 
-        // Checked before use because these values come from the dashboard file and end up inside a style attribute
+        // Checked because these values come from the dashboard file and end up inside a style attribute
         const titleHdrStyle  = 'background:' + (_safeCssColor(w.titleBackgroundColor, '#fefefe') || '#fefefe');
         const titleSpanStyle = 'font-size:' + _safeCssNumber(w.titleFontSize, 4, 200, 14) + 'px;color:' + (_safeCssColor(w.titleFontColor, '#323130') || '#323130');
         const isChartWidget = isEChartsWidget(w.type);
@@ -1225,7 +1221,7 @@ function rankSuggestions(rules, cols, meta) {
             else value = kpiData[0][field] != null ? kpiData[0][field] : '—';
           }
         }
-        // Sizes and color are checked because they come from the dashboard file and end up inside a style attribute
+        // Checked because these values come from the dashboard file and end up inside a style attribute
         const metricSize  = _safeCssNumber(w.kpiMetricFontSize, 4, 400, 36);
         const labelSize   = _safeCssNumber(w.kpiLabelFontSize, 4, 200, 13);
         const valueColor  = _safeCssColor(w.fillColor, '#0078d4') || '#0078d4';
@@ -2543,7 +2539,7 @@ function _renderBarLineOptionsHTML(w, wid) {
         // Pre-compute conditional HTML blocks (no nested backtick or ternary in template)
         var _showTitleChecked = (w.showTitle !== false) ? 'checked' : '';
         var _wTitleEsc   = _attrEnc(w.title);
-        // Every value below goes into a value="..." attribute, so each is encoded first
+        // Encoded because each value goes into an attribute
         var _wWidgetBg              = _attrEnc(w.widgetBackgroundColor || '#fefefe');
         var _wWidgetBgText          = _attrEnc(w.widgetBackgroundColor || '');
         var _wWidgetBgIsTransparent = !w.widgetBackgroundColor;
@@ -2581,7 +2577,7 @@ function _renderBarLineOptionsHTML(w, wid) {
         }
         var _textPropsHTML = '';
         if (isText) {
-          // Values are encoded for the attribute and textarea so content from a dashboard file cannot break out of them
+          // Encoded so content from a dashboard file cannot break out of the attribute or the textarea
           _textPropsHTML = '<div class="props-row"><label>Font size</label>'
             + '<input type="number" class="form-input" min="8" max="72" value="' + _attrEnc(w.fontSize) + '" data-action="widget-update-num" data-wid="' + wid + '" data-prop="fontSize"/></div>'
             + '<div class="props-row"><label>Font color</label>'

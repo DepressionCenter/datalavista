@@ -120,7 +120,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           if (w.parentContainerId) continue; // rendered inside container
           const el = document.createElement('div');
           el.className = 'widget';
-          // Checked before use because these values come from the dashboard file and end up inside a style attribute
+          // Checked because these values come from the dashboard file and end up inside a style attribute
           const titleHdrStyle  = 'background:' + (_safeCssColor(w.titleBackgroundColor, '#fefefe') || '#fefefe');
           const titleSpanStyle = 'font-size:' + _safeCssNumber(w.titleFontSize, 4, 200, 14) + 'px;color:' + (_safeCssColor(w.titleFontColor, '#323130') || '#323130');
           var _prevHeightStyle = (w.type === 'container') ? ('min-height:' + (w.minHeightVh || 30) + 'vh;height:auto') : (w.heightVh + 'vh');

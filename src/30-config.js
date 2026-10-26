@@ -186,7 +186,7 @@ function buildConfig() {
       internalName: ds.internalName || dsName,
       siteTitle: ds.siteTitle || '',
       tables: ds.tables || [],
-      // The bearer token is deliberately left out: a dashboard file is shared, a credential is not.
+      // The bearer token is left out because a dashboard file is shared and a credential must not be
       type: ds.type || 'sharepoint',
       url: ds.url || '',
       siteUrl: ds.siteUrl || '',
@@ -498,8 +498,8 @@ async function loadConfig(cfg) {
   // [END REMOVE AFTER]
   DataLaVistaState.currentWidgetId = null;
   DataLaVistaState.dataSources = cfg.dataSources || {};
-  // A dashboard file never supplies a credential. Any token in the file is dropped, and a
-  // SharePoint source that signs in with a token asks the person opening the dashboard for their own.
+  // A token in the file would let anyone who received it use the author's sign-in,
+  // so it is dropped and each viewer supplies their own
   for (const [_dsName, _ds] of Object.entries(DataLaVistaState.dataSources)) {
     const _dsCast = /** @type {any} */ (_ds);
     _dsCast.token = '';
@@ -617,8 +617,8 @@ async function loadConfig(cfg) {
     if (w.kpiLabelFontSize == null)       w.kpiLabelFontSize = 13;
     if (w.kpiLabelOverride == null)       w.kpiLabelOverride = '';
     if (w.textContent      == null)       w.textContent = '';
-    // The file is untrusted: text content must be a string, and every color or size that
-    // ends up inside a style or value attribute must have a plain form or it is reset.
+    // Values from the file end up inside style and value attributes, so anything
+    // that is not a plain string, color, or number is reset
     if (typeof w.textContent !== 'string') w.textContent = '';
     if (typeof w.typeConfig.textContent !== 'string') w.typeConfig.textContent = '';
     for (const [prop, fallback] of Object.entries(WIDGET_COLOR_PROPS)) {

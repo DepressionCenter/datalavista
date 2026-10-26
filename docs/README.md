@@ -38,12 +38,6 @@ Start with the guide that matches your task and follow the project instructions.
 
 ### Additional resources
 
-- [Setup and dashboard use](../README.md#quick-start-guide)
-- [DataLaVista knowledge base article](https://teamdynamix.umich.edu/TDClient/210/DepressionCenter/KB/ArticleDet?ID=15179)
-- [Repository maintenance](repository-maintenance.md)
-- [Compliance](compliance.md)
-- [Documentation template](doc-template.md)
-- [Skill authoring examples](skill-examples.md)
 - [Project instructions](../AGENTS.md)
 - [Skills index](../SKILLS.md)
 

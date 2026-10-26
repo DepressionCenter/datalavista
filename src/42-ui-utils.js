@@ -196,16 +196,13 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 
       // ============================================================
       // QUESTION DIALOG
-      // A styled replacement for confirm() and prompt(). Only one question shows
-      // at a time; later questions wait their turn so answers are never mixed up.
+      // Questions are shown one at a time so two answers cannot be mixed up.
       // ============================================================
       let _askDialogQueue = Promise.resolve();
 
       /**
        * Ask the person a question in the shared question popup and wait for the answer.
-       *
-       * All text is inserted as text, never as HTML, so it is safe to show addresses
-       * and names that came from a dashboard file or a remote server.
+       * All text is inserted as text, so addresses and names from a dashboard file are safe to show.
        *
        * @param {object} options
        * @param {string} options.title          Heading of the popup.
@@ -297,7 +294,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           const onOk = () => finish(true);
           const onCancel = () => finish(false);
           const onOverlayClick = (e) => { if (e.target === overlay) finish(false); };
-          // Keep keyboard focus inside the popup while it is open. Escape declines; Enter in the text box confirms.
+          // Focus stays inside the popup so a keyboard user cannot land on the page behind it.
           const onKeyDown = (e) => {
             if (e.key === 'Escape') { e.preventDefault(); finish(false); return; }
             if (e.key === 'Enter' && inputEl && e.target === inputEl) { e.preventDefault(); finish(true); return; }

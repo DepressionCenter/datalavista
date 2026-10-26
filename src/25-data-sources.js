@@ -664,11 +664,9 @@ function _fetchSPSiteMeta(siteUrl, dsName) {
 // ============================================================
 
 /**
- * Make sure a SharePoint data source that signs in with a bearer token has one in memory.
- *
- * Asks the person for their own token when none is present. The token lives only in
- * DataLaVistaState for this page load; buildConfig never writes it into a dashboard file
- * and loadConfig never reads one in.
+ * Make sure a SharePoint data source that signs in with a bearer token has one in memory,
+ * asking the person for their own when none is present. The token is never saved, because a
+ * dashboard file is shared and a credential must not be.
  *
  * @param {string} dsName Internal data source name.
  * @returns {Promise<boolean>} true when a token is available, false when the person skipped it.
@@ -724,7 +722,7 @@ async function loadSharePointListsSource(siteUrl, dsName, newAuth='current', new
       keepRawData: false
     };
   } else {
-    // Connecting again replaces the sign-in choice and the in-memory token for this source
+    // An opened dashboard never carries a token, so connecting again must be able to supply one
     DataLaVistaState.dataSources[dsName].auth = newAuth || 'current';
     DataLaVistaState.dataSources[dsName].token = newToken || '';
   }
@@ -827,22 +825,20 @@ async function loadSharePointListsSource(siteUrl, dsName, newAuth='current', new
 // ============================================================
 // REMOTE FILE RETRIEVAL
 // ============================================================
-// Relay services (public proxies) that can download a file when the website that
-// hosts it does not allow this page to read it directly. A relay sees the address
-// and the whole file, so one is used only after the person agrees.
+// Public relay services for files whose website blocks direct reads. A relay sees the
+// address and the whole file, so one is used only after the person agrees.
 const RELAY_SERVICES = [
   { name: 'corsproxy.io',            buildUrl: (url) => 'https://corsproxy.io/?url=' + encodeURIComponent(url) },
   { name: 'allorigins.win',          buildUrl: (url) => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url) },
   { name: 'thingproxy.freeboard.io', buildUrl: (url) => 'https://thingproxy.freeboard.io/fetch/' + url },
 ];
 
-// Relay decisions for this page load, keyed by destination host: true means agreed, false means declined.
-// Kept outside DataLaVistaState on purpose, so buildConfig can never write a decision into a
-// dashboard file and loadConfig can never read one in.
+// Relay answers by destination host, kept outside DataLaVistaState so they can never be
+// saved into a dashboard file or read from one.
 const _relayDecisionByHost = new Map();
 
-// True when the address points at this page's own site or the current SharePoint site.
-// Those servers can read the browser's own sign-in and a relay cannot, so a relay is never offered for them.
+// A relay is never offered for this page's own site or the current SharePoint site, because
+// those servers need the browser's own sign-in and a relay cannot provide it.
 function _isSameSiteUrl(url) {
   try {
     const target = new URL(url);
@@ -857,7 +853,6 @@ function _isSameSiteUrl(url) {
   return false;
 }
 
-// Ask once per destination host whether a relay may be used, and remember the answer for this page load.
 async function _mayUseRelay(url) {
   const host = new URL(url).hostname;
   if (_relayDecisionByHost.has(host)) return _relayDecisionByHost.get(host);
@@ -875,18 +870,15 @@ async function _mayUseRelay(url) {
     okLabel: 'Use a relay service',
     cancelLabel: 'Do not use a relay'
   });
-  // A second question for the same host may have been waiting behind this one; keep the first answer.
+  // Keep the first answer when another question for the same host was waiting behind this one
   if (!_relayDecisionByHost.has(host)) _relayDecisionByHost.set(host, answer.confirmed);
   return _relayDecisionByHost.get(host);
 }
 
 /**
- * Download a remote file, as parsed JSON or as raw text.
- *
- * Direct downloads are tried first, without and then with the browser's own sign-in.
- * A relay service is tried only for a file on another site, only when the address carries
- * no parameters or sign-in details, and only after the person agrees in a popup. The file
- * is never run as a script.
+ * Download a remote file, as parsed JSON or as raw text. The file is never run as a script,
+ * and a relay service is used only for another site's file, only when the address carries no
+ * parameters or sign-in details, and only after the person agrees.
  *
  * @param {string} url         Web address of the file.
  * @param {boolean} returnText true for the raw text, false for parsed JSON.
@@ -948,12 +940,12 @@ async function fetchWithFallbacks(url, returnText) {
   throw cannotOpen;
 }
 
-// Fetch JSON from a URL. See fetchWithFallbacks for the order of attempts.
+// Fetch JSON from a URL.
 function fetchJSONWithFallbacks(url) {
   return fetchWithFallbacks(url, false);
 }
 
-// Fetch raw CSV text from a URL. See fetchWithFallbacks for the order of attempts.
+// Fetch raw CSV text from a URL.
 function fetchCSVWithFallbacks(url) {
   return fetchWithFallbacks(url, true);
 }

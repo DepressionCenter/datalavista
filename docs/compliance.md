@@ -89,18 +89,6 @@ The target is WCAG 2.2 AA. The code today provides this evidence:
   hand in a headless browser when they were added.
 - The page sets no Content Security Policy of its own. When the page runs in a
   SharePoint tenant, the tenant's policy applies.
-- A dashboard file saved with a bearer token before October 2026 still contains
-  that token. Treat such a file as a disclosed credential and revoke the token.
-
-### Change history
-
-| Date | Change |
-| --- | --- |
-| 2026-10-23 | Cell values, column names, and titles are escaped before they are written into the page. |
-| 2026-10-23 | Status messages are shown as text instead of HTML. |
-| 2026-10-26 | Bearer tokens are left out of saved dashboards and sent only to the source's own site. |
-| 2026-10-26 | Remote files are no longer run as script, and relay services need approval. |
-| 2026-10-26 | Text widget HTML and widget style values are cleaned before rendering. |
 
 ### Conclusion
 
