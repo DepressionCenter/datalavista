@@ -678,11 +678,17 @@ async function ensureSharePointToken(dsName) {
   if (!ds || ds.type !== 'sharepoint' || ds.auth !== 'token') return true;
   if (ds.token) return true;
   const label = ds.alias || dsName;
+  const siteUrl = ds.siteUrl || ds.url || '';
+  // A dashboard file can name any address, so a token is only requested for a site it may be sent to
+  if (!isTrustedSharePointSite(siteUrl)) {
+    toast('Skipped "' + label + '". A bearer token can only be used with a SharePoint Online site or with the SharePoint site this page is on, and ' + siteUrl + ' is neither.', 'warning');
+    return false;
+  }
   const answer = await dlvAskDialog({
     title: 'Bearer token needed',
     sections: [
       { text: 'The data source "' + label + '" reads lists from this SharePoint site:' },
-      { detail: ds.siteUrl || ds.url || '' },
+      { detail: siteUrl },
       { text: 'Dashboards never store bearer tokens. Paste your own token to load the data.' },
       { input: { label: 'Your bearer token', type: 'password', placeholder: 'eyJ...' } },
       { note: 'The token stays in this browser tab until you close or reload the page.' }

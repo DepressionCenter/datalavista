@@ -25,10 +25,40 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
     // ============================================================
     // Rule 1: Use application/json instead of verbose
     // All SharePoint fetches use direct fetch() — never routed through external CORS proxies.
+    // True when both addresses have the same scheme, host, and port.
+    function _sameOrigin(urlA, urlB) {
+      try { return new URL(urlA).origin === new URL(urlB).origin; } catch (e) { return false; }
+    }
+
+    /**
+     * Decide whether a bearer token may be sent to a SharePoint site address.
+     *
+     * Allowed: the SharePoint site this page runs in, or a SharePoint Online site over https.
+     * A dashboard file can name any address, so this check keeps a pasted token from being
+     * sent to a look-alike or unrelated host.
+     *
+     * @param {string} siteUrl Site address from the data source.
+     * @returns {boolean}
+     */
+    function isTrustedSharePointSite(siteUrl) {
+      let target;
+      try { target = new URL(siteUrl); } catch (e) { return false; }
+      const current = typeof getSpSiteUrl === 'function' && getSpSiteUrl();
+      if (current && _sameOrigin(current, siteUrl)) return true;
+      const host = target.hostname.toLowerCase();
+      return target.protocol === 'https:' && /(^|\.)sharepoint(-mil)?\.(com|us|de|cn)$/.test(host);
+    }
+
     async function spFetch(url, dsName, _throttleRetries = 5) {
       const headers = { 'Accept': 'application/json' };
-      if (DataLaVistaState.dataSources[dsName] && DataLaVistaState.dataSources[dsName].auth === 'token' && DataLaVistaState.dataSources[dsName].token) {
-        headers['Authorization'] = 'Bearer ' + DataLaVistaState.dataSources[dsName].token;
+      const ds = dsName ? DataLaVistaState.dataSources[dsName] : null;
+      // The token goes only to the source's own trusted SharePoint site, so neither a
+      // dashboard file nor a server reply can send it somewhere else.
+      if (ds && ds.auth === 'token' && ds.token) {
+        const siteUrl = ds.siteUrl || ds.url || '';
+        if (isTrustedSharePointSite(siteUrl) && _sameOrigin(url, siteUrl)) {
+          headers['Authorization'] = 'Bearer ' + ds.token;
+        }
       }
       const res = await fetch(url, { headers, credentials: 'include' });
       if (res.status === 429 && _throttleRetries > 0) {
@@ -408,6 +438,12 @@ async function fetchSPItemsWithRetry(siteUrl, listGuid, selectStr, expandStr, to
         else if (json['odata.nextLink']) nextUrl = json['odata.nextLink'];
         else if (json.d && json.d.__next) nextUrl = json.d.__next;
         else nextUrl = null;
+
+        // A page link that points at another site is never followed, so a reply cannot
+        // send the sign-in to a different host.
+        if (nextUrl && !_sameOrigin(nextUrl, siteUrl)) {
+          throw new Error('SharePoint replied with a link to a different site, so loading stopped. Check the list and try again.');
+        }
 
         // Stop if we hit our manual limit
         if (allItems.length >= top) { 
