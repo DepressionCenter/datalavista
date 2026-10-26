@@ -344,10 +344,11 @@ const CyberdynePipeline = {
    */
   makeColumnNamesQueryable(result) {
     const tables = (result && Array.isArray(result.tables)) ? result.tables : [result];
-    const renamesByTable = {};
+    // Maps, not plain objects, so names such as "constructor" never match inherited properties
+    const renamesByTable = new Map();
     for (const table of tables) {
       if (!table || !Array.isArray(table.data) || !Array.isArray(table.fields)) continue;
-      const renames = {};
+      const renames = new Map();
       const taken = new Set(table.fields.map(f => f.internalName));
       for (const f of table.fields) {
         const name = String(f.internalName);
@@ -356,23 +357,23 @@ const CyberdynePipeline = {
         let safe = base;
         for (let n = 2; taken.has(safe); n++) safe = base + '_' + n;
         taken.add(safe);
-        renames[name] = safe;
+        renames.set(name, safe);
         f.internalName = safe;
         // toPascalCase() returns '' for names made only of symbols, and the alias then falls back to the raw name
         if (/[\]']/.test(String(f.alias))) { f.alias = safe; f.userAlias = safe; }
       }
-      if (!Object.keys(renames).length) continue;
+      if (!renames.size) continue;
       table.data = table.data.map(row => {
         const out = {};
-        for (const [k, v] of Object.entries(row)) out[renames[k] || k] = v;
+        for (const [k, v] of Object.entries(row)) out[renames.get(k) || k] = v;
         return out;
       });
-      renamesByTable[(table.metadata && table.metadata.internalTableName) || table.tableName] = renames;
+      renamesByTable.set((table.metadata && table.metadata.internalTableName) || table.tableName, renames);
     }
     // SQLite foreign keys refer to columns by their original names
     for (const fk of (result && result.foreignKeys) || []) {
-      fk.fromCol = (renamesByTable[fk.fromTable] || {})[fk.fromCol] || fk.fromCol;
-      fk.toCol   = (renamesByTable[fk.toTable]   || {})[fk.toCol]   || fk.toCol;
+      fk.fromCol = (renamesByTable.get(fk.fromTable) || new Map()).get(fk.fromCol) || fk.fromCol;
+      fk.toCol   = (renamesByTable.get(fk.toTable)   || new Map()).get(fk.toCol)   || fk.toCol;
     }
     return result;
   },
