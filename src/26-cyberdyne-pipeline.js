@@ -3,7 +3,7 @@ This file is part of DataLaVista™
 26-cyberdyne-pipeline.js: Unified data loading and processing pipeline
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 Created: 2026-03-28
-Last Modified: 2026-04-04
+Last Modified: 2026-10-26
 Summary: Cyberdyne Pipeline - unified data processing for CSV, JSON, Excel, XML, SQLite
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
@@ -373,7 +373,7 @@ const CyberdynePipeline = {
     });
   },
 
-  /** Load uploaded Excel file via SheetJS (XLSX v0.18.5, Apache 2.0) */
+  /** Load uploaded Excel file via SheetJS (XLSX v0.20.3, Apache 2.0) */
   async loadExcelFile(file, dsName, metadata) {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
