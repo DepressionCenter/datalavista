@@ -669,7 +669,7 @@ function _fetchSPSiteMeta(siteUrl, dsName) {
  * dashboard file is shared and a credential must not be.
  *
  * @param {string} dsName Internal data source name.
- * @returns {Promise<boolean>} true when a token is available, false when the person skipped it.
+ * @returns {Promise<boolean>} true when a token is available, false when the person chose to go on without one.
  */
 async function ensureSharePointToken(dsName) {
   const ds = /** @type {any} */ (DataLaVistaState.dataSources[dsName]);
@@ -679,7 +679,7 @@ async function ensureSharePointToken(dsName) {
   const siteUrl = ds.siteUrl || ds.url || '';
   // A dashboard file can name any address, so a token is only requested for a site it may be sent to
   if (!isTrustedSharePointSite(siteUrl)) {
-    toast('Skipped "' + label + '". A bearer token can only be used with a SharePoint Online site or with the SharePoint site this page is on, and ' + siteUrl + ' is neither.', 'warning');
+    toast('The data source "' + label + '" cannot use a bearer token, because ' + siteUrl + ' is not a SharePoint Online site or the site this page is on.', 'warning');
     return false;
   }
   const answer = await dlvAskDialog({
@@ -692,14 +692,14 @@ async function ensureSharePointToken(dsName) {
       { note: 'The token stays in this browser tab until you close or reload the page.' }
     ],
     okLabel: 'Load with my token',
-    cancelLabel: 'Skip this data source'
+    cancelLabel: 'Continue without a token'
   });
   const token = (answer.value || '').trim();
   if (answer.confirmed && token) {
     ds.token = token;
     return true;
   }
-  toast('Skipped "' + label + '" because no bearer token was entered. Right-click it in the fields panel and choose Refresh Source to enter one.', 'warning');
+  toast('Continuing without a token for "' + label + '". To add one later, right-click the data source and choose Refresh Source.', 'info');
   return false;
 }
 

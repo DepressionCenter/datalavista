@@ -404,7 +404,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
   showLoadingPopup('Refreshing data source...');
   try {
     if (ds.type === 'sharepoint') {
-      if (!(await ensureSharePointToken(dsName))) return;
+      await ensureSharePointToken(dsName);
       await loadSharePointListsSource(ds.siteUrl || ds.url, dsName, ds.auth || 'current', ds.token || '', ds.description || '');
     } else if (['json', 'json5', 'csv', 'tsv', 'xlsx', 'xls', 'xml', 'sqlite', 'db'].includes(ds.type)) {
       // Unified refresh path for all remote file types via CyberdynePipeline
