@@ -1093,8 +1093,12 @@ function rankSuggestions(rules, cols, meta) {
             const sConds  = (spEntry.conditions || []).filter(c => c.field);
             const alias   = `__dlvy_${yi}`;
 
-            // Virtual count field — always COUNT(*)
-            if (_isVirtCount(yf)) return `COUNT(*) AS [${alias}]`;
+            // Virtual count field — COUNT(*), or the number of matching rows when the series has conditions
+            if (_isVirtCount(yf)) {
+              return sConds.length
+                ? `SUM(CASE WHEN ${_condsToWhereBody(sConds)} THEN 1 ELSE 0 END) AS [${alias}]`
+                : `COUNT(*) AS [${alias}]`;
+            }
 
             if (!agg) return `[${yf}] AS [${alias}]`;
 
@@ -1104,7 +1108,7 @@ function rankSuggestions(rules, cols, meta) {
             // Conditions-filtered aggregates — transpile user-friendly vals to SQL ops for CASE patterns
             const sqlOp = (DataLaVistaCore.AGG_META[agg] || {}).sqlFn || agg;
             const caseWhen = _condsToWhereBody(sConds);
-            if (sqlOp === 'SUM')           return `SUM(CASE WHEN ${caseWhen} THEN 1 ELSE 0 END) AS [${alias}]`;
+            if (sqlOp === 'SUM')           return `SUM(CASE WHEN ${caseWhen} THEN [${yf}] ELSE 0 END) AS [${alias}]`;
             if (sqlOp === 'COUNT')         return `COUNT(CASE WHEN ${caseWhen} THEN 1 ELSE NULL END) AS [${alias}]`;
             if (sqlOp === 'COUNT_DISTINCT') return `COUNT(DISTINCT CASE WHEN ${caseWhen} THEN [${yf}] ELSE NULL END) AS [${alias}]`;
             return `${sqlOp}(CASE WHEN ${caseWhen} THEN [${yf}] ELSE NULL END) AS [${alias}]`;
