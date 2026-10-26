@@ -130,6 +130,7 @@ If you need assistance identifying a contact person, email the EFDC's Mobile Tec
 #### Contributors:
 + [Eisenberg Family Depression Center](https://depressioncenter.org) [(@DepressionCenter)](https://github.com/DepressionCenter)
 + [Automators Anonumous™](https://github.com/DepressionCenter/AutomatorsAnonymous) community of practice.
++ [Danny Ward (@dannyward630)](https://github.com/dannyward630)
 
 
 #### This work is based in part on the following projects, libraries and/or studies:
