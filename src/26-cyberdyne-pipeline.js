@@ -349,7 +349,11 @@ const CyberdynePipeline = {
     for (const table of tables) {
       if (!table || !Array.isArray(table.data) || !Array.isArray(table.fields)) continue;
       const renames = new Map();
+      // Fields come from the first row only, so reserve keys that appear in later rows too
       const taken = new Set(table.fields.map(f => f.internalName));
+      for (const row of table.data) {
+        if (row && typeof row === 'object') for (const k of Object.keys(row)) taken.add(k);
+      }
       for (const f of table.fields) {
         const name = String(f.internalName);
         if (!/[\]']/.test(name)) continue;
