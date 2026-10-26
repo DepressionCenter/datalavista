@@ -3,7 +3,7 @@ This file is part of DataLaVista™
 40-ui-context-menu.js: Right-click context menus and data source management.
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 Created: 2026-03-24
-Last Modified: 2026-04-04
+Last Modified: 2026-10-26
 Summary: Right-click context menus and data source management.
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
@@ -404,6 +404,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
   showLoadingPopup('Refreshing data source...');
   try {
     if (ds.type === 'sharepoint') {
+      await ensureSharePointToken(dsName);
       await loadSharePointListsSource(ds.siteUrl || ds.url, dsName, ds.auth || 'current', ds.token || '', ds.description || '');
     } else if (['json', 'json5', 'csv', 'tsv', 'xlsx', 'xls', 'xml', 'sqlite', 'db'].includes(ds.type)) {
       // Unified refresh path for all remote file types via CyberdynePipeline

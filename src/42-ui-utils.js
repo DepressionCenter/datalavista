@@ -3,7 +3,7 @@ This file is part of DataLaVista™
 42-ui-utils.js: Resizable panels, tab switching, utility functions, and SharePoint file picker.
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 Created: 2026-03-24
-Last Modified: 2026-04-04
+Last Modified: 2026-10-26
 Summary: Resizable panels, tab switching, utility functions, and SharePoint file picker.
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
@@ -193,6 +193,133 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         a.download = filename;
         a.click();
       }
+
+      // ============================================================
+      // QUESTION DIALOG
+      // Questions are shown one at a time so two answers cannot be mixed up.
+      // ============================================================
+      let _askDialogQueue = Promise.resolve();
+
+      /**
+       * Ask the person a question in the shared question popup and wait for the answer.
+       * All text is inserted as text, so addresses and names from a dashboard file are safe to show.
+       *
+       * @param {object} options
+       * @param {string} options.title          Heading of the popup.
+       * @param {Array<object>} options.sections Body parts, shown in order. Each is one of:
+       *        { text: string }                      a plain sentence or two;
+       *        { detail: string }                    one value on its own line in a fixed-width font, such as a web address;
+       *        { list: string[] }                    a numbered list;
+       *        { input: { label, type?, placeholder? } } one text box, whose value is returned with the answer;
+       *        { note: string }                      a smaller muted sentence.
+       * @param {string} [options.okLabel]      Label of the confirming button. Defaults to "OK".
+       * @param {string} [options.cancelLabel]  Label of the declining button. Defaults to "Cancel".
+       * @returns {Promise<{confirmed: boolean, value: string}>}
+       *          confirmed is true only when the confirming button was used. Closing the popup,
+       *          clicking outside it, or pressing Escape counts as declining.
+       */
+      function dlvAskDialog(options) {
+        const run = () => new Promise(resolve => {
+          const overlay   = document.getElementById('dlv-ask-overlay');
+          const dialog    = document.getElementById('dlv-ask-dialog');
+          const titleEl   = document.getElementById('dlv-ask-title');
+          const body      = document.getElementById('dlv-ask-body');
+          const okBtn     = /** @type {HTMLButtonElement} */ (document.getElementById('dlv-ask-ok-btn'));
+          const cancelBtn = /** @type {HTMLButtonElement} */ (document.getElementById('dlv-ask-cancel-btn'));
+          const closeBtn  = document.getElementById('dlv-ask-close-btn');
+          if (!overlay || !dialog || !titleEl || !body || !okBtn || !cancelBtn || !closeBtn) {
+            resolve({ confirmed: false, value: '' });
+            return;
+          }
+
+          titleEl.textContent = options.title || '';
+          body.textContent = '';
+          let inputEl = null;
+          for (const section of options.sections || []) {
+            if (typeof section.text === 'string') {
+              const p = document.createElement('p');
+              p.style.margin = '0';
+              p.textContent = section.text;
+              body.appendChild(p);
+            } else if (typeof section.detail === 'string') {
+              const d = document.createElement('div');
+              d.style.cssText = 'font-family:monospace;font-size:12px;word-break:break-all;padding:6px 8px;background:var(--bg);border-radius:var(--radius)';
+              d.textContent = section.detail;
+              body.appendChild(d);
+            } else if (Array.isArray(section.list)) {
+              const ol = document.createElement('ol');
+              ol.style.cssText = 'margin:0;padding-left:22px';
+              for (const item of section.list) {
+                const li = document.createElement('li');
+                li.textContent = item;
+                ol.appendChild(li);
+              }
+              body.appendChild(ol);
+            } else if (section.input && !inputEl) {
+              const label = document.createElement('label');
+              label.style.cssText = 'display:flex;flex-direction:column;gap:4px';
+              const labelText = document.createElement('span');
+              labelText.textContent = section.input.label || '';
+              inputEl = document.createElement('input');
+              inputEl.type = section.input.type || 'text';
+              inputEl.className = 'form-input';
+              inputEl.autocomplete = 'off';
+              inputEl.placeholder = section.input.placeholder || '';
+              label.appendChild(labelText);
+              label.appendChild(inputEl);
+              body.appendChild(label);
+            } else if (typeof section.note === 'string') {
+              const n = document.createElement('p');
+              n.style.cssText = 'margin:0;font-size:12px;color:var(--text-secondary)';
+              n.textContent = section.note;
+              body.appendChild(n);
+            }
+          }
+          okBtn.textContent = options.okLabel || 'OK';
+          cancelBtn.textContent = options.cancelLabel || 'Cancel';
+
+          const previouslyFocused = /** @type {HTMLElement|null} */ (document.activeElement);
+          const finish = (confirmed) => {
+            overlay.removeEventListener('click', onOverlayClick);
+            dialog.removeEventListener('keydown', onKeyDown);
+            okBtn.removeEventListener('click', onOk);
+            cancelBtn.removeEventListener('click', onCancel);
+            closeBtn.removeEventListener('click', onCancel);
+            const value = inputEl ? inputEl.value : '';
+            if (inputEl) inputEl.value = '';
+            overlay.style.display = 'none';
+            if (previouslyFocused && typeof previouslyFocused.focus === 'function') previouslyFocused.focus();
+            resolve({ confirmed, value });
+          };
+          const onOk = () => finish(true);
+          const onCancel = () => finish(false);
+          const onOverlayClick = (e) => { if (e.target === overlay) finish(false); };
+          // Focus stays inside the popup so a keyboard user cannot land on the page behind it.
+          const onKeyDown = (e) => {
+            if (e.key === 'Escape') { e.preventDefault(); finish(false); return; }
+            if (e.key === 'Enter' && inputEl && e.target === inputEl) { e.preventDefault(); finish(true); return; }
+            if (e.key !== 'Tab') return;
+            const focusable = Array.from(dialog.querySelectorAll('button, input'))
+              .filter(el => el instanceof HTMLElement && !el.hasAttribute('disabled'));
+            if (!focusable.length) return;
+            const first = focusable[0], last = focusable[focusable.length - 1];
+            if (e.shiftKey && document.activeElement === first) { e.preventDefault(); /** @type {HTMLElement} */ (last).focus(); }
+            else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); /** @type {HTMLElement} */ (first).focus(); }
+          };
+          overlay.addEventListener('click', onOverlayClick);
+          dialog.addEventListener('keydown', onKeyDown);
+          okBtn.addEventListener('click', onOk);
+          cancelBtn.addEventListener('click', onCancel);
+          closeBtn.addEventListener('click', onCancel);
+
+          overlay.style.display = 'flex';
+          (inputEl || okBtn).focus();
+        });
+        const turn = _askDialogQueue.then(run, run);
+        _askDialogQueue = turn.then(() => {}, () => {});
+        return turn;
+      }
+
       
       /** Detect if running inside a SharePoint site and return the site URL, or null. */
       function getSpSiteUrl() {
