@@ -642,65 +642,6 @@ async function fetchWithTimeout(url, opts = {}, ms = FETCH_TIMEOUT_MS, returnTex
 }
 
     
-// - Non-guessable callback name (timestamp + random)
-// - settled flag prevents double resolution
-// - Always cleans up script tag and window callback
-// - Runs safeJSONParse via stringify round-trip to strip pollution keys
-function tryJSONP(url) {
-  return new Promise((resolve, reject) => {
-    const callbackName =
-      `__jsonp_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-
-    let script  = null;
-    let settled = false;
-
-    const timeoutId = setTimeout(() => {
-      settle(reject, new Error(`JSONP timed out after ${FETCH_TIMEOUT_MS}ms`));
-    }, FETCH_TIMEOUT_MS);
-
-    const cleanup = () => {
-      clearTimeout(timeoutId);
-      if (callbackName in window) delete window[callbackName];
-      if (script?.parentNode) script.parentNode.removeChild(script);
-      script = null;
-    };
-
-    // Prevents double-resolution if callback somehow fires more than once
-    const settle = (fn, value) => {
-      if (settled) return;
-      settled = true;
-      cleanup();
-      fn(value);
-    };
-
-    window[callbackName] = (data) => {
-      try {
-        // Stringify then safeJSONParse: deep-copies AND strips pollution keys
-        const safe = safeJSONParse(JSON.stringify(data));
-        settle(resolve, safe);
-      } catch (err) {
-        settle(reject, err);
-      }
-    };
-
-    script = document.createElement("script");
-    script.type  = "text/javascript";
-    script.async = true;
-
-    const sep  = url.includes("?") ? "&" : "?";
-    script.src = `${url}${sep}callback=${callbackName}`;
-
-    script.onerror = () =>
-      settle(
-        reject,
-        new Error("JSONP script failed to load — server likely does not support JSONP.")
-      );
-
-    // document.head is safer than document.body (body may not exist yet)
-    (document.head || document.documentElement).appendChild(script);
-  });
-}
-
 // ============================================================
 // SHAREPOINT SITE METADATA HELPER
 // ============================================================
@@ -878,14 +819,75 @@ async function loadSharePointListsSource(siteUrl, dsName, newAuth='current', new
 }
 
 // ============================================================
-// DATA SOURCE LOADER
+// REMOTE FILE RETRIEVAL
 // ============================================================
+// Relay services (public proxies) that can download a file when the website that
+// hosts it does not allow this page to read it directly. A relay sees the address
+// and the whole file, so one is used only after the person agrees.
+const RELAY_SERVICES = [
+  { name: 'corsproxy.io',            buildUrl: (url) => 'https://corsproxy.io/?url=' + encodeURIComponent(url) },
+  { name: 'allorigins.win',          buildUrl: (url) => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url) },
+  { name: 'thingproxy.freeboard.io', buildUrl: (url) => 'https://thingproxy.freeboard.io/fetch/' + url },
+];
 
-// Fetch JSON from a URL trying multiple strategies.
-// Skips external proxies if the URL is on the same host as the current page,
-// on the same SharePoint tenant/site, or otherwise same-origin — proxies
-// cannot authenticate to internal servers and must not receive private data.
-async function fetchJSONWithFallbacks(url) {
+// Relay decisions for this page load, keyed by destination host: true means agreed, false means declined.
+// Kept outside DataLaVistaState on purpose, so buildConfig can never write a decision into a
+// dashboard file and loadConfig can never read one in.
+const _relayDecisionByHost = new Map();
+
+// True when the address points at this page's own site or the current SharePoint site.
+// Those servers can read the browser's own sign-in and a relay cannot, so a relay is never offered for them.
+function _isSameSiteUrl(url) {
+  try {
+    const target = new URL(url);
+    if (target.origin === window.location.origin) return true;
+    if (target.hostname === window.location.hostname) return true;
+    const spSite = typeof getSpSiteUrl === 'function' && getSpSiteUrl();
+    if (spSite) {
+      if (url.startsWith(spSite)) return true;
+      try { if (new URL(spSite).origin === target.origin) return true; } catch (_) {}
+    }
+  } catch (e) {}
+  return false;
+}
+
+// Ask once per destination host whether a relay may be used, and remember the answer for this page load.
+async function _mayUseRelay(url) {
+  const host = new URL(url).hostname;
+  if (_relayDecisionByHost.has(host)) return _relayDecisionByHost.get(host);
+  const answer = await dlvAskDialog({
+    title: 'Try a relay service?',
+    sections: [
+      { text: 'DataLaVista could not open this file directly:' },
+      { detail: url },
+      { text: 'It can try again through a relay service, also called a proxy. A relay is another website that downloads the file and passes it on to you. The relay will see this web address and everything in the file.' },
+      { text: 'Relay services that will be tried, in order:' },
+      { list: RELAY_SERVICES.map(relay => relay.name) },
+      { text: 'Do not use a relay for private, confidential, or regulated data.' },
+      { note: 'Your answer applies to every file from ' + host + ' until you reload the page.' }
+    ],
+    okLabel: 'Use a relay service',
+    cancelLabel: 'Do not use a relay'
+  });
+  // A second question for the same host may have been waiting behind this one; keep the first answer.
+  if (!_relayDecisionByHost.has(host)) _relayDecisionByHost.set(host, answer.confirmed);
+  return _relayDecisionByHost.get(host);
+}
+
+/**
+ * Download a remote file, as parsed JSON or as raw text.
+ *
+ * Direct downloads are tried first, without and then with the browser's own sign-in.
+ * A relay service is tried only for a file on another site, only when the address carries
+ * no parameters or sign-in details, and only after the person agrees in a popup. The file
+ * is never run as a script.
+ *
+ * @param {string} url         Web address of the file.
+ * @param {boolean} returnText true for the raw text, false for parsed JSON.
+ * @returns {Promise<any>}     The parsed JSON or the text.
+ * @throws {Error}             With a message that says what happened and what to do next.
+ */
+async function fetchWithFallbacks(url, returnText) {
   if (window.location.protocol === 'file:') {
     throw new Error(
       'Cannot fetch external URLs when running from a local file. ' +
@@ -893,91 +895,66 @@ async function fetchJSONWithFallbacks(url) {
     );
   }
 
-  const encodedUrl = encodeURIComponent(url);
-
-  const isSameOrigin = (() => {
-    try {
-      const target = new URL(url);
-      if (target.origin === window.location.origin) return true;
-      if (target.hostname === window.location.hostname) return true;
-      const spSite = typeof getSpSiteUrl === 'function' && getSpSiteUrl();
-      if (spSite) {
-        if (url.startsWith(spSite)) return true;
-        try { if (new URL(spSite).origin === target.origin) return true; } catch(_) {}
-      }
-    } catch (e) {}
-    return false;
-  })();
-
-  const strategies = [
-    { name: 'CORS',        fn: () => fetchWithTimeout(url, { mode: 'cors' }, FETCH_TIMEOUT_MS) },
-    { name: 'Credentials', fn: () => fetchWithTimeout(url, { mode: 'cors', credentials: 'include' }, FETCH_TIMEOUT_MS) },
-    ...(!isSameOrigin ? [
-      { name: 'JSONP',       fn: () => tryJSONP(url) },
-      { name: 'CORSProxy.io',fn: () => fetchWithTimeout(`https://corsproxy.io/?url=${encodedUrl}`, { mode: 'cors' }, PROXY_TIMEOUT_MS) },
-      { name: 'AllOrigins',  fn: () => fetchWithTimeout(`https://api.allorigins.win/raw?url=${encodedUrl}`, { mode: 'cors' }, PROXY_TIMEOUT_MS) },
-      { name: 'Thingproxy',  fn: () => fetchWithTimeout(`https://thingproxy.freeboard.io/fetch/${url}`, { mode: 'cors' }, PROXY_TIMEOUT_MS) },
-    ] : []),
-  ];
-
   const errors = {};
-  for (const s of strategies) {
+  const directAttempts = [
+    { name: 'CORS',        fn: () => fetchWithTimeout(url, { mode: 'cors' }, FETCH_TIMEOUT_MS, returnText) },
+    { name: 'Credentials', fn: () => fetchWithTimeout(url, { mode: 'cors', credentials: 'include' }, FETCH_TIMEOUT_MS, returnText) },
+  ];
+  for (const attempt of directAttempts) {
     try {
-      const result = await s.fn();
-      return result;
+      return await attempt.fn();
     } catch (err) {
-      errors[s.name] = err.message;
+      errors[attempt.name] = err.message;
+      console.warn('[fetchWithFallbacks] ' + attempt.name + ' failed:', err.message);
+    }
+  }
+
+  const cannotOpen = new Error(
+    'DataLaVista could not open ' + url + '. Check that the address is right. ' +
+    'The website that hosts the file must allow other sites to read it, or the file must be on the same site as this page.'
+  );
+  if (_isSameSiteUrl(url)) throw cannotOpen;
+
+  let target;
+  try { target = new URL(url); } catch (e) { throw cannotOpen; }
+  if (target.search !== '' || target.username || target.password) {
+    throw new Error(
+      'DataLaVista could not open ' + url + ' directly, and it will not send an address that has extra parameters ' +
+      'after a question mark, or sign-in details, to a relay service. Check the address, or ask the website that ' +
+      'hosts the file to allow other sites to read it.'
+    );
+  }
+  if (!(await _mayUseRelay(url))) {
+    throw new Error('DataLaVista did not open ' + url + ' because you chose not to use a relay service. Reload the page to be asked again.');
+  }
+
+  for (const relay of RELAY_SERVICES) {
+    try {
+      return await fetchWithTimeout(relay.buildUrl(url), { mode: 'cors' }, PROXY_TIMEOUT_MS, returnText);
+    } catch (err) {
+      errors[relay.name] = err.message;
+      console.warn('[fetchWithFallbacks] ' + relay.name + ' failed:', err.message);
     }
   }
 
   const summary = Object.entries(errors).map(([k, v]) => `  [${k}] ${v}`).join('\n');
-  throw new Error('Unable to fetch file. Check the URL and try again.');
+  console.warn('[fetchWithFallbacks] All attempts failed:', summary);
+  throw cannotOpen;
 }
 
-// Fetch raw CSV text from a URL trying multiple strategies.
-// Skips external proxies for same-host, same-origin, and SharePoint tenant URLs (privacy).
-async function fetchCSVWithFallbacks(url) {
-  const encodedUrl = encodeURIComponent(url);
-
-  const isSameOrigin = (() => {
-    try {
-      const target = new URL(url);
-      if (target.origin === window.location.origin) return true;
-      if (target.hostname === window.location.hostname) return true;
-      const spSite = typeof getSpSiteUrl === 'function' && getSpSiteUrl();
-      if (spSite) {
-        if (url.startsWith(spSite)) return true;
-        try { if (new URL(spSite).origin === target.origin) return true; } catch(_) {}
-      }
-    } catch (e) {}
-    return false;
-  })();
-
-  const strategies = [
-    { name: 'CORS',        fn: () => fetchWithTimeout(url, { mode: 'cors' }, FETCH_TIMEOUT_MS, true) },
-    { name: 'Credentials', fn: () => fetchWithTimeout(url, { mode: 'cors', credentials: 'include' }, FETCH_TIMEOUT_MS, true) },
-    ...(!isSameOrigin ? [
-      { name: 'CORSProxy.io', fn: () => fetchWithTimeout(`https://corsproxy.io/?url=${encodedUrl}`, { mode: 'cors' }, PROXY_TIMEOUT_MS, true) },
-      { name: 'AllOrigins',   fn: () => fetchWithTimeout(`https://api.allorigins.win/raw?url=${encodedUrl}`, { mode: 'cors' }, PROXY_TIMEOUT_MS, true) },
-      { name: 'Thingproxy',   fn: () => fetchWithTimeout(`https://thingproxy.freeboard.io/fetch/${url}`, { mode: 'cors' }, PROXY_TIMEOUT_MS, true) },
-    ] : []),
-  ];
-
-  const errors = {};
-  for (const s of strategies) {
-    try {
-      const text = await s.fn();
-      return text;
-    } catch (err) {
-      errors[s.name] = err.message;
-      console.warn(`[fetchCSVWithFallbacks] ${s.name} failed:`, err.message);
-    }
-  }
-
-  const summary = Object.entries(errors).map(([k, v]) => `  [${k}] ${v}`).join('\n');
-  console.warn('[fetchCSVWithFallbacks] All strategies failed:', summary);
-  throw new Error('Unable to fetch file. Check the URL and try again.');
+// Fetch JSON from a URL. See fetchWithFallbacks for the order of attempts.
+function fetchJSONWithFallbacks(url) {
+  return fetchWithFallbacks(url, false);
 }
+
+// Fetch raw CSV text from a URL. See fetchWithFallbacks for the order of attempts.
+function fetchCSVWithFallbacks(url) {
+  return fetchWithFallbacks(url, true);
+}
+
+// ============================================================
+// DATA SOURCE LOADER
+// ============================================================
 
 // Load JSON from URL with multiple strategies and robust error handling
 async function loadJSONSource(url, dsName) {
