@@ -75,7 +75,7 @@ prepend_html_license() {
   local output="$1"
   local tmp
   tmp=$(mktemp)
-  { printf '<!--\n'; printf '%s\n' "$LICENSE_TEXT"; printf '-->\n'; cat "$output"; } > "$tmp"
+  { printf '<!--\n'; printf '%s\n' "$LICENSE_TEXT"; printf '%s\n' '-->'; cat "$output"; } > "$tmp"
   mv "$tmp" "$output"
 }
 
