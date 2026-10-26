@@ -58,10 +58,11 @@ This is a local preview server, not an authenticated deployment.
 
 The four binaries in `bin/` come from
 [ZippyServe commit 1d55cdafa42adf60dddf22376d7686d37ca03676](https://github.com/DepressionCenter/ZippyServe/tree/1d55cdafa42adf60dddf22376d7686d37ca03676).
-[Provenance and checksums](../vendor/zippyserve/PROVENANCE.txt), corresponding
-source, build scripts, and the [GPL license](../vendor/zippyserve/LICENSE) are
+[Provenance and checksums](../vendor/zippyserve/PROVENANCE.txt), the upstream
+source snapshot, build scripts, and the [GPL license](../vendor/zippyserve/LICENSE) are
 included in `vendor/zippyserve/`. The binaries are copied upstream artifacts, not
-locally rebuilt ones. The launchers leave the application build and SharePoint
+locally rebuilt ones. The Linux binary records a modified build tree; exact
+source-to-binary reproducibility has not been verified. The launchers leave the application build and SharePoint
 installation unchanged.
 
 ### Next steps

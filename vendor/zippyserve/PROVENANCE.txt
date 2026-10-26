@@ -1,8 +1,9 @@
 ZippyServe source commit: 1d55cdafa42adf60dddf22376d7686d37ca03676
 Source: https://github.com/DepressionCenter/ZippyServe/tree/1d55cdafa42adf60dddf22376d7686d37ca03676
-Binaries copied unchanged from that commit. Corresponding upstream source and build scripts are in this directory.
+Binaries copied unchanged from that commit. The source snapshot and build scripts from that commit are in this directory.
 SHA-256:
 aaf0d170713b8411d29158488442c89bfd11696b5d8aae2459ad935e18c4f100  bin/ZippyServe-linux-amd64
 276521493576d0fd9619f0d50fbae59a8964f3099c92f7169b2eb2cf35b79756  bin/ZippyServe-mac-amd64
 e7339647cbfc43d4cc138f2e242183a828e70624cbfc1d51c450cbdf0d43d440  bin/ZippyServe-mac-arm64
 52800326ab01b097c07cdd617061fdafd746e1017ebb2a7785ec22e4b2679135  bin/ZippyServe.exe
+Linux binary build metadata: go1.26.5, vcs.revision=f72de55b0ada348c0f8a5d95ebcf6dc513d06ae7, vcs.modified=true. Exact reproducibility against the source snapshot has not been verified.

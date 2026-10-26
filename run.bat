@@ -5,18 +5,18 @@
 @rem Last Modified: 2026-10-26
 @rem Summary: Starts DataLaVista over local HTTP on Windows.
 @rem Notes: See README file for documentation and full license information.
-@rem 
+@rem
 @rem Copyright © 2026 The Regents of the University of Michigan
-@rem 
+@rem
 @rem This program is free software: you can redistribute it and/or modify
 @rem it under the terms of the GNU General Public License as published by
 @rem the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
-@rem 
+@rem
 @rem This program is distributed in the hope that it will be useful,
 @rem but WITHOUT ANY WARRANTY; without even the implied warranty of
 @rem MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 @rem GNU General Public License for more details.
-@rem 
+@rem
 @rem You should have received a copy of the GNU General Public License along
 @rem with this program. If not, see <https://www.gnu.org/licenses/>.
 
