@@ -28,7 +28,7 @@ for the repository layout, build process, and shared instructions.
 - [Setup and dashboard use](../README.md#quick-start-guide): live demos, SharePoint installation, data loading, and dashboard design.
 - [DataLaVista knowledge base article](https://teamdynamix.umich.edu/TDClient/210/DepressionCenter/KB/ArticleDet?ID=15179): the existing project documentation.
 - [Repository maintenance](repository-maintenance.md): source files, generated outputs, build commands, and template conventions.
-- [Compliance](compliance.md): security and accessibility controls in the code today, where data goes, and known gaps.
+- [Compliance](compliance.md): security and accessibility controls in the code today, data handling, and known gaps.
 - [Documentation template](doc-template.md): starting structure for a knowledge base page.
 - [Skill authoring examples](skill-examples.md): optional recipes for common project types.
 
