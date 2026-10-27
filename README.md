@@ -3,7 +3,7 @@ This file is part of DataLaVista™
 README.md
 Author(s): Gabriel Mongefranco, Jeremy Gluskin, Shelley Boa.
 Created: 2026-03-10
-Last Modified: 2026-04-06
+Last Modified: 2026-10-26
 Summary: DataLaVista is a ightweight, client-side reporting and dashboard toolkit.
 Notes: See README file for documentation and full license information.
 
@@ -66,7 +66,7 @@ Most enterprise data is trapped behind bloated frameworks or expensive BI tools.
 + Go to your site's home page and create a new page using the Modern Script Editor template. Use "DataLaVista" for the page title.
 + In the "Modern Script Editor" webpart, click "Markup" then click the "{ }" button to open the code editor.
 + Copy and the paste the code from [DataLaVista.html](DataLaVista.html) into the script editor.
-  - Note: If your SharePoint tenant has CSP restrictions that block inline JavaScript, use DataLaVista-nojs.html instead. Update the script tag near the bottom of the file (before </body>) to point to htttp://you-tenant.sharepoint.com/sites/your-site/SiteAssets/datalavista.js, then upload datalavista.js to your site's /SiteAssets directory.
+  - Note: If your SharePoint tenant has CSP restrictions that block inline JavaScript, use DataLaVista-nojs.html instead. Update the script tag near the bottom of the file (before </body>) to point to https://your-tenant.sharepoint.com/sites/your-site/SiteAssets/datalavista.js, then upload datalavista.js to your site's /SiteAssets directory.
 + Save, and refresh the page.
 <p>
 <a href="https://code.depressioncenter.org/datalavista/presentations/sharepoint-installation-1.mp4" target="_blank" title="Click to open full video with SharePoint installation instructions"><img src="images/sharepoint-installation-1.gif" alt="Click to open full video with SharePoint installation instructions" style="width: 600px; height: auto" /></a>
@@ -130,6 +130,7 @@ If you need assistance identifying a contact person, email the EFDC's Mobile Tec
 #### Contributors:
 + [Eisenberg Family Depression Center](https://depressioncenter.org) [(@DepressionCenter)](https://github.com/DepressionCenter)
 + [Automators Anonumous™](https://github.com/DepressionCenter/AutomatorsAnonymous) community of practice.
++ [Danny Ward (@dannyward630)](https://github.com/dannyward630)
 
 
 #### This work is based in part on the following projects, libraries and/or studies:
@@ -142,8 +143,8 @@ If you need assistance identifying a contact person, email the EFDC's Mobile Tec
 
 ## License
 ### Copyright Notice
-<small><strong>DataLaVista™</strong>, "Come with me if you want to query"™, "The BI Tool Terminator"™, "I'll be back... with a better report"™, "Skynet UI Toolkit"™, "CyberdynePipeline", "I'll be pipeline"™, and "I'll be data processing"™</small> are all trademarks of The Regents of the University of Michigan.
-<small>Microsoft, SharePoint, Script Editor, DOI, Zenodo, GNU, GPL, Free Software Foundation, Apache ECharts, AlaSQL, CodeMirror, and other external libraries</small> are all registred marks or trademarks of their respective owners.
+<small><strong>DataLaVista™</strong>, "Come with me if you want to query"™, "The BI Tool Terminator"™, "Skynet UI Toolkit"™, and "CyberdynePipeline"</small> are all trademarks of The Regents of the University of Michigan.
+<small>Microsoft, SharePoint, Zenodo, Apache ECharts, AlaSQL, CodeMirror, and other external libraries</small> are all registred marks or trademarks of their respective owners.
 Copyright © 2026 The Regents of the University of Michigan
 
 

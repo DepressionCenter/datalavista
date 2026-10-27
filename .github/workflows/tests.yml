@@ -1,0 +1,68 @@
+# ============================================================
+#  This file is part of DataLaVista™
+#  tests.yml: GitHub Actions workflow - runs the automated tests.
+#  Author(s): Gabriel Mongefranco.
+#  Created: 2026-10-27
+#  Last Modified: 2026-10-27
+#  Summary: Runs repository checks, the build, and unit tests on pull requests.
+#  Notes: See README file for documentation and full license information.
+#  Website: https://github.com/DepressionCenter/datalavista
+#
+#  Copyright © 2026 The Regents of the University of Michigan
+#
+#  This program is free software: you can redistribute it and/or modify
+#  it under the terms of the GNU General Public License as published by
+#  the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+#  This program is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+#  GNU General Public License for more details.
+#  You should have received a copy of the GNU General Public License along
+#  with this program. If not, see <https://www.gnu.org/licenses/>.
+#  ================================================================
+
+name: Tests
+
+# Pull requests are tested before they merge, so pushes to main are not tested again
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A newer push to the same branch makes the older run pointless
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    name: Repository checks, build, and unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          # The full history lets the checks compare a pull request with its target branch
+          fetch-depth: 0
+
+      - name: Repository checks
+        run: bash tests/check-repository.sh "origin/${{ github.base_ref }}"
+
+      - name: Cache esbuild
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/datalavista-build
+          key: esbuild-0.28.0-linux-x64
+
+      - name: Build
+        run: bash build.sh
+
+      # The runner already has Node.js, so nothing is installed for these steps
+      - name: Check the built script for syntax errors
+        run: node --check datalavista.js
+
+      - name: Unit tests
+        run: node --test tests/*.test.cjs

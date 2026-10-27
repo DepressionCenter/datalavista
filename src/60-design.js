@@ -3,7 +3,7 @@ This file is part of DataLaVista™
 60-design.js: Design canvas, widget rendering, data transforms, and widget properties.
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 Created: 2026-03-24
-Last Modified: 2026-04-06
+Last Modified: 2026-10-26
 Summary: Design canvas, widget rendering, data transforms, and widget properties.
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
@@ -149,7 +149,8 @@ function rankSuggestions(rules, cols, meta) {
 
   // ============================================================
   // HTML SANITIZER  (strip scripts / event handlers; allow safe markup)
-  // Used for dashboard title tooltip which accepts user-supplied HTML.
+  // Used for the dashboard title tooltip and text widgets, whose HTML may come
+  // from a shared dashboard file, so only formatting survives.
   // ============================================================
   function sanitizeHTML(html) {
     if (!html) return '';
@@ -161,11 +162,23 @@ function rankSuggestions(rules, cols, meta) {
     }
     const ALLOWED = new Set(['p','br','b','i','strong','em','span','div','ul','ol','li',
       'a','h1','h2','h3','h4','h5','h6','code','pre','hr','table','tr','td','th',
-      'thead','tbody','small','sup','sub','mark','blockquote']);
+      'thead','tbody','small','sup','sub','mark','blockquote','img']);
     const BLOCKED = new Set(['script','iframe','object','embed','form','input','button',
       'style','link','meta','base','frame','frameset','noscript','template']);
-    const SAFE_ATTRS = new Set(['href','title','target','class','style','rel',
-      'colspan','rowspan','width','height','alt','id']);
+    // The id attribute is left out so a dashboard file cannot take over an element id the app looks up
+    const SAFE_ATTRS = new Set(['href','src','title','target','class','style','rel',
+      'colspan','rowspan','width','height','alt']);
+    // These style forms could run code in old browsers or cover the whole page, so such a style is dropped
+    const UNSAFE_STYLE = /expression\s*\(|behavior\s*:|-moz-binding|javascript\s*:|position\s*:\s*fixed/i;
+
+    // Other address types, such as javascript: or data:, could run code or hide where a link leads
+    function hasSafeProtocol(value, allowed) {
+      try {
+        return allowed.includes(new URL(value, document.baseURI).protocol);
+      } catch (e) {
+        return false;
+      }
+    }
 
     function clean(node) {
       if (node.nodeType === 3) return document.createTextNode(node.textContent);
@@ -175,9 +188,11 @@ function rankSuggestions(rules, cols, meta) {
       const out = document.createElement(ALLOWED.has(tag) ? tag : 'span');
       for (const attr of Array.from(node.attributes)) {
         const n = attr.name.toLowerCase();
-        if (n.startsWith('on')) continue;
-        if ((n === 'href' || n === 'src') && /^\s*javascript:/i.test(attr.value)) continue;
-        if (SAFE_ATTRS.has(n)) out.setAttribute(n, attr.value);
+        if (!SAFE_ATTRS.has(n)) continue;
+        if (n === 'href' && !hasSafeProtocol(attr.value, ['http:', 'https:', 'mailto:', 'tel:'])) continue;
+        if (n === 'src' && (tag !== 'img' || !hasSafeProtocol(attr.value, ['http:', 'https:']))) continue;
+        if (n === 'style' && UNSAFE_STYLE.test(attr.value)) continue;
+        out.setAttribute(n, attr.value);
       }
       // Force links to open safely
       if (tag === 'a') { out.setAttribute('target', '_blank'); out.setAttribute('rel', 'noopener noreferrer'); }
@@ -193,6 +208,7 @@ function rankSuggestions(rules, cols, meta) {
     const cleaned = clean(root);
     return cleaned ? cleaned.innerHTML : '';
   }
+
 
   // ============================================================
   // DASHBOARD TITLE PROPERTIES PANEL
@@ -708,14 +724,16 @@ function rankSuggestions(rules, cols, meta) {
       // ============================================================
       // DESIGN CANVAS RENDERING
       // ============================================================
-      function getWidgetContentHTML(w) {
-        if (w.type === 'text') return '<div class="text-widget" style="font-size:' + w.fontSize + 'px;color:' + w.fontColor + '">' + w.textContent + '</div>';
-        if (w.type === 'placeholder') return '';
-        if (w.type === 'container') return renderContainerContent(w);
-        if (w.type === 'kpi') return renderKPIContent(w);
-        if (w.type === 'table') return renderTableContent(w);
-        if (isEChartsWidget(w.type)) return '<div id="chart-' + w.id + '" style="width:100%;height:100%;min-height:200px"></div>';
-        return '';
+      /**
+       * Render a text widget for the designer and the preview. The content, size, and color
+       * may come from a shared dashboard file, so they are cleaned before they reach the page.
+       * @param {any} w Widget record.
+       * @returns {string} HTML for the widget body.
+       */
+      function renderTextWidgetHTML(w) {
+        const size  = _safeCssNumber(w.fontSize, 4, 200, 13);
+        const color = _safeCssColor(w.fontColor, '#323130') || '#323130';
+        return '<div class="text-widget" style="font-size:' + size + 'px;color:' + color + '">' + sanitizeHTML(w.textContent) + '</div>';
       }
 
 
@@ -831,8 +849,9 @@ function rankSuggestions(rules, cols, meta) {
           + '<button class="btn btn-danger btn-icon btn-sm" data-action="widget-delete" data-wid="' + w.id + '" title="Delete">\u2715</button>'
           + '</div>';
 
-        const titleHdrStyle  = 'background:' + (w.titleBackgroundColor || '#fefefe');
-        const titleSpanStyle = 'font-size:' + (w.titleFontSize || 14) + 'px;color:' + (w.titleFontColor || '#323130');
+        // Checked because these values come from the dashboard file and end up inside a style attribute
+        const titleHdrStyle  = 'background:' + (_safeCssColor(w.titleBackgroundColor, '#fefefe') || '#fefefe');
+        const titleSpanStyle = 'font-size:' + _safeCssNumber(w.titleFontSize, 4, 200, 14) + 'px;color:' + (_safeCssColor(w.titleFontColor, '#323130') || '#323130');
         const isChartWidget = isEChartsWidget(w.type);
         var contentClass = 'widget-content';
         if (isChartWidget) { contentClass += ' widget-content-chart'; }
@@ -842,7 +861,7 @@ function rankSuggestions(rules, cols, meta) {
         if (w.type === 'container') {
           var alignMap = { 'top': 'flex-start', 'space-between': 'space-between', 'stretch': 'stretch' };
           var justifyVal = alignMap[w.containerAlign || 'top'] || 'flex-start';
-          contentStyle = ' style="display:flex;flex-direction:column;gap:' + (w.containerGap || 8) + 'px;padding:' + (w.containerPadding || 8) + 'px;justify-content:' + justifyVal + ';flex-wrap:wrap;height:auto;overflow:visible"';
+          contentStyle = ' style="display:flex;flex-direction:column;gap:' + _safeCssNumber(w.containerGap, 0, 64, 8) + 'px;padding:' + _safeCssNumber(w.containerPadding, 0, 64, 8) + 'px;justify-content:' + justifyVal + ';flex-wrap:wrap;height:auto;overflow:visible"';
         }
 
         el.innerHTML = '<div class="widget-header" style="' + titleHdrStyle + '"><span class="widget-title" style="' + titleSpanStyle + '">' + _attrEnc(w.title || '') + '</span>' + actions + '</div>'
@@ -912,7 +931,7 @@ function rankSuggestions(rules, cols, meta) {
       }
 
       function getWidgetContentHTML(w) {
-        if (w.type === 'text') return '<div class="text-widget" style="font-size:' + w.fontSize + 'px;color:' + w.fontColor + '">' + w.textContent + '</div>';
+        if (w.type === 'text') return renderTextWidgetHTML(w);
         if (w.type === 'placeholder') return '';
         if (w.type === 'container') return renderContainerContent(w);
         if (w.type === 'kpi') return renderKPIContent(w);
@@ -1074,8 +1093,12 @@ function rankSuggestions(rules, cols, meta) {
             const sConds  = (spEntry.conditions || []).filter(c => c.field);
             const alias   = `__dlvy_${yi}`;
 
-            // Virtual count field — always COUNT(*)
-            if (_isVirtCount(yf)) return `COUNT(*) AS [${alias}]`;
+            // Virtual count field — COUNT(*), or the number of matching rows when the series has conditions
+            if (_isVirtCount(yf)) {
+              return sConds.length
+                ? `SUM(CASE WHEN ${_condsToWhereBody(sConds)} THEN 1 ELSE 0 END) AS [${alias}]`
+                : `COUNT(*) AS [${alias}]`;
+            }
 
             if (!agg) return `[${yf}] AS [${alias}]`;
 
@@ -1085,7 +1108,7 @@ function rankSuggestions(rules, cols, meta) {
             // Conditions-filtered aggregates — transpile user-friendly vals to SQL ops for CASE patterns
             const sqlOp = (DataLaVistaCore.AGG_META[agg] || {}).sqlFn || agg;
             const caseWhen = _condsToWhereBody(sConds);
-            if (sqlOp === 'SUM')           return `SUM(CASE WHEN ${caseWhen} THEN 1 ELSE 0 END) AS [${alias}]`;
+            if (sqlOp === 'SUM')           return `SUM(CASE WHEN ${caseWhen} THEN [${yf}] ELSE 0 END) AS [${alias}]`;
             if (sqlOp === 'COUNT')         return `COUNT(CASE WHEN ${caseWhen} THEN 1 ELSE NULL END) AS [${alias}]`;
             if (sqlOp === 'COUNT_DISTINCT') return `COUNT(DISTINCT CASE WHEN ${caseWhen} THEN [${yf}] ELSE NULL END) AS [${alias}]`;
             return `${sqlOp}(CASE WHEN ${caseWhen} THEN [${yf}] ELSE NULL END) AS [${alias}]`;
@@ -1202,10 +1225,12 @@ function rankSuggestions(rules, cols, meta) {
             else value = kpiData[0][field] != null ? kpiData[0][field] : '—';
           }
         }
-        const metricSize  = w.kpiMetricFontSize || 36;
-        const labelSize   = w.kpiLabelFontSize  || 13;
+        // Checked because these values come from the dashboard file and end up inside a style attribute
+        const metricSize  = _safeCssNumber(w.kpiMetricFontSize, 4, 400, 36);
+        const labelSize   = _safeCssNumber(w.kpiLabelFontSize, 4, 200, 13);
+        const valueColor  = _safeCssColor(w.fillColor, '#0078d4') || '#0078d4';
         const labelText   = (w.kpiLabelOverride && w.kpiLabelOverride.trim()) ? w.kpiLabelOverride : field;
-        return `<div class="kpi-card"><div class="kpi-value" style="color:${w.fillColor};font-size:${metricSize}px">${_attrEnc(value)}</div><div class="kpi-label" style="font-size:${labelSize}px">${_attrEnc(labelText)}</div></div>`;
+        return `<div class="kpi-card"><div class="kpi-value" style="color:${valueColor};font-size:${metricSize}px">${_attrEnc(value)}</div><div class="kpi-label" style="font-size:${labelSize}px">${_attrEnc(labelText)}</div></div>`;
       }
 
 
@@ -2509,8 +2534,8 @@ function _renderBarLineOptionsHTML(w, wid) {
           }
           _containerSection = '<div class="adv-node-section">'
             + '<div class="adv-node-section-hdr">CONTAINER LAYOUT</div>'
-            + '<div class="props-row"><label>Gap (px)</label><input type="number" class="form-input" min="0" max="64" value="' + (w.containerGap != null ? w.containerGap : 8) + '" data-action="widget-update-num" data-wid="' + wid + '" data-prop="containerGap"/></div>'
-            + '<div class="props-row"><label>Padding (px)</label><input type="number" class="form-input" min="0" max="64" value="' + (w.containerPadding != null ? w.containerPadding : 8) + '" data-action="widget-update-num" data-wid="' + wid + '" data-prop="containerPadding"/></div>'
+            + '<div class="props-row"><label>Gap (px)</label><input type="number" class="form-input" min="0" max="64" value="' + _attrEnc(w.containerGap != null ? w.containerGap : 8) + '" data-action="widget-update-num" data-wid="' + wid + '" data-prop="containerGap"/></div>'
+            + '<div class="props-row"><label>Padding (px)</label><input type="number" class="form-input" min="0" max="64" value="' + _attrEnc(w.containerPadding != null ? w.containerPadding : 8) + '" data-action="widget-update-num" data-wid="' + wid + '" data-prop="containerPadding"/></div>'
             + '<div class="props-row"><label>Align</label><select class="form-input" data-action="widget-update-prop" data-wid="' + wid + '" data-prop="containerAlign">' + _alignOpts + '</select></div>'
             + '<div style="font-size:11px;color:var(--text-secondary);padding:4px 0">Drag widget headers into this container. Drag out onto canvas to un-parent.</div>'
             + '</div>';
@@ -2518,18 +2543,19 @@ function _renderBarLineOptionsHTML(w, wid) {
         // Pre-compute conditional HTML blocks (no nested backtick or ternary in template)
         var _showTitleChecked = (w.showTitle !== false) ? 'checked' : '';
         var _wTitleEsc   = _attrEnc(w.title);
-        var _wWidgetBg              = w.widgetBackgroundColor || '#fefefe';
-        var _wWidgetBgText          = w.widgetBackgroundColor || '';
+        // Encoded because each value goes into an attribute
+        var _wWidgetBg              = _attrEnc(w.widgetBackgroundColor || '#fefefe');
+        var _wWidgetBgText          = _attrEnc(w.widgetBackgroundColor || '');
         var _wWidgetBgIsTransparent = !w.widgetBackgroundColor;
-        var _wTitleBg    = w.titleBackgroundColor  || '#fefefe';
-        var _wTitleFs    = w.titleFontSize || 12;
-        var _wTitleFc    = w.titleFontColor || '#323130';
-        var _wFillColor  = w.fillColor;
-        var _wBorderColor = w.borderColor;
-        var _wBorderSize  = w.borderSize;
+        var _wTitleBg    = _attrEnc(w.titleBackgroundColor  || '#fefefe');
+        var _wTitleFs    = _attrEnc(w.titleFontSize || 12);
+        var _wTitleFc    = _attrEnc(w.titleFontColor || '#323130');
+        var _wFillColor  = _attrEnc(w.fillColor);
+        var _wBorderColor = _attrEnc(w.borderColor);
+        var _wBorderSize  = _attrEnc(w.borderSize);
         var _chartBgRowHTML = '';
         if (isChart) {
-          var _cbc = w.chartBackgroundColor || '#fefefe';
+          var _cbc = _attrEnc(w.chartBackgroundColor || '#fefefe');
           _chartBgRowHTML = '<div class="props-row"><label>Chart bg</label>'
             + '<div class="color-input-wrap">'
             + '<input type="color" value="' + _cbc + '" data-action="widget-update-prop" data-wid="' + wid + '" data-prop="chartBackgroundColor"/>'
@@ -2538,9 +2564,9 @@ function _renderBarLineOptionsHTML(w, wid) {
         }
         var _tableHeaderRowsHTML = '';
         if (isTable) {
-          var _hbc = w.headersBackgroundColor || '#f3f2f1';
-          var _hfs = w.headersFontSize || 12;
-          var _hfc = w.headersFontColor || '#323130';
+          var _hbc = _attrEnc(w.headersBackgroundColor || '#f3f2f1');
+          var _hfs = _attrEnc(w.headersFontSize || 12);
+          var _hfc = _attrEnc(w.headersFontColor || '#323130');
           _tableHeaderRowsHTML = '<div class="props-row"><label>Header bg</label>'
             + '<div class="color-input-wrap">'
             + '<input type="color" value="' + _hbc + '" data-action="widget-update-prop" data-wid="' + wid + '" data-prop="headersBackgroundColor"/>'
@@ -2555,15 +2581,16 @@ function _renderBarLineOptionsHTML(w, wid) {
         }
         var _textPropsHTML = '';
         if (isText) {
+          // Encoded so content from a dashboard file cannot break out of the attribute or the textarea
           _textPropsHTML = '<div class="props-row"><label>Font size</label>'
-            + '<input type="number" class="form-input" min="8" max="72" value="' + w.fontSize + '" data-action="widget-update-num" data-wid="' + wid + '" data-prop="fontSize"/></div>'
+            + '<input type="number" class="form-input" min="8" max="72" value="' + _attrEnc(w.fontSize) + '" data-action="widget-update-num" data-wid="' + wid + '" data-prop="fontSize"/></div>'
             + '<div class="props-row"><label>Font color</label>'
             + '<div class="color-input-wrap">'
-            + '<input type="color" value="' + w.fontColor + '" data-action="widget-update-prop" data-wid="' + wid + '" data-prop="fontColor"/>'
-            + '<input type="text" class="form-input" value="' + w.fontColor + '" data-action="widget-update-prop" data-wid="' + wid + '" data-prop="fontColor"/>'
+            + '<input type="color" value="' + _attrEnc(w.fontColor) + '" data-action="widget-update-prop" data-wid="' + wid + '" data-prop="fontColor"/>'
+            + '<input type="text" class="form-input" value="' + _attrEnc(w.fontColor) + '" data-action="widget-update-prop" data-wid="' + wid + '" data-prop="fontColor"/>'
             + '</div></div>'
             + '<div class="props-row" style="flex-direction:column;align-items:flex-start"><label>Content</label>'
-            + '<textarea class="form-input" rows="4" data-action="widget-update-prop" data-wid="' + wid + '" data-prop="textContent">' + w.textContent + '</textarea></div>';
+            + '<textarea class="form-input" rows="4" data-action="widget-update-prop" data-wid="' + wid + '" data-prop="textContent">' + _attrEnc(w.textContent) + '</textarea></div>';
         }
         var _dataSectionHTML = '';
         if (isData) {
@@ -2801,7 +2828,7 @@ function _renderBarLineOptionsHTML(w, wid) {
         if (prop === 'titleBackgroundColor' && hdr) hdr.style.background = value;
         if (prop === 'titleFontSize' && titleEl instanceof HTMLElement) titleEl.style.fontSize = value + 'px';
         if (prop === 'titleFontColor' && titleEl instanceof HTMLElement) titleEl.style.color = value;
-        if (prop === 'textContent' && w.type === 'text') el.querySelector('.text-widget').innerHTML = value;
+        if (prop === 'textContent' && w.type === 'text') el.querySelector('.text-widget').innerHTML = sanitizeHTML(value);
         if (prop === 'fontSize' && w.type === 'text') el.querySelector('.text-widget').style.fontSize = value + 'px';
         if (prop === 'fontColor' && w.type === 'text') el.querySelector('.text-widget').style.color = value;
         // Table-specific: re-render for header style / visibility changes

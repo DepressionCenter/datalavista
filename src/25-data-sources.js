@@ -3,7 +3,7 @@ This file is part of DataLaVista™
 25-data-sources.js: Data source connection popup, remote fetch guards, and source loaders.
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 Created: 2026-03-24
-Last Modified: 2026-04-06
+Last Modified: 2026-10-26
 Summary: Data source connection popup, remote fetch guards, and source loaders.
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
@@ -97,12 +97,14 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       if (spTab) {
         if (!DataLaVistaState.isSpSite) {
           spTab.classList.add('disabled');
+          spTab.setAttribute('aria-disabled', 'true');
           if (spWrapper) dlvTooltip.attach(spWrapper, 'Only available when running inside SharePoint', { placement: 'top', delay: 200 });
           // Activate Remote Files tab instead
           const remoteTab = document.querySelector('.source-tab[data-src="remote"]');
           if (remoteTab) switchSourceTab(remoteTab, 'remote');
         } else {
           spTab.classList.remove('disabled');
+          spTab.removeAttribute('aria-disabled');
           if (spWrapper) dlvTooltip.detach(spWrapper);
         }
       }
@@ -133,11 +135,33 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 
     function switchSourceTab(el, src) {
       if (el.classList.contains('disabled')) return;
-      document.querySelectorAll('.source-tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.source-tab').forEach(t => {
+        t.classList.remove('active');
+        t.setAttribute('aria-selected', 'false');
+        t.setAttribute('tabindex', '-1');
+      });
       document.querySelectorAll('.source-pane').forEach(p => p.classList.remove('active'));
       el.classList.add('active');
+      el.setAttribute('aria-selected', 'true');
+      el.setAttribute('tabindex', '0');
       document.getElementById('src-' + src)?.classList.add('active');
       if (src === 'upload' || src === 'remote') spPickerCheckVisibility();
+    }
+
+    /* Arrow keys, Home, and End move focus between the available source tabs.
+       Enter or Space then selects the focused tab through its click handler. */
+    function handleSourceTabKeydown(e) {
+      const tabs = Array.from(document.querySelectorAll('.source-tab:not(.disabled)'));
+      const current = tabs.indexOf(/** @type {HTMLElement} */ (e.target));
+      if (current === -1) return;
+      let next;
+      if (e.key === 'ArrowRight')     next = (current + 1) % tabs.length;
+      else if (e.key === 'ArrowLeft') next = (current - 1 + tabs.length) % tabs.length;
+      else if (e.key === 'Home')      next = 0;
+      else if (e.key === 'End')       next = tabs.length - 1;
+      else return;
+      e.preventDefault();
+      /** @type {HTMLElement} */ (tabs[next]).focus();
     }
     
 
@@ -642,65 +666,6 @@ async function fetchWithTimeout(url, opts = {}, ms = FETCH_TIMEOUT_MS, returnTex
 }
 
     
-// - Non-guessable callback name (timestamp + random)
-// - settled flag prevents double resolution
-// - Always cleans up script tag and window callback
-// - Runs safeJSONParse via stringify round-trip to strip pollution keys
-function tryJSONP(url) {
-  return new Promise((resolve, reject) => {
-    const callbackName =
-      `__jsonp_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-
-    let script  = null;
-    let settled = false;
-
-    const timeoutId = setTimeout(() => {
-      settle(reject, new Error(`JSONP timed out after ${FETCH_TIMEOUT_MS}ms`));
-    }, FETCH_TIMEOUT_MS);
-
-    const cleanup = () => {
-      clearTimeout(timeoutId);
-      if (callbackName in window) delete window[callbackName];
-      if (script?.parentNode) script.parentNode.removeChild(script);
-      script = null;
-    };
-
-    // Prevents double-resolution if callback somehow fires more than once
-    const settle = (fn, value) => {
-      if (settled) return;
-      settled = true;
-      cleanup();
-      fn(value);
-    };
-
-    window[callbackName] = (data) => {
-      try {
-        // Stringify then safeJSONParse: deep-copies AND strips pollution keys
-        const safe = safeJSONParse(JSON.stringify(data));
-        settle(resolve, safe);
-      } catch (err) {
-        settle(reject, err);
-      }
-    };
-
-    script = document.createElement("script");
-    script.type  = "text/javascript";
-    script.async = true;
-
-    const sep  = url.includes("?") ? "&" : "?";
-    script.src = `${url}${sep}callback=${callbackName}`;
-
-    script.onerror = () =>
-      settle(
-        reject,
-        new Error("JSONP script failed to load — server likely does not support JSONP.")
-      );
-
-    // document.head is safer than document.body (body may not exist yet)
-    (document.head || document.documentElement).appendChild(script);
-  });
-}
-
 // ============================================================
 // SHAREPOINT SITE METADATA HELPER
 // ============================================================
@@ -721,6 +686,47 @@ function _fetchSPSiteMeta(siteUrl, dsName) {
 // ============================================================
 // SHAREPOINT SOURCE LOADER
 // ============================================================
+
+/**
+ * Make sure a SharePoint data source that signs in with a bearer token has one in memory,
+ * asking the person for their own when none is present. The token is never saved, because a
+ * dashboard file is shared and a credential must not be.
+ *
+ * @param {string} dsName Internal data source name.
+ * @returns {Promise<boolean>} true when a token is available, false when the person chose to go on without one.
+ */
+async function ensureSharePointToken(dsName) {
+  const ds = /** @type {any} */ (DataLaVistaState.dataSources[dsName]);
+  if (!ds || ds.type !== 'sharepoint' || ds.auth !== 'token') return true;
+  if (ds.token) return true;
+  const label = ds.alias || dsName;
+  const siteUrl = ds.siteUrl || ds.url || '';
+  // A dashboard file can name any address, so a token is only requested for a site it may be sent to
+  if (!isTrustedSharePointSite(siteUrl)) {
+    toast('The data source "' + label + '" cannot use a bearer token, because ' + siteUrl + ' is not a SharePoint Online site or the site this page is on.', 'warning');
+    return false;
+  }
+  const answer = await dlvAskDialog({
+    title: 'Bearer token needed',
+    sections: [
+      { text: 'The data source "' + label + '" reads lists from this SharePoint site:' },
+      { detail: siteUrl },
+      { text: 'Dashboards never store bearer tokens. Paste your own token to load the data.' },
+      { input: { label: 'Your bearer token', type: 'password', placeholder: 'eyJ...' } },
+      { note: 'The token stays in this browser tab until you close or reload the page.' }
+    ],
+    okLabel: 'Load with my token',
+    cancelLabel: 'Continue without a token'
+  });
+  const token = (answer.value || '').trim();
+  if (answer.confirmed && token) {
+    ds.token = token;
+    return true;
+  }
+  toast('Continuing without a token for "' + label + '". To add one later, right-click the data source and choose Refresh Source.', 'info');
+  return false;
+}
+
 async function loadSharePointListsSource(siteUrl, dsName, newAuth='current', newToken='', description='') {
   setStatus('Loading SharePoint lists from ' + siteUrl + '...', 'loading');
 
@@ -739,6 +745,10 @@ async function loadSharePointListsSource(siteUrl, dsName, newAuth='current', new
       isFileUpload: false,
       keepRawData: false
     };
+  } else {
+    // An opened dashboard never carries a token, so connecting again must be able to supply one
+    DataLaVistaState.dataSources[dsName].auth = newAuth || 'current';
+    DataLaVistaState.dataSources[dsName].token = newToken || '';
   }
 
   // Best-effort: fetch SP site title and description for the data dictionary (fire-and-forget)
@@ -756,7 +766,7 @@ async function loadSharePointListsSource(siteUrl, dsName, newAuth='current', new
   for (const list of lists) {
     try {
       const isDocLib = list.BaseType === 1;
-      const fields = await fetchSPFields(siteUrl, list.Id, isDocLib);
+      const fields = await fetchSPFields(siteUrl, list.Id, isDocLib, dsName);
 
       // Strip SharePoint's "List" / "ListItem" suffix from EntityTypeName for cleaner keys
       const rawEntityType = list.EntityTypeName || (list.Title || 'List').replace(/[^A-Za-z0-9_]/g, '');
@@ -837,14 +847,69 @@ async function loadSharePointListsSource(siteUrl, dsName, newAuth='current', new
 }
 
 // ============================================================
-// DATA SOURCE LOADER
+// REMOTE FILE RETRIEVAL
 // ============================================================
+// Public relay services for files whose website blocks direct reads. A relay sees the
+// address and the whole file, so one is used only after the person agrees.
+const RELAY_SERVICES = [
+  { name: 'corsproxy.io',            buildUrl: (url) => 'https://corsproxy.io/?url=' + encodeURIComponent(url) },
+  { name: 'allorigins.win',          buildUrl: (url) => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url) },
+  { name: 'thingproxy.freeboard.io', buildUrl: (url) => 'https://thingproxy.freeboard.io/fetch/' + url },
+];
 
-// Fetch JSON from a URL trying multiple strategies.
-// Skips external proxies if the URL is on the same host as the current page,
-// on the same SharePoint tenant/site, or otherwise same-origin — proxies
-// cannot authenticate to internal servers and must not receive private data.
-async function fetchJSONWithFallbacks(url) {
+// Relay answers by destination host, kept outside DataLaVistaState so they can never be
+// saved into a dashboard file or read from one.
+const _relayDecisionByHost = new Map();
+
+// A relay is never offered for this page's own site or the current SharePoint site, because
+// those servers need the browser's own sign-in and a relay cannot provide it.
+function _isSameSiteUrl(url) {
+  try {
+    const target = new URL(url);
+    if (target.origin === window.location.origin) return true;
+    if (target.hostname === window.location.hostname) return true;
+    const spSite = typeof getSpSiteUrl === 'function' && getSpSiteUrl();
+    if (spSite) {
+      if (url.startsWith(spSite)) return true;
+      try { if (new URL(spSite).origin === target.origin) return true; } catch (_) {}
+    }
+  } catch (e) {}
+  return false;
+}
+
+async function _mayUseRelay(url) {
+  const host = new URL(url).hostname;
+  if (_relayDecisionByHost.has(host)) return _relayDecisionByHost.get(host);
+  const answer = await dlvAskDialog({
+    title: 'Try a relay service?',
+    sections: [
+      { text: 'DataLaVista could not open this file directly:' },
+      { detail: url },
+      { text: 'It can try again through a relay service, also called a proxy. A relay is another website that downloads the file and passes it on to you. The relay will see this web address and everything in the file.' },
+      { text: 'Relay services that will be tried, in order:' },
+      { list: RELAY_SERVICES.map(relay => relay.name) },
+      { text: 'Do not use a relay for private, confidential, or regulated data.' },
+      { note: 'Your answer applies to every file from ' + host + ' until you reload the page.' }
+    ],
+    okLabel: 'Use a relay service',
+    cancelLabel: 'Do not use a relay'
+  });
+  // Keep the first answer when another question for the same host was waiting behind this one
+  if (!_relayDecisionByHost.has(host)) _relayDecisionByHost.set(host, answer.confirmed);
+  return _relayDecisionByHost.get(host);
+}
+
+/**
+ * Download a remote file, as parsed JSON or as raw text. The file is never run as a script,
+ * and a relay service is used only for another site's file, only when the address carries no
+ * parameters or sign-in details, and only after the person agrees.
+ *
+ * @param {string} url         Web address of the file.
+ * @param {boolean} returnText true for the raw text, false for parsed JSON.
+ * @returns {Promise<any>}     The parsed JSON or the text.
+ * @throws {Error}             With a message that says what happened and what to do next.
+ */
+async function fetchWithFallbacks(url, returnText) {
   if (window.location.protocol === 'file:') {
     throw new Error(
       'Cannot fetch external URLs when running from a local file. ' +
@@ -852,91 +917,66 @@ async function fetchJSONWithFallbacks(url) {
     );
   }
 
-  const encodedUrl = encodeURIComponent(url);
-
-  const isSameOrigin = (() => {
-    try {
-      const target = new URL(url);
-      if (target.origin === window.location.origin) return true;
-      if (target.hostname === window.location.hostname) return true;
-      const spSite = typeof getSpSiteUrl === 'function' && getSpSiteUrl();
-      if (spSite) {
-        if (url.startsWith(spSite)) return true;
-        try { if (new URL(spSite).origin === target.origin) return true; } catch(_) {}
-      }
-    } catch (e) {}
-    return false;
-  })();
-
-  const strategies = [
-    { name: 'CORS',        fn: () => fetchWithTimeout(url, { mode: 'cors' }, FETCH_TIMEOUT_MS) },
-    { name: 'Credentials', fn: () => fetchWithTimeout(url, { mode: 'cors', credentials: 'include' }, FETCH_TIMEOUT_MS) },
-    ...(!isSameOrigin ? [
-      { name: 'JSONP',       fn: () => tryJSONP(url) },
-      { name: 'CORSProxy.io',fn: () => fetchWithTimeout(`https://corsproxy.io/?url=${encodedUrl}`, { mode: 'cors' }, PROXY_TIMEOUT_MS) },
-      { name: 'AllOrigins',  fn: () => fetchWithTimeout(`https://api.allorigins.win/raw?url=${encodedUrl}`, { mode: 'cors' }, PROXY_TIMEOUT_MS) },
-      { name: 'Thingproxy',  fn: () => fetchWithTimeout(`https://thingproxy.freeboard.io/fetch/${url}`, { mode: 'cors' }, PROXY_TIMEOUT_MS) },
-    ] : []),
-  ];
-
   const errors = {};
-  for (const s of strategies) {
+  const directAttempts = [
+    { name: 'CORS',        fn: () => fetchWithTimeout(url, { mode: 'cors' }, FETCH_TIMEOUT_MS, returnText) },
+    { name: 'Credentials', fn: () => fetchWithTimeout(url, { mode: 'cors', credentials: 'include' }, FETCH_TIMEOUT_MS, returnText) },
+  ];
+  for (const attempt of directAttempts) {
     try {
-      const result = await s.fn();
-      return result;
+      return await attempt.fn();
     } catch (err) {
-      errors[s.name] = err.message;
+      errors[attempt.name] = err.message;
+      console.warn('[fetchWithFallbacks] ' + attempt.name + ' failed:', err.message);
+    }
+  }
+
+  const cannotOpen = new Error(
+    'DataLaVista could not open ' + url + '. Check that the address is right. ' +
+    'The website that hosts the file must allow other sites to read it, or the file must be on the same site as this page.'
+  );
+  if (_isSameSiteUrl(url)) throw cannotOpen;
+
+  let target;
+  try { target = new URL(url); } catch (e) { throw cannotOpen; }
+  if (target.search !== '' || target.username || target.password) {
+    throw new Error(
+      'DataLaVista could not open ' + url + ' directly, and it will not send an address that has extra parameters ' +
+      'after a question mark, or sign-in details, to a relay service. Check the address, or ask the website that ' +
+      'hosts the file to allow other sites to read it.'
+    );
+  }
+  if (!(await _mayUseRelay(url))) {
+    throw new Error('DataLaVista did not open ' + url + ' because you chose not to use a relay service. Reload the page to be asked again.');
+  }
+
+  for (const relay of RELAY_SERVICES) {
+    try {
+      return await fetchWithTimeout(relay.buildUrl(url), { mode: 'cors' }, PROXY_TIMEOUT_MS, returnText);
+    } catch (err) {
+      errors[relay.name] = err.message;
+      console.warn('[fetchWithFallbacks] ' + relay.name + ' failed:', err.message);
     }
   }
 
   const summary = Object.entries(errors).map(([k, v]) => `  [${k}] ${v}`).join('\n');
-  throw new Error('Unable to fetch file. Check the URL and try again.');
+  console.warn('[fetchWithFallbacks] All attempts failed:', summary);
+  throw cannotOpen;
 }
 
-// Fetch raw CSV text from a URL trying multiple strategies.
-// Skips external proxies for same-host, same-origin, and SharePoint tenant URLs (privacy).
-async function fetchCSVWithFallbacks(url) {
-  const encodedUrl = encodeURIComponent(url);
-
-  const isSameOrigin = (() => {
-    try {
-      const target = new URL(url);
-      if (target.origin === window.location.origin) return true;
-      if (target.hostname === window.location.hostname) return true;
-      const spSite = typeof getSpSiteUrl === 'function' && getSpSiteUrl();
-      if (spSite) {
-        if (url.startsWith(spSite)) return true;
-        try { if (new URL(spSite).origin === target.origin) return true; } catch(_) {}
-      }
-    } catch (e) {}
-    return false;
-  })();
-
-  const strategies = [
-    { name: 'CORS',        fn: () => fetchWithTimeout(url, { mode: 'cors' }, FETCH_TIMEOUT_MS, true) },
-    { name: 'Credentials', fn: () => fetchWithTimeout(url, { mode: 'cors', credentials: 'include' }, FETCH_TIMEOUT_MS, true) },
-    ...(!isSameOrigin ? [
-      { name: 'CORSProxy.io', fn: () => fetchWithTimeout(`https://corsproxy.io/?url=${encodedUrl}`, { mode: 'cors' }, PROXY_TIMEOUT_MS, true) },
-      { name: 'AllOrigins',   fn: () => fetchWithTimeout(`https://api.allorigins.win/raw?url=${encodedUrl}`, { mode: 'cors' }, PROXY_TIMEOUT_MS, true) },
-      { name: 'Thingproxy',   fn: () => fetchWithTimeout(`https://thingproxy.freeboard.io/fetch/${url}`, { mode: 'cors' }, PROXY_TIMEOUT_MS, true) },
-    ] : []),
-  ];
-
-  const errors = {};
-  for (const s of strategies) {
-    try {
-      const text = await s.fn();
-      return text;
-    } catch (err) {
-      errors[s.name] = err.message;
-      console.warn(`[fetchCSVWithFallbacks] ${s.name} failed:`, err.message);
-    }
-  }
-
-  const summary = Object.entries(errors).map(([k, v]) => `  [${k}] ${v}`).join('\n');
-  console.warn('[fetchCSVWithFallbacks] All strategies failed:', summary);
-  throw new Error('Unable to fetch file. Check the URL and try again.');
+// Fetch JSON from a URL.
+function fetchJSONWithFallbacks(url) {
+  return fetchWithFallbacks(url, false);
 }
+
+// Fetch raw CSV text from a URL.
+function fetchCSVWithFallbacks(url) {
+  return fetchWithFallbacks(url, true);
+}
+
+// ============================================================
+// DATA SOURCE LOADER
+// ============================================================
 
 // Load JSON from URL with multiple strategies and robust error handling
 async function loadJSONSource(url, dsName) {

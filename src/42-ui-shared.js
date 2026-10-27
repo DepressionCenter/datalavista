@@ -3,7 +3,7 @@ This file is part of DataLaVista™
 42-ui-shared.js: Shared UI rendering helpers for condition rows, sort rows, and aggregate popups.
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 Created: 2026-04-07
-Last Modified: 2026-04-09
+Last Modified: 2026-10-26
 Summary: Centralizes renderConditionRows, renderSortRows, and showAggPopup so that all callers
          (basic QB, advanced QB, widget properties panel, series advanced properties modal)
          use identical rendering logic and pick up the same operators / date macros.
@@ -33,6 +33,44 @@ function _attrEnc(s) {
     .replace(/'/g, '&#39;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
+}
+
+// ============================================================
+// STYLE VALUE CHECKS
+// Widget colors and sizes can come from a shared dashboard file and end up
+// inside a style attribute, so each one is checked before it is used.
+// ============================================================
+
+/**
+ * Return a CSS color only when it has one of the plain forms a color input or a
+ * person would produce: a hex color, a color name, or an rgb/rgba/hsl/hsla call.
+ * Anything else, such as a value with quotes or semicolons, becomes the fallback.
+ * An empty value stays empty, because some properties use empty to mean unset.
+ * @param {any} value
+ * @param {string} fallback
+ * @returns {string}
+ */
+function _safeCssColor(value, fallback) {
+  if (value == null || value === '') return '';
+  const text = String(value).trim();
+  const isHex   = /^#[0-9a-f]{3,8}$/i.test(text);
+  const isName  = /^[a-z]{3,30}$/i.test(text);
+  const isFunc  = /^(rgb|rgba|hsl|hsla)\(\s*[0-9.%,\s/]+\)$/i.test(text);
+  return (isHex || isName || isFunc) ? text : fallback;
+}
+
+/**
+ * Return a number only when it is finite and within [min, max]; otherwise the fallback.
+ * @param {any} value
+ * @param {number} min
+ * @param {number} max
+ * @param {number} fallback
+ * @returns {number}
+ */
+function _safeCssNumber(value, min, max, fallback) {
+  const n = typeof value === 'number' ? value : parseFloat(value);
+  if (!Number.isFinite(n) || n < min || n > max) return fallback;
+  return n;
 }
 
 // ============================================================

@@ -3,7 +3,7 @@ This file is part of DataLaVista™
 02-cdn-deps.js: CDN dependency list for async loading.
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 Created: 2026-05-20
-Last Modified: 2026-05-20
+Last Modified: 2026-10-26
 Summary: Defines _DLV_CDN_DEPS, the two-group array of CDN scripts loaded
          dynamically by _dlvLoadCdnDeps() at startup (minimal shell mode only).
          Group 0: init() awaits these before proceeding (core deps with SRI).
@@ -30,7 +30,7 @@ var _DLV_CDN_DEPS = [
   [
     {src: 'https://cdn.jsdelivr.net/npm/alasql@4.17.2/dist/alasql.min.js', integrity: 'sha256-cSUWm7ESD8Wh7fMFQMkVwlbYugKkhpH1q6bPGIZy9bg=', crossorigin: 'anonymous'},
     {src: 'https://cdn.jsdelivr.net/npm/echarts@6.0.0/dist/echarts.min.js', integrity: 'sha256-uqjf5+HZM2uY6Jhrp+IOoV582+oe9CpZ1ZR4Yy+kWh0=', crossorigin: 'anonymous'},
-    {src: 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js', integrity: 'sha256-yVBhl8r4CaB1tt7h2g02+xnacVj/6KiOewyWxdhiPJk=', crossorigin: 'anonymous'},
+    {src: 'https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js', integrity: 'sha256-zAFRMKqFIefwiPiImOupSczcv7ON8L0Sm0S3Jzw6b0E=', crossorigin: 'anonymous'},
     {src: 'https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js'},
     {src: 'https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/sql/sql.min.js'},
     {src: 'https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/hint/show-hint.min.js'},

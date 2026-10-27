@@ -3,7 +3,7 @@ This file is part of DataLaVista™
 10-constants.js: Constants, state object, and core DataLaVista objects.
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 Created: 2026-03-24
-Last Modified: 2026-04-05
+Last Modified: 2026-10-26
 Summary: Constants, state object, and core DataLaVista objects.
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
@@ -338,7 +338,7 @@ function isEChartsWidget(type) {
 /* ===== STATE ===== */
 //const dlvRawState = {
 const DataLaVistaState = {
-  dataSources: {},   // dsName -> { type, url, auth, token, fileName, alias, tables: [internalTableKeys] },											  
+  dataSources: {},   // dsName -> { type, url, auth, token (memory only, never saved to a dashboard), fileName, alias, tables: [internalTableKeys] },
   tables: {},        // internalName -> { displayName, alias, fields: [], data: [], loaded: false }
   queryMode: 'advanced',
   basicQB: { // Basic Query Builder

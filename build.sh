@@ -4,7 +4,7 @@
 #  build.sh: DataLaVista™ build script (Linux / macOS / GitHub Actions).
 #  Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 #  Created: 2026-03-24
-#  Last Modified: 2026-04-27
+#  Last Modified: 2026-10-26
 #  Summary: Generates datalavista.js, DataLaVista.html, DataLaVista-nojs.html.
 #  Notes: See README file for documentation and full license information.
 #  Website: https://github.com/DepressionCenter/datalavista
@@ -75,7 +75,7 @@ prepend_html_license() {
   local output="$1"
   local tmp
   tmp=$(mktemp)
-  { printf '<!--\n'; printf '%s\n' "$LICENSE_TEXT"; printf '-->\n'; cat "$output"; } > "$tmp"
+  { printf '<!--\n'; printf '%s\n' "$LICENSE_TEXT"; printf '%s\n' '-->'; cat "$output"; } > "$tmp"
   mv "$tmp" "$output"
 }
 
@@ -170,6 +170,8 @@ echo "Building DataLaVista.html (inline)..."
   printf '<!DOCTYPE html>\n'
   printf '%s\n' "$DLV_HEAD_SECTION"
   printf '<body>\n  <div id="dlv-root"></div>\n  <script>\n'
+  echo "$DLV_SHELL_VAR"
+  echo "$DLV_HEAD_CSS_VAR"
   cat /tmp/dlv_js_minified.js
   printf '  </script>\n</body>\n</html>\n'
 } > DataLaVista.html
@@ -177,5 +179,16 @@ prepend_html_license DataLaVista.html
 echo "  -> DataLaVista.html"
 
 rm -f /tmp/dlv_clean_template.html /tmp/dlv_js_body.js /tmp/dlv_js_minified.js
+
+# ── 4. Check the outputs that run the application ─────────────────────────────
+# Without these values the application cannot draw its interface inside dlv-root.
+for output in datalavista.js DataLaVista.html; do
+  for definition in _DLV_SHELL_HTML _DLV_HEAD_CSS; do
+    if ! grep -q "var $definition = " "$output"; then
+      echo "Build failed: $output is missing $definition, so the page would show nothing." >&2
+      exit 1
+    fi
+  done
+done
 echo ""
 echo "Build completed at $(date '+%Y-%m-%d %I:%M:%S %p')."
