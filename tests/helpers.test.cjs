@@ -3,8 +3,8 @@ This file is part of DataLaVista™
 helpers.test.cjs: Unit tests for parsing and safety helpers.
 Author(s): Gabriel Mongefranco.
 Created: 2026-10-27
-Last Modified: 2026-10-27
-Summary: Checks CSV parsing, name conversion, escaping, style values, and trusted SharePoint addresses.
+Last Modified: 2026-10-28
+Summary: Checks parsing, safety helpers, trusted SharePoint addresses, and clipboard handling.
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
 
@@ -70,4 +70,51 @@ test('isTrustedSharePointSite accepts only https SharePoint hosts', () => {
     'https://example.org/sharepoint.com',
     'not an address',
   ].map(u => isTrusted(u)), [true, false, false, false, false]);
+});
+
+test('clipboard success is reported only after the browser finishes copying', async () => {
+  let completeWrite;
+  const notifications = [];
+  const dialogs = [];
+  const pendingWrite = new Promise(resolve => { completeWrite = resolve; });
+  const get = loadSource({
+    navigator: { clipboard: { writeText: text => {
+      assert.equal(text, 'Example report');
+      return pendingWrite;
+    } } },
+    recordToast: (message, type) => notifications.push({ message, type }),
+    recordDialog: options => dialogs.push(options),
+  });
+  get('toast = (message, type) => recordToast(message, type)');
+  get('dlvAskDialog = async options => recordDialog(options)');
+  const result = get('copyTextWithFallback')('Example report', 'Copied');
+  assert.equal(notifications.length, 0);
+  completeWrite();
+  assert.equal(await result, true);
+  assert.deepEqual(notifications, [{ message: 'Copied', type: 'success' }]);
+  assert.equal(dialogs.length, 0);
+});
+
+test('clipboard failures offer the original text for manual copying', async () => {
+  const unsafeText = '<img src=x onerror="alert(1)">\nExample report';
+  for (const navigator of [
+    {},
+    { clipboard: { writeText: () => Promise.reject(new Error('Permission denied')) } },
+    { clipboard: { writeText: () => { throw new Error('Blocked'); } } },
+  ]) {
+    const notifications = [];
+    const dialogs = [];
+    const get = loadSource({
+      navigator,
+      recordToast: (message, type) => notifications.push({ message, type }),
+      recordDialog: options => dialogs.push(options),
+    });
+    get('toast = (message, type) => recordToast(message, type)');
+    get('dlvAskDialog = async options => recordDialog(options)');
+    assert.equal(await get('copyTextWithFallback')(unsafeText, 'Copied'), false);
+    assert.equal(notifications.length, 0);
+    assert.equal(dialogs.length, 1);
+    assert.equal(dialogs[0].title, 'Copy text manually');
+    assert.equal(dialogs[0].sections[1].copyText.value, unsafeText);
+  }
 });

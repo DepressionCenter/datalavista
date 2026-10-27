@@ -3,7 +3,7 @@ This file is part of DataLaVista™
 60-design.js: Design canvas, widget rendering, data transforms, and widget properties.
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 Created: 2026-03-24
-Last Modified: 2026-10-26
+Last Modified: 2026-10-28
 Summary: Design canvas, widget rendering, data transforms, and widget properties.
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
@@ -2298,7 +2298,7 @@ function _renderBarLineOptionsHTML(w, wid) {
         dlvTooltip.update(btn, html, { html: true, maxWidth: '500px', placement: 'top', delay: 0 });
         // Force immediate show
         btn.dispatchEvent(new MouseEvent('mouseenter'));
-        try { navigator.clipboard.writeText(formatted).then(() => toast('Widget SQL code copied to clipboard', 'success')); } catch(err) { }
+        copyTextWithFallback(formatted, 'Widget SQL code copied to clipboard');
       }
 
       // ── Per-widget conditions ────────────────────────────────────────────
