@@ -3,8 +3,8 @@ This file is part of DataLaVista™
 docs/repository-maintenance.md
 Author(s): Gabriel Mongefranco.
 Created: 2026-10-25
-Last Modified: 2026-10-26
-Summary: Explains the application build, shared instructions, citation metadata, and previews.
+Last Modified: 2026-10-27
+Summary: Explains the application build, automated tests, shared instructions, citation metadata, and previews.
 Notes: See README file for documentation and full license information.
 
 Copyright © 2026 The Regents of the University of Michigan
@@ -19,9 +19,9 @@ See <https://www.gnu.org/licenses/fdl-1.3.html>. See README for full license inf
 
 [Back to project README](../README.md)
 
-This guide helps maintainers find the application source and build its browser
-files. It also explains the shared repository instructions, citation metadata,
-and preview images.
+This guide helps maintainers find the application source, build its browser
+files, and run the automated tests. It also explains the shared repository
+instructions, citation metadata, and preview images.
 
 ### Application files and builds
 
@@ -47,6 +47,43 @@ dispatch. It commits generated outputs when the build changes them.
 
 Documentation and metadata changes do not need a rebuild. Confirm that the source,
 stylesheet, build workflow, and generated browser files remain unchanged.
+
+### Automated tests
+
+The Tests workflow in `.github/workflows/tests.yml` runs on every pull request,
+on pushes to `main`, and on manual dispatch. It has two parts:
+
+- **Repository checks and unit tests.** `tests/check-repository.sh` checks that
+  every JSON file is valid and that every source file in `src/` has its license
+  header. On a pull request, it also rejects trailing spaces and changes to the
+  three generated outputs. Then Node.js runs any `tests/*.test.cjs` or
+  `tests/*.test.js` files with its built-in test runner.
+- **Build and browser tests.** The workflow runs `build.sh`, checks the built
+  script for syntax errors, and opens both pages in Chromium with
+  [Playwright](https://playwright.dev/). The tests in `tests/browser/` load
+  synthetic CSV, JSON, and Excel files, run queries, check the safety helpers,
+  and scan the Connect popup's tab list with axe-core.
+
+The build itself still needs only Bash, Python 3, and esbuild. Node.js is needed
+only to run the tests. To run them on your computer, build first, then run these
+commands from the repository root:
+
+```sh
+bash tests/check-repository.sh main
+cd tests
+npm ci
+npx playwright install chromium
+npx playwright test
+```
+
+On Windows, set `PYTHON=python` before both test commands if your computer has
+no `python3` command. The browser tests load their libraries from the public
+CDNs, so they need an internet connection. When a browser test fails in GitHub,
+download the `playwright-report` file from the workflow run to see what happened.
+
+`tests/package-lock.json` records the exact versions of the test tools that the
+workflow installs. To move to newer versions, run `npm update` in `tests/`, run
+the tests, and commit the updated `package-lock.json`.
 
 ### Shared instructions and documentation
 
@@ -95,6 +132,7 @@ maintenance. Review generated outputs only when a source change requires a build
 ### Additional resources
 
 - [Project instructions](../AGENTS.md)
+- [Playwright documentation](https://playwright.dev/)
 - [Project preferences](../skills/project-preferences/SKILL.md)
 - [Skills index](../SKILLS.md)
 - [Documentation index](README.md)

@@ -1,0 +1,113 @@
+# ============================================================
+#  This file is part of DataLaVista™
+#  tests.yml: GitHub Actions workflow - runs the automated tests.
+#  Author(s): Gabriel Mongefranco.
+#  Created: 2026-10-27
+#  Last Modified: 2026-10-27
+#  Summary: Runs repository checks, unit tests, and browser tests on pull requests and pushes to main.
+#  Notes: See README file for documentation and full license information.
+#  Website: https://github.com/DepressionCenter/datalavista
+#
+#  Copyright © 2026 The Regents of the University of Michigan
+#
+#  This program is free software: you can redistribute it and/or modify
+#  it under the terms of the GNU General Public License as published by
+#  the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+#  This program is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+#  GNU General Public License for more details.
+#  You should have received a copy of the GNU General Public License along
+#  with this program. If not, see <https://www.gnu.org/licenses/>.
+#  ================================================================
+
+name: Tests
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A newer push to the same branch makes the older run pointless
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: Repository checks and unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          # The full history lets the checks compare a pull request with its target branch
+          fetch-depth: 0
+
+      - name: Repository checks
+        run: bash tests/check-repository.sh "${{ github.event.pull_request.base.sha }}"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: lts/*
+
+      - name: Unit tests
+        run: |
+          shopt -s nullglob
+          files=(tests/*.test.cjs tests/*.test.js)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "No unit test files found in tests/."
+            exit 0
+          fi
+          node --test "${files[@]}"
+
+  browser:
+    name: Build and browser tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Cache esbuild
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/datalavista-build
+          key: esbuild-0.28.0-linux-x64
+
+      - name: Build
+        run: bash build.sh
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: lts/*
+          cache: npm
+          cache-dependency-path: tests/package-lock.json
+
+      - name: Check the built script for syntax errors
+        run: node --check datalavista.js
+
+      - name: Install test tools
+        working-directory: tests
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Browser tests
+        working-directory: tests
+        run: npx playwright test
+
+      - name: Save the test report
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report
+          path: |
+            tests/playwright-report/
+            tests/test-results/
+          retention-days: 14
