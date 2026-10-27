@@ -3,7 +3,7 @@ This file is part of DataLaVista™
 README.md
 Author(s): Gabriel Mongefranco, Jeremy Gluskin, Shelley Boa.
 Created: 2026-03-10
-Last Modified: 2026-10-26
+Last Modified: 2026-10-27
 Summary: DataLaVista is a ightweight, client-side reporting and dashboard toolkit.
 Notes: See README file for documentation and full license information.
 
@@ -132,6 +132,7 @@ If you need assistance identifying a contact person, email the EFDC's Mobile Tec
 + [Automators Anonumous™](https://github.com/DepressionCenter/AutomatorsAnonymous) community of practice.
 + [Danny Ward (@dannyward630)](https://github.com/dannyward630)
 + [Sukhdeep Singh (@Sukhdeep-Singh-Panesar)](https://github.com/Sukhdeep-Singh-Panesar)
++ [@NehonaYa](https://github.com/NehonaYa)
 
 
 #### This work is based in part on the following projects, libraries and/or studies:

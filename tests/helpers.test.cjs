@@ -3,7 +3,7 @@ This file is part of DataLaVista™
 helpers.test.cjs: Unit tests for parsing and safety helpers.
 Author(s): Gabriel Mongefranco.
 Created: 2026-10-27
-Last Modified: 2026-10-28
+Last Modified: 2026-10-27
 Summary: Checks parsing, safety helpers, trusted SharePoint addresses, and clipboard handling.
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
@@ -116,5 +116,6 @@ test('clipboard failures offer the original text for manual copying', async () =
     assert.equal(dialogs.length, 1);
     assert.equal(dialogs[0].title, 'Copy text manually');
     assert.equal(dialogs[0].sections[1].copyText.value, unsafeText);
+    assert.equal(dialogs[0].hideCancel, true);
   }
 });

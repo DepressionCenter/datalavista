@@ -3,7 +3,7 @@ This file is part of DataLaVista™
 42-ui-utils.js: Resizable panels, tab switching, utility functions, and SharePoint file picker.
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 Created: 2026-03-24
-Last Modified: 2026-10-28
+Last Modified: 2026-10-27
 Summary: Resizable panels, tab switching, utility functions, and SharePoint file picker.
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
@@ -210,11 +210,11 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           await dlvAskDialog({
             title: 'Copy text manually',
             sections: [
-              { text: 'The text could not be copied. Select the text below, then copy it using your device.' },
+              { text: "Your browser didn't allow copying. The text below is selected, so press Ctrl+C to copy it (Cmd+C on a Mac)." },
               { copyText: { label: 'Text to copy', value: text } }
             ],
             okLabel: 'Done',
-            cancelLabel: 'Close'
+            hideCancel: true
           });
           return false;
         }
@@ -243,6 +243,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
        *        { note: string }                      a smaller muted sentence.
        * @param {string} [options.okLabel]      Label of the confirming button. Defaults to "OK".
        * @param {string} [options.cancelLabel]  Label of the declining button. Defaults to "Cancel".
+       * @param {boolean} [options.hideCancel]  Hides the declining button when there is nothing to decline.
        * @returns {Promise<{confirmed: boolean, value: string}>}
        *          confirmed is true only when the confirming button was used. Closing the popup,
        *          clicking outside it, or pressing Escape counts as declining.
@@ -319,6 +320,9 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           }
           okBtn.textContent = options.okLabel || 'OK';
           cancelBtn.textContent = options.cancelLabel || 'Cancel';
+          // Disabled as well as hidden so the focus loop below skips it
+          cancelBtn.style.display = options.hideCancel ? 'none' : '';
+          cancelBtn.disabled = !!options.hideCancel;
 
           const previouslyFocused = /** @type {HTMLElement|null} */ (document.activeElement);
           const finish = (confirmed) => {
