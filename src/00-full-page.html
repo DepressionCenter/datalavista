@@ -404,9 +404,12 @@ with this program. If not, see https://www.gnu.org/licenses/.
 
     .source-tab {
       padding: 6px 14px;
+      font-family: inherit;
       font-size: 12px;
       font-weight: 500;
       color: var(--text-secondary);
+      background: none;
+      border: none;
       border-bottom: 2px solid transparent;
       cursor: pointer;
       transition: all var(--transition);
@@ -414,6 +417,11 @@ with this program. If not, see https://www.gnu.org/licenses/.
 
     .source-tab:hover {
       color: var(--text);
+    }
+
+    .source-tab:focus-visible {
+      outline: 2px solid var(--primary);
+      outline-offset: 2px;
     }
 
     .source-tab.active {
@@ -3266,17 +3274,17 @@ with this program. If not, see https://www.gnu.org/licenses/.
           <button class="btn btn-ghost btn-icon" id="popup-close-btn" title="Close">✕</button>
         </div>
         <div class="popup-body">
-          <div class="source-tabs">
-            <div class="source-tab-sp-wrapper" id="tab-sharepoint-wrapper">
-              <div class="source-tab" id="tab-sharepoint" data-src="sharepoint">SharePoint Lists</div>
+          <div class="source-tabs" id="source-tablist" role="tablist" aria-label="Data source type">
+            <div class="source-tab-sp-wrapper" id="tab-sharepoint-wrapper" role="presentation">
+              <button type="button" class="source-tab active" id="tab-sharepoint" data-src="sharepoint" role="tab" aria-selected="true" aria-controls="src-sharepoint" tabindex="0">SharePoint Lists</button>
             </div>
-            <div class="source-tab" id="tab-upload" data-src="upload">Upload Files</div>
-            <div class="source-tab" id="tab-remote" data-src="remote">Remote Files</div>
-            <div class="source-tab" id="tab-loadconfig" data-src="loadconfig">Open Dashboard</div>
+            <button type="button" class="source-tab" id="tab-upload" data-src="upload" role="tab" aria-selected="false" aria-controls="src-upload" tabindex="-1">Upload Files</button>
+            <button type="button" class="source-tab" id="tab-remote" data-src="remote" role="tab" aria-selected="false" aria-controls="src-remote" tabindex="-1">Remote Files</button>
+            <button type="button" class="source-tab" id="tab-loadconfig" data-src="loadconfig" role="tab" aria-selected="false" aria-controls="src-loadconfig" tabindex="-1">Open Dashboard</button>
           </div>
 
           <!-- SharePoint Lists -->
-          <div class="source-pane active" id="src-sharepoint">
+          <div class="source-pane active" id="src-sharepoint" role="tabpanel" aria-labelledby="tab-sharepoint">
             <div class="form-group">
               <label>SharePoint Site URL</label>
               <input type="text" class="form-input" id="sp-url"
@@ -3301,7 +3309,7 @@ with this program. If not, see https://www.gnu.org/licenses/.
           </div>
 
           <!-- Upload Files -->
-          <div class="source-pane" id="src-upload">
+          <div class="source-pane" id="src-upload" role="tabpanel" aria-labelledby="tab-upload">
             <div class="form-group">
               <label>Select files to upload</label>
               <div class="dlv-dropzone" id="upload-dropzone"
@@ -3324,7 +3332,7 @@ with this program. If not, see https://www.gnu.org/licenses/.
           </div>
 
           <!-- Remote Files -->
-          <div class="source-pane" id="src-remote">
+          <div class="source-pane" id="src-remote" role="tabpanel" aria-labelledby="tab-remote">
             <div class="form-group">
               <label>Remote file URL</label>
               <div style="display:flex;gap:6px;align-items:center">
@@ -3349,7 +3357,7 @@ with this program. If not, see https://www.gnu.org/licenses/.
           </div>
 
           <!-- Open Dashboard -->
-          <div class="source-pane" id="src-loadconfig">
+          <div class="source-pane" id="src-loadconfig" role="tabpanel" aria-labelledby="tab-loadconfig">
             <div class="form-group">
               <label>Dashboard URL (SharePoint library or direct link)</label>
               <div style="display:flex;gap:6px;align-items:center">

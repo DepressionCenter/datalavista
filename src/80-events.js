@@ -3,7 +3,7 @@ This file is part of DataLaVista™
 80-events.js: DOM event bindings for all interactive elements.
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 Created: 2026-04-28
-Last Modified: 2026-04-28
+Last Modified: 2026-10-26
 Summary: Wires all onclick, ondrop, ondragover, oninput, onblur, and
          onchange handlers that were previously inline in the HTML.
 Notes: See README file for documentation and full license information.
@@ -159,6 +159,7 @@ function attachEvents() {
   on('tab-upload',     'click', function () { switchSourceTab(this, 'upload'); });
   on('tab-remote',     'click', function () { switchSourceTab(this, 'remote'); });
   on('tab-loadconfig', 'click', function () { switchSourceTab(this, 'loadconfig'); });
+  on('source-tablist', 'keydown', function (e) { handleSourceTabKeydown(e); });
 
   // Upload dropzone drag-and-drop
   var uploadDropzone = document.getElementById('upload-dropzone');

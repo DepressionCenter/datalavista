@@ -3,7 +3,7 @@ This file is part of DataLaVista™
 README.md
 Author(s): Gabriel Mongefranco, Jeremy Gluskin, Shelley Boa.
 Created: 2026-03-10
-Last Modified: 2026-04-06
+Last Modified: 2026-10-26
 Summary: DataLaVista is a ightweight, client-side reporting and dashboard toolkit.
 Notes: See README file for documentation and full license information.
 
@@ -66,7 +66,7 @@ Most enterprise data is trapped behind bloated frameworks or expensive BI tools.
 + Go to your site's home page and create a new page using the Modern Script Editor template. Use "DataLaVista" for the page title.
 + In the "Modern Script Editor" webpart, click "Markup" then click the "{ }" button to open the code editor.
 + Copy and the paste the code from [DataLaVista.html](DataLaVista.html) into the script editor.
-  - Note: If your SharePoint tenant has CSP restrictions that block inline JavaScript, use DataLaVista-nojs.html instead. Update the script tag near the bottom of the file (before </body>) to point to htttp://you-tenant.sharepoint.com/sites/your-site/SiteAssets/datalavista.js, then upload datalavista.js to your site's /SiteAssets directory.
+  - Note: If your SharePoint tenant has CSP restrictions that block inline JavaScript, use DataLaVista-nojs.html instead. Update the script tag near the bottom of the file (before </body>) to point to https://your-tenant.sharepoint.com/sites/your-site/SiteAssets/datalavista.js, then upload datalavista.js to your site's /SiteAssets directory.
 + Save, and refresh the page.
 <p>
 <a href="https://code.depressioncenter.org/datalavista/presentations/sharepoint-installation-1.mp4" target="_blank" title="Click to open full video with SharePoint installation instructions"><img src="images/sharepoint-installation-1.gif" alt="Click to open full video with SharePoint installation instructions" style="width: 600px; height: auto" /></a>

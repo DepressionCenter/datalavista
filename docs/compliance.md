@@ -47,6 +47,7 @@ reads the data you connect to and keeps it in memory while the tab is open.
 | Token asked only for a trusted site | `ensureSharePointToken` in `src/25-data-sources.js` | The popup that asks for a token appears only for a site that passes the check above. It shows the site address. The token stays in memory for the page load. |
 | Remote files are never run as script | `fetchWithFallbacks` in `src/25-data-sources.js` | Files are downloaded with `fetch` and parsed as JSON or text. The application has no JSONP step, no `eval`, and no `new Function`. |
 | Relay services only after approval | `_mayUseRelay` in `src/25-data-sources.js` | After both direct downloads fail, a popup names the three relay services and explains what they see. The answer is kept per destination host for the page load, in a variable outside the saved state. An address with a query string or sign-in details is never sent to a relay. |
+| Excel files are read with a fixed parser | `_DLV_CDN_DEPS` in `src/02-cdn-deps.js`, `loadExcelFile` in `src/26-cyberdyne-pipeline.js` | Excel files are read with SheetJS 0.20.3 from the SheetJS website. That release fixes CVE-2023-30533 and CVE-2024-22363. The page checks the file against a fixed hash, so the browser refuses a changed copy. |
 | Remote addresses are checked | `validateURL` in `src/25-data-sources.js` | Only `http` and `https` addresses are allowed. Addresses that point at private network ranges or the local machine are refused. |
 | Text widget HTML is cleaned | `sanitizeHTML` and `renderTextWidgetHTML` in `src/60-design.js` | Formatting tags, inline styles, links to web, mail, and phone addresses, and images from web addresses are kept. Scripts, event handlers, `style` elements, and `id` attributes are removed. An inline style that uses `expression`, `behavior`, `-moz-binding`, `javascript:`, or fixed positioning is removed. The same cleaner runs in the designer, the preview, and the live edit path. |
 | Widget colors and sizes are checked | `loadConfig` in `src/30-config.js`, `_safeCssColor` and `_safeCssNumber` in `src/42-ui-shared.js` | Every color and size read from a dashboard file must have a plain form, such as `#0078d4`, `red`, or `rgb(0, 120, 212)`. Anything else is reset to the default. The designer and preview check the values again where they build a style attribute. |
@@ -74,6 +75,11 @@ The target is WCAG 2.2 AA. The code today provides this evidence:
 - The question popup is marked as a dialog and is labeled by its title. It keeps
   keyboard focus inside while open, closes on Escape, and returns focus to where
   it was.
+- The four tabs at the top of the Connect to Data Source popup are a tab list.
+  Press Tab to reach the selected tab, use the arrow keys, Home, or End to move
+  between the available tabs, and press Enter or Space to open one. A screen
+  reader announces which tab is selected. Outside SharePoint, the SharePoint
+  Lists tab is announced as unavailable and can't be opened.
 - Status messages appear in a polite live region, so a screen reader announces
   them without interrupting.
 - No automated accessibility scan has been recorded for the application yet.
@@ -88,7 +94,10 @@ The target is WCAG 2.2 AA. The code today provides this evidence:
 - The repository has no automated test suite. The controls above were checked by
   hand in a headless browser when they were added.
 - The page sets no Content Security Policy of its own. When the page runs in a
-  SharePoint tenant, the tenant's policy applies.
+  SharePoint tenant, the tenant's policy applies. The page loads its libraries
+  from cdn.jsdelivr.net, cdnjs.cloudflare.com, and cdn.sheetjs.com. If your
+  tenant limits which sites can supply scripts, ask your SharePoint admin to
+  allow all three.
 
 ### Conclusion
 

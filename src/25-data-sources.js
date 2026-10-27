@@ -97,12 +97,14 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       if (spTab) {
         if (!DataLaVistaState.isSpSite) {
           spTab.classList.add('disabled');
+          spTab.setAttribute('aria-disabled', 'true');
           if (spWrapper) dlvTooltip.attach(spWrapper, 'Only available when running inside SharePoint', { placement: 'top', delay: 200 });
           // Activate Remote Files tab instead
           const remoteTab = document.querySelector('.source-tab[data-src="remote"]');
           if (remoteTab) switchSourceTab(remoteTab, 'remote');
         } else {
           spTab.classList.remove('disabled');
+          spTab.removeAttribute('aria-disabled');
           if (spWrapper) dlvTooltip.detach(spWrapper);
         }
       }
@@ -133,11 +135,33 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 
     function switchSourceTab(el, src) {
       if (el.classList.contains('disabled')) return;
-      document.querySelectorAll('.source-tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.source-tab').forEach(t => {
+        t.classList.remove('active');
+        t.setAttribute('aria-selected', 'false');
+        t.setAttribute('tabindex', '-1');
+      });
       document.querySelectorAll('.source-pane').forEach(p => p.classList.remove('active'));
       el.classList.add('active');
+      el.setAttribute('aria-selected', 'true');
+      el.setAttribute('tabindex', '0');
       document.getElementById('src-' + src)?.classList.add('active');
       if (src === 'upload' || src === 'remote') spPickerCheckVisibility();
+    }
+
+    /* Arrow keys, Home, and End move focus between the available source tabs.
+       Enter or Space then selects the focused tab through its click handler. */
+    function handleSourceTabKeydown(e) {
+      const tabs = Array.from(document.querySelectorAll('.source-tab:not(.disabled)'));
+      const current = tabs.indexOf(/** @type {HTMLElement} */ (e.target));
+      if (current === -1) return;
+      let next;
+      if (e.key === 'ArrowRight')     next = (current + 1) % tabs.length;
+      else if (e.key === 'ArrowLeft') next = (current - 1 + tabs.length) % tabs.length;
+      else if (e.key === 'Home')      next = 0;
+      else if (e.key === 'End')       next = tabs.length - 1;
+      else return;
+      e.preventDefault();
+      /** @type {HTMLElement} */ (tabs[next]).focus();
     }
     
 
