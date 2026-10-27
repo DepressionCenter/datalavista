@@ -3,7 +3,7 @@ This file is part of DataLaVista™
 42-ui-utils.js: Resizable panels, tab switching, utility functions, and SharePoint file picker.
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 Created: 2026-03-24
-Last Modified: 2026-10-26
+Last Modified: 2026-10-28
 Summary: Resizable panels, tab switching, utility functions, and SharePoint file picker.
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
@@ -194,6 +194,34 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         a.click();
       }
 
+      /**
+       * Copy text and show a selectable copy if the browser cannot write to the clipboard.
+       * @param {string} text Text to copy. It remains in the page while the popup is open.
+       * @param {string} successMessage Message shown after the clipboard write succeeds.
+       * @returns {Promise<boolean>} True if the browser copied the text.
+       */
+      async function copyTextWithFallback(text, successMessage) {
+        try {
+          if (!navigator.clipboard || typeof navigator.clipboard.writeText !== 'function') {
+            throw new Error('Clipboard unavailable');
+          }
+          await navigator.clipboard.writeText(text);
+        } catch (err) {
+          await dlvAskDialog({
+            title: 'Copy text manually',
+            sections: [
+              { text: 'The text could not be copied. Select the text below, then copy it using your device.' },
+              { copyText: { label: 'Text to copy', value: text } }
+            ],
+            okLabel: 'Done',
+            cancelLabel: 'Close'
+          });
+          return false;
+        }
+        toast(successMessage, 'success');
+        return true;
+      }
+
       // ============================================================
       // QUESTION DIALOG
       // Questions are shown one at a time so two answers cannot be mixed up.
@@ -211,6 +239,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
        *        { detail: string }                    one value on its own line in a fixed-width font, such as a web address;
        *        { list: string[] }                    a numbered list;
        *        { input: { label, type?, placeholder? } } one text box, whose value is returned with the answer;
+       *        { copyText: { label, value } }        a read-only text area for manual copying;
        *        { note: string }                      a smaller muted sentence.
        * @param {string} [options.okLabel]      Label of the confirming button. Defaults to "OK".
        * @param {string} [options.cancelLabel]  Label of the declining button. Defaults to "Cancel".
@@ -268,6 +297,19 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
               label.appendChild(labelText);
               label.appendChild(inputEl);
               body.appendChild(label);
+            } else if (section.copyText && !inputEl) {
+              const label = document.createElement('label');
+              label.style.cssText = 'display:flex;flex-direction:column;gap:4px';
+              const labelText = document.createElement('span');
+              labelText.textContent = section.copyText.label || '';
+              inputEl = document.createElement('textarea');
+              inputEl.className = 'form-input';
+              inputEl.readOnly = true;
+              inputEl.rows = 8;
+              inputEl.value = section.copyText.value;
+              label.appendChild(labelText);
+              label.appendChild(inputEl);
+              body.appendChild(label);
             } else if (typeof section.note === 'string') {
               const n = document.createElement('p');
               n.style.cssText = 'margin:0;font-size:12px;color:var(--text-secondary)';
@@ -285,7 +327,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
             okBtn.removeEventListener('click', onOk);
             cancelBtn.removeEventListener('click', onCancel);
             closeBtn.removeEventListener('click', onCancel);
-            const value = inputEl ? inputEl.value : '';
+            const value = inputEl && !inputEl.readOnly ? inputEl.value : '';
             if (inputEl) inputEl.value = '';
             overlay.style.display = 'none';
             if (previouslyFocused && typeof previouslyFocused.focus === 'function') previouslyFocused.focus();
@@ -297,9 +339,9 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           // Focus stays inside the popup so a keyboard user cannot land on the page behind it.
           const onKeyDown = (e) => {
             if (e.key === 'Escape') { e.preventDefault(); finish(false); return; }
-            if (e.key === 'Enter' && inputEl && e.target === inputEl) { e.preventDefault(); finish(true); return; }
+            if (e.key === 'Enter' && inputEl && inputEl.tagName !== 'TEXTAREA' && e.target === inputEl) { e.preventDefault(); finish(true); return; }
             if (e.key !== 'Tab') return;
-            const focusable = Array.from(dialog.querySelectorAll('button, input'))
+            const focusable = Array.from(dialog.querySelectorAll('button, input, textarea'))
               .filter(el => el instanceof HTMLElement && !el.hasAttribute('disabled'));
             if (!focusable.length) return;
             const first = focusable[0], last = focusable[focusable.length - 1];
@@ -314,6 +356,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 
           overlay.style.display = 'flex';
           (inputEl || okBtn).focus();
+          if (inputEl && inputEl.readOnly) inputEl.select();
         });
         const turn = _askDialogQueue.then(run, run);
         _askDialogQueue = turn.then(() => {}, () => {});

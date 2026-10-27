@@ -3,7 +3,7 @@ This file is part of DataLaVista™
 70-preview.js: Preview tab, CSV download, and report generation.
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 Created: 2026-03-24
-Last Modified: 2026-10-26
+Last Modified: 2026-10-28
 Summary: Preview tab, CSV download, and report generation.
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
@@ -321,7 +321,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           };
         }
            finally {
-            navigator.clipboard.writeText(window.location.href).then(() => toast('Report URL copied to clipboard', 'success'));
+            await copyTextWithFallback(window.location.href, 'Report URL copied to clipboard');
           }
       }
 
@@ -349,7 +349,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 
       function copyGenCode() {
         if (!_lastGeneratedJson) { toast('Generate the report first.', 'warning'); return; }
-        navigator.clipboard.writeText(_lastGeneratedJson).then(() => toast('Copied to clipboard', 'success'));
+        return copyTextWithFallback(_lastGeneratedJson, 'Copied to clipboard');
       }
 
       function downloadGenCode() {
@@ -438,5 +438,5 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
             url
           });
         }
-        navigator.clipboard.writeText(url).then(() => toast('URL copied to clipboard', 'success'));
+        return copyTextWithFallback(url, 'URL copied to clipboard');
       }

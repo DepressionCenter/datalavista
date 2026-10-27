@@ -3,7 +3,7 @@ This file is part of DataLaVista™
 40-ui-context-menu.js: Right-click context menus and data source management.
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 Created: 2026-03-24
-Last Modified: 2026-10-26
+Last Modified: 2026-10-28
 Summary: Right-click context menus and data source management.
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
@@ -84,9 +84,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           }
         }
         if (url) {
-          navigator.clipboard.writeText(url).then(() => toast('URL copied to clipboard', 'success'), () => {
-            prompt('Copy this URL:', url);
-          });
+          copyTextWithFallback(url, 'URL copied to clipboard');
         } else {
           toast('No URL available for this source', 'warning');
         }

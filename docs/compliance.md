@@ -3,7 +3,7 @@ This file is part of DataLaVista™
 docs/compliance.md
 Author(s): Gabriel Mongefranco.
 Created: 2026-10-26
-Last Modified: 2026-10-27
+Last Modified: 2026-10-28
 Summary: Records the security and accessibility controls that exist in the code today, and the known gaps.
 Notes: See README file for documentation and full license information.
 
@@ -54,6 +54,7 @@ reads the data you connect to and keeps it in memory while the tab is open.
 | Data values and names are escaped | `_attrEnc` in `src/42-ui-shared.js` | Cell values, column names, titles, and file names are escaped before they are written into the page. |
 | Status messages are shown as text | `toast` in `src/42-ui-utils.js` | Messages are set as text, never as HTML. Error text from a file or a server cannot add markup. |
 | Question popup inserts text only | `dlvAskDialog` in `src/42-ui-utils.js` | Addresses and names shown in the popup are inserted as text. |
+| Manual copying keeps text on the page | `copyTextWithFallback` in `src/42-ui-utils.js` | If the browser cannot copy, a read-only text area shows the text for manual copying. The text is cleared when the popup closes. |
 
 ### Remote files
 
@@ -74,7 +75,7 @@ The target is WCAG 2.2 AA. The code today provides this evidence:
 
 - The question popup is marked as a dialog and is labeled by its title. It keeps
   keyboard focus inside while open, closes on Escape, and returns focus to where
-  it was.
+  it was. When copying fails, the popup focuses and selects the text to copy.
 - The four tabs at the top of the Connect to Data Source popup are a tab list.
   Press Tab to reach the selected tab, use the arrow keys, Home, or End to move
   between the available tabs, and press Enter or Space to open one. A screen
