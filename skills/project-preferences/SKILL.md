@@ -56,10 +56,10 @@ Follow the repository’s existing file and folder naming conventions when addin
   all three generated outputs. Use `build.ps1` for the PowerShell build.
 - The build workflow runs on pushes to `main` that change `src/` or `build.sh`,
   and on manual dispatch. It can commit generated outputs.
-- The Tests workflow runs `tests/check-repository.sh` and the Playwright browser
-  tests in `tests/browser/` on every pull request. Node.js is used only for these
-  tests, never in the build scripts. Add a browser test when a change fixes a bug
-  that a test could have caught.
+- The Tests workflow runs `tests/check-repository.sh`, the build, and the Node.js
+  unit tests in `tests/*.test.cjs` on every pull request. Keep it light: no npm
+  packages and no browser. Node.js is used only for the tests, never in the build
+  scripts. Add a unit test when a change fixes a bug that a test could have caught.
 - For documentation and metadata changes, run `git diff --check`, validate JSON
   and citation metadata, and check local links. Confirm that application files
   and generated outputs are unchanged when the change does not affect behavior.

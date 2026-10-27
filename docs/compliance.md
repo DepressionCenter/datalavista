@@ -82,9 +82,9 @@ The target is WCAG 2.2 AA. The code today provides this evidence:
   Lists tab is announced as unavailable and can't be opened.
 - Status messages appear in a polite live region, so a screen reader announces
   them without interrupting.
-- The automated tests check the tab list keyboard steps above and scan the tab
-  list with axe-core on every pull request. The rest of the interface has no
-  automated accessibility scan yet.
+- The automated tests check the arrow key, Home, and End steps above on every
+  pull request. No automated accessibility scan has been recorded for the
+  application yet.
 
 ### Known gaps
 
@@ -94,8 +94,8 @@ The target is WCAG 2.2 AA. The code today provides this evidence:
   style its own widget freely. It cannot cover the page with fixed positioning,
   and it cannot add a `style` element.
 - The automated tests cover only some of the controls above: the trusted site
-  check, the text widget cleaner, the color check, and escaping in query results.
-  The others were checked by hand in a headless browser when they were added.
+  check, the color check, and the escaping of data values. The others were
+  checked by hand in a headless browser when they were added.
 - The page sets no Content Security Policy of its own. When the page runs in a
   SharePoint tenant, the tenant's policy applies. The page loads its libraries
   from cdn.jsdelivr.net, cdnjs.cloudflare.com, and cdn.sheetjs.com. If your

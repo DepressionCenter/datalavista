@@ -95,11 +95,6 @@ CHATGPT.md
 !KIMI.md
 !.github/copilot-instructions.md
 
-# Ignore test tools and test reports
-tests/node_modules/
-tests/playwright-report/
-tests/test-results/
-
 # Ignore cache files
 *.cache
 __pycache__/
