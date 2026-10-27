@@ -72,50 +72,103 @@ test('isTrustedSharePointSite accepts only https SharePoint hosts', () => {
   ].map(u => isTrusted(u)), [true, false, false, false, false]);
 });
 
-test('clipboard success is reported only after the browser finishes copying', async () => {
-  let completeWrite;
-  const notifications = [];
-  const dialogs = [];
-  const pendingWrite = new Promise(resolve => { completeWrite = resolve; });
+/**
+ * Load the source with stand-ins for the clipboard feature, the older copy command, the success message, and the popup.
+ * @param {object} navigator Stand-in for the browser's navigator, with or without a clipboard.
+ * @param {() => boolean} [copyCommand] Result of the older copy command. It may throw instead.
+ */
+function loadCopy(navigator, copyCommand = () => false) {
+  const shown = { notifications: [], dialogs: [], copyCommands: [], textBoxes: [] };
   const get = loadSource({
-    navigator: { clipboard: { writeText: text => {
-      assert.equal(text, 'Example report');
-      return pendingWrite;
-    } } },
-    recordToast: (message, type) => notifications.push({ message, type }),
-    recordDialog: options => dialogs.push(options),
+    navigator,
+    recordToast: (message, type) => shown.notifications.push({ message, type }),
+    recordDialog: options => shown.dialogs.push(options),
   });
   get('toast = (message, type) => recordToast(message, type)');
   get('dlvAskDialog = async options => recordDialog(options)');
-  const result = get('copyTextWithFallback')('Example report', 'Copied');
-  assert.equal(notifications.length, 0);
+  const document = get('document');
+  document.createElement = () => {
+    const textBox = {
+      value: '', style: {}, isConnected: false, selected: '',
+      focus() {}, select() { this.selected = this.value; }, remove() { this.isConnected = false; },
+    };
+    shown.textBoxes.push(textBox);
+    return textBox;
+  };
+  document.body.appendChild = element => { element.isConnected = true; };
+  document.execCommand = command => {
+    shown.copyCommands.push({ command, selected: shown.textBoxes[shown.textBoxes.length - 1].selected });
+    return copyCommand();
+  };
+  return { copy: get('copyTextWithFallback'), document, shown };
+}
+
+// Ways the clipboard feature can be missing or refuse to copy
+const clipboardFailures = [
+  {},
+  { clipboard: {} },
+  { clipboard: { writeText: null } },
+  { clipboard: { writeText: () => Promise.reject(new Error('Permission denied')) } },
+  { clipboard: { writeText: () => { throw new Error('Blocked'); } } },
+];
+
+test('clipboard success is reported only after the browser finishes copying', async () => {
+  let completeWrite;
+  const pendingWrite = new Promise(resolve => { completeWrite = resolve; });
+  const { copy, shown } = loadCopy({ clipboard: { writeText: text => {
+    assert.equal(text, 'Example report');
+    return pendingWrite;
+  } } });
+  const result = copy('Example report', 'Copied');
+  assert.equal(shown.notifications.length, 0);
   completeWrite();
   assert.equal(await result, true);
-  assert.deepEqual(notifications, [{ message: 'Copied', type: 'success' }]);
-  assert.equal(dialogs.length, 0);
+  assert.deepEqual(shown.notifications, [{ message: 'Copied', type: 'success' }]);
+  assert.equal(shown.copyCommands.length, 0);
+  assert.equal(shown.dialogs.length, 0);
 });
 
-test('clipboard failures offer the original text for manual copying', async () => {
+test('the older copy command copies the text when the clipboard feature is missing or refuses', async () => {
+  for (const navigator of clipboardFailures) {
+    const { copy, shown } = loadCopy(navigator, () => true);
+    assert.equal(await copy('Example report', 'Copied'), true);
+    assert.deepEqual(shown.copyCommands, [{ command: 'copy', selected: 'Example report' }]);
+    assert.deepEqual(shown.notifications, [{ message: 'Copied', type: 'success' }]);
+    assert.equal(shown.dialogs.length, 0);
+    assert.equal(shown.textBoxes[0].isConnected, false);
+  }
+});
+
+test('the older copy command returns focus to the control that started it, unless that control was removed', async () => {
+  for (const removed of [false, true]) {
+    let rejectWrite;
+    const { copy, document, shown } = loadCopy(
+      { clipboard: { writeText: () => new Promise((resolve, reject) => { rejectWrite = reject; }) } },
+      () => true);
+    const focusCalls = [];
+    const button = { isConnected: true, focus: options => focusCalls.push(options) };
+    document.activeElement = button;
+    const result = copy('Example report', 'Copied');
+    button.isConnected = !removed;
+    rejectWrite(new Error('Permission denied'));
+    assert.equal(await result, true);
+    assert.deepEqual(plain(focusCalls), removed ? [] : [{ preventScroll: true }]);
+    assert.equal(shown.textBoxes[0].isConnected, false);
+  }
+});
+
+test('copy failures offer the original text for manual copying', async () => {
   const unsafeText = '<img src=x onerror="alert(1)">\nExample report';
-  for (const navigator of [
-    {},
-    { clipboard: { writeText: () => Promise.reject(new Error('Permission denied')) } },
-    { clipboard: { writeText: () => { throw new Error('Blocked'); } } },
-  ]) {
-    const notifications = [];
-    const dialogs = [];
-    const get = loadSource({
-      navigator,
-      recordToast: (message, type) => notifications.push({ message, type }),
-      recordDialog: options => dialogs.push(options),
-    });
-    get('toast = (message, type) => recordToast(message, type)');
-    get('dlvAskDialog = async options => recordDialog(options)');
-    assert.equal(await get('copyTextWithFallback')(unsafeText, 'Copied'), false);
-    assert.equal(notifications.length, 0);
-    assert.equal(dialogs.length, 1);
-    assert.equal(dialogs[0].title, 'Copy text manually');
-    assert.equal(dialogs[0].sections[1].copyText.value, unsafeText);
-    assert.equal(dialogs[0].hideCancel, true);
+  for (const navigator of clipboardFailures) {
+    for (const copyCommand of [() => false, () => { throw new Error('Blocked'); }]) {
+      const { copy, shown } = loadCopy(navigator, copyCommand);
+      assert.equal(await copy(unsafeText, 'Copied'), false);
+      assert.equal(shown.notifications.length, 0);
+      assert.equal(shown.dialogs.length, 1);
+      assert.equal(shown.dialogs[0].title, 'Copy text manually');
+      assert.equal(shown.dialogs[0].sections[1].copyText.value, unsafeText);
+      assert.equal(shown.dialogs[0].hideCancel, true);
+      assert.equal(shown.textBoxes[0].isConnected, false);
+    }
   }
 });

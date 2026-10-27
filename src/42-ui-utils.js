@@ -195,18 +195,51 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       }
 
       /**
-       * Copy text and show a selectable copy if the browser cannot write to the clipboard.
+       * Copy text with the browser's older copy command, for pages where the clipboard feature is missing or blocked.
+       * A hidden text box holds the text during the copy and is removed right after. Focus then goes back where it was.
+       * @param {string} text Text to copy.
+       * @returns {boolean} True if the browser reported that the copy worked.
+       */
+      function _copyWithCopyCommand(text) {
+        const previouslyFocused = /** @type {HTMLElement|null} */ (document.activeElement);
+        const textArea = document.createElement('textarea');
+        textArea.value = text;
+        textArea.style.cssText = 'position:fixed;top:0;left:0;opacity:0';
+        try {
+          document.body.appendChild(textArea);
+          textArea.focus();
+          textArea.select();
+          return document.execCommand('copy') === true;
+        } catch (err) {
+          return false;
+        } finally {
+          textArea.remove();
+          // A control removed while the copy was running can't take focus back
+          if (previouslyFocused && previouslyFocused.isConnected && typeof previouslyFocused.focus === 'function') {
+            previouslyFocused.focus({ preventScroll: true });
+          }
+        }
+      }
+
+      /**
+       * Copy text with the clipboard feature, then with the older copy command. If both fail, show the text
+       * in a popup so the person can copy it by hand.
        * @param {string} text Text to copy. It remains in the page while the popup is open.
-       * @param {string} successMessage Message shown after the clipboard write succeeds.
+       * @param {string} successMessage Message shown after the browser reports a successful copy.
        * @returns {Promise<boolean>} True if the browser copied the text.
        */
       async function copyTextWithFallback(text, successMessage) {
+        let copied = false;
         try {
-          if (!navigator.clipboard || typeof navigator.clipboard.writeText !== 'function') {
-            throw new Error('Clipboard unavailable');
+          if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+            await navigator.clipboard.writeText(text);
+            copied = true;
           }
-          await navigator.clipboard.writeText(text);
         } catch (err) {
+          // Some browsers block the clipboard feature but still allow the older copy command
+        }
+        if (!copied) copied = _copyWithCopyCommand(text);
+        if (!copied) {
           await dlvAskDialog({
             title: 'Copy text manually',
             sections: [
@@ -334,7 +367,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
             const value = inputEl && !inputEl.readOnly ? inputEl.value : '';
             if (inputEl) inputEl.value = '';
             overlay.style.display = 'none';
-            if (previouslyFocused && typeof previouslyFocused.focus === 'function') previouslyFocused.focus();
+            if (previouslyFocused && previouslyFocused.isConnected && typeof previouslyFocused.focus === 'function') previouslyFocused.focus();
             resolve({ confirmed, value });
           };
           const onOk = () => finish(true);
