@@ -3,7 +3,7 @@ This file is part of DataLaVista™
 docs/compliance.md
 Author(s): Gabriel Mongefranco.
 Created: 2026-10-26
-Last Modified: 2026-10-26
+Last Modified: 2026-10-27
 Summary: Records the security and accessibility controls that exist in the code today, and the known gaps.
 Notes: See README file for documentation and full license information.
 
@@ -82,7 +82,9 @@ The target is WCAG 2.2 AA. The code today provides this evidence:
   Lists tab is announced as unavailable and can't be opened.
 - Status messages appear in a polite live region, so a screen reader announces
   them without interrupting.
-- No automated accessibility scan has been recorded for the application yet.
+- The automated tests check the tab list keyboard steps above and scan the tab
+  list with axe-core on every pull request. The rest of the interface has no
+  automated accessibility scan yet.
 
 ### Known gaps
 
@@ -91,8 +93,9 @@ The target is WCAG 2.2 AA. The code today provides this evidence:
 - The cleaner keeps inline styles on text widget content. A shared dashboard can
   style its own widget freely. It cannot cover the page with fixed positioning,
   and it cannot add a `style` element.
-- The repository has no automated test suite. The controls above were checked by
-  hand in a headless browser when they were added.
+- The automated tests cover only some of the controls above: the trusted site
+  check, the text widget cleaner, the color check, and escaping in query results.
+  The others were checked by hand in a headless browser when they were added.
 - The page sets no Content Security Policy of its own. When the page runs in a
   SharePoint tenant, the tenant's policy applies. The page loads its libraries
   from cdn.jsdelivr.net, cdnjs.cloudflare.com, and cdn.sheetjs.com. If your

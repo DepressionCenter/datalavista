@@ -8,7 +8,7 @@ This file is part of DataLaVista™
 skills/project-preferences/SKILL.md
 Author(s): Gabriel Mongefranco.
 Created: 2026-09-05
-Last Modified: 2026-10-25
+Last Modified: 2026-10-27
 Summary: Records DataLaVista terminology, structure, verification, and project constraints.
 Notes: See README file for documentation and full license information.
 
@@ -56,6 +56,10 @@ Follow the repository’s existing file and folder naming conventions when addin
   all three generated outputs. Use `build.ps1` for the PowerShell build.
 - The build workflow runs on pushes to `main` that change `src/` or `build.sh`,
   and on manual dispatch. It can commit generated outputs.
+- The Tests workflow runs `tests/check-repository.sh` and the Playwright browser
+  tests in `tests/browser/` on every pull request. Node.js is used only for these
+  tests, never in the build scripts. Add a browser test when a change fixes a bug
+  that a test could have caught.
 - For documentation and metadata changes, run `git diff --check`, validate JSON
   and citation metadata, and check local links. Confirm that application files
   and generated outputs are unchanged when the change does not affect behavior.
