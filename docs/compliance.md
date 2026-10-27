@@ -3,7 +3,7 @@ This file is part of DataLaVista™
 docs/compliance.md
 Author(s): Gabriel Mongefranco.
 Created: 2026-10-26
-Last Modified: 2026-10-28
+Last Modified: 2026-10-27
 Summary: Records the security and accessibility controls that exist in the code today, and the known gaps.
 Notes: See README file for documentation and full license information.
 
@@ -54,7 +54,7 @@ reads the data you connect to and keeps it in memory while the tab is open.
 | Data values and names are escaped | `_attrEnc` in `src/42-ui-shared.js` | Cell values, column names, titles, and file names are escaped before they are written into the page. |
 | Status messages are shown as text | `toast` in `src/42-ui-utils.js` | Messages are set as text, never as HTML. Error text from a file or a server cannot add markup. |
 | Question popup inserts text only | `dlvAskDialog` in `src/42-ui-utils.js` | Addresses and names shown in the popup are inserted as text. |
-| Manual copying keeps text on the page | `copyTextWithFallback` in `src/42-ui-utils.js` | If the browser cannot copy, a read-only text area shows the text for manual copying. The text is cleared when the popup closes. |
+| Manual copying keeps text on the page | `copyTextWithFallback` in `src/42-ui-utils.js` | Copy buttons try the browser's clipboard feature, then its older copy command, which uses a hidden text box that is removed right away. If both fail, a read-only text area in a popup shows the text for manual copying. The text is cleared when the popup closes. |
 
 ### Remote files
 

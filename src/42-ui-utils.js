@@ -3,7 +3,7 @@ This file is part of DataLaVista™
 42-ui-utils.js: Resizable panels, tab switching, utility functions, and SharePoint file picker.
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 Created: 2026-03-24
-Last Modified: 2026-10-28
+Last Modified: 2026-10-27
 Summary: Resizable panels, tab switching, utility functions, and SharePoint file picker.
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
@@ -195,26 +195,59 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
       }
 
       /**
-       * Copy text and show a selectable copy if the browser cannot write to the clipboard.
+       * Copy text with the browser's older copy command, for pages where the clipboard feature is missing or blocked.
+       * A hidden text box holds the text during the copy and is removed right after. Focus then goes back where it was.
+       * @param {string} text Text to copy.
+       * @returns {boolean} True if the browser reported that the copy worked.
+       */
+      function _copyWithCopyCommand(text) {
+        const previouslyFocused = /** @type {HTMLElement|null} */ (document.activeElement);
+        const textArea = document.createElement('textarea');
+        textArea.value = text;
+        textArea.style.cssText = 'position:fixed;top:0;left:0;opacity:0';
+        try {
+          document.body.appendChild(textArea);
+          textArea.focus();
+          textArea.select();
+          return document.execCommand('copy') === true;
+        } catch (err) {
+          return false;
+        } finally {
+          textArea.remove();
+          // A control removed while the copy was running can't take focus back
+          if (previouslyFocused && previouslyFocused.isConnected && typeof previouslyFocused.focus === 'function') {
+            previouslyFocused.focus({ preventScroll: true });
+          }
+        }
+      }
+
+      /**
+       * Copy text with the clipboard feature, then with the older copy command. If both fail, show the text
+       * in a popup so the person can copy it by hand.
        * @param {string} text Text to copy. It remains in the page while the popup is open.
-       * @param {string} successMessage Message shown after the clipboard write succeeds.
+       * @param {string} successMessage Message shown after the browser reports a successful copy.
        * @returns {Promise<boolean>} True if the browser copied the text.
        */
       async function copyTextWithFallback(text, successMessage) {
+        let copied = false;
         try {
-          if (!navigator.clipboard || typeof navigator.clipboard.writeText !== 'function') {
-            throw new Error('Clipboard unavailable');
+          if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+            await navigator.clipboard.writeText(text);
+            copied = true;
           }
-          await navigator.clipboard.writeText(text);
         } catch (err) {
+          // Some browsers block the clipboard feature but still allow the older copy command
+        }
+        if (!copied) copied = _copyWithCopyCommand(text);
+        if (!copied) {
           await dlvAskDialog({
             title: 'Copy text manually',
             sections: [
-              { text: 'The text could not be copied. Select the text below, then copy it using your device.' },
+              { text: "Your browser didn't allow copying. The text below is selected, so press Ctrl+C to copy it (Cmd+C on a Mac)." },
               { copyText: { label: 'Text to copy', value: text } }
             ],
             okLabel: 'Done',
-            cancelLabel: 'Close'
+            hideCancel: true
           });
           return false;
         }
@@ -243,6 +276,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
        *        { note: string }                      a smaller muted sentence.
        * @param {string} [options.okLabel]      Label of the confirming button. Defaults to "OK".
        * @param {string} [options.cancelLabel]  Label of the declining button. Defaults to "Cancel".
+       * @param {boolean} [options.hideCancel]  Hides the declining button when there is nothing to decline.
        * @returns {Promise<{confirmed: boolean, value: string}>}
        *          confirmed is true only when the confirming button was used. Closing the popup,
        *          clicking outside it, or pressing Escape counts as declining.
@@ -319,6 +353,9 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
           }
           okBtn.textContent = options.okLabel || 'OK';
           cancelBtn.textContent = options.cancelLabel || 'Cancel';
+          // Disabled as well as hidden so the focus loop below skips it
+          cancelBtn.style.display = options.hideCancel ? 'none' : '';
+          cancelBtn.disabled = !!options.hideCancel;
 
           const previouslyFocused = /** @type {HTMLElement|null} */ (document.activeElement);
           const finish = (confirmed) => {
@@ -330,7 +367,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
             const value = inputEl && !inputEl.readOnly ? inputEl.value : '';
             if (inputEl) inputEl.value = '';
             overlay.style.display = 'none';
-            if (previouslyFocused && typeof previouslyFocused.focus === 'function') previouslyFocused.focus();
+            if (previouslyFocused && previouslyFocused.isConnected && typeof previouslyFocused.focus === 'function') previouslyFocused.focus();
             resolve({ confirmed, value });
           };
           const onOk = () => finish(true);
