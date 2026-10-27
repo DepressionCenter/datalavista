@@ -287,13 +287,15 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         }
         if (!results || !results.length) { toast('No data to export', 'warning'); return; }
         const cols = Object.keys(results[0]);
-        const csv = [cols.join(','), ...(/** @type {any[]} */ (results)).map(r => cols.map(c => {
-          var v = r[c];
-          if (typeof v === 'string' && (v.includes(',') || v.includes('"') || v.includes('\n'))) {
-            return '"' + v.replace(/"/g, '""') + '"';
+        const escapeCSVField = value => {
+          if (typeof value === 'string' && /[,"\r\n]/.test(value)) {
+            return '"' + value.replace(/"/g, '""') + '"';
           }
-          return v != null ? v : '';
-        }).join(','))].join('\n');
+          return value != null ? value : '';
+        };
+        const csv = [cols.map(escapeCSVField).join(','),
+          ...(/** @type {any[]} */ (results)).map(r =>
+            cols.map(c => escapeCSVField(r[c])).join(','))].join('\n');
         if(DataLaVistaState.design.title) {
           downloadText(csv, DataLaVistaState.design.title + '.csv', 'text/csv');
         } else {
