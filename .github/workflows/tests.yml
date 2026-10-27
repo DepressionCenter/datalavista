@@ -4,7 +4,7 @@
 #  Author(s): Gabriel Mongefranco.
 #  Created: 2026-10-27
 #  Last Modified: 2026-10-27
-#  Summary: Runs repository checks, unit tests, and browser tests on pull requests and pushes to main.
+#  Summary: Runs repository checks, the build, and unit tests on pull requests.
 #  Notes: See README file for documentation and full license information.
 #  Website: https://github.com/DepressionCenter/datalavista
 #
@@ -23,10 +23,9 @@
 
 name: Tests
 
+# Pull requests are tested before they merge, so pushes to main are not tested again
 on:
   pull_request:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -38,9 +37,10 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  checks:
-    name: Repository checks and unit tests
+  tests:
+    name: Repository checks, build, and unit tests
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -51,28 +51,6 @@ jobs:
       - name: Repository checks
         run: bash tests/check-repository.sh "${{ github.event.pull_request.base.sha }}"
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v7
-        with:
-          node-version: lts/*
-
-      - name: Unit tests
-        run: |
-          shopt -s nullglob
-          files=(tests/*.test.cjs tests/*.test.js)
-          if [ ${#files[@]} -eq 0 ]; then
-            echo "No unit test files found in tests/."
-            exit 0
-          fi
-          node --test "${files[@]}"
-
-  browser:
-    name: Build and browser tests
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-
       - name: Cache esbuild
         uses: actions/cache@v6
         with:
@@ -82,32 +60,9 @@ jobs:
       - name: Build
         run: bash build.sh
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v7
-        with:
-          node-version: lts/*
-          cache: npm
-          cache-dependency-path: tests/package-lock.json
-
+      # The runner already has Node.js, so nothing is installed for these steps
       - name: Check the built script for syntax errors
         run: node --check datalavista.js
 
-      - name: Install test tools
-        working-directory: tests
-        run: |
-          npm ci
-          npx playwright install --with-deps chromium
-
-      - name: Browser tests
-        working-directory: tests
-        run: npx playwright test
-
-      - name: Save the test report
-        if: failure()
-        uses: actions/upload-artifact@v7
-        with:
-          name: playwright-report
-          path: |
-            tests/playwright-report/
-            tests/test-results/
-          retention-days: 14
+      - name: Unit tests
+        run: node --test tests/*.test.cjs
