@@ -27,12 +27,18 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
   <title>DataLaVista™ | The BI Tool Terminator</title>
   <meta name="description" content="DataLaVista is a lightweight, client-side reporting and dashboard toolkit. Tell your expensive BI tools: 'Data la vista, baby!'">
   
-  <script async src="https://www.googletagmanager.com/gtag/js?id=G-3Q455XWS5F"></script>
+  <!-- Google Analytics, loaded only on the public website, the same rule the app follows -->
   <script>
-    window.dataLayer = window.dataLayer || [];
-    function gtag(){dataLayer.push(arguments);}
-    gtag('js', new Date());
-    gtag('config', 'G-3Q455XWS5F');
+    if (window.location.hostname === 'code.depressioncenter.org') {
+      var gaScript = document.createElement('script');
+      gaScript.async = true;
+      gaScript.src = 'https://www.googletagmanager.com/gtag/js?id=G-3Q455XWS5F';
+      document.head.appendChild(gaScript);
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-3Q455XWS5F');
+    }
   </script>
 
   <link rel="preconnect" href="https://fonts.googleapis.com">

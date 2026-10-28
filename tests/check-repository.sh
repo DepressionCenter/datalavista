@@ -46,6 +46,8 @@ done < <(git ls-files -z '*.json')
 ### Check Source and Documentation File Headers ###
 for file in src/[0-9][0-9]-*.js src/00-full-page.html src/before-libraries.js src/after-libraries.js \
     src/DataLaVista-sp.html.txt src/website/index.html src/website/404.html src/website/docs-links.py \
+    src/website/mkdocs-overrides/*.html src/website/mkdocs-overrides/partials/*.html \
+    src/website/mkdocs-overrides/assets/stylesheets/*.css styles/*.css \
     tests/docs_links_test.py mkdocs.yml requirements-docs.txt docs/*.md docs/how-to/*.md; do
   if ! grep -q "This file is part of DataLaVista" "$file"; then
     fail "$file has no license header. Copy the header from section 3 of AGENTS.md to the top of the file."
