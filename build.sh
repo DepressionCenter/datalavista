@@ -4,7 +4,7 @@
 #  build.sh: DataLaVista™ build script (Linux / macOS / GitHub Actions).
 #  Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 #  Created: 2026-03-24
-#  Last Modified: 2026-10-26
+#  Last Modified: 2026-10-27
 #  Summary: Generates datalavista.js, DataLaVista.html, DataLaVista-nojs.html.
 #  Notes: See README file for documentation and full license information.
 #  Website: https://github.com/DepressionCenter/datalavista
@@ -34,21 +34,51 @@ JS_FILES=$(ls "$SRC"/[0-9][0-9]-*.js | sort)
 
 # ── Helper: get or download esbuild ───────────────────────────────────────────
 ESBUILD_VERSION="0.28.0"
-ESBUILD_CACHE="$HOME/.cache/datalavista-build/esbuild"
+ESBUILD_CACHE_DIR="$HOME/.cache/datalavista-build"
 
+# Prints the esbuild package name for an operating system and a processor, as reported by
+# "uname -s" and "uname -m", such as linux-x64 or darwin-arm64. Prints nothing when esbuild
+# publishes no package for that pair. Windows users run build.ps1 instead of this script.
+esbuild_platform() {
+  local os="" arch=""
+  case "$1" in
+    Linux) os="linux" ;;
+    Darwin) os="darwin" ;;
+  esac
+  case "$2" in
+    x86_64|amd64) arch="x64" ;;
+    aarch64|arm64) arch="arm64" ;;
+  esac
+  if [ -n "$os" ] && [ -n "$arch" ]; then echo "${os}-${arch}"; fi
+}
+
+# Prints the path of an esbuild executable: one already on the PATH, one cached by an earlier
+# build, or one downloaded now. Each platform and version gets its own cached file, so a cache
+# shared between computers can never hand out an executable built for another system.
 get_esbuild() {
   if command -v esbuild >/dev/null 2>&1; then echo "esbuild"; return; fi
-  if [ -x "$ESBUILD_CACHE" ]; then echo "$ESBUILD_CACHE"; return; fi
-  echo "  Downloading esbuild v${ESBUILD_VERSION}..." >&2
-  mkdir -p "$(dirname "$ESBUILD_CACHE")"
-  curl -fsSL "https://registry.npmjs.org/@esbuild/linux-x64/-/linux-x64-${ESBUILD_VERSION}.tgz" -o /tmp/esbuild.tgz
-  mkdir -p /tmp/esbuild-extract
-  tar -xzf /tmp/esbuild.tgz -C /tmp/esbuild-extract
-  EXTRACTED_BIN=$(find /tmp/esbuild-extract -name 'esbuild' -type f | head -1)
-  cp "$EXTRACTED_BIN" "$ESBUILD_CACHE"
-  chmod +x "$ESBUILD_CACHE"
-  rm -rf /tmp/esbuild.tgz /tmp/esbuild-extract
-  echo "$ESBUILD_CACHE"
+  local platform cached tmpdir extracted
+  platform="$(esbuild_platform "$(uname -s)" "$(uname -m)")"
+  if [ -z "$platform" ]; then
+    echo "Build failed: esbuild $ESBUILD_VERSION has no package for $(uname -s) on $(uname -m). Install esbuild $ESBUILD_VERSION and put it on your PATH, or run build.ps1 on Windows." >&2
+    exit 1
+  fi
+  cached="$ESBUILD_CACHE_DIR/esbuild-${ESBUILD_VERSION}-${platform}"
+  if [ -x "$cached" ]; then echo "$cached"; return; fi
+  echo "  Downloading esbuild v${ESBUILD_VERSION} for ${platform}..." >&2
+  mkdir -p "$ESBUILD_CACHE_DIR"
+  tmpdir="$(mktemp -d)"
+  curl -fsSL "https://registry.npmjs.org/@esbuild/${platform}/-/${platform}-${ESBUILD_VERSION}.tgz" -o "$tmpdir/esbuild.tgz"
+  tar -xzf "$tmpdir/esbuild.tgz" -C "$tmpdir"
+  extracted="$(find "$tmpdir" -name 'esbuild' -type f | head -1)"
+  if [ -z "$extracted" ]; then
+    echo "Build failed: the esbuild package for ${platform} did not contain an executable. Delete $tmpdir and run the build again." >&2
+    exit 1
+  fi
+  cp "$extracted" "$cached"
+  chmod +x "$cached"
+  rm -rf "$tmpdir"
+  echo "$cached"
 }
 ESBUILD=$(get_esbuild)
 

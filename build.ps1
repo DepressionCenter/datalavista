@@ -3,7 +3,7 @@
 #  build.ps1: DataLaVista™ build script (Windows PowerShell).
 #  Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 #  Created: 2026-03-24
-#  Last Modified: 2026-10-26
+#  Last Modified: 2026-10-27
 #  Summary: Generates datalavista.js, DataLaVista.html, DataLaVista-nojs.html.
 #  Notes: See README file for documentation and full license information.
 #  Website: https://github.com/DepressionCenter/datalavista
@@ -34,24 +34,47 @@ $LicenseText = $LicenseText.Replace('{GIT_HASH}', $SourceHash)
 $JsFiles = Get-ChildItem "$SRC\[0-9][0-9]-*.js" | Sort-Object Name
 
 # ── Helper: get or download esbuild ──────────────────────────────────────────
-$EsBuildVersion = '0.28.0'
-$EsBuildCache   = "$env:LOCALAPPDATA\datalavista-build\esbuild.exe"
+$EsBuildVersion  = '0.28.0'
+$EsBuildCacheDir = "$env:LOCALAPPDATA\datalavista-build"
 
+# Returns the esbuild package name for a Windows processor as reported by PROCESSOR_ARCHITECTURE,
+# such as win32-x64 or win32-arm64, or an empty string when esbuild publishes no package for it.
+function Get-EsBuildPlatform {
+    param([string]$Architecture)
+    switch (($Architecture -as [string]).ToUpperInvariant()) {
+        'AMD64' { return 'win32-x64' }
+        'ARM64' { return 'win32-arm64' }
+        'X86'   { return 'win32-ia32' }
+        default { return '' }
+    }
+}
+
+# Returns the path of an esbuild executable: one already on the PATH, one cached by an earlier
+# build, or one downloaded now. Each platform and version gets its own cached file.
 function Get-EsBuild {
     if (Get-Command esbuild -ErrorAction SilentlyContinue) { return 'esbuild' }
-    if (Test-Path $EsBuildCache) { return $EsBuildCache }
-    Write-Host "  Downloading esbuild v$EsBuildVersion..." -ForegroundColor Cyan
-    New-Item -ItemType Directory -Force -Path (Split-Path $EsBuildCache) | Out-Null
-    $tgz = "$env:TEMP\esbuild.tgz"
-    $url = "https://registry.npmjs.org/@esbuild/win32-x64/-/win32-x64-$EsBuildVersion.tgz"
-    Invoke-WebRequest $url -OutFile $tgz
-    $extractDir = "$env:TEMP\esbuild-extract"
+    $platform = Get-EsBuildPlatform $env:PROCESSOR_ARCHITECTURE
+    if (-not $platform) {
+        Write-Error "Build failed: esbuild $EsBuildVersion has no package for a $env:PROCESSOR_ARCHITECTURE processor. Install esbuild $EsBuildVersion and put it on your PATH."
+        exit 1
+    }
+    $cached = Join-Path $EsBuildCacheDir "esbuild-$EsBuildVersion-$platform.exe"
+    if (Test-Path $cached) { return $cached }
+    Write-Host "  Downloading esbuild v$EsBuildVersion for $platform..." -ForegroundColor Cyan
+    New-Item -ItemType Directory -Force -Path $EsBuildCacheDir | Out-Null
+    $extractDir = Join-Path $env:TEMP ("datalavista-esbuild-" + [System.IO.Path]::GetRandomFileName())
     New-Item -ItemType Directory -Force -Path $extractDir | Out-Null
+    $tgz = Join-Path $extractDir 'esbuild.tgz'
+    Invoke-WebRequest "https://registry.npmjs.org/@esbuild/$platform/-/$platform-$EsBuildVersion.tgz" -OutFile $tgz
     tar -xzf $tgz -C $extractDir
     $bin = Get-ChildItem $extractDir -Filter 'esbuild.exe' -Recurse | Select-Object -First 1
-    Copy-Item $bin.FullName $EsBuildCache
-    Remove-Item $tgz, $extractDir -Recurse -Force
-    return $EsBuildCache
+    if (-not $bin) {
+        Write-Error "Build failed: the esbuild package for $platform did not contain esbuild.exe. Delete $extractDir and run the build again."
+        exit 1
+    }
+    Copy-Item $bin.FullName $cached
+    Remove-Item $extractDir -Recurse -Force
+    return $cached
 }
 $EsBuild = Get-EsBuild
 

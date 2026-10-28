@@ -35,8 +35,13 @@ From the repository root, run the shell build with Bash and Python 3 available:
 bash build.sh
 ```
 
-The script uses an installed or cached esbuild executable. If neither exists, it
-downloads esbuild 0.28.0. Windows maintainers can use `build.ps1`.
+The script uses an esbuild executable that is already on your PATH or cached by
+an earlier build. If neither exists, it downloads esbuild 0.28.0 for your computer:
+Linux or macOS, on an x64 or ARM64 processor. Each platform gets its own cached
+file under `~/.cache/datalavista-build`, so a cache copied between computers never
+supplies the wrong executable. On any other system the script stops and tells you
+to install esbuild yourself. Windows maintainers use `build.ps1`, which picks the
+x64 or ARM64 Windows package the same way.
 
 Both scripts stop with an error if `datalavista.js` or `DataLaVista.html` is
 missing the page layout or the styles. Without them, the page opens blank.
