@@ -1621,13 +1621,26 @@ function _buildViolinOption(w, rows, sp) {
 // ── CHART OPTION DISPATCHER ───────────────────────────────────────────────────
 // Routes to the appropriate option builder based on the widget type registry.
 // Standard ECharts types with supportsDataset=true go through _buildDatasetOption.
-// Types with optionBuilder defined call that named function directly.
+// Types with optionBuilder set name a function in _dlvOptionBuilders.
+
+// Option builders that DataLaVistaCore.WIDGET_TYPES can name in optionBuilder. A widget type
+// that names a builder missing from this table draws nothing and logs the name.
+var _dlvOptionBuilders = {
+  _buildScatterOption: _buildScatterOption,
+  _buildViolinOption: _buildViolinOption
+};
+
 function _buildChartOption(w, rows) {
   if (!rows || !rows.length) return null;
   var wtDef = DataLaVistaCore.WIDGET_TYPES.find(function(t) { return t.id === w.type; });
   if (!wtDef) return null;
-  if (wtDef.optionBuilder && typeof (/** @type {any} */ (window))[wtDef.optionBuilder] === 'function') {
-    return (/** @type {any} */ (window))[wtDef.optionBuilder](w, rows, _getSeriesProps(w));
+  if (wtDef.optionBuilder) {
+    var builder = _dlvOptionBuilders[wtDef.optionBuilder];
+    if (typeof builder !== 'function') {
+      console.error('DataLaVista has no chart option builder named ' + wtDef.optionBuilder + ' for the ' + w.type + ' widget type. Add it to _dlvOptionBuilders in 60-design.js.');
+      return null;
+    }
+    return builder(w, rows, _getSeriesProps(w));
   }
   if (wtDef.supportsDataset) return _buildDatasetOption(w, rows);
   return null;

@@ -114,6 +114,12 @@ runs the esbuild platform choice from `build.sh` through Bash. Code that needs a
 real page, such as drawing the interface or running a query in AlaSQL, isn't
 covered.
 
+The functions on `window.dlv`, listed in `src/95-public-api.js`, are the app's
+public interface. Browser checks and other pages call the app through it, and
+nothing else inside the built script is reachable from outside. The page's own
+buttons and inputs reach the app through `data-action` attributes, which
+`registerAction` in `src/80-events.js` routes, so no function has to be global.
+
 The build needs only Bash, Python 3, and esbuild. Node.js 18 or later is needed
 only to run the tests. From the repository root, run:
 

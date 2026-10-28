@@ -252,7 +252,7 @@ SKIP_FIELDS: new Set([
   // usesECharts:       renders via echarts.init()
   // supportsDataset:   uses ECharts dataset+encode pattern (false for echarts-custom — their series don't support it)
   // supportsInteraction: participates in cross-filter / cross-highlight
-  // optionBuilder:     fn name string → returns full ECharts option object (overrides generic dataset path)
+  // optionBuilder:     fn name string, listed in _dlvOptionBuilders in 60-design.js → returns full ECharts option object (overrides generic dataset path)
   // seriesBuilder:     fn name string → returns partial series config merged into generic series object
   // sqlBuilder:        fn name string → returns { sql, fromSrc } (overrides standard buildWidgetSQL path)
   // htmlRenderer:      fn name string → returns HTML string (for category:'custom' non-ECharts types)

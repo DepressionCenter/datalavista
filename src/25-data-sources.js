@@ -3,7 +3,7 @@ This file is part of DataLaVista™
 25-data-sources.js: Data source connection popup, remote fetch guards, and source loaders.
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 Created: 2026-03-24
-Last Modified: 2026-10-26
+Last Modified: 2026-10-27
 Summary: Data source connection popup, remote fetch guards, and source loaders.
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
@@ -85,7 +85,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
     // POPUP LOGIC
     // ============================================================
     function showConnectPopup() {
-      ensureInit();
       const overlayDiv = document.getElementById('popup-overlay');
       if(overlayDiv) {
         overlayDiv.classList.add('active');

@@ -150,13 +150,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
   }
 
   
-  // Guard: call init() automatically if it was never called (e.g. SiteAssets/lazy mode).
-  function ensureInit() {
-    if (!DataLaVistaState._initialized) init();
-  }
-
-
-
   // Injects the app shell HTML into #dlv-root when running from a built page or the SharePoint
   // web part. _DLV_SHELL_HTML and _DLV_HEAD_CSS are set by the build script.
   // No-ops when running from 00-full-page.html (no #dlv-root present).
@@ -199,11 +192,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
   async function init() {
     _dlvInjectShell();
     if (DataLaVistaState && DataLaVistaState._initialized) return;
-    // If a different build already ran init (e.g. CDN + SiteAssets both loaded),
-    // window.DataLaVistaState points to the other build's state object.
-    const _wAny = /** @type {any} */ (window);
-    if (_wAny.DataLaVistaState && _wAny.DataLaVistaState._initialized && _wAny.DataLaVistaState !== DataLaVistaState) return;
-    //window.DataLaVistaState = new Proxy(dlvRawState, dlvStateHandler);
     console.log('Initializing...');
     DataLaVistaState._initialized = true;
     console.log("Come with me if you want to query...");
