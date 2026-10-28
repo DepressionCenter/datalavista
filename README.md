@@ -3,7 +3,7 @@ This file is part of DataLaVista™
 README.md
 Author(s): Gabriel Mongefranco, Jeremy Gluskin, Shelley Boa.
 Created: 2026-03-10
-Last Modified: 2026-10-27
+Last Modified: 2026-10-28
 Summary: DataLaVista is a ightweight, client-side reporting and dashboard toolkit.
 Notes: See README file for documentation and full license information.
 
@@ -63,7 +63,7 @@ Most enterprise data is trapped behind bloated frameworks or expensive BI tools.
   - Use the "Remote Files" tab in the Connect popup and use one of these links to load sample data: [studies.csv](https://code.depressioncenter.org/datalavista/samples/data/studies.csv), [researchers.xml](https://code.depressioncenter.org/datalavista/samples/data/researchers.xml), [participants.json](https://code.depressioncenter.org/datalavista/samples/data/participants.json)
 ### To use inside a SharePoint Online page:
 + First ensure you have the "Modern Script Editor" app installed. If not available, contact your site administrator to [install it](https://github.com/pnp/sp-dev-fx-webparts/tree/main/samples/react-script-editor)
-+ Upload [dist/datalavista.js](dist/datalavista.js) to your site's Site Assets library. Every library DataLaVista needs is inside that one file, so your tenant does not have to allow any other site.
++ In your site's Site Assets library, create a folder named `scripts` and upload [dist/datalavista.js](dist/datalavista.js) into it. Every library DataLaVista needs is inside that one file, so your tenant does not have to allow any other site.
 + Go to your site's home page and create a new page using the Modern Script Editor template. Use "DataLaVista" for the page title.
 + In the "Modern Script Editor" webpart, click "Markup" then click the "{ }" button to open the code editor.
 + Copy and paste the code from [dist/DataLaVista-sp.html.txt](dist/DataLaVista-sp.html.txt) into the script editor.

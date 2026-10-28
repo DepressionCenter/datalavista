@@ -3,7 +3,7 @@ This file is part of DataLaVista™
 docs/how-to/install-in-sharepoint.md
 Author(s): Gabriel Mongefranco.
 Created: 2026-10-27
-Last Modified: 2026-10-27
+Last Modified: 2026-10-28
 Summary: Explains how to add DataLaVista to a SharePoint Online site, update it, and fix a page that does not start.
 Notes: See README file for documentation and full license information.
 
@@ -37,7 +37,7 @@ You need no developer tools, only the two files from the `dist` folder.
 
 | File | What you do with it | What it is |
 | --- | --- | --- |
-| `dist/datalavista.js` | Upload it to Site Assets. | The DataLaVista app with every library it needs packed inside. |
+| `dist/datalavista.js` | Upload it to the `scripts` folder in Site Assets. | The DataLaVista app with every library it needs packed inside. |
 | `dist/DataLaVista-sp.html.txt` | Copy its contents into the web part. | Two lines of page code that show the app and load the script. |
 
 Because every library is inside `datalavista.js`, the page loads nothing from
@@ -49,36 +49,39 @@ that policy.
 
 1. Open your site's Site Assets library. Go to **Settings**, then
    **Site contents**, then **Site Assets**.
-2. Upload `dist/datalavista.js` to the top level of the library, not into a
-   folder.
-3. Go to the site's home page and select **New**, then **Page**. Choose the
+2. Select **New**, then **Folder**, and name the folder `scripts`. Skip this
+   step if the folder is already there.
+3. Open the `scripts` folder and upload `dist/datalavista.js` into it.
+4. Go to the site's home page and select **New**, then **Page**. Choose the
    **Modern Script Editor** template.
-4. Name the page `DataLaVista`. Its address then ends in
+5. Name the page `DataLaVista`. Its address then ends in
    `/SitePages/DataLaVista.aspx`, such as
    `https://contoso.sharepoint.com/sites/example/SitePages/DataLaVista.aspx`.
    Keep the page in Site Pages itself, not in a folder inside it. The page code
-   finds the script at `../SiteAssets/datalavista.js`, which only works from there.
+   finds the script at `../SiteAssets/scripts/datalavista.js`, which only works
+   from there.
    The list formatting in `src/sp-view-formatting.json` also links to that address.
-5. In the Modern Script Editor web part, select **Markup**, then the **{ }**
+6. In the Modern Script Editor web part, select **Markup**, then the **{ }**
    button to open the code editor.
-6. Open `dist/DataLaVista-sp.html.txt` in a text editor, copy everything in it,
+7. Open `dist/DataLaVista-sp.html.txt` in a text editor, copy everything in it,
    and paste it into the code editor. After a comment with these steps, it looks
    like this:
 
    ```html
    <div id="dlv-root"></div>
-   <script src="../SiteAssets/datalavista.js"></script>
+   <script src="../SiteAssets/scripts/datalavista.js"></script>
    ```
 
-7. Select **Save** in the code editor, then **Save** on the page to leave edit
+8. Select **Save** in the code editor, then **Save** on the page to leave edit
    mode.
-8. Refresh the page. The Connect to Data Source popup opens with your site's
+9. Refresh the page. The Connect to Data Source popup opens with your site's
    address filled in.
 
 ### Update to a newer version
 
 1. Download the latest `dist` folder from GitHub.
-2. Upload the new `dist/datalavista.js` to Site Assets, replacing the old one.
+2. Upload the new `dist/datalavista.js` to the `scripts` folder in Site Assets,
+   replacing the old one.
 3. Refresh the DataLaVista page. If the old version still shows, press Ctrl+F5
    to reload without the browser's saved copy.
 
@@ -94,8 +97,8 @@ says what to do next.
   the page's web parts and refresh. If it happens again, ask your site
   administrator and mention the errors in the browser console.
 - **The page stays blank.** Open the browser console (F12). If it says the script
-  could not be found, check that `datalavista.js` is at the top level of Site
-  Assets and that the page is directly in Site Pages. If it says the script was
+  could not be found, check that `datalavista.js` is in the `scripts` folder of
+  Site Assets and that the page is directly in Site Pages. If it says the script was
   blocked, ask your SharePoint administrator whether the tenant's content
   security policy allows scripts from the site's own Site Assets library.
 - **"DataLaVista could not find \<div id="dlv-root"\>"** in the console. The
