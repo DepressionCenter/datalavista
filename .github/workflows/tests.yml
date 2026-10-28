@@ -62,7 +62,7 @@ jobs:
 
       # The runner already has Node.js, so nothing is installed for these steps
       - name: Check the built script for syntax errors
-        run: node --check datalavista.js
+        run: node --check dist/datalavista.js
 
       - name: Unit tests
         run: node --test tests/*.test.cjs

@@ -28,8 +28,8 @@ $ErrorActionPreference = 'Stop'
 $SRC = 'src'
 $LibDir = Join-Path $SRC 'lib'
 $ChecksumFile = Join-Path $LibDir 'sha256sums.txt'
-# Folder that receives the built files
-$OutDir = '.'
+# Folder that receives the built files; it is emptied first so files that are no longer built disappear
+$OutDir = 'dist'
 # UTF-8 without a byte order mark, so the outputs match build.sh
 $Utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 
@@ -157,6 +157,7 @@ foreach ($libraryFile in Get-ChildItem -LiteralPath $LibDir -File) {
 }
 
 ### Prepare Output Folder ###
+if (Test-Path -LiteralPath $OutDir) { Remove-Item -LiteralPath $OutDir -Recurse -Force }
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
 Write-Host "Building DataLaVista into $OutDir/..."
 

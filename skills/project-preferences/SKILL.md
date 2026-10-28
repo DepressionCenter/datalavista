@@ -39,8 +39,11 @@ Follow the repository’s existing file and folder naming conventions when addin
 
 - `src/` holds the application HTML, ordered JavaScript fragments, license text,
   and SharePoint formatting JSON. The EFDC template's source samples do not belong here.
-- `DataLaVista.html`, `DataLaVista-nojs.html`, and `datalavista.js` are generated
-  outputs. Keep changes to them consistent with the build scripts.
+- `src/lib/` holds the exact copies of the third-party libraries that the build packs
+  into the outputs, with their license texts and `sha256sums.txt`.
+- `dist/` holds the generated outputs: `DataLaVista.html`, `DataLaVista-nojs.html`,
+  `DataLaVista-sp.html.txt`, and `datalavista.js`. The Build workflow rebuilds and
+  commits them after each merge to `main`; never commit them from a pull request.
 - `samples/` contains example data, dashboard configurations, and sample generators.
 - `images/` contains project screenshots and preview assets. `styles/um-style.css`
   is the existing project stylesheet; preserve its established behavior.
@@ -53,7 +56,7 @@ Follow the repository’s existing file and folder naming conventions when addin
   the build. The shell build uses Bash, Python 3, and esbuild; it downloads
   esbuild 0.28.0 if no executable or cached copy is available.
 - Run `bash build.sh` from the repository root after source changes and inspect
-  all three generated outputs. Use `build.ps1` for the PowerShell build.
+  the generated outputs in `dist/`. Use `build.ps1` for the PowerShell build.
 - The build workflow runs on pushes to `main` that change `src/` or `build.sh`,
   and on manual dispatch. It can commit generated outputs.
 - The Tests workflow runs `tests/check-repository.sh`, the build, and the Node.js

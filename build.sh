@@ -28,8 +28,8 @@ set -euo pipefail
 SRC="src"
 LIB_DIR="$SRC/lib"
 CHECKSUM_FILE="$LIB_DIR/sha256sums.txt"
-# Folder that receives the built files
-OUT_DIR="."
+# Folder that receives the built files; it is emptied first so files that are no longer built disappear
+OUT_DIR="dist"
 # Python 3 is used for the small text transformations; set PYTHON when the command has another name.
 # Each snippet writes UTF-8 bytes itself, so the build gives the same result whatever the console encoding is.
 PYTHON="${PYTHON:-python3}"
@@ -171,6 +171,7 @@ for library_path in "$LIB_DIR"/*; do
 done
 
 ### Prepare Output Folder ###
+rm -rf "$OUT_DIR"
 mkdir -p "$OUT_DIR"
 echo "Building DataLaVista into $OUT_DIR/..."
 
