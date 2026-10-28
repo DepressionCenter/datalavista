@@ -4,7 +4,7 @@ datalavista-style.css: The look of the DataLaVista home page as a stylesheet tha
 Author(s): Gabriel Mongefranco.
 Created: 2026-10-28
 Last Modified: 2026-10-28
-Summary: Colors, fonts, links, headings, buttons, and footer of the DataLaVista home page. The 404 page uses it. The home page keeps its own copy of these rules inside index.html because it also holds the animation styles, so change both when a color or font changes.
+Summary: Colors, fonts, links, headings, buttons, and footer of the DataLaVista home page. The 404 page uses it. The home page keeps its own copy of these rules inside index.html, next to its header and feature card styles, so change both when a color or font changes.
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
 

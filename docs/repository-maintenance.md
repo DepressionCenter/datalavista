@@ -229,8 +229,8 @@ so after you change the pinned theme version, compare them with the theme's
 `styles/datalavista-style.css` holds the colors, fonts, links, buttons, and
 footer of the home page as a stylesheet that other pages on the website can
 share. The 404 page uses it. The home page keeps its own copy of those rules
-inside `src/website/index.html`, next to its animation styles, so change both
-when a color or font changes. `styles/um-style.css` is the University of
+inside `src/website/index.html`, next to its header and feature card styles, so
+change both when a color or font changes. `styles/um-style.css` is the University of
 Michigan palette that the media pack skill uses as a starting point for
 artwork; no page on the website uses it. The DataLaVista app in `dist/` has
 its own styles and does not use either file.
