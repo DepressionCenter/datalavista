@@ -3,8 +3,8 @@ This file is part of DataLaVista™
 docs/repository-maintenance.md
 Author(s): Gabriel Mongefranco.
 Created: 2026-10-25
-Last Modified: 2026-10-27
-Summary: Explains the application build, the library copies, the dist/ outputs, automated tests, shared instructions, citation metadata, and previews.
+Last Modified: 2026-10-28
+Summary: Explains where the application source lives, how to build and test it, and how the website, the help pages, and releases are published.
 Notes: See README file for documentation and full license information.
 
 Copyright © 2026 The Regents of the University of Michigan
@@ -17,11 +17,12 @@ See <https://www.gnu.org/licenses/fdl-1.3.html>. See README for full license inf
 
 ## Repository maintenance
 
-[Back to project README](../README.md)
+[Back to help home](README.md)
 
 This guide helps maintainers find the application source, build its browser
-files, and run the automated tests. It also explains the shared repository
-instructions, citation metadata, and preview images.
+files, and run the automated tests. It also explains how the website and the
+help pages are published, how a release is made, and where the shared
+instructions, citation metadata, and preview images live.
 
 ### Application files and builds
 
@@ -68,8 +69,10 @@ usual global instead of registering with RequireJS on a SharePoint page.
 outside the app's strict-mode function on purpose.
 
 Review the outputs in `dist/` after a source change, but do not commit them.
-The Build workflow runs on pushes to `main` that change `src/` or `build.sh`,
-and on manual dispatch, and commits the rebuilt `dist/` when it changed.
+The publish workflow, described under "Publishing the website" below, rebuilds
+`dist/` after each push to `main` and commits it when it changed. The committed
+copy is the one people download from GitHub, and it is what Zenodo preserves
+inside the repository zip of each release.
 
 ### Library copies
 
@@ -94,15 +97,19 @@ stylesheet, build workflow, and `dist/` remain unchanged.
 ### Automated tests
 
 The Tests workflow in `.github/workflows/tests.yml` runs on every pull request
-and on manual dispatch. It runs one job that usually finishes in under a minute
-and installs nothing:
+and on manual dispatch. It runs one job that usually finishes in about a minute.
+The only installation is the two Python packages in `requirements-docs.txt`:
 
 1. `tests/check-repository.sh` checks that every JSON file is valid and that
-   every source file in `src/` has its license header. On a pull request, it also
-   rejects trailing spaces outside `src/lib` and any change under `dist/`.
-2. `build.sh` builds the outputs, and Node.js checks `dist/datalavista.js` for
+   every source file in `src/`, every page in `docs/`, and the website files have
+   their license header. On a pull request, it also rejects trailing spaces
+   outside `src/lib` and any change under `dist/`.
+2. MkDocs builds the help pages from `docs/` with `mkdocs build --strict`, so a
+   broken link or a page missing from `mkdocs.yml` fails the pull request, and
+   Python runs the unit tests for the link hook in `tests/docs_links_test.py`.
+3. `build.sh` builds the outputs, and Node.js checks `dist/datalavista.js` for
    syntax errors.
-3. Node.js runs the unit tests in `tests/*.test.cjs` with its built-in test
+4. Node.js runs the unit tests in `tests/*.test.cjs` with its built-in test
    runner.
 
 The unit tests don't open a browser. `tests/load-source.cjs` runs the `src/`
@@ -125,11 +132,80 @@ only to run the tests. From the repository root, run:
 
 ```sh
 bash tests/check-repository.sh main
+pip install -r requirements-docs.txt
+mkdocs build --strict
+python -m unittest tests/docs_links_test.py
 node --test tests/*.test.cjs
 ```
 
 On Windows, set `PYTHON=python` before the first command if your computer has no
 `python3` command.
+
+### Publishing the website
+
+The website at `https://code.depressioncenter.org/datalavista/` is built and
+published by the publish workflow in `.github/workflows/publish.yml`. It runs on
+every push to `main` that changes `src/`, `docs/`, `build.sh`, `mkdocs.yml`,
+`requirements-docs.txt`, or one of the folders the website serves, and on manual
+dispatch. The repository's Pages source is set to "GitHub Actions" in the
+repository settings, so the website is whatever the last successful run
+uploaded, and no branch holds it.
+
+The run does these things in order:
+
+1. Builds the help pages from `docs/` with `mkdocs build --strict`. The settings
+   are in `mkdocs.yml`, which lists every page under `nav` with the title shown
+   in the navigation. The hook in `src/website/docs-links.py` rewrites each link
+   that leaves `docs/`: a link into `dist`, `images`, `samples`, `styles`, or
+   `presentations` points at that folder on the website, and a link to any
+   other repository file points at GitHub. `docs/doc-template.md` is left out of
+   the website because its placeholder text sits in angle brackets.
+2. Runs `build.sh`, and commits `dist/` to `main` when it changed, with a
+   message that ends in `[skip ci]` so the push does not start the workflow
+   again.
+3. Assembles the website in `_site/`: `src/website/index.html` and
+   `src/website/404.html` at the root, `.nojekyll`, `dist/`, the help pages under
+   `docs/`, and the `images`, `samples`, `styles`, and `presentations` folders.
+4. Uploads `_site/` and deploys it to GitHub Pages.
+
+The two packages in `requirements-docs.txt` are pinned. Material for MkDocs
+has announced that it reaches end of life on May 5, 2027, with Zensical as its
+successor, so plan to move the theme before then and check for a newer pinned
+version when you update the other dependencies.
+
+To preview the website on your computer, install the two packages in
+`requirements-docs.txt`, run `mkdocs serve` to view the help pages while you
+edit them, or build everything and serve the assembled folder:
+
+```sh
+mkdocs build --strict
+bash build.sh
+mkdir -p _site && cp src/website/index.html src/website/404.html .nojekyll _site/
+cp -r dist images samples styles presentations _site/
+python -m http.server 8000 --directory _site
+```
+
+Then open `http://localhost:8000/` in a browser. `_site/` is ignored by git.
+
+When you add a page under `docs/`, add it to `nav` in `mkdocs.yml`, or the
+strict build fails. The [documentation skill](../skills/documentation/SKILL.md)
+has the page structure.
+
+### Releases
+
+Create a release on GitHub from a commit on `main` that already includes the
+rebuilt `dist/` folder, which means waiting for the publish workflow's
+"chore: rebuild outputs from src" commit after the last source change. The
+release workflow in `.github/workflows/release.yml` then checks out the tag,
+rebuilds `dist/`, and compares each file with the committed copy. If they match,
+it attaches the four files to the release page. If they differ, it fails and
+tells you to delete the release and its tag and create the release again from
+the rebuild commit.
+
+Zenodo archives the repository zip of each release through its GitHub
+integration, and that zip holds the committed `dist/` folder. The files attached
+to the release page are the same files, offered for download without opening
+the zip.
 
 ### Shared instructions and documentation
 
@@ -144,10 +220,11 @@ The template's `src/code-sample-*` files are omitted because this repository
 already has application source. Use the exact header text in `AGENTS.md` when
 adding source files.
 
-Preserve the existing main README. Add detailed guides under `docs/` and link
-them from [the documentation index](README.md). The
-[documentation template](doc-template.md) intentionally retains page-specific
-placeholders for future guides. Replace those fields when copying it to a real page.
+Preserve the existing main README. Add detailed guides under `docs/`, link
+them from [the help home](README.md), and add them to `nav` in `mkdocs.yml`. The
+[documentation template](https://github.com/DepressionCenter/datalavista/blob/main/docs/doc-template.md)
+intentionally retains page-specific placeholders for future guides. Replace
+those fields when copying it to a real page.
 
 ### Citation and licenses
 
@@ -173,18 +250,24 @@ resizing. Use the same composition at both sizes.
 ### Conclusion
 
 Use the source files for application changes and the local guides for repository
-maintenance. Review the outputs in `dist/` only when a source change requires a build.
+maintenance. Review the outputs in `dist/` only when a source change requires a
+build, and let the publish workflow commit them and publish the website.
 
 ### Additional resources
 
+- [Help home](README.md)
 - [Project instructions](../AGENTS.md)
 - [Node.js test runner](https://nodejs.org/api/test.html)
+- [MkDocs](https://www.mkdocs.org/)
+- [Material for MkDocs](https://squidfunk.github.io/mkdocs-material/)
+- [Publishing sources for GitHub Pages](https://docs.github.com/en/pages/getting-started-with-github-pages/configuring-a-publishing-source-for-your-github-pages-site)
 - [Project preferences](../skills/project-preferences/SKILL.md)
+- [Documentation skill](../skills/documentation/SKILL.md)
 - [Skills index](../SKILLS.md)
-- [Documentation index](README.md)
 - [Third-party notices](../THIRD-PARTY-NOTICES.md)
 - [SharePoint installation guide](how-to/install-in-sharepoint.md)
-- [Documentation template](doc-template.md)
+- [Architecture](architecture.md)
+- [Documentation template](https://github.com/DepressionCenter/datalavista/blob/main/docs/doc-template.md)
 - [EFDC repository template](https://github.com/DepressionCenter/EFDC-Repo-Template)
 - [Citation metadata](../CITATION.cff)
 - [Software license](../LICENSE)
@@ -193,4 +276,4 @@ maintenance. Review the outputs in `dist/` only when a source change requires a 
 - [Repository preview](../images/Repo-preview.png)
 - [Repository thumbnail](../images/Repo-preview-thumb.png)
 
-[Back to project README](../README.md)
+[Back to help home](README.md)

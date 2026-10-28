@@ -1,0 +1,93 @@
+# ============================================================
+#  This file is part of DataLaVista™
+#  release.yml: GitHub Actions workflow - attaches the built files in dist/ to a GitHub release.
+#  Author(s): Gabriel Mongefranco.
+#  Created: 2026-10-28
+#  Last Modified: 2026-10-28
+#  Summary: When a release is published, checks that the committed dist/ at its tag matches a fresh build, then uploads the four files to the release page.
+#  Notes: See README file for documentation and full license information.
+#  Website: https://github.com/DepressionCenter/datalavista
+#
+#  Copyright (c) 2026 The Regents of the University of Michigan
+#
+#  This program is free software: you can redistribute it and/or modify
+#  it under the terms of the GNU General Public License as published by
+#  the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+#  This program is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+#  GNU General Public License for more details.
+#  You should have received a copy of the GNU General Public License along
+#  with this program. If not, see <https://www.gnu.org/licenses/>.
+#  ================================================================
+#
+#  Zenodo archives the repository zip of each release, which already holds the
+#  committed dist/ folder. This workflow adds the same four files to the release
+#  page on GitHub, so people can download them without opening the zip.
+
+name: Attach the built files to a release
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Tag of an existing release, such as v1.0.0
+        required: true
+        type: string
+
+# Uploading files to a release needs write access to the repository contents
+permissions:
+  contents: write
+
+jobs:
+  attach:
+    name: Check the built files and attach them
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}
+
+    steps:
+      - name: Checkout the release tag
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+
+      - name: Keep the committed files
+        run: cp -r dist committed-dist
+
+      - name: Cache esbuild
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/datalavista-build
+          key: esbuild-0.28.0-linux-x64
+
+      - name: Build the DataLaVista files
+        run: |
+          chmod +x build.sh
+          ./build.sh
+
+      # A tag created before the publish workflow committed the rebuilt dist/ would ship stale files
+      - name: Compare the committed files with the fresh build
+        run: |
+          stale=0
+          for file in dist/*; do
+            name=$(basename "$file")
+            if ! cmp -s "$file" "committed-dist/$name"; then
+              echo "::error::dist/$name at tag $RELEASE_TAG does not match a fresh build."
+              stale=1
+            fi
+          done
+          if [ "$stale" -ne 0 ]; then
+            echo "The release was created before the publish workflow committed the rebuilt dist/ folder."
+            echo "Delete this release and its tag, wait for the commit 'chore: rebuild outputs from src' on main, and create the release again from that commit."
+            exit 1
+          fi
+          echo "The committed dist/ folder matches a fresh build."
+
+      - name: Attach the files to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$RELEASE_TAG" committed-dist/* --clobber --repo "$GITHUB_REPOSITORY"

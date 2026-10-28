@@ -4,8 +4,8 @@
 #  check-repository.sh: Repository checks for pull requests and pushes.
 #  Author(s): Gabriel Mongefranco.
 #  Created: 2026-10-27
-#  Last Modified: 2026-10-27
-#  Summary: Checks JSON files, source file headers, whitespace, and edits to the built files in dist/.
+#  Last Modified: 2026-10-28
+#  Summary: Checks JSON files, license headers in source and documentation files, whitespace, and edits to the built files in dist/.
 #  Notes: See README file for documentation and full license information.
 #  Website: https://github.com/DepressionCenter/datalavista
 #
@@ -43,8 +43,10 @@ while IFS= read -r -d '' file; do
   fi
 done < <(git ls-files -z '*.json')
 
-### Check Source File Headers ###
-for file in src/[0-9][0-9]-*.js src/00-full-page.html src/before-libraries.js src/after-libraries.js src/DataLaVista-sp.html.txt; do
+### Check Source and Documentation File Headers ###
+for file in src/[0-9][0-9]-*.js src/00-full-page.html src/before-libraries.js src/after-libraries.js \
+    src/DataLaVista-sp.html.txt src/website/index.html src/website/404.html src/website/docs-links.py \
+    tests/docs_links_test.py mkdocs.yml requirements-docs.txt docs/*.md docs/how-to/*.md; do
   if ! grep -q "This file is part of DataLaVista" "$file"; then
     fail "$file has no license header. Copy the header from section 3 of AGENTS.md to the top of the file."
   fi

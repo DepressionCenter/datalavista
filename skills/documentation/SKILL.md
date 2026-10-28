@@ -8,7 +8,7 @@ This file is part of DataLaVista™
 skills/documentation/SKILL.md
 Author(s): Gabriel Mongefranco.
 Created: 2026-09-10
-Last Modified: 2026-10-25
+Last Modified: 2026-10-28
 Summary: Defines the required structure and maintenance of the documentation folder.
 Notes: See README file for documentation and full license information.
 
@@ -39,14 +39,23 @@ Create the pages that apply and skip the rest. An empty stub is worse than a
 missing page.
 
     /docs
-    README.md           Index of this folder: one linked line per page
+    README.md           The help home: what the app does, the guides, the answers pages, and the maintainer pages, written for people who use the app
+    how-to/             One file per goal, such as how-to/connect-to-data.md; the user guides live here
+    faq.md              Questions people actually asked, with answers
+    troubleshooting.md  Known failure modes: symptom, cause, fix
     architecture.md     Components, what each does, how they connect, key decisions and why
     data-flow.md        Where data enters, how it changes, where it lands; formats, schemas, time zones; where PHI could appear and how it is protected
     usage.md            Common operations beyond the README quick start
-    how-to/             One file per goal, such as how-to/add-a-data-source.md
-    troubleshooting.md  Known failure modes: symptom, cause, fix
-    faq.md              Questions people actually asked, with answers
     compliance.md       Security and accessibility posture: controls in place, WCAG target and evidence, data retention, known gaps, review status
+    repository-maintenance.md  Source layout, build, tests, publishing, and releases
+
+The pages are published as the help website by the publish workflow, which runs
+MkDocs with the settings in `mkdocs.yml`. Every page must be listed under `nav`
+there, with the title to show in the navigation, or the strict build fails.
+Links that leave `/docs` are rewritten for the website by
+`src/website/docs-links.py`, so keep writing repository-relative links such as
+`../README.md`. `doc-template.md` is excluded from the website, so link to it on
+GitHub with a full address.
 
 ### Page structure
 
@@ -72,16 +81,19 @@ Every page uses this order.
 
 2. The project title as H1.
 3. The page subtitle as H2.
-4. A link back to the project README, directly under the subtitle, relative to this
-   page's depth: `../README.md` from `/docs`, `../../README.md` from `/docs/how-to/`.
+4. A link back to the help home, directly under the subtitle, relative to this
+   page's depth: `[Back to help home](README.md)` from `/docs`,
+   `[Back to help home](../README.md)` from `/docs/how-to/`. The help home itself
+   has no link back.
 5. A summary of two to four plain-language sentences covering what the page holds
    and who it is for. Someone who stops reading here still knows whether they are
    in the right place.
 6. The body, as sections, numbered steps, or both.
 7. A short conclusion saying what the reader can now do and where to go next.
 8. Additional resources: every link used in the page, plus related EFDC knowledge
-   base articles and outside references, all with descriptive link text.
-9. The same relative link back to the project README as the last line.
+   base articles and outside references, all with descriptive link text. Start
+   the list with the help home.
+9. The same link back to the help home as the last line.
 
 ### Content rules
 

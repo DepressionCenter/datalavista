@@ -67,23 +67,20 @@ Most enterprise data is trapped behind bloated frameworks or expensive BI tools.
 + Go to your site's home page and create a new page using the Modern Script Editor template. Use "DataLaVista" for the page title.
 + In the "Modern Script Editor" webpart, click "Markup" then click the "{ }" button to open the code editor.
 + Copy and paste the code from [dist/DataLaVista-sp.html.txt](dist/DataLaVista-sp.html.txt) into the script editor.
-+ Save, and refresh the page. For the full steps, see [Install DataLaVista in SharePoint](docs/how-to/install-in-sharepoint.md).
++ Save, and refresh the page. For the full steps, see [Install DataLaVista in SharePoint](https://code.depressioncenter.org/datalavista/docs/how-to/install-in-sharepoint.html).
 
 ### To use inside another web app:
 + If using inside a different web platform, follow the same steps as above with whatever method is available for adding scripts to the page. Alternatively, save [dist/DataLaVista.html](dist/DataLaVista.html) to your web server, and add its URL in an iframe tag.
 ### Load data and design your dashboard:
-+ Once the DataLaVista Designer is open, click Connect + Load and enter the location of your data. For SharePoint installations, it should automatically populate the URL for your site in a few seconds. You can also use the different tabs to connect to remote JSON files, CSV, Excel, or to upload a JSON or CSV file.
-+ Use the Query Builder and/or SQL Editor to pre-process your data. This will create a flat table, displayed in the preview.
-+ Switch to the Design tab to create your dashboard using visuals, tables, or HTML widgets.
-+ Switch to the Preview tab to see the final version of your dashboard.
-+ Switch to the Generate Report tab. From here, you will see the report configuration in JSON with options to copy, download, or publish to SharePoint.
-+ Once your report code is on SharePoint (either as a list item attachment or as a plain .json file in a document library), copy its share link and pass it to DataLaVista (e.g. DataLaVista.html?report=yourlink.json). That will be your shareable link.
++ Click Connect + Load and pick your data, shape it on the Query tab, design the dashboard, preview it, and share it from the Generate Report tab. The [Get started guide](https://code.depressioncenter.org/datalavista/docs/how-to/get-started.html) walks through each step with sample data.
 
 
 
 
 ## Documentation
-+ The full documentation is available at: [https://michmed.org/efdc-kb](https://teamdynamix.umich.edu/TDClient/210/DepressionCenter/KB/ArticleDet?ID=15179)
++ The help pages, with a guide for each step, are at: [https://code.depressioncenter.org/datalavista/docs/](https://code.depressioncenter.org/datalavista/docs/)
++ The same help is listed in the EFDC Health Research Resource Library at: [https://michmed.org/efdc-kb](https://teamdynamix.umich.edu/TDClient/210/DepressionCenter/KB/ArticleDet?ID=15179)
++ The pages are written in the [docs](docs/) folder of this repository.
 
 ### Background History
 Data La Vista was an idea conceived out of necessity. When our IT department was being too slow to roll out BI tools, the members of the [Automators Anonumous](https://github.com/DepressionCenter/AutomatorsAnonymous) group (a.k.a. Power Automate Lab) at UMich got together and created this tool through many, many iterations of AI prompts! Some of the prompts are included in this project for referene and to give you ideas of what's possible.

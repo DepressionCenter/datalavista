@@ -8,7 +8,7 @@ This file is part of DataLaVista™
 skills/project-preferences/SKILL.md
 Author(s): Gabriel Mongefranco.
 Created: 2026-09-05
-Last Modified: 2026-10-27
+Last Modified: 2026-10-28
 Summary: Records DataLaVista terminology, structure, verification, and project constraints.
 Notes: See README file for documentation and full license information.
 
@@ -42,13 +42,19 @@ Follow the repository’s existing file and folder naming conventions when addin
 - `src/lib/` holds the exact copies of the third-party libraries that the build packs
   into the outputs, with their license texts and `sha256sums.txt`.
 - `dist/` holds the generated outputs: `DataLaVista.html`, `DataLaVista-nojs.html`,
-  `DataLaVista-sp.html.txt`, and `datalavista.js`. The Build workflow rebuilds and
+  `DataLaVista-sp.html.txt`, and `datalavista.js`. The publish workflow rebuilds and
   commits them after each merge to `main`; never commit them from a pull request.
+  They are the only generated files in git.
+- `src/website/` holds the landing page `index.html`, the `404.html` page, and the
+  MkDocs hook `docs-links.py`. `mkdocs.yml` and `requirements-docs.txt` at the
+  root control how `docs/` becomes the help website. The assembled website in
+  `_site/` is ignored by git.
 - `samples/` contains example data, dashboard configurations, and sample generators.
 - `images/` contains project screenshots and preview assets. `styles/um-style.css`
   is the existing project stylesheet; preserve its established behavior.
-- Keep local documentation in `docs/`. Keep shared instructions in `AGENTS.md`
-  and project-specific preferences in this file.
+- Keep local documentation in `docs/`, which is also the source of the help
+  website. Add every new page to `nav` in `mkdocs.yml`. Keep shared instructions
+  in `AGENTS.md` and project-specific preferences in this file.
 
 ### Setup and verification
 
@@ -57,14 +63,17 @@ Follow the repository’s existing file and folder naming conventions when addin
   esbuild 0.28.0 if no executable or cached copy is available.
 - Run `bash build.sh` from the repository root after source changes and inspect
   the generated outputs in `dist/`. Use `build.ps1` for the PowerShell build.
-- The build workflow runs on pushes to `main` that change `src/` or `build.sh`,
-  and on manual dispatch. It can commit generated outputs.
-- The Tests workflow runs `tests/check-repository.sh`, the build, and the Node.js
-  unit tests in `tests/*.test.cjs` on every pull request. Keep it light: no npm
-  packages and no browser. Node.js is used only for the tests, never in the build
+- The publish workflow runs on pushes to `main` that change `src/`, `docs/`,
+  `build.sh`, the MkDocs files, or a folder the website serves, and on manual
+  dispatch. It commits the generated outputs and publishes the website from the
+  run. The release workflow attaches the `dist/` files to each GitHub release.
+- The Tests workflow runs `tests/check-repository.sh`, the strict MkDocs build,
+  the hook tests, the build, and the Node.js unit tests in `tests/*.test.cjs` on
+  every pull request. Keep it light: only the two Python packages in
+  `requirements-docs.txt`, no npm packages, and no browser. Node.js is used only for the tests, never in the build
   scripts. Add a unit test when a change fixes a bug that a test could have caught.
 - For documentation and metadata changes, run `git diff --check`, validate JSON
-  and citation metadata, and check local links. Confirm that application files
+  and citation metadata, and run `mkdocs build --strict` to check the links. Confirm that application files
   and generated outputs are unchanged when the change does not affect behavior.
 
 ### Project constraints
@@ -87,6 +96,9 @@ Follow the repository’s existing file and folder naming conventions when addin
 - Data source: a connected SharePoint list or file used by a query.
 - Dashboard: the tables and visuals assembled in the designer.
 - Report configuration: the JSON used to save and reopen a dashboard.
+- Help home: `docs/README.md`, published at
+  `https://code.depressioncenter.org/datalavista/docs/`.
+- Widget: one chart, table, card, text block, or filter on a dashboard.
 
 ### Project skills
 

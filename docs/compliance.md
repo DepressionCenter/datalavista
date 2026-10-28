@@ -3,7 +3,7 @@ This file is part of DataLaVista™
 docs/compliance.md
 Author(s): Gabriel Mongefranco.
 Created: 2026-10-26
-Last Modified: 2026-10-27
+Last Modified: 2026-10-28
 Summary: Records the security and accessibility controls that exist in the code today, and the known gaps.
 Notes: See README file for documentation and full license information.
 
@@ -17,7 +17,7 @@ See <https://www.gnu.org/licenses/fdl-1.3.html>. See README for full license inf
 
 ## Compliance
 
-[Back to project README](../README.md)
+[Back to help home](README.md)
 
 This page lists the security and accessibility controls in the code today. It
 names the file that holds each control and the gaps that remain. It is for
@@ -103,6 +103,21 @@ The target is WCAG 2.2 AA. The code today provides this evidence:
   from other sites, so a policy that allows only scripts from the site itself is
   enough. Loading the script from the site's Site Assets library has not yet been
   confirmed in a tenant with that policy.
+- The website at `code.depressioncenter.org` uses a custom domain set at the
+  organization level, and HTTPS is not enforced for it, so a plain `http`
+  address of the site is not redirected. The SharePoint install guide tells
+  people to download `dist/datalavista.js` from GitHub, which is served over
+  HTTPS, rather than from the website.
+
+### Hosting of the website
+
+The website, the help pages, and the demo are published by the publish workflow
+in `.github/workflows/publish.yml` from a GitHub Actions run, with the
+repository's Pages source set to "GitHub Actions". The help pages are generated
+from `docs/` on every run and are never stored in git; only `dist/` is committed.
+The landing page loads Google Analytics and two font families from Google, and
+the help pages load nothing from other sites. The
+[Repository maintenance](repository-maintenance.md) page describes the run.
 
 ### Conclusion
 
@@ -112,10 +127,11 @@ office whether the relay services and the SharePoint hosting fit your rules.
 
 ### Additional resources
 
+- [Help home](README.md)
 - [Project README](../README.md)
 - [Repository maintenance](repository-maintenance.md)
 - [Security reporting policy](../SECURITY.md)
 - [Project instructions](../AGENTS.md)
 - [WCAG 2.2 quick reference](https://www.w3.org/WAI/WCAG22/quickref/)
 
-[Back to project README](../README.md)
+[Back to help home](README.md)
