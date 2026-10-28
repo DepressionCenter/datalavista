@@ -3,7 +3,7 @@ This file is part of DataLaVista™
 60-design.js: Design canvas, widget rendering, data transforms, and widget properties.
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 Created: 2026-03-24
-Last Modified: 2026-10-28
+Last Modified: 2026-10-27
 Summary: Design canvas, widget rendering, data transforms, and widget properties.
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
@@ -1612,7 +1612,8 @@ function _buildViolinOption(w, rows, sp) {
     xAxis   : { type: 'category', data: cats, axisLabel: { rotate: 30, fontSize: 11 } },
     yAxis   : { type: 'value' },
     grid    : { left: 50, right: 20, top: 20, bottom: 60 },
-    series  : [{ type: 'violin', itemStyle: { color: colors[0] }, data: cats.map(function(c) { return { name: c, value: violinGroups[c] }; }) }]
+    // The violin add-on registers a custom series, which ECharts 6 draws through renderItem
+    series  : [{ type: 'custom', renderItem: 'violin', itemStyle: { color: colors[0] }, data: cats.map(function(c) { return { name: c, value: violinGroups[c] }; }) }]
   };
 }
 

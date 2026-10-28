@@ -4,7 +4,8 @@
 #  Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 #  Created: 2026-03-24
 #  Last Modified: 2026-10-27
-#  Summary: Generates datalavista.js, DataLaVista.html, DataLaVista-nojs.html.
+#  Summary: Packs the libraries in src/lib and the app source into datalavista.js, DataLaVista.html,
+#           DataLaVista-nojs.html, and DataLaVista-sp.html.txt. build.sh does the same work in Bash.
 #  Notes: See README file for documentation and full license information.
 #  Website: https://github.com/DepressionCenter/datalavista
 #
@@ -22,16 +23,36 @@
 #  ================================================================
 
 $ErrorActionPreference = 'Stop'
+
+### Load Configuration ###
 $SRC = 'src'
+$LibDir = Join-Path $SRC 'lib'
+$ChecksumFile = Join-Path $LibDir 'sha256sums.txt'
+# Folder that receives the built files
+$OutDir = '.'
+# UTF-8 without a byte order mark, so the outputs match build.sh
+$Utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+
+function Stop-Build([string]$Message) {
+    [Console]::Error.WriteLine("Build failed: $Message")
+    exit 1
+}
+
+# Reads a text file as UTF-8 with carriage returns removed, so a Windows checkout builds the same text as Linux.
+function Read-Text([string]$Path) {
+    return [System.IO.File]::ReadAllText($Path, [System.Text.Encoding]::UTF8).Replace("`r", '')
+}
 
 # Read license template and substitute {GIT_HASH} placeholder if present
 $SourceHash = (& git rev-parse --short HEAD 2>$null)
 if (-not $SourceHash) { $SourceHash = 'unknown' }
-$LicenseText = [System.IO.File]::ReadAllText("$SRC\license-template.txt", [System.Text.Encoding]::UTF8).TrimEnd()
-$LicenseText = $LicenseText.Replace('{GIT_HASH}', $SourceHash)
+$LicenseText = (Read-Text (Join-Path $SRC 'license-template.txt')).TrimEnd().Replace('{GIT_HASH}', $SourceHash)
 
-# Collect JS source files in sort order
+# Collect the app source files in sort order
 $JsFiles = Get-ChildItem "$SRC\[0-9][0-9]-*.js" | Sort-Object Name
+
+$TmpDir = Join-Path $env:TEMP ("datalavista-build-" + [System.IO.Path]::GetRandomFileName())
+New-Item -ItemType Directory -Force -Path $TmpDir | Out-Null
 
 # ── Helper: get or download esbuild ──────────────────────────────────────────
 $EsBuildVersion  = '0.28.0'
@@ -55,8 +76,7 @@ function Get-EsBuild {
     if (Get-Command esbuild -ErrorAction SilentlyContinue) { return 'esbuild' }
     $platform = Get-EsBuildPlatform $env:PROCESSOR_ARCHITECTURE
     if (-not $platform) {
-        Write-Error "Build failed: esbuild $EsBuildVersion has no package for a $env:PROCESSOR_ARCHITECTURE processor. Install esbuild $EsBuildVersion and put it on your PATH."
-        exit 1
+        Stop-Build "esbuild $EsBuildVersion has no package for a $env:PROCESSOR_ARCHITECTURE processor. Install esbuild $EsBuildVersion and put it on your PATH."
     }
     $cached = Join-Path $EsBuildCacheDir "esbuild-$EsBuildVersion-$platform.exe"
     if (Test-Path $cached) { return $cached }
@@ -69,8 +89,7 @@ function Get-EsBuild {
     tar -xzf $tgz -C $extractDir
     $bin = Get-ChildItem $extractDir -Filter 'esbuild.exe' -Recurse | Select-Object -First 1
     if (-not $bin) {
-        Write-Error "Build failed: the esbuild package for $platform did not contain esbuild.exe. Delete $extractDir and run the build again."
-        exit 1
+        Stop-Build "the esbuild package for $platform did not contain esbuild.exe. Delete $extractDir and run the build again."
     }
     Copy-Item $bin.FullName $cached
     Remove-Item $extractDir -Recurse -Force
@@ -90,8 +109,59 @@ function Strip-LicenseHtml {
     return [regex]::Replace($Text, '(?s)^\s*<!--.*?-->[ \t]*(\r?\n)?', '')
 }
 
+### Validate Inputs ###
+foreach ($sourceFile in @('00-full-page.html', 'before-libraries.js', 'after-libraries.js', 'DataLaVista-sp.html.txt', 'license-template.txt', 'lib\sha256sums.txt')) {
+    if (-not (Test-Path -LiteralPath (Join-Path $SRC $sourceFile) -PathType Leaf)) {
+        Stop-Build "src/$sourceFile is missing. Restore it from git and run the build again."
+    }
+}
+
+# Every file in src/lib/sha256sums.txt must exist and match, in the order listed, which is also the
+# order the scripts are packed in. Scripts are packed, style sheets are inlined, and the one .wasm
+# file is embedded as base64 for the SQLite reader.
+$LibScripts = @()
+$LibStyles = @()
+$LibWasm = ''
+$Listed = @()
+foreach ($checksumLine in (Read-Text $ChecksumFile).Split("`n")) {
+    if ($checksumLine.Trim().Length -eq 0) { continue }
+    $parts = $checksumLine.Trim() -split '\s+', 2
+    $expectedHash = $parts[0].ToLowerInvariant()
+    $libraryName = $parts[1]
+    $libraryPath = Join-Path $LibDir $libraryName
+    if (-not (Test-Path -LiteralPath $libraryPath -PathType Leaf)) {
+        Stop-Build "src/lib/$libraryName is listed in src/lib/sha256sums.txt but the file is missing."
+    }
+    $actualHash = (Get-FileHash -LiteralPath $libraryPath -Algorithm SHA256).Hash.ToLowerInvariant()
+    if ($actualHash -ne $expectedHash) {
+        Stop-Build "src/lib/$libraryName does not match its checksum in src/lib/sha256sums.txt. If you replaced this library on purpose, update its line in that file and in THIRD-PARTY-NOTICES.md."
+    }
+    if ($libraryName.EndsWith('.js')) { $LibScripts += $libraryName }
+    elseif ($libraryName.EndsWith('.css')) { $LibStyles += $libraryName }
+    elseif ($libraryName.EndsWith('.wasm')) {
+        if ($LibWasm) { Stop-Build 'src/lib/sha256sums.txt lists more than one .wasm file, but the build embeds exactly one for the SQLite reader.' }
+        $LibWasm = $libraryName
+    } else {
+        Stop-Build "src/lib/$libraryName has a file type the build does not handle. List only .js, .css, and .wasm files in src/lib/sha256sums.txt."
+    }
+    $Listed += $libraryName
+}
+if ($LibScripts.Count -eq 0) { Stop-Build 'src/lib/sha256sums.txt lists no script files.' }
+if (-not $LibWasm) { Stop-Build 'src/lib/sha256sums.txt lists no .wasm file for the SQLite reader.' }
+foreach ($libraryFile in Get-ChildItem -LiteralPath $LibDir -File) {
+    $name = $libraryFile.Name
+    if ($name -eq 'sha256sums.txt' -or $name.EndsWith('.license.txt') -or $name.EndsWith('.notice.txt')) { continue }
+    if ($Listed -notcontains $name) {
+        Stop-Build "src/lib/$name is not listed in src/lib/sha256sums.txt. Add its checksum there, or delete the file."
+    }
+}
+
+### Prepare Output Folder ###
+New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
+Write-Host "Building DataLaVista into $OutDir/..."
+
 # ── Strip license from HTML template once; reuse the clean copy ───────────────
-$RawHtml = [System.IO.File]::ReadAllText("$SRC\00-full-page.html", [System.Text.Encoding]::UTF8)
+$RawHtml = Read-Text (Join-Path $SRC '00-full-page.html')
 $CleanTemplate = Strip-LicenseHtml $RawHtml
 $HtmlLicenseComment = "<!--`n$LicenseText`n-->`n"
 
@@ -100,72 +170,104 @@ $HtmlLicenseComment = "<!--`n$LicenseText`n-->`n"
 $bodyMatch = [regex]::Match($RawHtml, '(?s)<body>(.*)</body>')
 $bodyRaw = $bodyMatch.Groups[1].Value
 $bodyContent = [regex]::Replace($bodyRaw, '(?s)\s*<!-- DATALAVISTA_SCRIPTS_PLACEHOLDER_OPEN -->.*?<!-- DATALAVISTA_SCRIPTS_PLACEHOLDER_CLOSE -->', '')
-$ShellHtmlJson = $bodyContent | ConvertTo-Json -Compress
-$ShellHtmlVar = 'var _DLV_SHELL_HTML = ' + $ShellHtmlJson + ';'
+$ShellHtmlVar = 'var _DLV_SHELL_HTML = ' + ($bodyContent | ConvertTo-Json -Compress) + ';'
 
-# ── Extract CSS head content for _DLV_HEAD_CSS ───────────────────────────────
-# Collect <link rel="stylesheet"> tags and the <style>...</style> block from the source head.
-$linkTagMatches = [regex]::Matches($RawHtml, '<link[^>]+rel=["\x27]stylesheet["\x27][^>]*/>')
-$styleContent   = [regex]::Match($RawHtml, '(?s)<style>(.*?)</style>').Groups[1].Value
-$headCssHtml    = ($linkTagMatches | ForEach-Object { $_.Value }) -join "`n"
-$headCssHtml   += "`n<style id=`"dlv-styles`">$styleContent</style>"
-$DlvHeadCssJson = $headCssHtml | ConvertTo-Json -Compress
-$DlvHeadCssVar  = 'var _DLV_HEAD_CSS = ' + $DlvHeadCssJson + ';'
+# ── Build _DLV_HEAD_CSS: the library style sheets, then the app's own styles ──
+# The library styles come first so the app's rules win where they overlap.
+$styleContent = [regex]::Match($RawHtml, '(?s)<style>(.*?)</style>').Groups[1].Value
+$vendorCss = ''
+foreach ($styleName in $LibStyles) {
+    $css = Read-Text (Join-Path $LibDir $styleName)
+    if ($css.ToLowerInvariant().Contains('</style')) {
+        Stop-Build "src/lib/$styleName contains `"</style>`", which would end the style block early. Remove it from the file."
+    }
+    $vendorCss += $css + "`n"
+}
+$headCssHtml = '<style id="dlv-vendor-styles">' + $vendorCss + '</style>' + "`n" + '<style id="dlv-styles">' + $styleContent + '</style>'
+$DlvHeadCssVar = 'var _DLV_HEAD_CSS = ' + ($headCssHtml | ConvertTo-Json -Compress) + ';'
 
-# ── Extract <head>...</head> for the minimal shell output ─────────────────────
-# Strip the CSS (link tags + style block) so the shell head only has CDN scripts.
+# ── Embed the SQLite reader's WebAssembly file as base64 ─────────────────────
+$WasmVar = 'var _DLV_SQL_WASM_BASE64 = "' + [Convert]::ToBase64String([System.IO.File]::ReadAllBytes((Join-Path $LibDir $LibWasm))) + '";'
+
+# ── Extract <head>...</head> for the minimal pages ───────────────────────────
+# The built script adds the styles itself, so the head keeps only the metadata and title.
 $headEnd = $CleanTemplate.IndexOf('</head>') + '</head>'.Length
 $HeadSection = $CleanTemplate.Substring(0, $headEnd)
 $HeadSection = [regex]::Replace($HeadSection, '\s*<link[^>]+rel=["\x27]stylesheet["\x27][^>]*/>', '')
 $HeadSection = [regex]::Replace($HeadSection, '(?s)\s*<!--[^-]*Custom styles[^-]*-->\s*<style>.*?</style>', '')
 
-
-
-# ── 1. Build datalavista.js ──────────────────────────────────────────────────
+# ── 1. Minify the app source ─────────────────────────────────────────────────
+# Only the app is minified. The libraries are copied as they are, so they still match
+# src/lib/sha256sums.txt and keep their own license banners.
 Write-Host 'Building datalavista.js...'
-$bodySb = [System.Text.StringBuilder]::new()
-$null = $bodySb.AppendLine('(() => {')
-$null = $bodySb.AppendLine("  'use strict';")
+$appSb = [System.Text.StringBuilder]::new()
+$null = $appSb.Append("(() => {`n  'use strict';`n")
 foreach ($f in $JsFiles) {
-    $null = $bodySb.AppendLine('')
-    $null = $bodySb.AppendLine("  /* === $($f.Name) === */")
-    $rawJs = [System.IO.File]::ReadAllText($f.FullName, [System.Text.Encoding]::UTF8)
-    $null = $bodySb.Append((Strip-LicenseJs $rawJs))
-    $null = $bodySb.AppendLine('')
+    $null = $appSb.Append("`n  /* === $($f.Name) === */`n")
+    $null = $appSb.Append((Strip-LicenseJs (Read-Text $f.FullName)))
+    $null = $appSb.Append("`n")
 }
-$null = $bodySb.AppendLine('')
-$null = $bodySb.AppendLine('})();')
+$null = $appSb.Append("`n})();`n")
+$appPath = Join-Path $TmpDir 'app.js'
+$appMinPath = Join-Path $TmpDir 'app.min.js'
+[System.IO.File]::WriteAllText($appPath, $appSb.ToString(), $Utf8NoBom)
+& $EsBuild $appPath --bundle=false --platform=browser --minify-whitespace --minify-syntax --log-level=error "--outfile=$appMinPath"
+if ($LASTEXITCODE -ne 0) { Stop-Build 'esbuild could not minify the app source. Fix the errors it printed and run the build again.' }
+$appMinified = Read-Text $appMinPath
 
-$bodyPath     = "$env:TEMP\dlv_js_body.js"
-$minifiedPath = "$env:TEMP\dlv_js_minified.js"
-[System.IO.File]::WriteAllText($bodyPath, $bodySb.ToString(), [System.Text.Encoding]::UTF8)
-& $EsBuild $bodyPath --bundle=false --platform=browser --minify-whitespace --minify-syntax --log-level=error "--outfile=$minifiedPath"
-$minifiedBody = [System.IO.File]::ReadAllText($minifiedPath, [System.Text.Encoding]::UTF8)
-$finalJs = "/* ============================================================`n$LicenseText`n================================================================ */`n`n" + $ShellHtmlVar + "`n" + $DlvHeadCssVar + "`n`n" + $minifiedBody
-[System.IO.File]::WriteAllText('datalavista.js', $finalJs, [System.Text.Encoding]::UTF8)
-$lineCount = (Get-Content 'datalavista.js').Count
-Write-Host "  -> datalavista.js ($lineCount lines)"
+# ── 2. Assemble datalavista.js ───────────────────────────────────────────────
+# Order matters: the loader guard must be the first statement, each library runs at the top
+# level so it creates its global, and the app runs last inside its own strict-mode function.
+$sb = [System.Text.StringBuilder]::new()
+$null = $sb.Append("/* ============================================================`n")
+$null = $sb.Append($LicenseText + "`n`n")
+$null = $sb.Append("This file also contains the third-party libraries listed in THIRD-PARTY-NOTICES.md,`n")
+$null = $sb.Append("each under its own license. Their license texts are in that file and in src/lib.`n")
+$null = $sb.Append("================================================================ */`n`n")
+$null = $sb.Append((Strip-LicenseJs (Read-Text (Join-Path $SRC 'before-libraries.js'))))
+foreach ($libraryName in $LibScripts) {
+    $null = $sb.Append("`n/* === src/lib/$libraryName === */`n")
+    $null = $sb.Append((Read-Text (Join-Path $LibDir $libraryName)))
+    $null = $sb.Append("`n")
+}
+$null = $sb.Append("`n")
+$null = $sb.Append((Strip-LicenseJs (Read-Text (Join-Path $SRC 'after-libraries.js'))))
+$null = $sb.Append("`n" + $ShellHtmlVar + "`n" + $DlvHeadCssVar + "`n" + $WasmVar + "`n`n" + $appMinified)
+$finalJs = $sb.ToString()
 
-# ── 2. Build DataLaVista-nojs.html ─────────────────────────────────────────
+# A script that contains "</script" cannot be placed inline in DataLaVista.html
+if ($finalJs.ToLowerInvariant().Contains('</script')) {
+    Stop-Build 'the built script contains "</script", which would end the inline script in DataLaVista.html early. Find the source of that text and change it.'
+}
+$jsOut = Join-Path $OutDir 'datalavista.js'
+[System.IO.File]::WriteAllText($jsOut, $finalJs, $Utf8NoBom)
+Write-Host "  -> $OutDir/datalavista.js ($((Get-Item $jsOut).Length) bytes)"
+
+# ── 3. Build DataLaVista-nojs.html ───────────────────────────────────────────
 Write-Host 'Building DataLaVista-nojs.html...'
-$noJsShell = "<!DOCTYPE html>`n" + $HeadSection + "`n<body>`n  <div id=`"dlv-root`"></div>`n  <script src=`"datalavista.js`"></script>`n</body>`n</html>"
-[System.IO.File]::WriteAllText('DataLaVista-nojs.html', ($HtmlLicenseComment + $noJsShell), [System.Text.Encoding]::UTF8)
-Write-Host '  -> DataLaVista-nojs.html'
+$noJsShell = "<!DOCTYPE html>`n" + $HeadSection + "`n<body>`n  <div id=`"dlv-root`"></div>`n  <script src=`"datalavista.js`"></script>`n</body>`n</html>`n"
+[System.IO.File]::WriteAllText((Join-Path $OutDir 'DataLaVista-nojs.html'), ($HtmlLicenseComment + $noJsShell), $Utf8NoBom)
+Write-Host "  -> $OutDir/DataLaVista-nojs.html"
 
-# ── 3. Build DataLaVista.html (inline) ──────────────────────────────────────
+# ── 4. Build DataLaVista.html (everything inline) ────────────────────────────
 Write-Host 'Building DataLaVista.html (inline)...'
-$inlineShell = "<!DOCTYPE html>`n" + $HeadSection + "`n<body>`n  <div id=`"dlv-root`"></div>`n  <script>`n" + $ShellHtmlVar + "`n" + $DlvHeadCssVar + "`n" + $minifiedBody.TrimEnd() + "`n  </script>`n</body>`n</html>"
-[System.IO.File]::WriteAllText('DataLaVista.html', ($HtmlLicenseComment + $inlineShell), [System.Text.Encoding]::UTF8)
-Write-Host '  -> DataLaVista.html'
+$inlineShell = "<!DOCTYPE html>`n" + $HeadSection + "`n<body>`n  <div id=`"dlv-root`"></div>`n  <script>`n" + $finalJs + "`n  </script>`n</body>`n</html>`n"
+[System.IO.File]::WriteAllText((Join-Path $OutDir 'DataLaVista.html'), ($HtmlLicenseComment + $inlineShell), $Utf8NoBom)
+Write-Host "  -> $OutDir/DataLaVista.html"
 
-# ── 4. Check the outputs that run the application ─────────────────────────────
-# Without these values the application cannot draw its interface inside dlv-root.
-foreach ($output in @('datalavista.js', 'DataLaVista.html')) {
+# ── 5. Copy the SharePoint web part snippet ──────────────────────────────────
+[System.IO.File]::WriteAllText((Join-Path $OutDir 'DataLaVista-sp.html.txt'), (Read-Text (Join-Path $SRC 'DataLaVista-sp.html.txt')), $Utf8NoBom)
+Write-Host "  -> $OutDir/DataLaVista-sp.html.txt"
+
+Remove-Item $TmpDir -Recurse -Force
+
+# ── 6. Check the outputs that run the application ────────────────────────────
+# Without these the page shows nothing, a library is missing, or the SQLite reader cannot start.
+foreach ($output in @((Join-Path $OutDir 'datalavista.js'), (Join-Path $OutDir 'DataLaVista.html'))) {
     $outputText = [System.IO.File]::ReadAllText($output, [System.Text.Encoding]::UTF8)
-    foreach ($definition in @('_DLV_SHELL_HTML', '_DLV_HEAD_CSS')) {
-        if (-not $outputText.Contains("var $definition = ")) {
-            Write-Error "Build failed: $output is missing $definition, so the page would show nothing."
-            exit 1
+    foreach ($marker in @('var _DLV_SHELL_HTML = ', 'var _DLV_HEAD_CSS = ', 'var _DLV_SQL_WASM_BASE64 = ', '_dlvRestoreModuleLoaders', 'make_xlsx_lib', 'registerCustomSeries', 'initSqlJs')) {
+        if (-not $outputText.Contains($marker)) {
+            Stop-Build "$output is missing '$marker', so the page would not work. Check src/lib/sha256sums.txt and the source files, then build again."
         }
     }
 }
@@ -174,10 +276,11 @@ Write-Host ''
 Write-Host ("Build completed at {0:yyyy-MM-dd hh:mm:ss tt}." -f (Get-Date))
 
 # Simple web server for testing; pass --start to start the server or --stop to stop it
+$StartPage = if ($OutDir -eq '.') { 'DataLaVista.html' } else { "$OutDir/DataLaVista.html" }
 if ($args -contains '--stop') {
     $Port = 8080
     Write-Host "Stopping server on port $Port..." -ForegroundColor Yellow
-    
+
     # Finds the specific process using the port and kills it
     $process = Get-NetTCPConnection -LocalPort $Port -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique
     if ($process -and $process -gt 4) {
@@ -195,8 +298,8 @@ elseif ($args -contains '--start') {
     $RootPath = $PSScriptRoot
 
     # 1. Clean up any existing server first
-    Get-NetTCPConnection -LocalPort $Port -ErrorAction SilentlyContinue | 
-        Select-Object -ExpandProperty OwningProcess -Unique | 
+    Get-NetTCPConnection -LocalPort $Port -ErrorAction SilentlyContinue |
+        Select-Object -ExpandProperty OwningProcess -Unique |
         Stop-Process -Force -ErrorAction SilentlyContinue
 
     # 2. Server Logic
@@ -216,10 +319,10 @@ elseif ($args -contains '--start') {
                 `$listener.Stop()          # Then stop
                 break                      # Exit loop
             }
-            
-            if ([string]::IsNullOrWhiteSpace(`$path)) { `$path = 'DataLaVista.html' }
+
+            if ([string]::IsNullOrWhiteSpace(`$path)) { `$path = '$StartPage' }
             `$fullPath = Join-Path '$RootPath' `$path
-            
+
             if (Test-Path `$fullPath -PathType Leaf) {
                 `$ext = [System.IO.Path]::GetExtension(`$fullPath).ToLower()
                 if (`$ext -eq '.html') { `$context.Response.ContentType = 'text/html' }
@@ -240,7 +343,7 @@ elseif ($args -contains '--start') {
     # 3. Launch background process
     Start-Process powershell -ArgumentList "-NoProfile", "-Command", $ServerBlock -WindowStyle Hidden
     Start-Sleep -Seconds 1
-    Start-Process "http://localhost:$Port/DataLaVista.html"
+    Start-Process "http://localhost:$Port/$StartPage"
 
     # 4. Print helpful instructions
     Write-Host "--------------------------------------------------------" -ForegroundColor Gray

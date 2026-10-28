@@ -31,17 +31,23 @@ const { spawnSync } = require('node:child_process');
 const buildScript = readFileSync(join(__dirname, '..', 'build.sh'), 'utf8');
 const match = buildScript.match(/^esbuild_platform\(\) \{[\s\S]*?^\}/m);
 
-function runBash(script) {
-  return spawnSync('bash', ['-c', script], { encoding: 'utf8' });
-}
+// On Windows the plain "bash" command can be the Windows Subsystem for Linux launcher, which expands
+// $1 before bash sees it, so the bash that comes with Git is tried first
+const bashCandidates = process.platform === 'win32'
+  ? ['C:/Program Files/Git/bin/bash.exe', 'C:/Program Files/Git/usr/bin/bash.exe', 'bash']
+  : ['bash'];
+const probe = 'f() { echo "$1"; }; f ok';
+const bash = bashCandidates.find(candidate => spawnSync(candidate, ['-c', probe], { encoding: 'utf8' }).stdout?.trim() === 'ok');
 
-const bashWorks = runBash('echo ok').stdout?.trim() === 'ok';
+function runBash(script) {
+  return spawnSync(bash, ['-c', script], { encoding: 'utf8' });
+}
 
 test('build.sh defines esbuild_platform', () => {
   assert.ok(match, 'build.sh must define an esbuild_platform function');
 });
 
-test('esbuild_platform picks the package that matches the computer', { skip: !bashWorks && 'bash is not available on this computer' }, () => {
+test('esbuild_platform picks the package that matches the computer', { skip: !bash && 'no bash that passes arguments through is available on this computer' }, () => {
   const cases = [
     ['Linux', 'x86_64', 'linux-x64'],
     ['Linux', 'aarch64', 'linux-arm64'],

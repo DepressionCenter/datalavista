@@ -3,7 +3,7 @@ This file is part of DataLaVista™
 26-cyberdyne-pipeline.js: Unified data loading and processing pipeline
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 Created: 2026-03-28
-Last Modified: 2026-10-26
+Last Modified: 2026-10-27
 Summary: Cyberdyne Pipeline - unified data processing for CSV, JSON, Excel, XML, SQLite
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
@@ -430,7 +430,7 @@ const CyberdynePipeline = {
       const reader = new FileReader();
       reader.onload = (e) => {
         try {
-          if (typeof XLSX === 'undefined') throw new Error('SheetJS library is not loaded');
+          if (typeof XLSX === 'undefined' || typeof XLSX.read !== 'function') throw new Error('The Excel reader did not load. Refresh the page and try again.');
           const workbook = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
           const sheetNames = workbook.SheetNames;
           if (!sheetNames || sheetNames.length === 0) throw new Error('Excel file contains no sheets');
@@ -497,26 +497,15 @@ async loadSQLiteFile(file, dsName, metadata) {
         const arrayBuffer = e.target.result;
         const dbAlias = normalizeDataSourceName(dsName);
         
-        // Try using SQL.js instead of AlaSQL's built-in SQLite
-        // SQL.js is more reliable for SQLite files
-        
-        // Check if we need to load SQL.js
+        // AlaSQL cannot read SQLite files itself; sql.js does the work. It is packed into the built
+        // script and its WebAssembly part is embedded as base64, so nothing is downloaded here.
         if (typeof SQL === 'undefined') {
-          await new Promise((resolveScript, rejectScript) => {
-            const script = document.createElement('script');
-            script.src = 'https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/sql-wasm.js';
-            script.onload = resolveScript;
-            script.onerror = () => rejectScript(new Error('Failed to load SQL.js'));
-            document.head.appendChild(script);
-          });
-          
-          // Initialize SQL.js
-          const SQL_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/';
-          window.SQL = await initSqlJs({
-            locateFile: file => SQL_CDN + file
-          });
+          if (typeof initSqlJs !== 'function' || typeof _DLV_SQL_WASM_BASE64 !== 'string') {
+            throw new Error('The SQLite reader is missing from this copy of DataLaVista. Download the latest release, or rebuild it with the build script, then try again.');
+          }
+          window.SQL = await initSqlJs({ wasmBinary: _dlvBase64ToBytes(_DLV_SQL_WASM_BASE64) });
         }
-        
+
         const uInt8Array = new Uint8Array(arrayBuffer);
         const db = new SQL.Database(uInt8Array);
         

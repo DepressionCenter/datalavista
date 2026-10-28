@@ -4,7 +4,7 @@ helpers.test.cjs: Unit tests for parsing and safety helpers.
 Author(s): Gabriel Mongefranco.
 Created: 2026-10-27
 Last Modified: 2026-10-27
-Summary: Checks parsing, safety helpers, trusted SharePoint addresses, and clipboard handling.
+Summary: Checks parsing, safety helpers, trusted SharePoint addresses, packed library helpers, and clipboard handling.
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
 
@@ -70,6 +70,18 @@ test('isTrustedSharePointSite accepts only https SharePoint hosts', () => {
     'https://example.org/sharepoint.com',
     'not an address',
   ].map(u => isTrusted(u)), [true, false, false, false, false]);
+});
+
+test('_dlvBase64ToBytes decodes the bytes the build embedded', () => {
+  const decode = loadSource({ atob })('_dlvBase64ToBytes');
+  const bytes = decode(Buffer.from([0, 97, 115, 109, 255]).toString('base64'));
+  assert.deepEqual(Array.from(bytes), [0, 97, 115, 109, 255]);
+});
+
+test('_ensureLZString explains when the compression library is missing', async () => {
+  await assert.rejects(get('_ensureLZString')(), { message: 'The compression library did not load. Refresh the page and try again.' });
+  const withLibrary = loadSource({ window: { addEventListener: () => {}, location: new URL('http://127.0.0.1:8765/DataLaVista.html'), LZString: {} } });
+  await withLibrary('_ensureLZString')();
 });
 
 /**
