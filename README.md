@@ -3,7 +3,7 @@ This file is part of DataLaVista™
 README.md
 Author(s): Gabriel Mongefranco, Jeremy Gluskin, Shelley Boa.
 Created: 2026-03-10
-Last Modified: 2026-10-27
+Last Modified: 2026-10-28
 Summary: DataLaVista is a ightweight, client-side reporting and dashboard toolkit.
 Notes: See README file for documentation and full license information.
 
@@ -40,7 +40,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 DataLaVista™ is an open-source, client-side JavaScript dashboard and reporting toolkit that brings SQL queries and interactive data visualization into the browser. It is designed to create high-performance business-intelligence dashboards without expensive server licenses or complex backend infrastructure.
 
 The initial integration targets SharePoint Lists with browser-based JavaScript widgets. Its framework-agnostic architecture is designed to expand to webpages and data from REST services, JSON, Excel, and CSV while keeping data within the tool's installed environment.
-<a href="https://code.depressioncenter.org/datalavista/DataLaVista.html" title="Click to try it live!" target="_blank"><img src="images/datalavista-screenshot-1.png" 
+<a href="https://code.depressioncenter.org/datalavista/dist/DataLaVista.html" title="Click to try it live!" target="_blank"><img src="images/datalavista-screenshot-1.png"
     alt="Screenshot of Data La Vista in action, terminating a data silo, displaying a SQL query with auto-completion dropdown menu and a dashboard designer with a table and pie chart with filters." 
     style="max-width:800px; width:100%; display:block; margin:auto;" /></a>
 
@@ -58,22 +58,19 @@ Most enterprise data is trapped behind bloated frameworks or expensive BI tools.
 
 ## Quick Start Guide
 ### Live Demo:
-+ ***Dashboard View-Mode Demo: [Project Health Dashboard](https://code.depressioncenter.org/datalavista/DataLaVista.html?reportMode=view&report=https://code.depressioncenter.org/datalavista/samples/reports/Project%20Health%20Dashboard.json)***
-+ ***Dashboard Designer Demo: [DataLaVista.html](https://code.depressioncenter.org/datalavista/DataLaVista.html?reportMode=edit&report=https://code.depressioncenter.org/datalavista/samples/reports/Project%20Health%20Dashboard.json)***
++ ***Dashboard View-Mode Demo: [Project Health Dashboard](https://code.depressioncenter.org/datalavista/dist/DataLaVista.html?reportMode=view&report=https://code.depressioncenter.org/datalavista/samples/reports/Project%20Health%20Dashboard.json)***
++ ***Dashboard Designer Demo: [DataLaVista.html](https://code.depressioncenter.org/datalavista/dist/DataLaVista.html?reportMode=edit&report=https://code.depressioncenter.org/datalavista/samples/reports/Project%20Health%20Dashboard.json)***
   - Use the "Remote Files" tab in the Connect popup and use one of these links to load sample data: [studies.csv](https://code.depressioncenter.org/datalavista/samples/data/studies.csv), [researchers.xml](https://code.depressioncenter.org/datalavista/samples/data/researchers.xml), [participants.json](https://code.depressioncenter.org/datalavista/samples/data/participants.json)
 ### To use inside a SharePoint Online page:
 + First ensure you have the "Modern Script Editor" app installed. If not available, contact your site administrator to [install it](https://github.com/pnp/sp-dev-fx-webparts/tree/main/samples/react-script-editor)
++ In your site's Site Assets library, create a folder named `scripts` and upload [dist/datalavista.js](dist/datalavista.js) into it. Every library DataLaVista needs is inside that one file, so your tenant does not have to allow any other site.
 + Go to your site's home page and create a new page using the Modern Script Editor template. Use "DataLaVista" for the page title.
 + In the "Modern Script Editor" webpart, click "Markup" then click the "{ }" button to open the code editor.
-+ Copy and the paste the code from [DataLaVista.html](DataLaVista.html) into the script editor.
-  - Note: If your SharePoint tenant has CSP restrictions that block inline JavaScript, use DataLaVista-nojs.html instead. Update the script tag near the bottom of the file (before </body>) to point to https://your-tenant.sharepoint.com/sites/your-site/SiteAssets/datalavista.js, then upload datalavista.js to your site's /SiteAssets directory.
-+ Save, and refresh the page.
-<p>
-<a href="https://code.depressioncenter.org/datalavista/presentations/sharepoint-installation-1.mp4" target="_blank" title="Click to open full video with SharePoint installation instructions"><img src="images/sharepoint-installation-1.gif" alt="Click to open full video with SharePoint installation instructions" style="width: 600px; height: auto" /></a>
-</p>
++ Copy and paste the code from [dist/DataLaVista-sp.html.txt](dist/DataLaVista-sp.html.txt) into the script editor.
++ Save, and refresh the page. For the full steps, see [Install DataLaVista in SharePoint](docs/how-to/install-in-sharepoint.md).
 
 ### To use inside another web app:
-+ If using inside a different web platform, follow the same steps as above with whatever method is available for adding scripts to the page. Alternatively, save [DataLaVista.html](DataLaVista.html) to your web server, and add its URL in an iframe tag.
++ If using inside a different web platform, follow the same steps as above with whatever method is available for adding scripts to the page. Alternatively, save [dist/DataLaVista.html](dist/DataLaVista.html) to your web server, and add its URL in an iframe tag.
 ### Load data and design your dashboard:
 + Once the DataLaVista Designer is open, click Connect + Load and enter the location of your data. For SharePoint installations, it should automatically populate the URL for your site in a few seconds. You can also use the different tabs to connect to remote JSON files, CSV, Excel, or to upload a JSON or CSV file.
 + Use the Query Builder and/or SQL Editor to pre-process your data. This will create a flat table, displayed in the preview.

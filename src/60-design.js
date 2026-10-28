@@ -3,7 +3,7 @@ This file is part of DataLaVista™
 60-design.js: Design canvas, widget rendering, data transforms, and widget properties.
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 Created: 2026-03-24
-Last Modified: 2026-10-28
+Last Modified: 2026-10-27
 Summary: Design canvas, widget rendering, data transforms, and widget properties.
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
@@ -1612,7 +1612,8 @@ function _buildViolinOption(w, rows, sp) {
     xAxis   : { type: 'category', data: cats, axisLabel: { rotate: 30, fontSize: 11 } },
     yAxis   : { type: 'value' },
     grid    : { left: 50, right: 20, top: 20, bottom: 60 },
-    series  : [{ type: 'violin', itemStyle: { color: colors[0] }, data: cats.map(function(c) { return { name: c, value: violinGroups[c] }; }) }]
+    // The violin add-on registers a custom series, which ECharts 6 draws through renderItem
+    series  : [{ type: 'custom', renderItem: 'violin', itemStyle: { color: colors[0] }, data: cats.map(function(c) { return { name: c, value: violinGroups[c] }; }) }]
   };
 }
 
@@ -1620,13 +1621,26 @@ function _buildViolinOption(w, rows, sp) {
 // ── CHART OPTION DISPATCHER ───────────────────────────────────────────────────
 // Routes to the appropriate option builder based on the widget type registry.
 // Standard ECharts types with supportsDataset=true go through _buildDatasetOption.
-// Types with optionBuilder defined call that named function directly.
+// Types with optionBuilder set name a function in _dlvOptionBuilders.
+
+// Option builders that DataLaVistaCore.WIDGET_TYPES can name in optionBuilder. A widget type
+// that names a builder missing from this table draws nothing and logs the name.
+var _dlvOptionBuilders = {
+  _buildScatterOption: _buildScatterOption,
+  _buildViolinOption: _buildViolinOption
+};
+
 function _buildChartOption(w, rows) {
   if (!rows || !rows.length) return null;
   var wtDef = DataLaVistaCore.WIDGET_TYPES.find(function(t) { return t.id === w.type; });
   if (!wtDef) return null;
-  if (wtDef.optionBuilder && typeof (/** @type {any} */ (window))[wtDef.optionBuilder] === 'function') {
-    return (/** @type {any} */ (window))[wtDef.optionBuilder](w, rows, _getSeriesProps(w));
+  if (wtDef.optionBuilder) {
+    var builder = _dlvOptionBuilders[wtDef.optionBuilder];
+    if (typeof builder !== 'function') {
+      console.error('DataLaVista has no chart option builder named ' + wtDef.optionBuilder + ' for the ' + w.type + ' widget type. Add it to _dlvOptionBuilders in 60-design.js.');
+      return null;
+    }
+    return builder(w, rows, _getSeriesProps(w));
   }
   if (wtDef.supportsDataset) return _buildDatasetOption(w, rows);
   return null;

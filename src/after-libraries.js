@@ -1,7 +1,12 @@
-<!--
+/* ============================================================
 This file is part of DataLaVista™
-Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
-Summary: DataLaVista™ is a lightweight, client-side reporting and dashboard toolkit.
+after-libraries.js: Puts the page's module loaders back after the packed libraries have run.
+Author(s): Gabriel Mongefranco.
+Created: 2026-10-27
+Last Modified: 2026-10-27
+Summary: The build places this file right after the packed libraries in datalavista.js.
+         It restores define.amd, window.exports, and window.module, which
+         before-libraries.js hid, so other scripts on the page keep working.
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
 
@@ -15,17 +20,7 @@ but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 GNU General Public License for more details.
 You should have received a copy of the GNU General Public License along
-with this program. If not, see https://www.gnu.org/licenses/.
--->
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>DataLaVista™ Dashboards</title>
-</head>
-<body>
-  <div id="dlv-root"></div>
-  <script src="datalavista.js"></script>
-</body>
-</html>
+with this program. If not, see <https://www.gnu.org/licenses/>.
+================================================================ */
+
+_dlvRestoreModuleLoaders();

@@ -4,7 +4,7 @@ docs/repository-maintenance.md
 Author(s): Gabriel Mongefranco.
 Created: 2026-10-25
 Last Modified: 2026-10-27
-Summary: Explains the application build, automated tests, shared instructions, citation metadata, and previews.
+Summary: Explains the application build, the library copies, the dist/ outputs, automated tests, shared instructions, citation metadata, and previews.
 Notes: See README file for documentation and full license information.
 
 Copyright © 2026 The Regents of the University of Michigan
@@ -26,8 +26,16 @@ instructions, citation metadata, and preview images.
 ### Application files and builds
 
 The numbered JavaScript fragments and HTML under `src/` are application source.
-The build scripts combine them into `datalavista.js`, `DataLaVista.html`, and
-`DataLaVista-nojs.html`. The last file loads the separate JavaScript file.
+`src/lib/` holds exact copies of the third-party libraries the app uses, with
+their license texts and `sha256sums.txt`. The build scripts pack both into four
+files under `dist/`:
+
+| File | Contents |
+| --- | --- |
+| `dist/datalavista.js` | The app, every library, the page markup, and the styles in one script. |
+| `dist/DataLaVista.html` | A page with that script inline. Open it from disk or host it. |
+| `dist/DataLaVista-nojs.html` | A page that loads `datalavista.js` from the same folder. |
+| `dist/DataLaVista-sp.html.txt` | The code to paste into a SharePoint web part. See the [SharePoint guide](how-to/install-in-sharepoint.md). |
 
 From the repository root, run the shell build with Bash and Python 3 available:
 
@@ -35,18 +43,53 @@ From the repository root, run the shell build with Bash and Python 3 available:
 bash build.sh
 ```
 
-The script uses an installed or cached esbuild executable. If neither exists, it
-downloads esbuild 0.28.0. Windows maintainers can use `build.ps1`.
+Windows maintainers run `.uild.ps1`. Both scripts write the same files; only
+the escaping of non-ASCII text inside the packed markup differs.
 
-Both scripts stop with an error if `datalavista.js` or `DataLaVista.html` is
-missing the page layout or the styles. Without them, the page opens blank.
+The script uses an esbuild executable that is already on your PATH or cached by
+an earlier build. If neither exists, it downloads esbuild 0.28.0 for your computer:
+Linux or macOS, on an x64 or ARM64 processor. Each platform gets its own cached
+file under `~/.cache/datalavista-build`, so a cache copied between computers never
+supplies the wrong executable. On any other system the script stops and tells you
+to install esbuild yourself. `build.ps1` picks the x64 or ARM64 Windows package
+the same way.
 
-Review all three generated outputs after a source change. The existing build
-workflow runs on pushes to `main` that change `src/` or `build.sh`, and on manual
-dispatch. It commits generated outputs when the build changes them.
+Both scripts empty `dist/` first, then check every file listed in
+`src/lib/sha256sums.txt`. They stop with an error when a copy does not match its
+checksum, when a listed file is missing, when a file in `src/lib` is not listed,
+or when an output lacks the page markup, the styles, or a library. Only the app
+source is minified. The libraries are copied unchanged, in the listed order, so
+their checksums and license banners stay intact.
+
+Inside `dist/datalavista.js`, `src/before-libraries.js` runs first and hides
+`define.amd`, `window.exports`, and `window.module`, so each library creates its
+usual global instead of registering with RequireJS on a SharePoint page.
+`src/after-libraries.js` puts them back before the app starts. Both files run
+outside the app's strict-mode function on purpose.
+
+Review the outputs in `dist/` after a source change, but do not commit them.
+The Build workflow runs on pushes to `main` that change `src/` or `build.sh`,
+and on manual dispatch, and commits the rebuilt `dist/` when it changed.
+
+### Library copies
+
+To update a library, download the release file from the source named in
+[THIRD-PARTY-NOTICES.md](../THIRD-PARTY-NOTICES.md) into `src/lib`, keeping the
+file name used there. Then:
+
+1. Compute its checksum with `sha256sum src/lib/<file>` or, in PowerShell,
+   `Get-FileHash src/lib/<file>`, and replace its line in `src/lib/sha256sums.txt`.
+2. Update the version in the table in `THIRD-PARTY-NOTICES.md` and in
+   `docs/compliance.md`, and copy any changed license text into both places.
+3. Run the build and the tests, then open `dist/DataLaVista.html` and
+   `dist/DataLaVista-nojs.html` in a browser and confirm the app starts.
+
+Libraries that register with a module loader must keep working when
+`define.amd` reads as null and `exports` and `module` are undefined, because that
+is what the guard files arrange while the libraries run.
 
 Documentation and metadata changes do not need a rebuild. Confirm that the source,
-stylesheet, build workflow, and generated browser files remain unchanged.
+stylesheet, build workflow, and `dist/` remain unchanged.
 
 ### Automated tests
 
@@ -56,17 +99,26 @@ and installs nothing:
 
 1. `tests/check-repository.sh` checks that every JSON file is valid and that
    every source file in `src/` has its license header. On a pull request, it also
-   rejects trailing spaces and changes to the three generated outputs.
-2. `build.sh` builds the outputs, and Node.js checks `datalavista.js` for syntax
-   errors.
+   rejects trailing spaces outside `src/lib` and any change under `dist/`.
+2. `build.sh` builds the outputs, and Node.js checks `dist/datalavista.js` for
+   syntax errors.
 3. Node.js runs the unit tests in `tests/*.test.cjs` with its built-in test
    runner.
 
 The unit tests don't open a browser. `tests/load-source.cjs` runs the `src/`
 files in build order inside a Node.js sandbox, with small stand-ins for the page.
 The tests then call the application's functions directly, such as `parseCSV`,
-`buildWidgetSQL`, and `makeColumnNamesQueryable`. Code that needs a real page,
-such as drawing the interface or running a query in AlaSQL, isn't covered.
+`buildWidgetSQL`, and `makeColumnNamesQueryable`. `tests/bundle-guard.test.cjs`
+runs the two guard files around a probe, and `tests/build-platform.test.cjs`
+runs the esbuild platform choice from `build.sh` through Bash. Code that needs a
+real page, such as drawing the interface or running a query in AlaSQL, isn't
+covered.
+
+The functions on `window.dlv`, listed in `src/95-public-api.js`, are the app's
+public interface. Browser checks and other pages call the app through it, and
+nothing else inside the built script is reachable from outside. The page's own
+buttons and inputs reach the app through `data-action` attributes, which
+`registerAction` in `src/80-events.js` routes, so no function has to be global.
 
 The build needs only Bash, Python 3, and esbuild. Node.js 18 or later is needed
 only to run the tests. From the repository root, run:
@@ -121,7 +173,7 @@ resizing. Use the same composition at both sizes.
 ### Conclusion
 
 Use the source files for application changes and the local guides for repository
-maintenance. Review generated outputs only when a source change requires a build.
+maintenance. Review the outputs in `dist/` only when a source change requires a build.
 
 ### Additional resources
 
@@ -130,6 +182,8 @@ maintenance. Review generated outputs only when a source change requires a build
 - [Project preferences](../skills/project-preferences/SKILL.md)
 - [Skills index](../SKILLS.md)
 - [Documentation index](README.md)
+- [Third-party notices](../THIRD-PARTY-NOTICES.md)
+- [SharePoint installation guide](how-to/install-in-sharepoint.md)
 - [Documentation template](doc-template.md)
 - [EFDC repository template](https://github.com/DepressionCenter/EFDC-Repo-Template)
 - [Citation metadata](../CITATION.cff)

@@ -3,7 +3,7 @@ This file is part of DataLaVista™
 10-constants.js: Constants, state object, and core DataLaVista objects.
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 Created: 2026-03-24
-Last Modified: 2026-10-26
+Last Modified: 2026-10-27
 Summary: Constants, state object, and core DataLaVista objects.
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
@@ -252,7 +252,7 @@ SKIP_FIELDS: new Set([
   // usesECharts:       renders via echarts.init()
   // supportsDataset:   uses ECharts dataset+encode pattern (false for echarts-custom — their series don't support it)
   // supportsInteraction: participates in cross-filter / cross-highlight
-  // optionBuilder:     fn name string → returns full ECharts option object (overrides generic dataset path)
+  // optionBuilder:     fn name string, listed in _dlvOptionBuilders in 60-design.js → returns full ECharts option object (overrides generic dataset path)
   // seriesBuilder:     fn name string → returns partial series config merged into generic series object
   // sqlBuilder:        fn name string → returns { sql, fromSrc } (overrides standard buildWidgetSQL path)
   // htmlRenderer:      fn name string → returns HTML string (for category:'custom' non-ECharts types)
@@ -724,16 +724,26 @@ function _sampleRawRows(tableKey, limit = 100) {
   try { return _alasql(`SELECT TOP ${limit} * FROM [${existing}]`); } catch { return []; }
 }
 
-/** Load LZ-String from CDN once; no-op on subsequent calls. */
+/**
+ * Confirm that the LZ-String library is present. It is packed into the built script, so this only
+ * fails when another script on the page kept it from loading.
+ * @returns {Promise<void>} Rejects with a message the page can show when the library is missing.
+ */
 async function _ensureLZString() {
   if ((/** @type {any} */ (window)).LZString) return;
-  await new Promise((resolve, reject) => {
-    const script = document.createElement('script');
-    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.5.0/lz-string.min.js';
-    script.onload = resolve;
-    script.onerror = () => reject(new Error('Failed to load LZ-String'));
-    document.head.appendChild(script);
-  });
+  throw new Error('The compression library did not load. Refresh the page and try again.');
+}
+
+/**
+ * Decode base64 text into bytes. The build embeds the SQLite reader's WebAssembly file this way.
+ * @param {string} text Base64 text with no line breaks.
+ * @returns {Uint8Array} The decoded bytes.
+ */
+function _dlvBase64ToBytes(text) {
+  const binary = atob(text);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
 }
 
 /**
