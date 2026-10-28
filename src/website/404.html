@@ -1,0 +1,87 @@
+<!--
+This file is part of DataLaVista™
+src/website/404.html: The page shown when an address on the DataLaVista website does not exist. The publish workflow copies it to the root of the website.
+Author(s): Gabriel Mongefranco.
+Created: 2026-10-28
+Last Modified: 2026-10-28
+Summary: Tells the visitor that the page was not found and links to the home page, the help pages, and the code.
+Notes: See README file for documentation and full license information.
+
+Copyright © 2026 The Regents of the University of Michigan
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU General Public License for more details.
+You should have received a copy of the GNU General Public License along
+with this program. If not, see <https://www.gnu.org/licenses/>.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Page not found | DataLaVista™</title>
+  <meta name="robots" content="noindex">
+  <style>
+    /* The same colors as the landing page. Text on the dark background keeps a contrast ratio above 7 to 1. */
+    :root {
+      --bg-dark: #030508;
+      --text-main: #e0e6ed;
+      --text-muted: #a9b6cb;
+      --term-red: #ff2200;
+      --term-blue: #00eeff;
+      --focus-ring: #00eeff;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      font-family: 'Segoe UI', Tahoma, Verdana, sans-serif;
+      line-height: 1.6;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+    main { max-width: 36rem; width: 100%; }
+    h1 {
+      font-size: clamp(1.75rem, 5vw, 2.5rem);
+      color: #fff;
+      border-bottom: 2px solid var(--term-red);
+      padding-bottom: 0.5rem;
+      margin-bottom: 1rem;
+    }
+    p { margin-bottom: 1rem; color: var(--text-muted); }
+    ul { list-style: none; display: flex; flex-wrap: wrap; gap: 1rem; margin-top: 1.5rem; }
+    a {
+      display: inline-block;
+      padding: 12px 20px;
+      min-height: 44px;
+      color: var(--term-blue);
+      border: 1px solid var(--term-blue);
+      text-decoration: none;
+    }
+    a:hover { background: var(--term-blue); color: #000; }
+    a:focus-visible { outline: 3px dashed var(--focus-ring); outline-offset: 4px; }
+    code { color: var(--text-main); word-break: break-all; }
+  </style>
+</head>
+<body>
+  <main id="main-content">
+    <h1>Page not found</h1>
+    <p>There is no page at the address you opened. The address may have a typo, or the page may have moved when the website changed.</p>
+    <p>The DataLaVista files now live under <code>dist/</code>, and the help pages under <code>docs/</code>. Use one of these links to continue.</p>
+    <ul>
+      <li><a href="https://code.depressioncenter.org/datalavista/">Home page</a></li>
+      <li><a href="https://code.depressioncenter.org/datalavista/docs/">Help pages</a></li>
+      <li><a href="https://code.depressioncenter.org/datalavista/dist/DataLaVista.html">Open the designer</a></li>
+      <li><a href="https://github.com/DepressionCenter/datalavista">Code on GitHub</a></li>
+    </ul>
+  </main>
+</body>
+</html>

@@ -1,0 +1,131 @@
+# ============================================================
+#  This file is part of DataLaVista™
+#  publish.yml: GitHub Actions workflow - builds the DataLaVista files and the website, and publishes the website.
+#  Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
+#  Created: 2026-03-24
+#  Last Modified: 2026-10-28
+#  Summary: On a push to main, builds dist/ from src/, commits it, builds the help pages from docs/, and deploys the website to GitHub Pages.
+#  Notes: See README file for documentation and full license information.
+#  Website: https://github.com/DepressionCenter/datalavista
+#
+#  Copyright (c) 2026 The Regents of the University of Michigan
+#
+#  This program is free software: you can redistribute it and/or modify
+#  it under the terms of the GNU General Public License as published by
+#  the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+#  This program is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+#  GNU General Public License for more details.
+#  You should have received a copy of the GNU General Public License along
+#  with this program. If not, see <https://www.gnu.org/licenses/>.
+#  ================================================================
+#
+#  The website is published from this workflow run, so the repository's Pages
+#  source must be set to "GitHub Actions". Only dist/ is committed back to main;
+#  the help pages and the rest of the website are never stored in git.
+
+name: Publish DataLaVista
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'docs/**'
+      - 'build.sh'
+      - 'mkdocs.yml'
+      - 'requirements-docs.txt'
+      - 'images/**'
+      - 'samples/**'
+      - 'styles/**'
+      - 'presentations/**'
+  workflow_dispatch:
+
+# contents: write lets the build job commit dist/ to main; pages and id-token let the deploy job publish the website
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+# Two deploys at once would race; a newer run waits for the older one to finish
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build the files and the website
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: requirements-docs.txt
+
+      - name: Install the help page builder
+        run: pip install -r requirements-docs.txt
+
+      # Any broken link or page missing from mkdocs.yml stops the run before anything is committed
+      - name: Build the help pages
+        run: mkdocs build --strict
+
+      - name: Cache esbuild
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/datalavista-build
+          key: esbuild-0.28.0-linux-x64
+
+      - name: Build the DataLaVista files
+        run: |
+          chmod +x build.sh
+          ./build.sh
+
+      - name: Stage the built files
+        id: changes
+        run: |
+          git add --all dist
+          echo "changed=$(git diff --staged --quiet && echo 'false' || echo 'true')" >> $GITHUB_OUTPUT
+
+      # The commit message says [skip ci] so this push does not start the workflow again
+      - name: Commit and push the built files
+        if: steps.changes.outputs.changed == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git commit -m "chore: rebuild outputs from src [skip ci]"
+          git push
+
+      # The website is index.html and 404.html at the root, the built files, the help pages, and the folders they link to
+      - name: Assemble the website
+        run: |
+          mkdir -p _site
+          cp src/website/index.html src/website/404.html .nojekyll _site/
+          cp -r dist images samples styles presentations _site/
+          ls -R _site | head -n 40
+
+      - name: Upload the website
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: _site
+
+  deploy:
+    name: Publish the website
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5
