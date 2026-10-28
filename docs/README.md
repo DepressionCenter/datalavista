@@ -30,7 +30,7 @@ the code.
 
 ![The DataLaVista designer, with the list of tables and fields on the left, the SQL editor in the middle, and a dashboard with bar charts and tables below.](../images/datalavista-screenshot-1.png)
 
-### The four steps
+### Dashboard Development Steps
 
 Every dashboard follows the same path through the four tabs of the designer:
 
