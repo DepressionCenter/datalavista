@@ -3,7 +3,7 @@ This file is part of DataLaVista™
 docs/local-server.md
 Author(s): PHJ2000.
 Created: 2026-10-26
-Last Modified: 2026-10-26
+Last Modified: 2026-10-28
 Summary: Runs DataLaVista with the bundled local web server.
 Notes: See README file for documentation and full license information.
 Copyright © 2026 The Regents of the University of Michigan
@@ -56,14 +56,14 @@ This is a local preview server, not an authenticated deployment.
 
 ### Bundled server
 
-The four binaries in `bin/` come from
-[ZippyServe commit 1d55cdafa42adf60dddf22376d7686d37ca03676](https://github.com/DepressionCenter/ZippyServe/tree/1d55cdafa42adf60dddf22376d7686d37ca03676).
-[Provenance and checksums](../vendor/zippyserve/PROVENANCE.txt), the upstream
-source snapshot, build scripts, and the [GPL license](../vendor/zippyserve/LICENSE) are
-included in `vendor/zippyserve/`. The binaries are copied upstream artifacts, not
-locally rebuilt ones. The Linux binary records a modified build tree; exact
-source-to-binary reproducibility has not been verified. The launchers leave the application build and SharePoint
-installation unchanged.
+The four binaries in `bin/` are built with Go 1.26.10 from the unchanged
+[ZippyServe source at commit 1d55cdafa42adf60dddf22376d7686d37ca03676](https://github.com/DepressionCenter/ZippyServe/tree/1d55cdafa42adf60dddf22376d7686d37ca03676).
+[Provenance and checksums](../vendor/zippyserve/PROVENANCE.txt), the source,
+upstream build scripts, and the [GPL license](../vendor/zippyserve/LICENSE) are
+included in `vendor/zippyserve/`. To rebuild all four binaries, install Go 1.26.10
+and run `bash vendor/zippyserve/rebuild.sh`. Set `GO_BIN` if Go is not on your path.
+Cross-compilation does not verify execution on Windows or macOS. The launchers
+leave the application build and SharePoint installation unchanged.
 
 ### Next steps
 

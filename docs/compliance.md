@@ -3,7 +3,7 @@ This file is part of DataLaVista™
 docs/compliance.md
 Author(s): Gabriel Mongefranco.
 Created: 2026-10-26
-Last Modified: 2026-10-27
+Last Modified: 2026-10-28
 Summary: Records the security and accessibility controls that exist in the code today, and the known gaps.
 Notes: See README file for documentation and full license information.
 
@@ -27,7 +27,8 @@ no promise about future work and no legal or HIPAA compliance claim.
 
 ### Data handling
 
-DataLaVista runs entirely in the browser. There is no server part. The page
+DataLaVista processes data in the browser. The optional local ZippyServe server
+serves application files but does not process uploaded data. The page
 reads the data you connect to and keeps it in memory while the tab is open.
 
 - A saved dashboard file holds the queries, the design, and the names and
@@ -37,6 +38,15 @@ reads the data you connect to and keeps it in memory while the tab is open.
 - The browser downloads remote files itself. If that fails and you agree, one of
   three public relay services downloads the file instead. The relay sees the
   address and the contents of the file. See "Remote files" below.
+
+### Optional local server
+
+The bundled launchers start ZippyServe on `127.0.0.1`. Hidden files, paths outside
+the project folder, and MCP access remain disabled by default. The server sends
+permissive CORS headers, so other web pages and local processes may read files
+inside the served folder. Keep private data and credentials elsewhere. This
+server has no authentication and is for local previews, not private-data hosting.
+See the [local server guide](local-server.md) for commands and dependency details.
 
 ### Security controls in place
 

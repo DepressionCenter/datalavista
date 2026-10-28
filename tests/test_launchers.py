@@ -2,7 +2,7 @@
 # tests/test_launchers.py
 # Author(s): PHJ2000.
 # Created: 2026-10-26
-# Last Modified: 2026-10-26
+# Last Modified: 2026-10-28
 # Summary: Checks the local launcher and HTTP serving contract.
 # Notes: See README file for documentation and full license information.
 #
@@ -69,6 +69,30 @@ class LauncherTests(unittest.TestCase):
             result = subprocess.run(["bash", str(pathlib.Path(tmp) / "run.sh")], capture_output=True)
             self.assertEqual(result.returncode, 1)
             self.assertIn(b"ZippyServe is missing", result.stderr)
+
+    def test_missing_application(self):
+        with tempfile.TemporaryDirectory(prefix="dlv missing app ") as tmp:
+            root = pathlib.Path(tmp)
+            shutil.copy2(ROOT / "run.sh", root)
+            (root / "bin").mkdir()
+            for name in ("ZippyServe-linux-amd64", "ZippyServe-mac-amd64", "ZippyServe-mac-arm64"):
+                binary = root / "bin" / name
+                binary.write_text("#!/bin/sh\nexit 99\n")
+                binary.chmod(0o755)
+            result = subprocess.run(["bash", str(root / "run.sh")], capture_output=True)
+            self.assertEqual(result.returncode, 1)
+            self.assertIn(b"DataLaVista.html is missing", result.stderr)
+
+    def test_unsupported_platform(self):
+        with tempfile.TemporaryDirectory(prefix="dlv unsupported ") as tmp:
+            root = pathlib.Path(tmp)
+            uname = root / "uname"
+            uname.write_text('#!/bin/sh\ncase "$1" in -s) echo Linux;; -m) echo aarch64;; esac\n')
+            uname.chmod(0o755)
+            result = subprocess.run(["bash", str(ROOT / "run.sh")], capture_output=True,
+                                    env={**os.environ, "PATH": str(root) + os.pathsep + os.environ["PATH"]})
+            self.assertEqual(result.returncode, 1)
+            self.assertIn(b"not supported", result.stderr)
 
     def test_http_from_another_directory(self):
         with tempfile.TemporaryDirectory(prefix="dlv space ") as tmp:
