@@ -17,7 +17,7 @@ See <https://www.gnu.org/licenses/fdl-1.3.html>. See README for full license inf
 
 ## Install DataLaVista in SharePoint
 
-[Back to project README](../../README.md)
+[Back to help home](../README.md)
 
 This page explains how to add DataLaVista to a SharePoint Online site, how to
 update it later, and what to do when the page does not start. It is for site
@@ -67,10 +67,10 @@ that policy.
    and paste it into the code editor. After a comment with these steps, it looks
    like this:
 
-   ```html
-   <div id="dlv-root"></div>
-   <script src="../SiteAssets/scripts/datalavista.js"></script>
-   ```
+    ```html
+    <div id="dlv-root"></div>
+    <script src="../SiteAssets/scripts/datalavista.js"></script>
+    ```
 
 8. Select **Save** in the code editor, then **Save** on the page to leave edit
    mode.
@@ -101,7 +101,7 @@ says what to do next.
   Site Assets and that the page is directly in Site Pages. If it says the script was
   blocked, ask your SharePoint administrator whether the tenant's content
   security policy allows scripts from the site's own Site Assets library.
-- **"DataLaVista could not find \<div id="dlv-root"\>"** in the console. The
+- **"DataLaVista could not find `<div id="dlv-root">`"** in the console. The
   web part code was not pasted in full. Paste the whole contents of
   `dist/DataLaVista-sp.html.txt` again.
 
@@ -109,14 +109,16 @@ says what to do next.
 
 You can now add DataLaVista to a site with one uploaded file and one pasted
 snippet, and replace the file to update it. Next, connect a SharePoint list or a
-data file from the Connect to Data Source popup, as the README describes.
+data file from the Connect to Data Source popup, as [Connect to data](connect-to-data.md) describes.
 
 ### Additional resources
 
-- [Project README](../../README.md)
-- [Documentation index](../README.md)
+- [Help home](../README.md)
+- [Connect to data](connect-to-data.md)
+- [Publish and share a dashboard](publish-and-share.md)
+- [Troubleshooting](../troubleshooting.md)
 - [Compliance](../compliance.md)
 - [DataLaVista knowledge base article](https://teamdynamix.umich.edu/TDClient/210/DepressionCenter/KB/ArticleDet?ID=15179)
 - [Modern Script Editor web part](https://github.com/pnp/sp-dev-fx-webparts/tree/main/samples/react-script-editor)
 
-[Back to project README](../../README.md)
+[Back to help home](../README.md)
