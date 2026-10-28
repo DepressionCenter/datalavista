@@ -87,6 +87,32 @@ class RewriteMarkdownTests(unittest.TestCase):
         )
         self.assertEqual(docs_links.rewrite_markdown(page, "", SITE_ROOT), expected)
 
+    def test_links_inside_code_are_left_as_written(self):
+        page = (
+            "Copy this skeleton:\n\n"
+            "```markdown\n"
+            "Read [the preferences](../project-preferences/SKILL.md) first.\n"
+            "```\n\n"
+            "Inline `[example](../README.md)` stays too, but [this one](../README.md) is rewritten.\n\n"
+            "    ~~~\n    [indented](../AGENTS.md)\n    ~~~\n"
+        )
+        expected = (
+            "Copy this skeleton:\n\n"
+            "```markdown\n"
+            "Read [the preferences](../project-preferences/SKILL.md) first.\n"
+            "```\n\n"
+            "Inline `[example](../README.md)` stays too, but [this one](" + GITHUB + "README.md) is rewritten.\n\n"
+            "    ~~~\n    [indented](../AGENTS.md)\n    ~~~\n"
+        )
+        self.assertEqual(docs_links.rewrite_markdown(page, "", SITE_ROOT), expected)
+
+    def test_skill_examples_skeleton_keeps_its_relative_link(self):
+        # docs/skill-examples.md shows a skeleton inside a code fence whose link is relative to skills/<name>/
+        page = (HOOK_PATH.parent.parent.parent / "docs" / "skill-examples.md").read_text(encoding="utf-8")
+        published = docs_links.rewrite_markdown(page, "", SITE_ROOT)
+        self.assertIn("](../project-preferences/SKILL.md)", published)
+        self.assertNotIn("blob/main/project-preferences/SKILL.md", published)
+
     def test_page_in_a_subfolder_resolves_from_its_own_folder(self):
         page = "[Help home](../README.md) and [the README](../../README.md)"
         expected = "[Help home](../README.md) and [the README](" + GITHUB + "README.md)"

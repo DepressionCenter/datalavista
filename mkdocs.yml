@@ -58,6 +58,8 @@ validation:
 theme:
   name: material
   language: en
+  # The pages use the reader's system fonts, so nothing is downloaded from Google Fonts
+  font: false
   features:
     - navigation.sections
     - navigation.top

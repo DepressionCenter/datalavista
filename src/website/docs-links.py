@@ -48,6 +48,10 @@ DOCS_FOLDER = "docs"
 # A Markdown link or image: optional "!", the text in brackets, then the target in parentheses
 LINK_PATTERN = re.compile(r"(!?\[[^\]]*\]\()([^)\s]+)((?:\s+\"[^\"]*\")?\))")
 
+# A fenced code block (``` or ~~~, at any indentation) or an inline code span. Links written
+# inside them are examples for the reader and must be published exactly as written.
+CODE_PATTERN = re.compile(r"(```.*?```|~~~.*?~~~|`[^`\n]*`)", re.S)
+
 
 ### Rewrite One Link ###
 
@@ -88,10 +92,17 @@ def rewrite_link(target, page_folder, site_root):
 ### Rewrite a Page ###
 
 def rewrite_markdown(markdown, page_folder, site_root):
-    """Return the Markdown of one page with every link target passed through rewrite_link."""
+    """Return the Markdown of one page with every link target passed through rewrite_link.
+
+    Text inside fenced code blocks and inline code spans is left exactly as written.
+    """
     def replace(match):
         return match.group(1) + rewrite_link(match.group(2), page_folder, site_root) + match.group(3)
-    return LINK_PATTERN.sub(replace, markdown)
+    parts = CODE_PATTERN.split(markdown)
+    # split() returns prose and code alternately, with the code in the odd positions
+    for index in range(0, len(parts), 2):
+        parts[index] = LINK_PATTERN.sub(replace, parts[index])
+    return "".join(parts)
 
 
 def site_root_from(site_url):
