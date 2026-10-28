@@ -159,7 +159,9 @@ The run does these things in order:
    that leaves `docs/`: a link into `dist`, `images`, `samples`, `styles`, or
    `presentations` points at that folder on the website, and a link to any
    other repository file points at GitHub. `docs/doc-template.md` is left out of
-   the website because its placeholder text sits in angle brackets.
+   the website because its placeholder text sits in angle brackets. The header,
+   the footer, and the colors of the help pages come from
+   `src/website/mkdocs-overrides/`, described below.
 2. Runs `build.sh`, and commits `dist/` to `main` when it changed, with a
    message that ends in `[skip ci]` so the push does not start the workflow
    again.
@@ -190,6 +192,41 @@ Then open `http://localhost:8000/` in a browser. `_site/` is ignored by git.
 When you add a page under `docs/`, add it to `nav` in `mkdocs.yml`, or the
 strict build fails. The [documentation skill](../skills/documentation/SKILL.md)
 has the page structure.
+
+#### Header, footer, and colors of the help pages
+
+The folder `src/website/mkdocs-overrides/` replaces three parts of the theme:
+
+- `partials/header.html` is the theme's header with a Home button added. The
+  button opens the address in `app_home_url` under `extra` in `mkdocs.yml`.
+- `partials/footer.html` keeps the theme's previous and next page links and
+  replaces the rest of the footer: the copyright and the Depression Center
+  link on the left, and the View code and More apps links on the right. The
+  text comes from `copyright`, and the addresses from `organization_name`,
+  `organization_url`, `code_url`, and `more_apps_url` under `extra`. The
+  theme's own "Made with Material for MkDocs" line is turned off with
+  `generator: false`, and the README credits MkDocs and the theme instead.
+- `assets/stylesheets/help.css` gives the pages the red of the home page in
+  place of the theme's indigo, in both the light and the dark color schemes,
+  and draws the Home button and the footer links. The palette entries in
+  `mkdocs.yml` are set to `custom` so the theme leaves those colors to this
+  file. The fonts stay the reader's system fonts.
+
+To change an address or the copyright, edit `mkdocs.yml`, not the templates.
+The two templates copy the theme's own markup from Material for MkDocs 9.8.0,
+so after you change the pinned theme version, compare them with the theme's
+`partials/header.html` and `partials/footer.html` and carry over any change.
+
+#### Look of the website pages
+
+`styles/datalavista-style.css` holds the colors, fonts, links, buttons, and
+footer of the home page as a stylesheet that other pages on the website can
+share. The 404 page uses it. The home page keeps its own copy of those rules
+inside `src/website/index.html`, next to its animation styles, so change both
+when a color or font changes. `styles/um-style.css` is the University of
+Michigan palette that the media pack skill uses as a starting point for
+artwork; no page on the website uses it. The DataLaVista app in `dist/` has
+its own styles and does not use either file.
 
 ### Releases
 

@@ -1,0 +1,161 @@
+/* ============================================================
+This file is part of DataLaVista™
+datalavista-style.css: The look of the DataLaVista home page as a stylesheet that other pages on the website can share.
+Author(s): Gabriel Mongefranco.
+Created: 2026-10-28
+Last Modified: 2026-10-28
+Summary: Colors, fonts, links, headings, buttons, and footer of the DataLaVista home page. The 404 page uses it. The home page keeps its own copy of these rules inside index.html because it also holds the animation styles, so change both when a color or font changes.
+Notes: See README file for documentation and full license information.
+Website: https://github.com/DepressionCenter/datalavista
+
+Copyright © 2026 The Regents of the University of Michigan
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU General Public License for more details.
+You should have received a copy of the GNU General Public License along
+with this program. If not, see <https://www.gnu.org/licenses/>.
+================================================================ */
+
+/* The fonts are the same ones the home page loads from Google Fonts. A page that uses this
+   stylesheet adds the same <link> as index.html, or the fallbacks after each name are used. */
+
+/* ### Colors ### */
+
+/* Contrast on the dark background: main text 15.6 to 1, muted text 7.3 to 1, red 3.8 to 1 (large text and borders only), cyan 13.7 to 1 */
+:root {
+  --bg-dark: #030508;
+  --bg-panel: #0a1118;
+  --text-main: #e0e6ed;
+  --text-muted: #8b9bb4;
+  --term-red: #ff2200;
+  --term-red-glow: rgba(255, 34, 0, 0.4);
+  --term-blue: #00eeff;
+  --focus-ring: #00eeff;
+}
+
+/* ### Page ### */
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  background-color: var(--bg-dark);
+  color: var(--text-main);
+  font-family: 'Inter', 'Segoe UI', Tahoma, Verdana, sans-serif;
+  line-height: 1.6;
+}
+
+/* ### Headings and text ### */
+
+h1, h2, h3 {
+  font-family: 'Orbitron', 'Segoe UI', Tahoma, Verdana, sans-serif;
+  color: #fff;
+}
+
+/* A title with the red line under it, as on the home page */
+.section-title {
+  display: inline-block;
+  padding-bottom: 0.5rem;
+  margin-bottom: 1.5rem;
+  border-bottom: 2px solid var(--term-red);
+}
+
+.lead-text {
+  font-size: 1.25rem;
+  color: var(--text-muted);
+  max-width: 800px;
+}
+
+.text-highlight { color: var(--term-red); font-weight: 600; }
+
+/* ### Links ### */
+
+a {
+  color: var(--term-blue);
+  text-decoration: none;
+  transition: color 0.2s, text-shadow 0.2s;
+}
+a:hover { color: #fff; text-shadow: 0 0 8px var(--term-blue); }
+a:focus-visible { outline: 3px dashed var(--focus-ring); outline-offset: 4px; }
+
+/* Shown only while the keyboard focus is on it; it is the first link on the page */
+.skip-link {
+  position: absolute;
+  top: -100px;
+  left: 16px;
+  z-index: 10000;
+  padding: 12px 20px;
+  background: var(--term-red);
+  color: #fff;
+  font-weight: 600;
+}
+.skip-link:focus { top: 16px; outline: 3px solid #fff; }
+
+/* ### Buttons ### */
+
+/* Red by default; add btn-blue for the cyan version. Both keep the 24 pixel minimum size for a pointer. */
+.btn {
+  display: inline-block;
+  padding: 12px 24px;
+  background: rgba(255, 34, 0, 0.1);
+  color: var(--term-red);
+  border: 1px solid var(--term-red);
+  font-family: 'Share Tech Mono', 'Courier New', monospace;
+  font-size: 1.1rem;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+.btn:hover, .btn:focus {
+  background: var(--term-red);
+  color: #fff;
+  box-shadow: 0 0 15px var(--term-red-glow);
+  outline: none;
+}
+.btn-blue {
+  background: rgba(0, 238, 255, 0.1);
+  color: var(--term-blue);
+  border-color: var(--term-blue);
+}
+.btn-blue:hover, .btn-blue:focus {
+  background: var(--term-blue);
+  color: #000;
+  box-shadow: 0 0 15px rgba(0, 238, 255, 0.4);
+}
+
+/* ### Panels ### */
+
+.feature-card {
+  background: var(--bg-panel);
+  border: 1px solid rgba(255, 34, 0, 0.2);
+  padding: 2rem;
+  border-radius: 8px;
+}
+
+/* ### Footer ### */
+
+.site-footer {
+  background: #000;
+  border-top: 1px solid #222;
+  padding: 3rem 5%;
+  text-align: center;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+.footer-links {
+  display: flex;
+  justify-content: center;
+  gap: 2rem;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+}
+.footer-links a { color: var(--text-muted); font-family: 'Share Tech Mono', 'Courier New', monospace; }
+.footer-links a:hover { color: var(--term-blue); }
+.copyright { font-size: 0.8rem; opacity: 0.6; }

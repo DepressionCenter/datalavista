@@ -45,13 +45,18 @@ Follow the repository’s existing file and folder naming conventions when addin
   `DataLaVista-sp.html.txt`, and `datalavista.js`. The publish workflow rebuilds and
   commits them after each merge to `main`; never commit them from a pull request.
   They are the only generated files in git.
-- `src/website/` holds the landing page `index.html`, the `404.html` page, and the
-  MkDocs hook `docs-links.py`. `mkdocs.yml` and `requirements-docs.txt` at the
-  root control how `docs/` becomes the help website. The assembled website in
-  `_site/` is ignored by git.
+- `src/website/` holds the landing page `index.html`, the `404.html` page, the
+  MkDocs hook `docs-links.py`, and `mkdocs-overrides/`, which replaces the
+  theme's header and footer and sets the help pages' colors. `mkdocs.yml` and
+  `requirements-docs.txt` at the root control how `docs/` becomes the help
+  website; the addresses in its header and footer are under `extra` there. The
+  assembled website in `_site/` is ignored by git.
 - `samples/` contains example data, dashboard configurations, and sample generators.
-- `images/` contains project screenshots and preview assets. `styles/um-style.css`
-  is the existing project stylesheet; preserve its established behavior.
+- `images/` contains project screenshots and preview assets. `styles/` holds
+  `datalavista-style.css`, the look of the home page as a shared stylesheet for
+  pages on the website such as `404.html`, and `um-style.css`, the University of
+  Michigan palette that the media pack skill starts from; preserve the
+  established behavior of both. The app in `dist/` uses neither.
 - Keep local documentation in `docs/`, which is also the source of the help
   website. Add every new page to `nav` in `mkdocs.yml`. Keep shared instructions
   in `AGENTS.md` and project-specific preferences in this file.

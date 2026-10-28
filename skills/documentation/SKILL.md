@@ -55,7 +55,9 @@ there, with the title to show in the navigation, or the strict build fails.
 Links that leave `/docs` are rewritten for the website by
 `src/website/docs-links.py`, so keep writing repository-relative links such as
 `../README.md`. `doc-template.md` is excluded from the website, so link to it on
-GitHub with a full address.
+GitHub with a full address. The header, the footer, and the colors of the
+published pages come from `src/website/mkdocs-overrides/`, so a page never
+repeats the copyright or the footer links in its body.
 
 ### Page structure
 

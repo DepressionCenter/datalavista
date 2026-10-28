@@ -4,7 +4,7 @@ src/website/404.html: The page shown when an address on the DataLaVista website 
 Author(s): Gabriel Mongefranco.
 Created: 2026-10-28
 Last Modified: 2026-10-28
-Summary: Tells the visitor that the page was not found and links to the home page, the help pages, and the code.
+Summary: Tells the visitor that the page was not found and links to the home page, the help pages, and the code. It uses the shared stylesheet in styles/ so it looks like the home page.
 Notes: See README file for documentation and full license information.
 
 Copyright © 2026 The Regents of the University of Michigan
@@ -26,22 +26,18 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Page not found | DataLaVista™</title>
   <meta name="robots" content="noindex">
+  <!-- The same fonts as the home page -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+  <!-- The page is shown at any missing address, so the stylesheet and the links use full addresses -->
+  <link rel="stylesheet" href="https://code.depressioncenter.org/datalavista/styles/datalavista-style.css">
   <style>
-    /* The same colors as the landing page. Text on the dark background keeps a contrast ratio above 7 to 1. */
-    :root {
-      --bg-dark: #030508;
-      --text-main: #e0e6ed;
-      --text-muted: #a9b6cb;
-      --term-red: #ff2200;
-      --term-blue: #00eeff;
-      --focus-ring: #00eeff;
-    }
-    * { margin: 0; padding: 0; box-sizing: border-box; }
+    /* The page colors and fonts, repeated here so the page stays readable when the shared stylesheet does not load */
     body {
-      background-color: var(--bg-dark);
-      color: var(--text-main);
-      font-family: 'Segoe UI', Tahoma, Verdana, sans-serif;
-      line-height: 1.6;
+      background-color: #030508;
+      color: #e0e6ed;
+      font-family: 'Inter', 'Segoe UI', Tahoma, Verdana, sans-serif;
       min-height: 100vh;
       display: flex;
       align-items: center;
@@ -50,25 +46,27 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
     }
     main { max-width: 36rem; width: 100%; }
     h1 {
-      font-size: clamp(1.75rem, 5vw, 2.5rem);
+      font-family: 'Orbitron', 'Segoe UI', Tahoma, Verdana, sans-serif;
       color: #fff;
-      border-bottom: 2px solid var(--term-red);
+      font-size: clamp(1.75rem, 5vw, 2.5rem);
+      border-bottom: 2px solid var(--term-red, #ff2200);
       padding-bottom: 0.5rem;
       margin-bottom: 1rem;
     }
-    p { margin-bottom: 1rem; color: var(--text-muted); }
+    p { margin-bottom: 1rem; color: var(--text-muted, #8b9bb4); }
     ul { list-style: none; display: flex; flex-wrap: wrap; gap: 1rem; margin-top: 1.5rem; }
-    a {
+    /* Each link is drawn as a button at least 44 pixels tall */
+    ul a {
       display: inline-block;
       padding: 12px 20px;
       min-height: 44px;
-      color: var(--term-blue);
-      border: 1px solid var(--term-blue);
+      color: var(--term-blue, #00eeff);
+      border: 1px solid var(--term-blue, #00eeff);
       text-decoration: none;
     }
-    a:hover { background: var(--term-blue); color: #000; }
-    a:focus-visible { outline: 3px dashed var(--focus-ring); outline-offset: 4px; }
-    code { color: var(--text-main); word-break: break-all; }
+    ul a:hover { background: var(--term-blue, #00eeff); color: #000; text-shadow: none; }
+    ul a:focus-visible { outline: 3px dashed var(--focus-ring, #00eeff); outline-offset: 4px; }
+    code { color: var(--text-main, #e0e6ed); word-break: break-all; }
   </style>
 </head>
 <body>

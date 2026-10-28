@@ -135,6 +135,7 @@ If you need assistance identifying a contact person, email the EFDC's Mobile Tec
 + [CodeMirror](https://codemirror.net/) -  A code editor component for the web, providing SQL syntax highlighting and autocomplete for your queries.
 + [Modern Script Editor](https://github.com/pnp/sp-dev-fx-webparts/tree/main/samples/react-script-editor) - The PnP/SPFX delivery vehicle used to deploy this "Unit" into modern SharePoint environments.
 + [Microsoft SharePoint REST API](https://learn.microsoft.com/en-us/sharepoint/dev/sp-add-ins/get-to-know-the-sharepoint-rest-service) - The primary data uplink for retrieving SharePoint List items and Document Library metadata.
++ [MkDocs](https://www.mkdocs.org/) and [Material for MkDocs](https://squidfunk.github.io/mkdocs-material/) - The tools that turn the Markdown pages in `docs/` into the help website.
 
 
 ## License
