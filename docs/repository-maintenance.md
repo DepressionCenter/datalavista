@@ -212,7 +212,14 @@ The folder `src/website/mkdocs-overrides/` replaces three parts of the theme:
   `mkdocs.yml` are set to `custom` so the theme leaves those colors to this
   file. The fonts stay the reader's system fonts.
 
-To change an address or the copyright, edit `mkdocs.yml`, not the templates.
+- `main.html` adds Google Analytics, with the property under `analytics` in
+  `mkdocs.yml`, and starts it only when the page's host name is the `host`
+  given there, which is `code.depressioncenter.org`. A local preview or a copy
+  of the site elsewhere sends nothing to Google. The app and the home page
+  follow the same rule.
+
+To change an address, the copyright, or the analytics property, edit
+`mkdocs.yml`, not the templates.
 The two templates copy the theme's own markup from Material for MkDocs 9.8.0,
 so after you change the pinned theme version, compare them with the theme's
 `partials/header.html` and `partials/footer.html` and carry over any change.

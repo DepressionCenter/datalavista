@@ -115,9 +115,12 @@ The website, the help pages, and the demo are published by the publish workflow
 in `.github/workflows/publish.yml` from a GitHub Actions run, with the
 repository's Pages source set to "GitHub Actions". The help pages are generated
 from `docs/` on every run and are never stored in git; only `dist/` is committed.
-The landing page loads Google Analytics and two font families from Google, and
-the help pages load nothing from other sites. The
-[Repository maintenance](repository-maintenance.md) page describes the run.
+The landing page, the help pages, and the app load Google Analytics only when
+they are served from `code.depressioncenter.org`; a local preview or a copy on
+another site sends nothing to Google. The landing page and the 404 page load
+their font families from Google, and the help pages load nothing else from
+other sites. The [Repository maintenance](repository-maintenance.md) page
+describes the run.
 
 ### Conclusion
 
