@@ -33,11 +33,21 @@ credits.
 
 ### Where does my data go?
 
-Nowhere new. DataLaVista runs in your browser, reads data from the places it
-already lives, and processes it on your computer. It has no server of its own.
-A dashboard you publish to SharePoint stays in your SharePoint site. The only
-exception is a file you load with the Upload Files tab, whose contents are
-saved inside the report configuration so the dashboard stays self-contained.
+Usually nowhere new. DataLaVista runs in your browser, reads data from the
+places it already lives, and processes it on your computer. It has no server of
+its own, and a dashboard you publish to SharePoint stays in your SharePoint
+site. There are two exceptions:
+
+- A file you load with the Upload Files tab is saved inside the report
+  configuration, so anyone you share that file with gets a copy of the data.
+- When a file on another website cannot be downloaded directly, DataLaVista
+  asks whether it may use a relay service and names the services it would use.
+  If you say yes, the relay receives the file's address and downloads the whole
+  file, and the answer applies to every file from that website until you
+  reload the page. Do not approve a relay for confidential or regulated data.
+  Put the file in a document library on your own SharePoint site instead,
+  which needs no relay.
+
 The [Compliance](compliance.md) page lists the protections in the code and the
 known gaps.
 
