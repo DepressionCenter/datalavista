@@ -144,6 +144,7 @@ nav:
       - Troubleshooting: troubleshooting.md
   - For developers and maintainers:
       - Architecture: architecture.md
+      - Local server: local-server.md
       - Repository maintenance: repository-maintenance.md
       - Compliance: compliance.md
       - Skill authoring examples: skill-examples.md

@@ -57,6 +57,8 @@ Most enterprise data is trapped behind bloated frameworks or expensive BI tools.
   
 
 ## Quick Start Guide
+Run locally with `run.bat` on Windows or `bash run.sh` on Linux/macOS.
+See the [local server guide](docs/local-server.md) for supported systems and data access.
 ### Live Demo:
 + ***Dashboard View-Mode Demo: [Project Health Dashboard](https://code.depressioncenter.org/datalavista/dist/DataLaVista.html?reportMode=view&report=https://code.depressioncenter.org/datalavista/samples/reports/Project%20Health%20Dashboard.json)***
 + ***Dashboard Designer Demo: [DataLaVista.html](https://code.depressioncenter.org/datalavista/dist/DataLaVista.html?reportMode=edit&report=https://code.depressioncenter.org/datalavista/samples/reports/Project%20Health%20Dashboard.json)***

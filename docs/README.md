@@ -46,7 +46,10 @@ Every dashboard follows the same path through the four tabs of the designer:
 Getting the query right first makes the other steps faster. You can also change
 the data source later and keep the same design.
 
+
 ### Guides
+
+- [Local server](local-server.md): run DataLaVista on your computer with ZippyServe.
 
 - [Get started](how-to/get-started.md): open the live demo, run DataLaVista from
   a file or inside another website, and build a first dashboard with sample data.

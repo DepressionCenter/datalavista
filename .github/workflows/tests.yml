@@ -83,3 +83,6 @@ jobs:
 
       - name: Unit tests
         run: node --test tests/*.test.cjs
+
+      - name: Local server launchers
+        run: python3 -m unittest discover -s tests -p "test_launchers.py" -v
