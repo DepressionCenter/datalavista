@@ -4,8 +4,8 @@
 #  check-repository.sh: Repository checks for pull requests and pushes.
 #  Author(s): Gabriel Mongefranco.
 #  Created: 2026-10-27
-#  Last Modified: 2026-10-27
-#  Summary: Checks JSON files, source file headers, whitespace, and edits to build outputs.
+#  Last Modified: 2026-10-28
+#  Summary: Checks JSON files, license headers in source and documentation files, whitespace, and edits to the built files in dist/.
 #  Notes: See README file for documentation and full license information.
 #  Website: https://github.com/DepressionCenter/datalavista
 #
@@ -43,8 +43,12 @@ while IFS= read -r -d '' file; do
   fi
 done < <(git ls-files -z '*.json')
 
-### Check Source File Headers ###
-for file in src/[0-9][0-9]-*.js src/00-full-page.html; do
+### Check Source and Documentation File Headers ###
+for file in src/[0-9][0-9]-*.js src/00-full-page.html src/before-libraries.js src/after-libraries.js \
+    src/DataLaVista-sp.html.txt src/website/index.html src/website/404.html src/website/docs-links.py \
+    src/website/mkdocs-overrides/*.html src/website/mkdocs-overrides/partials/*.html \
+    src/website/mkdocs-overrides/assets/stylesheets/*.css styles/*.css \
+    tests/docs_links_test.py mkdocs.yml requirements-docs.txt docs/*.md docs/how-to/*.md; do
   if ! grep -q "This file is part of DataLaVista" "$file"; then
     fail "$file has no license header. Copy the header from section 3 of AGENTS.md to the top of the file."
   fi
@@ -52,15 +56,14 @@ done
 
 ### Check Changes Since the Base Commit ###
 if [ -n "$BASE" ]; then
-  if ! git diff --check "$BASE"...HEAD; then
+  # The library copies in src/lib are checked against their checksums instead, so they are skipped here
+  if ! git diff --check "$BASE"...HEAD -- . ':(exclude)src/lib'; then
     fail "the changes above add trailing spaces or leftover conflict markers. Remove them and commit again."
   fi
-  # The build workflow rebuilds these files after each merge to main
-  for output in DataLaVista.html DataLaVista-nojs.html datalavista.js; do
-    if git diff --name-only "$BASE"...HEAD | grep -qx "$output"; then
-      fail "$output was changed. Make the change in src/ instead, then run: git checkout $BASE -- $output"
-    fi
-  done
+  # The build workflow rebuilds dist/ after each merge to main
+  while IFS= read -r output; do
+    fail "$output was changed. Make the change in src/ instead, then run: git checkout $BASE -- $output"
+  done < <(git diff --name-only "$BASE"...HEAD -- dist)
 fi
 
 if [ "$failures" -gt 0 ]; then

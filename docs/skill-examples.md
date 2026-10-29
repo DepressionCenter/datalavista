@@ -3,7 +3,7 @@ This file is part of DataLaVista™
 docs/skill-examples.md
 Author(s): Gabriel Mongefranco.
 Created: 2026-09-05
-Last Modified: 2026-10-25
+Last Modified: 2026-10-28
 Summary: Provides optional examples for authoring reusable project skills.
 Notes: See README file for documentation and full license information.
 
@@ -17,7 +17,7 @@ See <https://www.gnu.org/licenses/fdl-1.3.html>. See README for full license inf
 
 ## Skill authoring examples
 
-[Back to project README](../README.md)
+[Back to help home](README.md)
 
 These original starter recipes help maintainers write small, useful skills for
 common project types. They are documentation examples only: none is installed or
@@ -371,6 +371,7 @@ generic checks with real repository commands. Keep the skill subordinate to
 
 The source links beside each recipe are its primary technical references.
 
+- [Help home](README.md)
 - [Project instructions](../AGENTS.md)
 - [Skills index](../SKILLS.md)
 - [Skills folder guide](../skills/README.md)
@@ -380,4 +381,4 @@ The source links beside each recipe are its primary technical references.
 - [W3C WCAG 2.2](https://www.w3.org/TR/WCAG22/)
 - [EFDC Health Research Resource Library](https://michmed.org/efdc-kb)
 
-[Back to project README](../README.md)
+[Back to help home](README.md)

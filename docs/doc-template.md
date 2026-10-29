@@ -3,7 +3,7 @@ This file is part of DataLaVista™
 docs/doc-template.md
 Author(s): Gabriel Mongefranco.
 Created: 2026-08-17
-Last Modified: 2026-10-25
+Last Modified: 2026-10-28
 Summary: Provides a copyable structure for project documentation pages.
 Notes: See README file for documentation and full license information.
 
@@ -17,7 +17,7 @@ See <https://www.gnu.org/licenses/fdl-1.3.html>. See README for full license inf
 
 ## < YOUR_PAGE_TITLE (e.g., Installation Guide, Usage Examples, etc.) >
 
-[← Back to README](../README.md)
+[Back to help home](README.md)
 
 
 ## Summary
@@ -64,7 +64,7 @@ Article content.
 
 
 
-[← Back to README](../README.md)
+[Back to help home](README.md)
 
 ----
 

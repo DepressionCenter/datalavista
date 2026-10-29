@@ -1,10 +1,10 @@
 ﻿/* ============================================================
 This file is part of DataLaVista™
-95-public-api.js: Public API (window.dlv) and app self-initialization entry point.
+95-public-api.js: Public API (window.dlv).
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 Created: 2026-03-24
-Last Modified: 2026-10-26
-Summary: Public API (window.dlv) and app self-initialization entry point.
+Last Modified: 2026-10-27
+Summary: Defines window.dlv, the public interface that automated checks and other pages can call.
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
 
@@ -324,17 +324,11 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         _toggleLookupChild,
         _setLookupChildAgg,
         _advShowMoreFields,
-        _advShowLessFields,
-        ensureInit,
-        init
+        _advShowLessFields
       };
 
-      // Expose all dlv entries + key state objects as window globals so that
-      // inline onclick/oninput/onchange attributes on dynamically-generated HTML
-      // can call them. Direct assignment (not closure) so SharePoint cannot break
-      // the reference by touching window.dlv after the shim runs.
+      // window.dlv and window.DataLaVistaState are the only parts of the app reachable from outside
+      // the bundle. Automated checks drive the app through them. Everything else stays private;
+      // the page's own buttons and inputs reach the app through data-action attributes instead.
       const _w = /** @type {any} */ (window);
-      for (const [k, v] of Object.entries(_w.dlv)) {
-        if (!Object.prototype.hasOwnProperty.call(_w, k)) _w[k] = v;
-      }
       if (!_w.DataLaVistaState) _w.DataLaVistaState = DataLaVistaState;

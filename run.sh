@@ -40,10 +40,10 @@ if [[ ! -x "$SCRIPT_DIR/bin/$EXE" ]]; then
     echo "ZippyServe is missing or not executable. Restore bin/ and its executable permissions." >&2
     exit 1
 fi
-if [[ ! -f "$SCRIPT_DIR/DataLaVista.html" ]]; then
-    echo "DataLaVista.html is missing. Restore it from the project download." >&2
+if [[ ! -f "$SCRIPT_DIR/dist/DataLaVista.html" ]]; then
+    echo "dist/DataLaVista.html is missing. Restore it from the project download." >&2
     exit 1
 fi
-printf 'Open http://127.0.0.1:%s/DataLaVista.html in your browser. Press Ctrl+C to stop.
+printf 'Open http://127.0.0.1:%s/dist/DataLaVista.html in your browser. Press Ctrl+C to stop.
 ' "$PORT"
-exec "$SCRIPT_DIR/bin/$EXE" -port "$PORT" -index "$SCRIPT_DIR/DataLaVista.html"
+exec "$SCRIPT_DIR/bin/$EXE" -port "$PORT" -dir "$SCRIPT_DIR"

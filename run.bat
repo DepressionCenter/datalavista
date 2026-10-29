@@ -26,10 +26,10 @@ if not exist "%~dp0bin\ZippyServe.exe" (
     echo ZippyServe is missing. Restore bin from the project download.
     exit /b 1
 )
-if not exist "%~dp0DataLaVista.html" (
-    echo DataLaVista.html is missing. Restore it from the project download.
+if not exist "%~dp0dist\DataLaVista.html" (
+    echo dist/DataLaVista.html is missing. Restore it from the project download.
     exit /b 1
 )
-echo Open http://127.0.0.1:8010/DataLaVista.html in your browser. Press Ctrl+C to stop.
-"%~dp0bin\ZippyServe.exe" -port 8010 -index "%~dp0DataLaVista.html"
+echo Open http://127.0.0.1:8010/dist/DataLaVista.html in your browser. Press Ctrl+C to stop.
+"%~dp0bin\ZippyServe.exe" -port 8010 -dir "%~dp0."
 exit /b %errorlevel%

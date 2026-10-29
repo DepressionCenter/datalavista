@@ -2,7 +2,7 @@
 # tests/test_launchers.py
 # Author(s): PHJ2000.
 # Created: 2026-10-26
-# Last Modified: 2026-10-28
+# Last Modified: 2026-10-29
 # Summary: Checks the local launcher and HTTP serving contract.
 # Notes: See README file for documentation and full license information.
 #
@@ -49,7 +49,8 @@ class LauncherTests(unittest.TestCase):
             with self.subTest(system=system, arch=arch), tempfile.TemporaryDirectory(prefix="dlv platform ") as tmp:
                 root = pathlib.Path(tmp)
                 shutil.copy2(ROOT / "run.sh", root)
-                (root / "DataLaVista.html").write_text("synthetic app")
+                (root / "dist").mkdir()
+                (root / "dist/DataLaVista.html").write_text("synthetic app")
                 (root / "bin").mkdir()
                 stub = root / "bin" / binary
                 stub.write_text('#!/bin/sh\nprintf "%s\\n" "$@"\n')
@@ -61,7 +62,7 @@ class LauncherTests(unittest.TestCase):
                                         env={**os.environ, "PATH": str(root / "bin") + os.pathsep + os.environ["PATH"]})
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertEqual(result.stdout.decode().splitlines()[1:],
-                                 ["-port", "9000", "-index", str(root / "DataLaVista.html")])
+                                 ["-port", "9000", "-dir", str(root)])
 
     def test_missing_binary(self):
         with tempfile.TemporaryDirectory(prefix="dlv missing ") as tmp:
@@ -98,13 +99,27 @@ class LauncherTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix="dlv space ") as tmp:
             root = pathlib.Path(tmp)
             shutil.copy2(ROOT / "run.sh", root)
-            shutil.copy2(ROOT / "DataLaVista.html", root)
+            (root / "dist").mkdir()
+            shutil.copy2(ROOT / "dist/DataLaVista.html", root / "dist")
             (root / "bin").mkdir()
             shutil.copy2(ROOT / "bin/ZippyServe-linux-amd64", root / "bin")
             (root / "samples/data").mkdir(parents=True)
             sample = ROOT / "samples/data/studies.csv"
             shutil.copy2(sample, root / "samples/data")
             (root / ".secret").write_text("synthetic-hidden-value")
+            (root / ".private").mkdir()
+            (root / ".private/token.txt").write_text("synthetic-hidden-token")
+            (root / "alias.txt").symlink_to(".secret")
+            (root / "alias-dir").symlink_to(".private", target_is_directory=True)
+            (root / "public.txt").write_text("public-control")
+            (root / "public-alias.txt").symlink_to("public.txt")
+            (root / "outside.txt").symlink_to("/etc/passwd")
+            (root / "loop.txt").symlink_to("loop.txt")
+            (root / "chain.txt").symlink_to("alias.txt")
+            (root / "nested").mkdir()
+            (root / "nested/public.txt").symlink_to("../public.txt")
+            (root / "nested/index.html").symlink_to("../.secret")
+            (root / "index.html").symlink_to(".secret")
             with socket.socket() as probe:
                 probe.bind(("127.0.0.1", 0))
                 port = probe.getsockname()[1]
@@ -114,7 +129,7 @@ class LauncherTests(unittest.TestCase):
                     url = f"http://127.0.0.1:{port}"
                     for attempt in range(50):
                         try:
-                            response = urllib.request.urlopen(url + "/DataLaVista.html", timeout=1)
+                            response = urllib.request.urlopen(url + "/dist/DataLaVista.html", timeout=1)
                             break
                         except urllib.error.HTTPError:
                             raise
@@ -125,10 +140,13 @@ class LauncherTests(unittest.TestCase):
                     else:
                         self.fail("Server did not accept HTTP requests")
                     with response:
-                        self.assertEqual(response.read(), (ROOT / "DataLaVista.html").read_bytes())
+                        self.assertEqual(response.read(), (ROOT / "dist/DataLaVista.html").read_bytes())
                     with urllib.request.urlopen(url + "/samples/data/studies.csv") as response:
                         self.assertEqual(response.read(), sample.read_bytes())
-                    for path in ("/.secret", "/.git/config", "/%2e%2e/%2e%2e/etc/passwd", "/__mcp"):
+                    for path in ("/public-alias.txt", "/nested/public.txt"):
+                        with urllib.request.urlopen(url + path) as response:
+                            self.assertEqual(response.read(), b"public-control")
+                    for path in ("/alias.txt", "/alias-dir/token.txt", "/outside.txt", "/loop.txt", "/chain.txt", "/nested/", "/missing-route", "/.secret", "/.git/config", "/%2e%2e/%2e%2e/etc/passwd", "/__mcp"):
                         with self.subTest(path=path), self.assertRaises(urllib.error.HTTPError) as error:
                             urllib.request.urlopen(url + path)
                         self.assertIn(error.exception.code, (400, 403, 404))

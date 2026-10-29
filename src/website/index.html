@@ -1,0 +1,426 @@
+<!--
+This file is part of DataLaVista™
+src/website/index.html: The landing page for DataLaVista, with a description, a live demo dashboard, and links to the designer, the code, and the help pages. The publish workflow copies it to the root of the website.
+Author(s): Gabriel Mongefranco, Jeremy Gluskin, Shelley Boa.
+Created: 2026-03-10
+Last Modified: 2026-10-28
+Summary: DataLaVista is a ightweight, client-side reporting and dashboard toolkit. This file is the main landing page.
+Notes: See README file for documentation and full license information.
+
+Copyright © 2026 The Regents of the University of Michigan
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU General Public License for more details.
+You should have received a copy of the GNU General Public License along
+with this program. If not, see <https://www.gnu.org/licenses/>.
+
+-->
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DataLaVista™ | The BI Tool Terminator</title>
+  <meta name="description" content="DataLaVista is a lightweight, client-side reporting and dashboard toolkit. Tell your expensive BI tools: 'Data la vista, baby!'">
+  
+  <!-- Google Analytics, loaded only on the public website, the same rule the app follows -->
+  <script>
+    if (window.location.hostname === 'code.depressioncenter.org') {
+      var gaScript = document.createElement('script');
+      gaScript.async = true;
+      gaScript.src = 'https://www.googletagmanager.com/gtag/js?id=G-3Q455XWS5F';
+      document.head.appendChild(gaScript);
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-3Q455XWS5F');
+    }
+  </script>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&family=Bebas+Neue&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+
+  <style>
+    /* ==========================================================================
+       ACCESSIBILITY & BASE STYLES
+       ========================================================================== */
+    :root {
+      --bg-dark: #030508;
+      --bg-panel: #0a1118;
+      --text-main: #e0e6ed;
+      --text-muted: #8b9bb4;
+      --term-red: #ff2200;
+      --term-red-glow: rgba(255, 34, 0, 0.4);
+      --term-blue: #00eeff;
+      --focus-ring: #00eeff;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      font-family: 'Inter', sans-serif;
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+
+    .skip-link {
+      position: absolute;
+      top: -60px;
+      left: 0;
+      background: var(--term-red);
+      color: #fff;
+      padding: 8px;
+      z-index: 9999;
+      transition: top 0.2s;
+    }
+    .skip-link:focus { top: 0; outline: 3px solid var(--focus-ring); }
+
+    a { color: var(--term-blue); text-decoration: none; transition: color 0.2s, text-shadow 0.2s; }
+    a:hover { color: #fff; text-shadow: 0 0 8px var(--term-blue); }
+    a:focus-visible, button:focus-visible { outline: 3px dashed var(--focus-ring); outline-offset: 4px; }
+
+    /* ==========================================================================
+       GITHUB FORK RIBBON
+       ========================================================================== */
+    .github-fork-ribbon {
+      width: 12.1em;
+      height: 12.1em;
+      position: absolute;
+      overflow: hidden;
+      top: 0;
+      right: 0;
+      z-index: 9999;
+      pointer-events: none;
+      font-size: 13px;
+      text-decoration: none;
+      text-indent: -999999px;
+    }
+    .github-fork-ribbon:before, .github-fork-ribbon:after {
+      position: absolute;
+      display: block;
+      width: 15.38em;
+      height: 1.54em;
+      top: 3.23em;
+      right: -3.23em;
+      box-sizing: content-box;
+      transform: rotate(45deg);
+    }
+    .github-fork-ribbon:before {
+      content: "";
+      padding: .38em 0;
+      background-color: var(--term-red);
+      background-image: linear-gradient(to bottom, rgba(0,0,0,0), rgba(0,0,0,0.15));
+      box-shadow: 0 .15em .23em 0 rgba(0,0,0,0.5);
+      pointer-events: auto;
+    }
+    .github-fork-ribbon:after {
+      content: "Fork me on GitHub";
+      color: #fff;
+      font-family: 'Share Tech Mono', monospace;
+      font-weight: 700;
+      line-height: 1.54em;
+      text-decoration: none;
+      text-align: center;
+      text-indent: 0;
+      padding: .15em 0;
+      margin: .15em 0;
+      border-width: .08em 0;
+      border-style: dotted;
+      border-color: rgba(255,255,255,0.7);
+    }
+
+    /* ==========================================================================
+       NAVIGATION
+       ========================================================================== */
+    header {
+      background: rgba(3, 5, 8, 0.9);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid rgba(255, 34, 0, 0.3);
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+      padding: 1rem 11rem 1rem 5%;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    /* Red on the dark header is 3.8 to 1, which passes only for large text, so keep this at 24px or more */
+    .logo {
+      font-family: 'Bebas Neue', 'Impact', sans-serif;
+      font-size: 2.25rem;
+      font-weight: 400;
+      line-height: 1;
+      color: var(--term-red);
+      text-shadow: 0 0 12px var(--term-red), 0 0 28px var(--term-red-glow);
+      letter-spacing: 5px;
+    }
+    nav ul {
+      list-style: none;
+      display: flex;
+      gap: 2rem;
+    }
+    nav ul li a {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 1rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-main);
+    }
+    nav ul li a:hover { color: var(--term-red); text-shadow: 0 0 8px var(--term-red-glow); }
+
+    /* On phones the ribbon would cover the menu, and the Code link opens the same GitHub page */
+    @media (max-width: 700px) {
+      .github-fork-ribbon { display: none; }
+      header { flex-wrap: wrap; gap: 0.75rem 1.5rem; padding: 1rem 5%; }
+      nav ul { flex-wrap: wrap; gap: 0.5rem 1.5rem; }
+    }
+
+    /* ==========================================================================
+       PAGE CONTENT STYLES
+       ========================================================================== */
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 4rem 2rem;
+    }
+
+    .section-title {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 2.5rem;
+      color: #fff;
+      margin-bottom: 1.5rem;
+      border-bottom: 2px solid var(--term-red);
+      display: inline-block;
+      padding-bottom: 0.5rem;
+    }
+
+    .lead-text {
+      font-size: 1.25rem;
+      color: var(--text-muted);
+      margin-bottom: 3rem;
+      max-width: 800px;
+    }
+    
+    .text-highlight { color: var(--term-red); font-weight: 600; }
+
+    /* Features Grid */
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr));
+      gap: 2rem;
+      margin-bottom: 4rem;
+    }
+
+    .feature-card {
+      background: var(--bg-panel);
+      border: 1px solid rgba(255, 34, 0, 0.2);
+      padding: 2rem;
+      border-radius: 8px;
+      transition: transform 0.3s, box-shadow 0.3s;
+    }
+    .feature-card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 10px 20px rgba(255, 34, 0, 0.1);
+      border-color: rgba(255, 34, 0, 0.5);
+    }
+    .feature-card h3 {
+      font-family: 'Share Tech Mono', monospace;
+      color: var(--term-red);
+      font-size: 1.5rem;
+      margin-bottom: 1rem;
+    }
+
+    /* Iframe Wrapper */
+    .dashboard-preview {
+      margin: 4rem 0;
+    }
+    .cyber-frame {
+      position: relative;
+      background: var(--bg-panel);
+      padding: 2px;
+      border-radius: 8px;
+      box-shadow: 0 0 30px rgba(0, 238, 255, 0.1);
+      border: 1px solid rgba(0, 238, 255, 0.3);
+    }
+    .cyber-frame::before {
+      content: 'LIVE DEMO: PROJECT HEALTH DASHBOARD';
+      position: absolute;
+      top: -12px;
+      left: 20px;
+      background: var(--bg-dark);
+      padding: 0 10px;
+      font-family: 'Share Tech Mono', monospace;
+      color: var(--term-blue);
+      font-size: 0.85rem;
+      letter-spacing: 1px;
+    }
+    .cyber-frame iframe {
+      width: 100%;
+      height: 700px;
+      border: none;
+      border-radius: 6px;
+      background: #ffffff; /* Assuming the dashboard itself has a light background based on the screenshots */
+    }
+
+    /* Footer */
+    footer {
+      background: #000;
+      border-top: 1px solid #222;
+      padding: 3rem 5%;
+      text-align: center;
+      font-size: 0.9rem;
+      color: var(--text-muted);
+    }
+    .footer-links {
+      display: flex;
+      justify-content: center;
+      gap: 2rem;
+      margin-bottom: 1.5rem;
+      flex-wrap: wrap;
+    }
+    .footer-links a { color: var(--text-muted); font-family: 'Share Tech Mono', monospace;}
+    .footer-links a:hover { color: var(--term-blue); }
+    .copyright { font-size: 0.8rem; opacity: 0.6; }
+
+    /* Buttons */
+    .btn {
+      display: inline-block;
+      padding: 12px 24px;
+      background: rgba(255, 34, 0, 0.1);
+      color: var(--term-red);
+      border: 1px solid var(--term-red);
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 1.1rem;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      cursor: pointer;
+      transition: all 0.3s;
+      margin-top: 1rem;
+    }
+    .btn:hover, .btn:focus {
+      background: var(--term-red);
+      color: #fff;
+      box-shadow: 0 0 15px var(--term-red-glow);
+      outline: none;
+    }
+    .btn-blue {
+      background: rgba(0, 238, 255, 0.1);
+      color: var(--term-blue);
+      border-color: var(--term-blue);
+    }
+    .btn-blue:hover, .btn-blue:focus {
+      background: var(--term-blue);
+      color: #000;
+      box-shadow: 0 0 15px rgba(0, 238, 255, 0.4);
+    }
+
+  </style>
+</head>
+<body>
+
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+
+  <a class="github-fork-ribbon" href="https://github.com/DepressionCenter/datalavista/fork" data-ribbon="Fork me on GitHub" title="Fork me on GitHub" target="_blank" rel="noopener">Fork me on GitHub</a>
+
+  <header>
+    <h1 class="logo">DataLaVista™</h1>
+    <nav aria-label="Main Navigation">
+      <ul>
+        <li><a href="https://code.depressioncenter.org/datalavista/dist/DataLaVista.html" target="_blank" rel="noopener">Designer</a></li>
+        <li><a href="https://github.com/DepressionCenter/datalavista" target="_top" rel="noopener">Code</a></li>
+        <li><a href="https://code.depressioncenter.org/datalavista/docs/" target="_top" rel="noopener">Docs</a></li>
+        <li><a href="https://depressioncenter.org/mobiletech" target="_blank" rel="noopener">Contact</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <main id="main-content" class="container">
+    
+    <section>
+      <h2 class="section-title">Terminate Data Silos</h2>
+      <p class="lead-text">
+        Tell your expensive BI tools: <span class="text-highlight">"Data la vista, baby!"</span>™ DataLaVista™ is a lightweight, client-side reporting and dashboard toolkit. It brings the full power of SQL directly to your browser, allowing you to build high-performance visualizations without the need for expensive server-side licenses or complex backend infrastructure.
+      </p>
+
+      <div class="features-grid">
+        <div class="feature-card">
+          <h3>[01] Zero Server Footprint</h3>
+          <p>100% JavaScript. Your browser is the engine. No backend installation required.</p>
+        </div>
+        <div class="feature-card">
+          <h3>[02] Full SQL Support</h3>
+          <p>Query your SharePoint lists and flat files as if they were a robust relational database.</p>
+        </div>
+        <div class="feature-card">
+          <h3>[03] Pluggable Architecture</h3>
+          <p>Designed to be a universal survivor. Works in SharePoint today; works in React, Vue, or vanilla HTML tomorrow.</p>
+        </div>
+      </div>
+
+      <a href="https://code.depressioncenter.org/datalavista/dist/DataLaVista.html" class="btn" target="_blank" rel="noopener">Launch Designer</a>
+      <a href="https://code.depressioncenter.org/datalavista/docs/" target="_top" class="btn btn-blue" rel="noopener">Read the Manual</a>
+    </section>
+
+    <section class="dashboard-preview">
+      <h2 class="section-title">Live Target Acquisition</h2>
+      <p class="lead-text" style="margin-bottom: 1rem;">Interact with a live, completely client-side dashboard rendering right now.</p>
+      
+      <div class="cyber-frame">
+        <iframe 
+          src="https://code.depressioncenter.org/datalavista/dist/DataLaVista.html?reportMode=view&report=https://code.depressioncenter.org/datalavista/samples/reports/Project%20Health%20Dashboard.json"
+          title="DataLaVista Interactive Dashboard Demo"
+          allowfullscreen>
+          <p style="padding: 2rem; color: #fff; text-align: center;">
+            Your browser does not support iframes. 
+            <a href="https://code.depressioncenter.org/datalavista/dist/DataLaVista.html?reportMode=view&report=https://code.depressioncenter.org/datalavista/samples/reports/Project%20Health%20Dashboard.json" target="_blank" rel="noopener">View the Live Demo here</a>.
+          </p>
+        </iframe>
+      </div>
+      
+      <div style="text-align: right; margin-top: 1rem;">
+        <a href="https://code.depressioncenter.org/datalavista/dist/DataLaVista.html?reportMode=view&report=https://code.depressioncenter.org/datalavista/samples/reports/Project%20Health%20Dashboard.json" target="_blank" rel="noopener" class="btn btn-blue" style="font-size: 0.85rem; padding: 8px 16px;">
+          ↗ Open Demo in New Tab
+        </a>
+      </div>
+    </section>
+
+  </main>
+
+  <footer>
+    <div class="footer-links">
+      <a href="https://github.com/DepressionCenter/datalavista" rel="noopener">GitHub Repo</a>
+      <a href="https://code.depressioncenter.org/datalavista/docs/" rel="noopener">Documentation</a>
+      <a href="https://depressioncenter.org/mobiletech" rel="noopener">Contact Mobile Tech Core</a>
+      <a href="https://depressioncenter.org" rel="noopener">Eisenberg Family Depression Center</a>
+    </div>
+
+    <div style="margin-bottom: 2rem; font-family: 'Share Tech Mono', monospace; font-size: 0.9rem;">
+      <span style="color: var(--text-muted);">CREATED BY THE EISENBERG FAMILY DEPRESSION CENTER,<br />IN COLLABORATION WITH AUTOMATORS ANONYMOUS:</span><br>
+      <div style="margin-top: 8px; display: flex; justify-content: center; gap: 1rem; flex-wrap: wrap;">
+        <a href="https://gabriel.mongefranco.com" target="_blank" rel="noopener" style="color: var(--term-red);">Gabriel Mongefranco</a>
+        <span style="color: #444;">|</span>
+        <a href="https://github.com/jerm-ops" target="_blank" rel="noopener noreferrer" style="color: var(--term-red);">Jeremy Gluskin</a>
+        <span style="color: #444;">|</span>
+        <a href="https://github.com/blondilox-ai" target="_blank" rel="noopener noreferrer" style="color: var(--term-red);">Shelley Boa</a>
+      </div>
+    </div>
+
+    <div class="copyright">
+      <p>Copyright &copy; 2026 The Regents of the University of Michigan</p>
+      <p style="margin-top: 8px; font-size: 0.75rem;">
+        DataLaVista™, "Come with me if you want to query"™, and "The BI Tool Terminator"™ are trademarks of The Regents of the University of Michigan.
+      </p>
+    </div>
+  </footer>
+
+</body>
+</html>

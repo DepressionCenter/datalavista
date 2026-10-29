@@ -384,7 +384,7 @@ func (h *ZippyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	stat, err := h.RootFS.Stat(relPath)
+	stat, err := fs.Stat(h.visibleFS(), relPath)
 	if err != nil {
 		// Not found, or a path-escape attempt rejected by RootFS — either
 		// way there's nothing here. SPA fallback logic still applies for
@@ -415,7 +415,7 @@ func (h *ZippyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func (h *ZippyHandler) serveDirectory(w http.ResponseWriter, r *http.Request, relDir string) {
 	for _, idx := range IndexFiles {
 		idxRel := path.Join(relDir, idx)
-		if info, err := h.RootFS.Stat(idxRel); err == nil && !info.IsDir() {
+		if info, err := fs.Stat(h.visibleFS(), idxRel); err == nil && !info.IsDir() {
 			h.serveFile(w, r, idxRel)
 			return
 		}
@@ -423,9 +423,8 @@ func (h *ZippyHandler) serveDirectory(w http.ResponseWriter, r *http.Request, re
 
 	for _, arc := range ArchiveFiles {
 		arcRel := path.Join(relDir, arc)
-		if info, err := h.RootFS.Stat(arcRel); err == nil && !info.IsDir() {
-			arcAbs := filepath.Join(h.Root, filepath.FromSlash(arcRel))
-			if h.serveFromExtractedArchive(w, r, arcAbs) {
+		if info, err := fs.Stat(h.visibleFS(), arcRel); err == nil && !info.IsDir() {
+			if h.serveFromExtractedArchive(w, r, arcRel) {
 				return
 			}
 		}
@@ -442,10 +441,15 @@ func (h *ZippyHandler) serveDirectory(w http.ResponseWriter, r *http.Request, re
 // enforcement as the served root itself. Returns false (having logged the
 // error) if extraction failed, so the caller can keep trying other
 // candidates.
-func (h *ZippyHandler) serveFromExtractedArchive(w http.ResponseWriter, r *http.Request, arcAbs string) bool {
-	tmpDir, err := extractArchive(arcAbs)
+func (h *ZippyHandler) serveFromExtractedArchive(w http.ResponseWriter, r *http.Request, arcRel string) bool {
+	f, err := h.openVisible(arcRel)
 	if err != nil {
-		log.Printf("Error extracting fallback archive %s: %v", arcAbs, err)
+		return false
+	}
+	defer f.Close()
+	tmpDir, err := extractArchiveFile(arcRel, f)
+	if err != nil {
+		log.Printf("Error extracting fallback archive %s: %v", arcRel, err)
 		return false
 	}
 	tmpRoot, err := os.OpenRoot(tmpDir)
@@ -462,13 +466,13 @@ func (h *ZippyHandler) serveFromExtractedArchive(w http.ResponseWriter, r *http.
 
 func (h *ZippyHandler) serveIndexFallback(w http.ResponseWriter, r *http.Request) {
 	if h.Index != "" {
-		if info, err := h.RootFS.Stat(h.Index); err == nil && !info.IsDir() {
+		if info, err := fs.Stat(h.visibleFS(), h.Index); err == nil && !info.IsDir() {
 			h.serveFile(w, r, h.Index)
 			return
 		}
 	}
 	for _, idx := range IndexFiles {
-		if info, err := h.RootFS.Stat(idx); err == nil && !info.IsDir() {
+		if info, err := fs.Stat(h.visibleFS(), idx); err == nil && !info.IsDir() {
 			h.serveFile(w, r, idx)
 			return
 		}
@@ -480,7 +484,7 @@ func (h *ZippyHandler) serveFile(w http.ResponseWriter, r *http.Request, relPath
 	lower := strings.ToLower(relPath)
 
 	if strings.HasSuffix(lower, ".md") {
-		data, err := h.RootFS.ReadFile(relPath)
+		data, err := fs.ReadFile(h.visibleFS(), relPath)
 		if err != nil {
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 			return
@@ -502,7 +506,7 @@ func (h *ZippyHandler) serveFile(w http.ResponseWriter, r *http.Request, relPath
 		// .html/.htm, but ONLY while -mcp-browser is on; http.ServeFileFS
 		// still handles everything else, and .html/.htm too when
 		// -mcp-browser is off.
-		data, err := h.RootFS.ReadFile(relPath)
+		data, err := fs.ReadFile(h.visibleFS(), relPath)
 		if err != nil {
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 			return
@@ -513,7 +517,7 @@ func (h *ZippyHandler) serveFile(w http.ResponseWriter, r *http.Request, relPath
 		return
 	}
 
-	http.ServeFileFS(w, r, h.RootFS.FS(), relPath)
+	http.ServeFileFS(w, r, h.visibleFS(), relPath)
 }
 
 // Markdown Parser Engine
@@ -615,6 +619,15 @@ blockquote { border-left: .25em solid #d0d7de; padding: 0 1em; color: #57606a; m
 
 // Archive Extraction Engine
 func extractArchive(src string) (string, error) {
+	f, err := os.Open(src)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+	return extractArchiveFile(src, f)
+}
+
+func extractArchiveFile(src string, f *os.File) (string, error) {
 	tmpDir, err := os.MkdirTemp("", "zippyserve-*")
 	if err != nil {
 		return "", err
@@ -626,19 +639,22 @@ func extractArchive(src string) (string, error) {
 
 	lower := strings.ToLower(src)
 	if strings.HasSuffix(lower, ".zip") {
-		return tmpDir, unzip(src, tmpDir)
+		return tmpDir, unzip(f, tmpDir)
 	} else if strings.HasSuffix(lower, ".tar") || strings.HasSuffix(lower, ".tar.gz") || strings.HasSuffix(lower, ".tgz") {
-		return tmpDir, untar(src, tmpDir)
+		return tmpDir, untar(src, f, tmpDir)
 	}
 	return "", errors.New("unsupported archive format")
 }
 
-func unzip(src, dest string) error {
-	r, err := zip.OpenReader(src)
+func unzip(f *os.File, dest string) error {
+	info, err := f.Stat()
 	if err != nil {
 		return err
 	}
-	defer r.Close()
+	r, err := zip.NewReader(f, info.Size())
+	if err != nil {
+		return err
+	}
 
 	for _, f := range r.File {
 		if err := validateAndExtract(f.Name, dest, f.FileInfo(), func() (io.ReadCloser, error) { return f.Open() }); err != nil {
@@ -648,12 +664,7 @@ func unzip(src, dest string) error {
 	return nil
 }
 
-func untar(src, dest string) error {
-	f, err := os.Open(src)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
+func untar(src string, f *os.File, dest string) error {
 
 	var r io.Reader = f
 	if strings.HasSuffix(strings.ToLower(src), ".gz") || strings.HasSuffix(strings.ToLower(src), ".tgz") {

@@ -1,10 +1,10 @@
 ﻿/* ============================================================
 This file is part of DataLaVista™
-90-init.js: App initialization, lazy init guard, and report URL loading.
+90-init.js: App initialization, library check, and report URL loading.
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 Created: 2026-03-24
-Last Modified: 2026-04-04
-Summary: App initialization, lazy init guard, and report URL loading.
+Last Modified: 2026-10-27
+Summary: App initialization, library check, and report URL loading.
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
 
@@ -150,15 +150,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
   }
 
   
-  // Guard: call init() automatically if it was never called (e.g. SiteAssets/lazy mode).
-  function ensureInit() {
-    if (!DataLaVistaState._initialized) init();
-  }
-
-
-
-  // Injects the app shell HTML into #dlv-root when running from the minimal shell
-  // (DataLaVista.html / DataLaVista-nojs.html). _DLV_SHELL_HTML is set by the build script.
+  // Injects the app shell HTML into #dlv-root when running from a built page or the SharePoint
+  // web part. _DLV_SHELL_HTML and _DLV_HEAD_CSS are set by the build script.
   // No-ops when running from 00-full-page.html (no #dlv-root present).
   function _dlvInjectShell() {
     var root = document.getElementById('dlv-root');
@@ -171,49 +164,34 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
     root.dataset.dlvReady = '1';
   }
 
-  function _dlvLoadScript(src, integrity, crossOrigin) {
-    return new Promise(function(resolve) {
-      var s = document.createElement('script');
-      s.src = src;
-      if (integrity) { s.integrity = integrity; }
-      if (crossOrigin) { s.crossOrigin = crossOrigin; }
-      s.onload = resolve;
-      s.onerror = function() { console.warn('DLV: failed to load ' + src); resolve(); };
-      document.head.appendChild(s);
-    });
-  }
-
-  async function _dlvLoadCdnDeps() {
-    if (!document.getElementById('dlv-root')) { return; }
-    if (typeof _DLV_CDN_DEPS === 'undefined') { return; }
-    if (typeof alasql !== 'undefined') { return; }
-    var groups = _DLV_CDN_DEPS;
-    // Suppress SharePoint's AMD/RequireJS define() so UMD scripts (alasql, xlsx)
-    // fall back to global mode instead of conflicting with SP's anonymous define check.
-    var savedDefine = window.define;
-    window.define = undefined;
-    for (var i = 0; i < groups[0].length; i++) {
-      await _dlvLoadScript(groups[0][i].src, groups[0][i].integrity, groups[0][i].crossorigin);
+  // Confirms that every packed library created its global. Returns an empty string when all are
+  // present, or a plain-English message naming the first one that is missing, for the page to show.
+  function _dlvCheckLibraries() {
+    var w = /** @type {any} */ (window);
+    // SheetJS fills a page-level exports object when one exists; take it from there if that happened
+    if (!(w.XLSX && typeof w.XLSX.read === 'function') && w.exports && typeof w.exports.read === 'function') { w.XLSX = w.exports; }
+    var checks = [
+      ['AlaSQL', typeof w.alasql === 'function'],
+      ['ECharts', !!(w.echarts && typeof w.echarts.init === 'function')],
+      ['SheetJS', !!(w.XLSX && typeof w.XLSX.read === 'function')],
+      ['CodeMirror', !!(w.CodeMirror && typeof w.CodeMirror.fromTextArea === 'function')],
+      ['LZ-String', !!(w.LZString && typeof w.LZString.compressToBase64 === 'function')],
+      ['sql.js', typeof w.initSqlJs === 'function']
+    ];
+    for (var i = 0; i < checks.length; i++) {
+      if (checks[i][1]) { continue; }
+      return 'DataLaVista could not start because its built-in ' + checks[i][0] + ' library did not load. ' +
+        "Another script on this page may have interfered. Remove other code from this page's web parts and refresh the page. " +
+        'If this message appears again, ask your site administrator for help and mention the errors in the browser console.';
     }
-    window.define = savedDefine;
-    if (groups[1] && groups[1].length) {
-      Promise.all(groups[1].map(function(d) {
-        return _dlvLoadScript(d.src, d.integrity, d.crossorigin);
-      }));
-    }
+    return '';
   }
 
   /* *** INIT FUNCTION *** */
   // Main initialization function to set up event listeners, resizers, and default states.
   async function init() {
     _dlvInjectShell();
-    await _dlvLoadCdnDeps();
     if (DataLaVistaState && DataLaVistaState._initialized) return;
-    // If a different build already ran init (e.g. CDN + SiteAssets both loaded),
-    // window.DataLaVistaState points to the other build's state object.
-    const _wAny = /** @type {any} */ (window);
-    if (_wAny.DataLaVistaState && _wAny.DataLaVistaState._initialized && _wAny.DataLaVistaState !== DataLaVistaState) return;
-    //window.DataLaVistaState = new Proxy(dlvRawState, dlvStateHandler);
     console.log('Initializing...');
     DataLaVistaState._initialized = true;
     console.log("Come with me if you want to query...");

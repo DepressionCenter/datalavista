@@ -1,0 +1,137 @@
+/*
+This file is part of DataLaVista™
+src/website/mkdocs-overrides/assets/stylesheets/help.css: Styles for the Home button and the footer links on the help pages.
+Author(s): Gabriel Mongefranco.
+Created: 2026-10-28
+Last Modified: 2026-10-28
+Summary: Gives the help pages the red colors of the DataLaVista home page, draws the Home button in the header as a labeled button, lays out the footer with the copyright on the left and the links on the right, and hides the "opens in a new tab" text from sighted readers while screen readers still read it.
+Notes: See README file for documentation and full license information.
+
+Copyright © 2026 The Regents of the University of Michigan
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU General Public License for more details.
+You should have received a copy of the GNU General Public License along
+with this program. If not, see <https://www.gnu.org/licenses/>.
+*/
+
+/* The theme sets 1rem to 20 pixels, so 1.2rem is the 24 pixel minimum size of something a person clicks or taps */
+
+/* ### Colors ### */
+
+/* The reds of the DataLaVista home page (index.html) in place of the theme's indigo. The header and the
+   links use #cc1000, the home page's title red, because white text on it reads at 5.8 to 1 and it reads
+   at 5.8 to 1 on white; the brighter #ff2200 only reaches 3.8 to 1, so it is kept for lines and borders. */
+:root,
+[data-md-color-scheme="default"] {
+  --md-primary-fg-color: #cc1000;
+  --md-primary-fg-color--light: #ff2200;
+  --md-primary-fg-color--dark: #a30d00;
+  --md-accent-fg-color: #a30d00;
+  --md-accent-fg-color--transparent: rgba(163, 13, 0, 0.1);
+  --md-footer-bg-color: #030508;
+  --md-footer-bg-color--dark: #000;
+}
+
+/* Dark colors: the page takes the home page's panel color, and the links use a lighter red that reads at 6 to 1 on it */
+[data-md-color-scheme="slate"] {
+  --md-primary-fg-color: #cc1000;
+  --md-primary-fg-color--light: #ff2200;
+  --md-primary-fg-color--dark: #a30d00;
+  --md-accent-fg-color: #ff7755;
+  --md-accent-fg-color--transparent: rgba(255, 119, 85, 0.1);
+  --md-typeset-a-color: #ff5533;
+  --md-default-bg-color: #0a1118;
+  --md-footer-bg-color: #030508;
+  --md-footer-bg-color--dark: #000;
+}
+
+/* ### Home button in the header ### */
+
+.help-header__home {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  min-height: 1.2rem;
+  padding: 0.2rem 0.5rem;
+  margin: 0.2rem;
+  font-size: 0.7rem;
+  line-height: 1;
+  color: currentcolor;
+  text-decoration: none;
+  white-space: nowrap;
+  border: 0.05rem solid currentcolor;
+  border-radius: 0.2rem;
+  transition: opacity 0.25s;
+}
+
+.help-header__home:hover {
+  opacity: 0.7;
+}
+
+/* The ring is drawn in the header's own text color, so it stays visible on the indigo background */
+.help-header__home:focus-visible {
+  outline: 0.1rem solid currentcolor;
+  outline-offset: 0.1rem;
+  opacity: 1;
+}
+
+.help-header__home-icon svg {
+  display: block;
+  width: 0.9rem;
+  height: 0.9rem;
+  fill: currentcolor;
+}
+
+/* On a phone the icon is dropped so the page title keeps more of its width */
+@media screen and (max-width: 44.9375em) {
+  .help-header__home-icon {
+    display: none;
+  }
+}
+
+/* ### Footer ### */
+
+.help-footer {
+  align-items: center;
+  gap: 0.2rem 1rem;
+}
+
+.help-footer__copyright,
+.help-footer__links {
+  width: auto;
+  margin: 0;
+  padding: 0.5rem 0.6rem;
+}
+
+.help-footer__separator {
+  margin: 0 0.3rem;
+}
+
+/* Underlined, so the links are told apart from the text next to them by more than color */
+.md-footer-meta.md-typeset .help-footer a {
+  display: inline-block;
+  min-height: 1.2rem;
+  line-height: 1.2rem;
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+
+/* ### Text for screen readers only ### */
+
+.help-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

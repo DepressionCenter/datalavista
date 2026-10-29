@@ -4,7 +4,7 @@
 #  Author(s): Gabriel Mongefranco.
 #  Created: 2026-10-27
 #  Last Modified: 2026-10-28
-#  Summary: Runs repository checks, the build, and unit tests on pull requests.
+#  Summary: Runs repository checks, the help page build, the build, and unit tests on pull requests.
 #  Notes: See README file for documentation and full license information.
 #  Website: https://github.com/DepressionCenter/datalavista
 #
@@ -40,7 +40,7 @@ jobs:
   tests:
     name: Repository checks, build, and unit tests
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 8
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -50,6 +50,23 @@ jobs:
 
       - name: Repository checks
         run: bash tests/check-repository.sh "origin/${{ github.base_ref }}"
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: requirements-docs.txt
+
+      - name: Install the help page builder
+        run: pip install -r requirements-docs.txt
+
+      # A broken link or a page missing from mkdocs.yml fails the pull request
+      - name: Build the help pages
+        run: mkdocs build --strict
+
+      - name: Test the help page link hook
+        run: python -m unittest tests/docs_links_test.py
 
       - name: Cache esbuild
         uses: actions/cache@v6
@@ -62,7 +79,7 @@ jobs:
 
       # The runner already has Node.js, so nothing is installed for these steps
       - name: Check the built script for syntax errors
-        run: node --check datalavista.js
+        run: node --check dist/datalavista.js
 
       - name: Unit tests
         run: node --test tests/*.test.cjs

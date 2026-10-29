@@ -1,0 +1,37 @@
+<!--
+This file is part of DataLaVista™
+DataLaVista-sp.html.txt
+Author(s): Gabriel Mongefranco.
+Created: 2026-10-27
+Last Modified: 2026-10-28
+Summary: Code to paste into the Modern Script Editor web part on the DataLaVista page of a SharePoint site.
+Notes: See README file for documentation and full license information.
+Website: https://github.com/DepressionCenter/datalavista
+
+Copyright © 2026 The Regents of the University of Michigan
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License along
+with this program. If not, see <https://www.gnu.org/licenses/>.
+
+How to use this file:
+1. Open your site's Site Assets library (Settings > Site contents > Site Assets).
+   Create a folder named scripts, and upload datalavista.js from the dist folder into it.
+2. On your site's home page, select New, then Page, and choose the Modern Script Editor
+   template. Name the page DataLaVista, so its address ends in /SitePages/DataLaVista.aspx.
+3. In the Modern Script Editor web part, select the "{ }" button under Edit HTML Code.
+4. Paste the entire contents of this file into the code editor. Select Save in the code
+   editor, then select Save on the page.
+5. Refresh the page.
+See docs/how-to/install-in-sharepoint.md for the full steps.
+-->
+<div id="dlv-root"></div>
+<script src="../SiteAssets/scripts/datalavista.js"></script>

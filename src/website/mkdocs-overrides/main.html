@@ -1,0 +1,29 @@
+{#-
+  This file is part of DataLaVista™
+  src/website/mkdocs-overrides/main.html: Adds Google Analytics to the help pages when they are served from the public website.
+  Author(s): Gabriel Mongefranco.
+  Created: 2026-10-28
+  Last Modified: 2026-10-28
+  Summary: Extends the theme's page and replaces its analytics block. The theme's own Google Analytics script is included but started only when the page's host name matches extra.analytics.host in mkdocs.yml, so a local preview or another copy of the site sends nothing to Google. This is the same rule the app and the home page follow.
+  Notes: See README file for documentation and full license information.
+
+  Copyright © 2026 The Regents of the University of Michigan
+
+  This program is free software: you can redistribute it and/or modify
+  it under the terms of the GNU General Public License as published by
+  the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+  This program is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+  GNU General Public License for more details.
+  You should have received a copy of the GNU General Public License along
+  with this program. If not, see <https://www.gnu.org/licenses/>.
+-#}
+{% extends "base.html" %}
+
+{% block analytics %}
+  {% if config.extra.analytics and config.extra.analytics.provider == "google" and config.extra.analytics.host %}
+    {% include "partials/integrations/analytics/google.html" %}
+    <script>if (window.location.hostname === "{{ config.extra.analytics.host }}" && typeof __md_analytics !== "undefined") { __md_analytics(); }</script>
+  {% endif %}
+{% endblock %}

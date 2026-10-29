@@ -17,7 +17,7 @@ See <https://www.gnu.org/licenses/fdl-1.3.html>. See README for full license inf
 
 ## Compliance
 
-[Back to project README](../README.md)
+[Back to help home](README.md)
 
 This page lists the security and accessibility controls in the code today. It
 names the file that holds each control and the gaps that remain. It is for
@@ -57,7 +57,8 @@ See the [local server guide](local-server.md) for commands and dependency detail
 | Token asked only for a trusted site | `ensureSharePointToken` in `src/25-data-sources.js` | The popup that asks for a token appears only for a site that passes the check above. It shows the site address. The token stays in memory for the page load. |
 | Remote files are never run as script | `fetchWithFallbacks` in `src/25-data-sources.js` | Files are downloaded with `fetch` and parsed as JSON or text. The application has no JSONP step, no `eval`, and no `new Function`. |
 | Relay services only after approval | `_mayUseRelay` in `src/25-data-sources.js` | After both direct downloads fail, a popup names the three relay services and explains what they see. The answer is kept per destination host for the page load, in a variable outside the saved state. An address with a query string or sign-in details is never sent to a relay. |
-| Excel files are read with a fixed parser | `_DLV_CDN_DEPS` in `src/02-cdn-deps.js`, `loadExcelFile` in `src/26-cyberdyne-pipeline.js` | Excel files are read with SheetJS 0.20.3 from the SheetJS website. That release fixes CVE-2023-30533 and CVE-2024-22363. The page checks the file against a fixed hash, so the browser refuses a changed copy. |
+| Libraries are packed, not downloaded | `src/lib/sha256sums.txt`, `src/before-libraries.js`, `build.sh`, `build.ps1` | Every library the app needs (AlaSQL, ECharts, SheetJS, CodeMirror, lz-string, sql.js) is inside the built script, copied from `src/lib`. The build checks each copy against its recorded checksum and stops on a mismatch. While it runs, the app downloads no scripts and no style sheets, except Google Analytics on `code.depressioncenter.org`. The libraries and their licenses are listed in `THIRD-PARTY-NOTICES.md`. |
+| Excel files are read with a fixed parser | `src/lib/sha256sums.txt`, `loadExcelFile` in `src/26-cyberdyne-pipeline.js` | Excel files are read with SheetJS 0.20.3, which fixes CVE-2023-30533 and CVE-2024-22363. The copy is packed into the built script, and the build refuses to run if it does not match its recorded checksum. |
 | Remote addresses are checked | `validateURL` in `src/25-data-sources.js` | Only `http` and `https` addresses are allowed. Addresses that point at private network ranges or the local machine are refused. |
 | Text widget HTML is cleaned | `sanitizeHTML` and `renderTextWidgetHTML` in `src/60-design.js` | Formatting tags, inline styles, links to web, mail, and phone addresses, and images from web addresses are kept. Scripts, event handlers, `style` elements, and `id` attributes are removed. An inline style that uses `expression`, `behavior`, `-moz-binding`, `javascript:`, or fixed positioning is removed. The same cleaner runs in the designer, the preview, and the live edit path. |
 | Widget colors and sizes are checked | `loadConfig` in `src/30-config.js`, `_safeCssColor` and `_safeCssNumber` in `src/42-ui-shared.js` | Every color and size read from a dashboard file must have a plain form, such as `#0078d4`, `red`, or `rgb(0, 120, 212)`. Anything else is reset to the default. The designer and preview check the values again where they build a style attribute. |
@@ -108,10 +109,28 @@ The target is WCAG 2.2 AA. The code today provides this evidence:
   check, the color check, and the escaping of data values. The others were
   checked by hand in a headless browser when they were added.
 - The page sets no Content Security Policy of its own. When the page runs in a
-  SharePoint tenant, the tenant's policy applies. The page loads its libraries
-  from cdn.jsdelivr.net, cdnjs.cloudflare.com, and cdn.sheetjs.com. If your
-  tenant limits which sites can supply scripts, ask your SharePoint admin to
-  allow all three.
+  SharePoint tenant, the tenant's policy applies. The built script loads nothing
+  from other sites, so a policy that allows only scripts from the site itself is
+  enough. Loading the script from the site's Site Assets library has not yet been
+  confirmed in a tenant with that policy.
+- The website at `code.depressioncenter.org` uses a custom domain set at the
+  organization level, and HTTPS is not enforced for it, so a plain `http`
+  address of the site is not redirected. The SharePoint install guide tells
+  people to download `dist/datalavista.js` from GitHub, which is served over
+  HTTPS, rather than from the website.
+
+### Hosting of the website
+
+The website, the help pages, and the demo are published by the publish workflow
+in `.github/workflows/publish.yml` from a GitHub Actions run, with the
+repository's Pages source set to "GitHub Actions". The help pages are generated
+from `docs/` on every run and are never stored in git; only `dist/` is committed.
+The landing page, the help pages, and the app load Google Analytics only when
+they are served from `code.depressioncenter.org`; a local preview or a copy on
+another site sends nothing to Google. The landing page and the 404 page load
+their font families from Google, and the help pages load nothing else from
+other sites. The [Repository maintenance](repository-maintenance.md) page
+describes the run.
 
 ### Conclusion
 
@@ -121,10 +140,11 @@ office whether the relay services and the SharePoint hosting fit your rules.
 
 ### Additional resources
 
+- [Help home](README.md)
 - [Project README](../README.md)
 - [Repository maintenance](repository-maintenance.md)
 - [Security reporting policy](../SECURITY.md)
 - [Project instructions](../AGENTS.md)
 - [WCAG 2.2 quick reference](https://www.w3.org/WAI/WCAG22/quickref/)
 
-[Back to project README](../README.md)
+[Back to help home](README.md)

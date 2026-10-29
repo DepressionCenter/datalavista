@@ -1,0 +1,150 @@
+# ============================================================
+#  This file is part of DataLaVista™
+#  mkdocs.yml: Settings for turning the Markdown pages in docs/ into the help website.
+#  Author(s): Gabriel Mongefranco.
+#  Created: 2026-10-28
+#  Last Modified: 2026-10-28
+#  Summary: Names the pages, their order, the theme, the header and footer links, the analytics setting, and the checks that MkDocs runs when it builds docs/ into _site/docs.
+#  Notes: See README file for documentation and full license information.
+#  Website: https://github.com/DepressionCenter/datalavista
+#
+#  Copyright © 2026 The Regents of the University of Michigan
+#
+#  This program is free software: you can redistribute it and/or modify
+#  it under the terms of the GNU General Public License as published by
+#  the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+#  This program is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+#  GNU General Public License for more details.
+#  You should have received a copy of the GNU General Public License along
+#  with this program. If not, see <https://www.gnu.org/licenses/>.
+#  ================================================================
+#
+#  Build the help pages from the repository root with:  mkdocs build --strict
+#  Preview them while editing with:                     mkdocs serve
+#  The publish workflow copies the result into the website next to index.html and dist/.
+
+site_name: DataLaVista™ help
+site_description: Help pages for DataLaVista, the free dashboard and reporting tool that runs in your browser.
+site_author: Eisenberg Family Depression Center, University of Michigan
+# The help pages live under /docs/ on the website. The docs-links hook uses this address to link to the folders next to it.
+site_url: https://code.depressioncenter.org/datalavista/docs/
+# repo_url is left out on purpose: the theme would then call GitHub's API from every page for star counts
+# Shown on the left of every page's footer, followed by the organization link from the extra section below
+copyright: © 2026 The Regents of the University of Michigan
+
+docs_dir: docs
+site_dir: _site/docs
+# Each Markdown file becomes a page with the same name, so docs/faq.md is published as docs/faq.html
+use_directory_urls: false
+# Any warning stops the build, so a broken link or a page missing from the navigation fails a pull request
+strict: true
+
+# The template page holds placeholder text in angle brackets that a browser would hide, so it stays on GitHub only
+exclude_docs: |
+  doc-template.md
+
+validation:
+  nav:
+    omitted_files: warn
+    not_found: warn
+    absolute_links: warn
+  links:
+    not_found: warn
+    anchors: warn
+    absolute_links: warn
+    unrecognized_links: warn
+
+theme:
+  name: material
+  # Holds the header and footer templates that replace the theme's own, and the stylesheet for them
+  custom_dir: src/website/mkdocs-overrides
+  language: en
+  # The pages use the reader's system fonts, so nothing is downloaded from Google Fonts
+  font: false
+  features:
+    - navigation.sections
+    - navigation.top
+    - navigation.footer
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - toc.follow
+  # custom means the colors come from help.css in the custom_dir, which uses the red of the DataLaVista home page
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark colors
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light colors
+
+markdown_extensions:
+  - toc:
+      permalink: true
+      permalink_title: Link to this section
+  - tables
+  - admonition
+  - attr_list
+  # Lets a fenced code block sit inside a numbered step; without it the block's markup is written into the page as HTML
+  - pymdownx.superfences
+
+# Copied from the custom_dir above into the website next to the theme's own stylesheets
+extra_css:
+  - assets/stylesheets/help.css
+
+# Addresses shown in the header and footer of every help page. Change them here, not in the templates.
+extra:
+  # Removes the theme's "Made with Material for MkDocs" line from the footer; the README credits the theme instead
+  generator: false
+  # The Home button in the header
+  app_home_url: https://code.depressioncenter.org/datalavista/
+  # The organization link after the copyright, on the left of the footer
+  organization_name: Eisenberg Family Depression Center
+  organization_url: https://depressioncenter.org/
+  # The View code and More apps links on the right of the footer
+  code_url: https://github.com/DepressionCenter/datalavista
+  more_apps_url: https://code.depressioncenter.org/
+  # Google Analytics, the same property as the app and the home page. main.html in the custom_dir starts it
+  # only when the pages are served from host, so a local preview or another copy of the site sends nothing to Google.
+  analytics:
+    provider: google
+    property: G-3Q455XWS5F
+    host: code.depressioncenter.org
+
+plugins:
+  - search
+
+# The hook turns links that leave docs/ into links to the website folders or to the files on GitHub
+hooks:
+  - src/website/docs-links.py
+
+# Every page's first heading is the project name, so the page titles come from this list
+nav:
+  - Help home: README.md
+  - Guides:
+      - Get started: how-to/get-started.md
+      - Install in SharePoint: how-to/install-in-sharepoint.md
+      - Connect to data: how-to/connect-to-data.md
+      - Build a query: how-to/build-a-query.md
+      - Design a dashboard: how-to/design-a-dashboard.md
+      - Preview a dashboard: how-to/preview-a-dashboard.md
+      - Publish and share: how-to/publish-and-share.md
+  - Answers:
+      - Frequently asked questions: faq.md
+      - Troubleshooting: troubleshooting.md
+  - For developers and maintainers:
+      - Architecture: architecture.md
+      - Local server: local-server.md
+      - Repository maintenance: repository-maintenance.md
+      - Compliance: compliance.md
+      - Skill authoring examples: skill-examples.md

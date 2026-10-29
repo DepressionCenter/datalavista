@@ -1,0 +1,85 @@
+<!--
+This file is part of DataLaVista™
+src/website/404.html: The page shown when an address on the DataLaVista website does not exist. The publish workflow copies it to the root of the website.
+Author(s): Gabriel Mongefranco.
+Created: 2026-10-28
+Last Modified: 2026-10-28
+Summary: Tells the visitor that the page was not found and links to the home page, the help pages, and the code. It uses the shared stylesheet in styles/ so it looks like the home page.
+Notes: See README file for documentation and full license information.
+
+Copyright © 2026 The Regents of the University of Michigan
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU General Public License for more details.
+You should have received a copy of the GNU General Public License along
+with this program. If not, see <https://www.gnu.org/licenses/>.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Page not found | DataLaVista™</title>
+  <meta name="robots" content="noindex">
+  <!-- The same fonts as the home page -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+  <!-- The page is shown at any missing address, so the stylesheet and the links use full addresses -->
+  <link rel="stylesheet" href="https://code.depressioncenter.org/datalavista/styles/datalavista-style.css">
+  <style>
+    /* The page colors and fonts, repeated here so the page stays readable when the shared stylesheet does not load */
+    body {
+      background-color: #030508;
+      color: #e0e6ed;
+      font-family: 'Inter', 'Segoe UI', Tahoma, Verdana, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+    main { max-width: 36rem; width: 100%; }
+    h1 {
+      font-family: 'Orbitron', 'Segoe UI', Tahoma, Verdana, sans-serif;
+      color: #fff;
+      font-size: clamp(1.75rem, 5vw, 2.5rem);
+      border-bottom: 2px solid var(--term-red, #ff2200);
+      padding-bottom: 0.5rem;
+      margin-bottom: 1rem;
+    }
+    p { margin-bottom: 1rem; color: var(--text-muted, #8b9bb4); }
+    ul { list-style: none; display: flex; flex-wrap: wrap; gap: 1rem; margin-top: 1.5rem; }
+    /* Each link is drawn as a button at least 44 pixels tall */
+    ul a {
+      display: inline-block;
+      padding: 12px 20px;
+      min-height: 44px;
+      color: var(--term-blue, #00eeff);
+      border: 1px solid var(--term-blue, #00eeff);
+      text-decoration: none;
+    }
+    ul a:hover { background: var(--term-blue, #00eeff); color: #000; text-shadow: none; }
+    ul a:focus-visible { outline: 3px dashed var(--focus-ring, #00eeff); outline-offset: 4px; }
+    code { color: var(--text-main, #e0e6ed); word-break: break-all; }
+  </style>
+</head>
+<body>
+  <main id="main-content">
+    <h1>Page not found</h1>
+    <p>There is no page at the address you opened. The address may have a typo, or the page may have moved when the website changed.</p>
+    <p>The DataLaVista files now live under <code>dist/</code>, and the help pages under <code>docs/</code>. Use one of these links to continue.</p>
+    <ul>
+      <li><a href="https://code.depressioncenter.org/datalavista/">Home page</a></li>
+      <li><a href="https://code.depressioncenter.org/datalavista/docs/">Help pages</a></li>
+      <li><a href="https://code.depressioncenter.org/datalavista/dist/DataLaVista.html">Open the designer</a></li>
+      <li><a href="https://github.com/DepressionCenter/datalavista">Code on GitHub</a></li>
+    </ul>
+  </main>
+</body>
+</html>
