@@ -41,8 +41,9 @@ reads the data you connect to and keeps it in memory while the tab is open.
 
 ### Optional local server
 
-The bundled launchers start ZippyServe on `127.0.0.1`. Hidden files, paths outside
-the project folder, and MCP access remain disabled by default. The server sends
+The bundled launchers start ZippyServe on `127.0.0.1`. Hidden files, links to hidden targets, paths outside
+the project folder, and MCP access remain disabled by default. HTTP reads check
+each link target and the identity of each opened file or directory. The server sends
 permissive CORS headers, so other web pages and local processes may read files
 inside the served folder. Keep private data and credentials elsewhere. This
 server has no authentication and is for local previews, not private-data hosting.

@@ -59,7 +59,10 @@ The four binaries in `bin/` are built with Go 1.26.10 from the locally patched
 [ZippyServe source at commit 1d55cdafa42adf60dddf22376d7686d37ca03676](https://github.com/DepressionCenter/ZippyServe/tree/1d55cdafa42adf60dddf22376d7686d37ca03676).
 [Provenance and checksums](../vendor/zippyserve/PROVENANCE.txt), the source,
 upstream build scripts, and the [GPL license](../vendor/zippyserve/LICENSE) are
-included in `vendor/zippyserve/`. To rebuild all four binaries, install Go 1.26.10
+included in `vendor/zippyserve/`. The local patch checks link targets for hidden
+paths, including directory indexes and archive fallbacks. Public internal links
+still work. This does not protect against someone who can copy private data into
+a public file in this folder. To rebuild all four binaries, install Go 1.26.10
 and run `bash vendor/zippyserve/rebuild.sh`. Set `GO_BIN` if Go is not on your path.
 Cross-compilation does not verify execution on Windows or macOS. The launchers
 leave the application build and SharePoint installation unchanged.

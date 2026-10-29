@@ -30,6 +30,7 @@ import time
 import unittest
 import urllib.error
 import urllib.request
+import zipfile
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 
@@ -120,6 +121,16 @@ class LauncherTests(unittest.TestCase):
             (root / "nested/public.txt").symlink_to("../public.txt")
             (root / "nested/index.html").symlink_to("../.secret")
             (root / "index.html").symlink_to(".secret")
+            (root / ".well-known").mkdir()
+            (root / ".well-known/control.txt").write_text("public-control")
+            (root / "known.txt").symlink_to(".well-known/control.txt")
+            (root / "archive").mkdir()
+            (root / "private-archive").mkdir()
+            with zipfile.ZipFile(root / "archive/index.zip", "w") as archive:
+                archive.writestr("index.html", "archive-control")
+            with zipfile.ZipFile(root / ".private.zip", "w") as archive:
+                archive.writestr("index.html", "synthetic-hidden-archive")
+            (root / "private-archive/index.zip").symlink_to("../.private.zip")
             with socket.socket() as probe:
                 probe.bind(("127.0.0.1", 0))
                 port = probe.getsockname()[1]
@@ -143,10 +154,19 @@ class LauncherTests(unittest.TestCase):
                         self.assertEqual(response.read(), (ROOT / "dist/DataLaVista.html").read_bytes())
                     with urllib.request.urlopen(url + "/samples/data/studies.csv") as response:
                         self.assertEqual(response.read(), sample.read_bytes())
-                    for path in ("/public-alias.txt", "/nested/public.txt"):
+                    for path in ("/public-alias.txt", "/nested/public.txt", "/known.txt"):
                         with urllib.request.urlopen(url + path) as response:
                             self.assertEqual(response.read(), b"public-control")
-                    for path in ("/alias.txt", "/alias-dir/token.txt", "/outside.txt", "/loop.txt", "/chain.txt", "/nested/", "/missing-route", "/.secret", "/.git/config", "/%2e%2e/%2e%2e/etc/passwd", "/__mcp"):
+                    with urllib.request.urlopen(url + "/archive/") as response:
+                        self.assertEqual(response.read(), b"archive-control")
+                    request = urllib.request.Request(url + "/public-alias.txt", headers={"Range": "bytes=0-5"})
+                    with urllib.request.urlopen(request) as response:
+                        self.assertEqual(response.status, 206)
+                        self.assertEqual(response.read(), b"public")
+                    with urllib.request.urlopen(urllib.request.Request(url + "/public-alias.txt", method="HEAD")) as response:
+                        self.assertEqual(response.status, 200)
+                        self.assertEqual(response.read(), b"")
+                    for path in ("/private-archive/", "/alias.txt", "/alias-dir/token.txt", "/outside.txt", "/loop.txt", "/chain.txt", "/nested/", "/missing-route", "/.secret", "/.git/config", "/%2e%2e/%2e%2e/etc/passwd", "/__mcp"):
                         with self.subTest(path=path), self.assertRaises(urllib.error.HTTPError) as error:
                             urllib.request.urlopen(url + path)
                         self.assertIn(error.exception.code, (400, 403, 404))

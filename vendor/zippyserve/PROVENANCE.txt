@@ -1,12 +1,13 @@
 ZippyServe upstream source commit: 1d55cdafa42adf60dddf22376d7686d37ca03676
 Source: https://github.com/DepressionCenter/ZippyServe/tree/1d55cdafa42adf60dddf22376d7686d37ca03676
-Binaries rebuilt from the included, unchanged src/server snapshot with Go 1.26.10.
+Binaries rebuilt from the included src/server snapshot with the local HTTP hidden-link patch with Go 1.26.10.
 Build: CGO_ENABLED=0 go build -trimpath -buildvcs=false (per GOOS/GOARCH).
 Rebuild: GO_BIN=/path/to/go bash vendor/zippyserve/rebuild.sh
 Toolchain archive: go1.26.10.linux-amd64.tar.gz
 Toolchain SHA-256: ccfe7ae822d2c2f41f4fe7c956199967a4dac22d0ee0d2b2bfdb440aab3b20c5
+Local modifications: main.go uses checked HTTP file opens; visible.go validates link targets and opened file identities.
 Binary SHA-256:
-b1709f878c8ad807a6d61502431e4553c6f6cb5bea7f1f244b068c8a0fd2a264  bin/ZippyServe-linux-amd64
-760f08872369eaf85f08f2cee95bc5d63aafb94066f598af2089b5972f48f575  bin/ZippyServe-mac-amd64
-4561e8307620a05fce66ac52503dbb52e3d52d00f875af301c98b0d8a2e63658  bin/ZippyServe-mac-arm64
-cb1312043d739aaa9748385f827668415f2c77748e0d7ba409566aba3daccd93  bin/ZippyServe.exe
+cc75c4d79a358c8f1f8bb717a79cfdca3fd0da0c7b85203586949b9ac324cc36  bin/ZippyServe-linux-amd64
+7ed12e1aae62534f73e7488b9d243aa58149609ba3858398dde34e49a505438d  bin/ZippyServe-mac-amd64
+2f28ac4a0783fd40e8c87b0ff5770737c83debf02e71a1720202920c8dca90fe  bin/ZippyServe-mac-arm64
+01fe661c56b307fb6fab080df7ba249263b965d2c37714dd70e6c467e3fd20a9  bin/ZippyServe.exe
