@@ -3,7 +3,7 @@ This file is part of DataLaVista™
 24-normalization.js: Data normalization, field type parsing, and CSV parsing.
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 Created: 2026-03-24
-Last Modified: 2026-4-06
+Last Modified: 2026-11-05
 Summary: Data normalization, field type parsing, and CSV parsing.
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
@@ -245,25 +245,50 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
     // ============================================================
     // CSV PARSING
     // ============================================================
+    /**
+     * Parse comma-separated text without splitting quoted cells at line breaks.
+     * @param {string} text CSV text with a header record and optional data records.
+     * @returns {{headers: string[], rows: Object[]}} String values; missing cells are null.
+     */
     function parseCSV(text) {
-      const lines = text.split('\n').filter(l => l.trim());
-      if (!lines.length) return { headers: [], rows: [] };
-      const parse = line => {
-        const result = []; let cur = ''; let inQ = false;
-        for (let i = 0; i < line.length; i++) {
-          const c = line[i];
-          if (c === '"') { if (inQ && line[i + 1] === '"') { cur += '"'; i++; } else inQ = !inQ; }
-          else if (c === ',' && !inQ) { result.push(cur.trim()); cur = ''; }
-          else cur += c;
-        }
-        result.push(cur.trim());
-        return result;
+      const records = [];
+      let fields = [], value = '', inQuotes = false, quoted = false, hasContent = false;
+      const finishField = () => {
+        fields.push(quoted ? value : value.trim());
+        value = ''; quoted = false;
       };
-      const headers = parse(lines[0]);
-      const rows = lines.slice(1).map(l => {
-        const vals = parse(l);
+      const finishRecord = () => {
+        // Empty physical lines are ignored, but quoted empty cells are records.
+        if (hasContent) { finishField(); records.push(fields); }
+        fields = []; value = ''; quoted = false; hasContent = false;
+      };
+      for (let i = 0; i < text.length; i++) {
+        const c = text[i];
+        if (inQuotes) {
+          if (c === '"') {
+            if (text[i + 1] === '"') { value += '"'; i++; }
+            else inQuotes = false;
+          } else value += c;
+        } else if (c === '"') {
+          if (!value.trim()) value = '';
+          inQuotes = true; quoted = true; hasContent = true;
+        } else if (c === ',') {
+          finishField(); hasContent = true;
+        } else if (c === '\n' || c === '\r') {
+          finishRecord();
+          if (c === '\r' && text[i + 1] === '\n') i++;
+        } else {
+          // Whitespace inside quotes is data; padding outside quotes is not.
+          if (!quoted || c.trim()) value += c;
+          if (c.trim()) hasContent = true;
+        }
+      }
+      finishRecord();
+      if (!records.length) return { headers: [], rows: [] };
+      const [headers, ...data] = records;
+      const rows = data.map(values => {
         const row = {};
-        headers.forEach((h, i) => { row[h] = vals[i] !== undefined ? vals[i] : null; });
+        headers.forEach((h, i) => { row[h] = values[i] !== undefined ? values[i] : null; });
         return row;
       });
       return { headers, rows };
