@@ -3,7 +3,7 @@ This file is part of DataLaVista™
 docs/how-to/connect-to-data.md
 Author(s): Gabriel Mongefranco, Jeremy Gluskin, Shelley Boa.
 Created: 2026-10-28
-Last Modified: 2026-10-28
+Last Modified: 2026-11-05
 Summary: Explains the data sources DataLaVista can connect to, the file types it reads, the extra fields it adds, and the Tables & Fields panel.
 Notes: See README file for documentation and full license information.
 
@@ -53,6 +53,25 @@ or list appears in the Tables & Fields panel on the left.
 DataLaVista cannot connect directly to a database on your network, such as SQL
 Server or Oracle, because a browser is not allowed to open those connections.
 Export the data to one of the file types above, or put it in a SharePoint list.
+
+### CSV cells with line breaks
+
+When uploading a CSV file, wrap any cell containing line breaks or commas in
+double quotation marks. Write a quotation mark inside that cell as two quotation
+marks. Spaces and line breaks inside the quotes stay in the same cell.
+
+For example, this file imports two rows. The first note contains two lines:
+
+```csv
+id,note
+1,"line one
+line two"
+2,ok
+```
+
+Blank lines outside quoted cells are ignored. Spaces around unquoted values are
+trimmed. The same parsing rules apply when a remote CSV uses the built-in fetch
+loader.
 
 ### Extra fields DataLaVista adds
 
