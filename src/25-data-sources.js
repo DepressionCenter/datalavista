@@ -3,7 +3,7 @@ This file is part of DataLaVista™
 25-data-sources.js: Data source connection popup, remote fetch guards, and source loaders.
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 Created: 2026-03-24
-Last Modified: 2026-10-27
+Last Modified: 2026-11-06
 Summary: Data source connection popup, remote fetch guards, and source loaders.
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
@@ -344,24 +344,31 @@ function handleUploadFiles() {
     return;
   }
   
-  const fileCount = input.files.length;
+  let added = 0;
+  let skipped = 0;
   
   Array.from(input.files).forEach(file => {
     const ext = file.name.split('.').pop().toLowerCase();
     const type = ['xlsx','xls'].includes(ext) ? 'xlsx' : ext;
     
     if (!['csv','json','xlsx','xml','sqlite','db'].includes(type)) {
-      toast(`Unsupported file type: .${ext}`, 'warning');
+      skipped++;
       return;
     }
     
     const rawDsName = (document.getElementById('upload-ds-name')?.value || '').trim();
     const dsName = generateDataSourceName(type, rawDsName || file.name.replace(/\.[^/.]+$/, ''));
     ConnectQueue.addUploadedFile(file, type, dsName);
+    added++;
   });
   
   input.value = ''; // Clear the input
-  toast(`Added ${fileCount} file(s) to queue`, 'success');
+  const summary = added ? `Added ${added} ${added === 1 ? 'file' : 'files'} to the queue.` : 'No files were added.';
+  if (skipped) {
+    toast(`${summary} Skipped ${skipped} unsupported ${skipped === 1 ? 'file' : 'files'}. Choose a supported file type.`, 'warning');
+  } else {
+    toast(summary, 'success');
+  }
 }
 
 /** Called when the Add button is clicked on the Remote Files tab. */

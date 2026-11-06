@@ -3,7 +3,7 @@ This file is part of DataLaVista™
 docs/how-to/connect-to-data.md
 Author(s): Gabriel Mongefranco, Jeremy Gluskin, Shelley Boa.
 Created: 2026-10-28
-Last Modified: 2026-10-28
+Last Modified: 2026-11-06
 Summary: Explains the data sources DataLaVista can connect to, the file types it reads, the extra fields it adds, and the Tables & Fields panel.
 Notes: See README file for documentation and full license information.
 
@@ -33,7 +33,7 @@ of source:
 | Tab | Use it for | Good to know |
 | --- | --- | --- |
 | SharePoint Lists | Lists on the SharePoint site the page runs in. | Only available inside a SharePoint site. The site address fills in on its own after a few seconds. Your SharePoint permissions decide which lists you can read, and no password or token is stored. |
-| Upload Files | A file on your computer. | Choose the file, select **Add to Queue**, and repeat for more files. The data is saved inside the report configuration, so the dashboard is self-contained. The file grows with the data, and anyone you share it with gets that copy of the data. |
+| Upload Files | A file on your computer. | Choose or drop files to add them to the queue. The message tells you how many were added and how many were skipped if a file type is unsupported. The data is saved inside the report configuration, so the dashboard is self-contained. The file grows with the data, and anyone you share it with gets that copy of the data. |
 | Remote Files | A file on the web, including a file in a SharePoint document library. | Paste the address, or select **Browse SharePoint** to pick a file from a library, then **Add to Queue**. The website that hosts the file must allow other sites to read it. Files in your own SharePoint site always work. |
 | Open Dashboard | A saved report configuration. | Opens a dashboard you saved earlier, from a file or from a link. |
 
