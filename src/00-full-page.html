@@ -3,7 +3,7 @@ This file is part of DataLaVista™
 DataLaVista.html: Report and dashboard designer main file.
 Author(s): Gabriel Mongefranco; Jeremy Gluskin; Shelley Boa.
 Created: 2026-03-10
-Last Modified: 2026-10-28
+Last Modified: 2026-11-07
 Summary: Main window in DataLaVista for loading data and designing reports and dashboards.
 Notes: See README file for documentation and full license information.
 Website: https://github.com/DepressionCenter/datalavista
@@ -415,7 +415,8 @@ with this program. If not, see https://www.gnu.org/licenses/.
       color: var(--text);
     }
 
-    .source-tab:focus-visible {
+    .source-tab:focus-visible,
+    #btn-upload-browse:focus-visible {
       outline: 2px solid var(--primary);
       outline-offset: 2px;
     }
@@ -3307,18 +3308,16 @@ with this program. If not, see https://www.gnu.org/licenses/.
           <!-- Upload Files -->
           <div class="source-pane" id="src-upload" role="tabpanel" aria-labelledby="tab-upload">
             <div class="form-group">
-              <label>Select files to upload</label>
+              <label for="upload-file-input">Select files to upload</label>
               <div class="dlv-dropzone" id="upload-dropzone"
                 >
                 <span>📂 Drag &amp; drop files here, or</span>
-                <label class="btn btn-default btn-sm" style="cursor:pointer;margin:0">
-                  Browse…
-                  <input type="file" id="upload-file-input" multiple
-                    accept=".csv,.CSV,.json,.json5,.JSON,.xlsx,.xls,.xml,.XML,.sqlite,.db"
-                    style="display:none" />
-                </label>
+                <button type="button" id="btn-upload-browse" class="btn btn-default btn-sm"
+                  aria-describedby="upload-file-types">Browse…</button>
+                <input type="file" id="upload-file-input" multiple hidden
+                  accept=".csv,.CSV,.json,.json5,.JSON,.xlsx,.xls,.xml,.XML,.sqlite,.db" />
               </div>
-              <span class="text-xs text-muted">Supported: CSV, JSON, Excel (.xlsx/.xls), XML, SQLite (.sqlite/.db)</span>
+              <span class="text-xs text-muted" id="upload-file-types">Supported: CSV, JSON, Excel (.xlsx/.xls), XML, SQLite (.sqlite/.db)</span>
             </div>
             <div class="form-group">
               <label>Data Source Name <span style="font-weight:400;color:var(--text-disabled)">(optional — auto-generated from filename)</span></label>

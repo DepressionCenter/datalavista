@@ -3,7 +3,7 @@ This file is part of DataLaVista™
 docs/compliance.md
 Author(s): Gabriel Mongefranco.
 Created: 2026-10-26
-Last Modified: 2026-10-28
+Last Modified: 2026-11-07
 Summary: Records the security and accessibility controls that exist in the code today, and the known gaps.
 Notes: See README file for documentation and full license information.
 
@@ -82,11 +82,16 @@ The target is WCAG 2.2 AA. The code today provides this evidence:
   between the available tabs, and press Enter or Space to open one. A screen
   reader announces which tab is selected. Outside SharePoint, the SharePoint
   Lists tab is announced as unavailable and can't be opened.
+- On the Upload Files tab, press Tab to reach Browse. A focus outline appears
+  around the button. Enter or Space opens the file picker. The button's
+  description lists the supported file types.
 - Status messages appear in a polite live region, so a screen reader announces
   them without interrupting.
 - The automated tests check the arrow key, Home, and End steps above on every
-  pull request. No automated accessibility scan has been recorded for the
-  application yet.
+  pull request. A Chromium check confirmed that Browse opens the file picker
+  with Enter, Space, and a mouse click, and that a selected CSV reaches the
+  queue. An axe scan of the Browse button found no violations. The rest of the
+  application still needs a full audit, including screen reader testing.
 
 ### Known gaps
 
