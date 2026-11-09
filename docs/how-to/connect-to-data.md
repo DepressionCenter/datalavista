@@ -50,6 +50,9 @@ or list appears in the Tables & Fields panel on the left.
 | SQLite | `.sqlite`, `.db` |
 | Excel | `.xlsx`, `.xls` |
 
+When you upload an Excel workbook with several sheets, each sheet becomes a
+table. The saved report keeps those tables together under one Excel source.
+
 DataLaVista cannot connect directly to a database on your network, such as SQL
 Server or Oracle, because a browser is not allowed to open those connections.
 Export the data to one of the file types above, or put it in a SharePoint list.

@@ -402,11 +402,10 @@ async function processConnectQueue(mode) {
         // Load the file and get the result
         const result = await CyberdynePipeline.loadUploadedFile(item.file, item.dsName);
 
-        // Handle SQLite (returns { tables: [...], foreignKeys?, dbName })
+        // SQLite databases and multi-sheet workbooks both return a list of tables.
         if (result.tables && Array.isArray(result.tables)) {
-          // SQLite returns multiple tables
           const dsMetadata = {
-            type: 'sqlite',
+            type: item.type === 'db' ? 'sqlite' : item.type,
             fileName: item.file.name,
             isFileUpload: true,
             url: null
@@ -496,16 +495,15 @@ async function processConnectQueue(mode) {
         // Load the remote file
         const result = await CyberdynePipeline.loadRemoteFile(item.url, item.dsName, item.type);
 
-        // Handle SQLite
         if (result.tables && Array.isArray(result.tables)) {
           const dsMetadata = {
-            type: 'sqlite',
+            type: item.type,
             fileName: item.url.split('/').pop(),
             isFileUpload: false,
             url: item.url
           };
 
-          CyberdynePipeline.registerDataSource(item.dsName, dsMetadata, result.tables);
+          CyberdynePipeline.registerDataSource(item.dsName, dsMetadata, result.tables, result.foreignKeys);
           loadedCount += result.tables.length;
 
         } else {

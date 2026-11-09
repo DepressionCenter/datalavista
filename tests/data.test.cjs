@@ -81,3 +81,63 @@ test('conditioned SUM and Count series build the right SQL', () => {
   assert.match(sql, /SUM\(\[Budget\]\)/);
   assert.match(sql, /FROM \[dlv_results\] GROUP BY \[Grp\]/);
 });
+
+test('a two-sheet upload keeps its Excel type in the saved report', async () => {
+  const XLSX = require('../src/lib/xlsx.full.min.js');
+  const book = XLSX.utils.book_new();
+  for (const name of ['Visits', 'Sites']) {
+    XLSX.utils.book_append_sheet(book, XLSX.utils.aoa_to_sheet([['id'], [1]]), name);
+  }
+  const bytes = XLSX.write(book, { type: 'array', bookType: 'xlsx' });
+  const app = loadSource({ XLSX, FileReader: class {
+    readAsArrayBuffer() { this.onload({ target: { result: bytes } }); }
+  } });
+  app('renderFieldsPanel = setupCodeMirror = toast = setStatus = () => {}');
+  const pipeline = app('CyberdynePipeline');
+  pipeline._registerRawTable = () => {};
+  pipeline.createView = (_, viewName) => viewName;
+  app('ConnectQueue').addUploadedFile({ name: 'sample.xlsx' }, 'xlsx', 'Sample');
+  await app('processConnectQueue')('upload');
+  const ds = app('DataLaVistaState').dataSources.Sample;
+  assert.deepEqual(Array.from(ds.tables), ['Sample_Visits', 'Sample_Sites']);
+  assert.equal(ds.type, 'xlsx');
+  const saved = JSON.parse(JSON.stringify(app('buildConfig')()));
+  const reopened = loadSource();
+  reopened("document.getElementById = id => id === 'btn-save-config' ? {} : null");
+  reopened('DataLaVistaState.reportMode = "view"');
+  reopened('refreshDashboardPreview = renderFilterBar = updateConnectButton = updateDashboardTitleTooltipIcon = setStatus = () => {}');
+  await reopened('loadConfig')(saved);
+  assert.equal(reopened('DataLaVistaState').dataSources.Sample.type, 'xlsx');
+});
+
+test('refreshing a remote workbook uses the Excel loader again', async () => {
+  const app = loadSource();
+  app('renderFieldsPanel = setupCodeMirror = toast = setStatus = showLoadingPopup = hideLoadingPopup = () => {}');
+  const pipeline = app('CyberdynePipeline');
+  const types = [];
+  pipeline.loadRemoteFile = async (url, dsName, type) => {
+    types.push(type);
+    return { tables: ['Visits', 'Sites'].map(name => ({
+      tableName: name, metadata: { sourceType: type, url }, fields: [], data: [],
+    })) };
+  };
+  pipeline._registerRawTable = pipeline.createView = pipeline.refreshDataSourceTables = () => {};
+  app('ConnectQueue').addRemoteUrl('https://example.org/sample.xlsx', 'xlsx', 'Sample');
+  await app('processConnectQueue')('remote');
+  await app('refreshDataSource')('Sample');
+  assert.deepEqual(types, ['xlsx', 'xlsx']);
+});
+
+test('a .db upload retains its SQLite type and foreign keys', async () => {
+  const app = loadSource();
+  app('renderFieldsPanel = setupCodeMirror = toast = setStatus = () => {}');
+  const pipeline = app('CyberdynePipeline');
+  const foreignKeys = [{ fromTable: 'Visits', fromCol: 'SiteId', toTable: 'Sites', toCol: 'Id' }];
+  pipeline.loadUploadedFile = async () => ({ tables: [], foreignKeys });
+  let registeredKeys;
+  pipeline.registerSqliteFkRelationships = (_, keys) => { registeredKeys = keys; };
+  app('ConnectQueue').addUploadedFile({ name: 'sample.db' }, 'db', 'Sample');
+  await app('processConnectQueue')('upload');
+  assert.equal(app('DataLaVistaState').dataSources.Sample.type, 'sqlite');
+  assert.deepEqual(registeredKeys, foreignKeys);
+});
