@@ -731,6 +731,14 @@ async function deriveStructureFromSample(dataArray) {
       });
     }
 
+    // Replace the attachment contents in one request so a failed save never needs a DELETE.
+    function updateListAttachment(collectionUrl, filename, content, siteUrl) {
+      const name = encodeURIComponent(filename.replace(/'/g, "''"));
+      return spFetchWrite(`${collectionUrl}('${name}')/$value`, {
+        method: 'POST', headers: { 'X-HTTP-Method': 'PUT' }, body: content
+      }, siteUrl);
+    }
+
     // ============================================================
     // SHAREPOINT FILE DIALOG
     // ============================================================
@@ -1397,7 +1405,7 @@ const SharePointFileDialog = {
     filename = decodeURIComponent(filename);
     const title = filename.replace(/\.[^.]+$/, '') || 'Untitled';
     const listTitle = state.currentList.Title;
-    const enc = encodeURIComponent(listTitle);
+    const enc = encodeURIComponent(listTitle.replace(/'/g, "''"));
     const headers = { 'Accept': 'application/json', 'Content-Type': 'application/json' };
 
     const fieldsJson = await spFetch(`${state.siteUrl}/_api/web/lists/getbytitle('${enc}')/fields?$select=InternalName`);
@@ -1432,19 +1440,20 @@ const SharePointFileDialog = {
     }
 
     if (state.params.fileContent) {
-      const attName = decodeURIComponent(filename);
-      try {
-        await spFetchWrite(
-          `${state.siteUrl}/_api/web/lists/getbytitle('${enc}')/items(${id})/AttachmentFiles/getbyfilename('${encodeURIComponent(attName)}')`,
-          { method: 'POST', headers: { 'X-HTTP-Method': 'DELETE' } },
+      const attName = filename;
+      const collection = `${state.siteUrl}/_api/web/lists/getbytitle('${enc}')/items(${id})/AttachmentFiles`;
+      let ar = isUpdatingSelected
+        ? await updateListAttachment(collection, attName, state.params.fileContent, state.siteUrl)
+        : null;
+      // A new item, or an existing item with no attachment of this name, needs an add.
+      if (!ar || ar.status === 404) {
+        const name = encodeURIComponent(attName.replace(/'/g, "''"));
+        ar = await spFetchWrite(
+          `${collection}/add(FileName='${name}')`,
+          { method: 'POST', headers: { 'Accept': 'application/json' }, body: state.params.fileContent },
           state.siteUrl
         );
-      } catch(e) {}
-      const ar = await spFetchWrite(
-        `${state.siteUrl}/_api/web/lists/getbytitle('${enc}')/items(${id})/AttachmentFiles/add(FileName='${encodeURIComponent(attName)}')`,
-        { method: 'POST', headers: { 'Accept': 'application/json' }, body: state.params.fileContent },
-        state.siteUrl
-      );
+      }
       if (!ar.ok) { const t = await ar.text(); throw new Error(`Attachment failed (${ar.status}): ${t}`); }
 
       // Get attachment URL from response, or construct it from the known SP pattern

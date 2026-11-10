@@ -184,3 +184,57 @@ test('copy failures offer the original text for manual copying', async () => {
     }
   }
 });
+
+test('saving an existing dashboard updates its attachment without deleting it first', async () => {
+  const site = 'https://example.sharepoint.com/sites/demo';
+  const report = site + "/Lists/Team%20Reports/Attachments/7/Team%27s%20report.json?download=1";
+  const replacement = '{"title":"Updated dashboard"}';
+  for (const status of [204, 403]) {
+    let stored = '{"title":"Original dashboard"}';
+    const original = stored;
+    const requests = [];
+    const save = loadSource({
+      _spPageContextInfo: { formDigestValue: 'test-digest' },
+      fetch: async (url, options) => {
+        requests.push([url, options.method, options.headers['X-HTTP-Method']]);
+        if (options.headers['X-HTTP-Method'] === 'DELETE') stored = null;
+        if (status === 204) stored = options.body;
+        return { ok: status === 204, status, text: async () => 'Update refused' };
+      },
+    })('_saveConfigToSpList');
+    if (status === 204) await save(replacement, report, site);
+    else await assert.rejects(save(replacement, report, site), /403.*Update refused/);
+    assert.equal(stored, status === 204 ? replacement : original);
+    assert.deepEqual(requests, [[site + "/_api/web/lists/getbytitle('Team%20Reports')/items(7)/AttachmentFiles('Team''s%20report.json')/$value", 'POST', 'PUT']]);
+  }
+});
+
+test('the list dialog adds a missing attachment but never retries a refused update as an add', async () => {
+  const site = 'https://example.sharepoint.com/sites/demo';
+  for (const [selected, updateStatus, expected] of [
+    [false, null, ['add']], [true, 204, ['PUT']], [true, 404, ['PUT', 'add']], [true, 403, ['PUT']],
+  ]) {
+    const writes = [];
+    const dialog = loadSource({
+      _spPageContextInfo: { formDigestValue: 'test-digest' },
+      confirm: () => true,
+      fetch: async (url, options) => {
+        let status = 200;
+        if (url.includes('/AttachmentFiles')) {
+          const operation = url.includes('/add(') ? 'add' : options.headers['X-HTTP-Method'];
+          writes.push(operation);
+          status = operation === 'PUT' ? updateStatus : 201;
+        }
+        return { ok: status < 300, status, text: async () => 'Update refused',
+          json: async () => url.includes('/fields?') ? { value: [] } : { ID: 7 } };
+      },
+    })('SharePointFileDialog');
+    const result = dialog._saveListItem({
+      siteUrl: site, currentList: { Title: 'Reports' }, filenameInput: { value: 'Sample.json' },
+      params: { fileContent: '{"title":"Example"}' }, selectedItem: selected ? { name: 'Sample', id: 7 } : null,
+    });
+    if (updateStatus === 403) await assert.rejects(result, /403.*Update refused/);
+    else assert.equal((await result).id, 7);
+    assert.deepEqual(writes, expected);
+  }
+});

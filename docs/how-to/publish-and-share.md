@@ -38,6 +38,8 @@ is a file you loaded with the Upload Files tab, whose data is included.
 | Save to SharePoint List | Saves the report configuration as an attachment on a SharePoint list item. |
 | Save Local Copy | Downloads the report configuration to your computer. Use it for a backup, for version control, or to move a dashboard between sites. |
 
+When you save changes to an existing list attachment, DataLaVista updates the file in place. If SharePoint rejects the update, the previous file remains available.
+
 ### Open a shared dashboard
 
 To open a dashboard, add the address of its report configuration to the
