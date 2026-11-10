@@ -129,23 +129,13 @@ async function _saveConfigToSpFile(json, reportUrl, siteUrl) {
 }
 
 async function _saveConfigToSpList(json, reportUrl, siteUrl) {
-  const listsMatch = reportUrl.match(/\/Lists\/([^/]+)\/Attachments\/(\d+)\/([^/]+)/);
+  const path = new URL(reportUrl, siteUrl).pathname;
+  const listsMatch = path.match(/\/Lists\/([^/]+)\/Attachments\/(\d+)\/([^/]+)$/i);
   if (!listsMatch) throw new Error('Unable to parse SharePoint list URL for save.');
   const [, listTitle, itemId, filenameEnc] = listsMatch;
-  const filename = decodeURIComponent(filenameEnc);
-  const enc = encodeURIComponent(listTitle);
-  try {
-    await spFetchWrite(
-      `${siteUrl}/_api/web/lists/getbytitle('${enc}')/items(${itemId})/AttachmentFiles/getbyfilename('${encodeURIComponent(filename)}')`,
-      { method: 'POST', headers: { 'X-HTTP-Method': 'DELETE' } },
-      siteUrl
-    );
-  } catch(e) {}
-  const ar = await spFetchWrite(
-    `${siteUrl}/_api/web/lists/getbytitle('${enc}')/items(${itemId})/AttachmentFiles/add(FileName='${encodeURIComponent(filename)}')`,
-    { method: 'POST', headers: { 'Accept': 'application/json' }, body: json },
-    siteUrl
-  );
+  const enc = encodeURIComponent(decodeURIComponent(listTitle).replace(/'/g, "''"));
+  const collection = `${siteUrl}/_api/web/lists/getbytitle('${enc}')/items(${itemId})/AttachmentFiles`;
+  const ar = await updateListAttachment(collection, decodeURIComponent(filenameEnc), json, siteUrl);
   if (!ar.ok) { const t = await ar.text(); throw new Error(`Save failed (${ar.status}): ${t}`); }
 }
 
