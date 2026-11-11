@@ -38,6 +38,17 @@ test('parseCSV keeps quoted commas and doubled quotes', () => {
   });
 });
 
+test('CSV uploads reject repeated columns instead of silently dropping the first value', async () => {
+  const app = loadSource({ FileReader: class {
+    readAsText(file) { this.onload({ target: { result: file.text } }); }
+  } });
+  const upload = text => app('CyberdynePipeline').loadUploadedFile({ name: 'sample.csv', text }, 'Sample');
+  await assert.rejects(upload('id,id\n1,2'), /duplicate.*"id".*rename/i);
+  await assert.rejects(upload('"Visit, Date",id,"Visit, Date"'), /duplicate.*"Visit, Date".*rename/i);
+  const result = await upload('id,"ID"\n1,2');
+  assert.deepEqual(plain(result.data), [{ id: '1', ID: '2' }]);
+});
+
 test('parseCSV returns no headers for empty text', () => {
   assert.deepEqual(plain(get('parseCSV')('\n\n')), { headers: [], rows: [] });
 });

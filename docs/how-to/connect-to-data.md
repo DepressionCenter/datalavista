@@ -42,6 +42,8 @@ or list appears in the Tables & Fields panel on the left.
 
 ### File types
 
+When uploading a CSV file, give each column a unique name. If two headers match, the upload stops and tells you which column to rename.
+
 | Format | File name ends in |
 | --- | --- |
 | CSV | `.csv` |
