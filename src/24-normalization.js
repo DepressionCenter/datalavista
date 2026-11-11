@@ -260,6 +260,13 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
         return result;
       };
       const headers = parse(lines[0]);
+      const seen = new Set();
+      for (const name of headers) {
+        if (seen.has(name)) {
+          throw new Error(`Duplicate CSV column "${name}". Rename one of the columns and try again.`);
+        }
+        seen.add(name);
+      }
       const rows = lines.slice(1).map(l => {
         const vals = parse(l);
         const row = {};
