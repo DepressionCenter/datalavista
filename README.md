@@ -72,7 +72,7 @@ Most enterprise data is trapped behind bloated frameworks or expensive BI tools.
 ### To use inside another web app:
 + If using inside a different web platform, follow the same steps as above with whatever method is available for adding scripts to the page. Alternatively, save [dist/DataLaVista.html](dist/DataLaVista.html) to your web server, and add its URL in an iframe tag.
 ### Load data and design your dashboard:
-+ Click Connect + Load and pick your data, shape it on the Query tab, design the dashboard, preview it, and share it from the Generate Report tab. The [Get started guide](https://code.depressioncenter.org/datalavista/docs/how-to/get-started.html) walks through each step with sample data.
++ Click Connect + Load and pick your data, shape it on the Query tab, design the dashboard, preview it, and share it from the Generate Report tab. [Build your first dashboard](https://code.depressioncenter.org/datalavista/docs/how-to/get-started.html#your-first-dashboard) with a sample CSV, then save and reopen your project status chart.
 
 
 

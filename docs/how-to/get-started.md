@@ -69,31 +69,48 @@ when the website that hosts them allows it, which the
 
 ### Your first dashboard
 
-These steps use the sample file `studies.csv` from this website. The same steps
-work with your own file.
+Build a bar chart that answers one question: **How many projects have each status?**
+You will use 15 synthetic projects. Download the [projects CSV](../../samples/data/projects.csv)
+and [DataLaVista.html](../../dist/DataLaVista.html) first. Once you have both files,
+the exercise works offline. You do not need a SharePoint account.
 
-1. Open the [dashboard designer](../../dist/DataLaVista.html) and select
-   **Connect + Load** in the toolbar. The Connect to Data Source popup opens.
-2. Select the **Remote Files** tab, paste this address into the file address
-   box, and select **Add to Queue**:
-   `https://code.depressioncenter.org/datalavista/samples/data/studies.csv`.
-   Then select **Connect & Load**. The file appears in the Tables & Fields
-   panel on the left.
-3. On the **Query** tab, pick the fields you want in the Query Builder, or write
-   a query in the SQL Editor. The results preview below shows the table your
-   dashboard will use. Check it before you go on.
-4. Select the **Design** tab. Add a chart and a table to the canvas, and map a
-   field to each one. Add a filter if you want people to narrow the data.
-5. Select the **Preview Dashboard** tab. Try the filter and compare a few
-   numbers with the results preview from step 3.
-6. Select the **Generate Report** tab. Select **Save Local Copy** to download
-   the dashboard as a file you can open again later with the **Open Dashboard**
-   tab of the Connect to Data Source popup. Inside SharePoint, **Publish to
-   SharePoint** saves it to a document library and gives you a link to share.
+1. **Load the projects.** Open the saved HTML file. Select **Connect + Load**,
+   then **Upload Files**. Type `Demo` in **Data Source Name** *before* selecting
+   **Browse…** and choosing `projects.csv`. Select **Connect & Load**.
+   In **Tables & Fields**, expand **Demo**. You should see **Projects** with
+   15 rows. The source and table together give you the SQL name `Demo_Projects`.
+2. **Count projects by status.** On **Query → SQL Editor**, replace the existing
+   query with the following and select **Run Query**:
 
-Two more sample files use the same steps:
-[researchers.xml](../../samples/data/researchers.xml) and
-[participants.json](../../samples/data/participants.json).
+   ```sql
+   SELECT Status, COUNT(*) AS Projects
+   FROM [Demo_Projects]
+   GROUP BY Status
+   ORDER BY Projects DESC
+   ```
+
+   Open **Results**. You should see three rows: **Active: 10**, **Completed: 4**,
+   and **On Hold: 1**. Together they account for all 15 projects.
+
+   ![Query results with one row for each status and its project count](../assets/images/first-dashboard-results.png)
+
+3. **Create the chart.** Select **Design**, then click **Bar** in the widget
+   toolbox. With this query, the chart starts with **Status** on the X axis
+   and **Projects** as the Y value, aggregated by **SUM**. Keep these settings:
+   the query already counted the projects, so counting the three result rows
+   again would give a bar of 1 for each status.
+4. **Preview it.** Select **Preview Dashboard**. Compare the bars with your
+   query results: Active should be tallest at 10, and On Hold shortest at 1.
+
+   ![Dashboard preview showing a bar for each of the three project statuses](../assets/images/first-dashboard-chart.png)
+
+5. **Save your dashboard.** Select **Generate Report**. When the report is
+   ready, select **Save Local Copy** and keep the downloaded JSON file.
+6. **Reopen and check it.** Open the saved HTML file in a fresh browser tab.
+   Select **Connect + Load → Open Dashboard**, choose the JSON file under
+   **Or upload a local dashboard file**, then select **Connect & Load**.
+   Select **Preview Dashboard** again. The same three bars should appear
+   without uploading the CSV again: the report includes the uploaded data.
 
 ### Conclusion
 
