@@ -82,6 +82,8 @@ The target is WCAG 2.2 AA. The code today provides this evidence:
   between the available tabs, and press Enter or Space to open one. A screen
   reader announces which tab is selected. Outside SharePoint, the SharePoint
   Lists tab is announced as unavailable and can't be opened.
+- On the Design tab, Tab moves between widget buttons in the toolbox. Enter or
+  Space adds the focused widget to the canvas. The buttons also support dragging.
 - Status messages appear in a polite live region, so a screen reader announces
   them without interrupting.
 - The automated tests check the arrow key, Home, and End steps above on every
