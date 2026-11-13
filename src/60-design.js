@@ -448,14 +448,15 @@ function rankSuggestions(rules, cols, meta) {
         if(grid) {
             grid.innerHTML = '';
             for (const wt of DataLaVistaCore.WIDGET_TYPES) {
-              const btn = document.createElement('div');
+              const btn = document.createElement('button');
+              btn.type = 'button';
               btn.className = 'widget-type-btn';
               btn.draggable = true;
-              btn.innerHTML = `<span class="icon">${wt.icon}</span><span>${wt.label}</span>`;
+              btn.innerHTML = `<span class="icon" aria-hidden="true">${wt.icon}</span><span>${wt.label}</span>`;
               btn.addEventListener('dragstart', e => {
                 safeDragSet(e, { type: 'widget-type', widgetType: wt.id });
               });
-              btn.addEventListener('click', () => { addWidgetToCanvas(wt.id, null, null); }); // TODO: Does this conflict with another event?
+              btn.addEventListener('click', () => { addWidgetToCanvas(wt.id, null, null); });
               grid.appendChild(btn);
             }
         }
