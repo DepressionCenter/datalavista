@@ -439,6 +439,11 @@ with this program. If not, see https://www.gnu.org/licenses/.
       display: none;
     }
 
+    .source-name-hint {
+      font-weight: 400;
+      color: var(--text-secondary);
+    }
+
     .source-pane.active {
       display: flex;
       flex-direction: column;
@@ -475,7 +480,7 @@ with this program. If not, see https://www.gnu.org/licenses/.
     }
     .queue-empty {
       font-size: 12px;
-      color: var(--text-disabled);
+      color: var(--text-secondary);
       padding: 4px 0;
     }
     .queue-item {
@@ -3288,7 +3293,7 @@ with this program. If not, see https://www.gnu.org/licenses/.
               <span class="text-xs text-muted">The base URL of the SharePoint site containing your lists</span>
             </div>
             <div class="form-group">
-              <label>Data Source Name <span style="font-weight:400;color:var(--text-disabled)">(up to 6 alphanumeric chars, default: SP)</span></label>
+              <label>Data Source Name <span class="source-name-hint">(up to 6 alphanumeric chars, default: SP)</span></label>
               <input type="text" class="form-input" id="sp-ds-name" placeholder="SP" maxlength="6" />
             </div>
             <div class="form-group">
@@ -3321,7 +3326,7 @@ with this program. If not, see https://www.gnu.org/licenses/.
               <span class="text-xs text-muted">Supported: CSV, JSON, Excel (.xlsx/.xls), XML, SQLite (.sqlite/.db)</span>
             </div>
             <div class="form-group">
-              <label>Data Source Name <span style="font-weight:400;color:var(--text-disabled)">(optional — auto-generated from filename)</span></label>
+              <label>Data Source Name <span class="source-name-hint">(optional — auto-generated from filename)</span></label>
               <input type="text" class="form-input" id="upload-ds-name" placeholder="auto" maxlength="6" />
             </div>
             <div id="upload-queue" class="dlv-queue"><div class="queue-empty">No files queued</div></div>
@@ -3343,7 +3348,7 @@ with this program. If not, see https://www.gnu.org/licenses/.
               <span class="text-xs text-muted">The website that hosts the file must allow other sites to read it, or the file must be on this site.</span>
             </div>
             <div class="form-group">
-              <label>Data Source Name <span style="font-weight:400;color:var(--text-disabled)">(optional — auto-generated from filename)</span></label>
+              <label>Data Source Name <span class="source-name-hint">(optional — auto-generated from filename)</span></label>
               <input type="text" class="form-input" id="remote-ds-name" placeholder="auto" maxlength="6" />
             </div>
             <div style="display:flex;justify-content:flex-end;margin-bottom:6px">
