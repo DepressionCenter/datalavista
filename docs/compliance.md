@@ -85,8 +85,10 @@ The target is WCAG 2.2 AA. The code today provides this evidence:
 - Status messages appear in a polite live region, so a screen reader announces
   them without interrupting.
 - The automated tests check the arrow key, Home, and End steps above on every
-  pull request. No automated accessibility scan has been recorded for the
-  application yet.
+  pull request.
+- In Chromium, axe-core 4.10.2 measured the source-name hint and the empty
+  queue message at 6.45:1 contrast in both Remote Files and Upload Files.
+  This check covered those two panes with empty queues, not the whole app.
 
 ### Known gaps
 
