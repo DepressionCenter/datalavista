@@ -3282,24 +3282,24 @@ with this program. If not, see https://www.gnu.org/licenses/.
           <!-- SharePoint Lists -->
           <div class="source-pane active" id="src-sharepoint" role="tabpanel" aria-labelledby="tab-sharepoint">
             <div class="form-group">
-              <label>SharePoint Site URL</label>
-              <input type="text" class="form-input" id="sp-url"
+              <label for="sp-url">SharePoint Site URL</label>
+              <input type="text" class="form-input" id="sp-url" aria-describedby="sp-url-help"
                 placeholder="https://tenant.sharepoint.com/sites/YourSite" />
-              <span class="text-xs text-muted">The base URL of the SharePoint site containing your lists</span>
+              <span class="text-xs text-muted" id="sp-url-help">The base URL of the SharePoint site containing your lists</span>
             </div>
             <div class="form-group">
-              <label>Data Source Name <span style="font-weight:400;color:var(--text-disabled)">(up to 6 alphanumeric chars, default: SP)</span></label>
+              <label for="sp-ds-name">Data Source Name <span style="font-weight:400;color:var(--text-disabled)">(up to 6 alphanumeric chars, default: SP)</span></label>
               <input type="text" class="form-input" id="sp-ds-name" placeholder="SP" maxlength="6" />
             </div>
             <div class="form-group">
-              <label>Authentication</label>
+              <label for="sp-auth">Authentication</label>
               <select class="form-input" id="sp-auth">
                 <option value="current">Current SharePoint session (default)</option>
                 <option value="token">Bearer token (paste below)</option>
               </select>
             </div>
             <div class="form-group hidden" id="sp-token-group">
-              <label>Bearer Token</label>
+              <label for="sp-token">Bearer Token</label>
               <textarea class="form-input" id="sp-token" rows="3" placeholder="eyJ..."></textarea>
             </div>
           </div>
@@ -3321,7 +3321,7 @@ with this program. If not, see https://www.gnu.org/licenses/.
               <span class="text-xs text-muted">Supported: CSV, JSON, Excel (.xlsx/.xls), XML, SQLite (.sqlite/.db)</span>
             </div>
             <div class="form-group">
-              <label>Data Source Name <span style="font-weight:400;color:var(--text-disabled)">(optional — auto-generated from filename)</span></label>
+              <label for="upload-ds-name">Data Source Name <span style="font-weight:400;color:var(--text-disabled)">(optional — auto-generated from filename)</span></label>
               <input type="text" class="form-input" id="upload-ds-name" placeholder="auto" maxlength="6" />
             </div>
             <div id="upload-queue" class="dlv-queue"><div class="queue-empty">No files queued</div></div>
@@ -3330,20 +3330,20 @@ with this program. If not, see https://www.gnu.org/licenses/.
           <!-- Remote Files -->
           <div class="source-pane" id="src-remote" role="tabpanel" aria-labelledby="tab-remote">
             <div class="form-group">
-              <label>Remote file URL</label>
+              <label for="remote-url">Remote file URL</label>
               <div style="display:flex;gap:6px;align-items:center">
-                <input type="text" class="form-input" id="remote-url"
+                <input type="text" class="form-input" id="remote-url" aria-describedby="remote-file-types remote-file-host"
                   placeholder="https://example.com/data/report.csv"
                   style="flex:1" />
                 <button class="btn btn-default btn-sm" id="btn-sp-browse-remote"
                   title="Browse SharePoint document libraries for a data file"
                   style="display:none;white-space:nowrap;flex-shrink:0">📂 Browse SharePoint</button>
               </div>
-              <span class="text-xs text-muted">Supported: CSV, JSON, Excel, XML, SQLite — enter URL then click Add</span>
-              <span class="text-xs text-muted">The website that hosts the file must allow other sites to read it, or the file must be on this site.</span>
+              <span class="text-xs text-muted" id="remote-file-types">Supported: CSV, JSON, Excel, XML, SQLite — enter URL then click Add</span>
+              <span class="text-xs text-muted" id="remote-file-host">The website that hosts the file must allow other sites to read it, or the file must be on this site.</span>
             </div>
             <div class="form-group">
-              <label>Data Source Name <span style="font-weight:400;color:var(--text-disabled)">(optional — auto-generated from filename)</span></label>
+              <label for="remote-ds-name">Data Source Name <span style="font-weight:400;color:var(--text-disabled)">(optional — auto-generated from filename)</span></label>
               <input type="text" class="form-input" id="remote-ds-name" placeholder="auto" maxlength="6" />
             </div>
             <div style="display:flex;justify-content:flex-end;margin-bottom:6px">
@@ -3355,7 +3355,7 @@ with this program. If not, see https://www.gnu.org/licenses/.
           <!-- Open Dashboard -->
           <div class="source-pane" id="src-loadconfig" role="tabpanel" aria-labelledby="tab-loadconfig">
             <div class="form-group">
-              <label>Dashboard URL (SharePoint library or direct link)</label>
+              <label for="config-url">Dashboard URL (SharePoint library or direct link)</label>
               <div style="display:flex;gap:6px;align-items:center">
                 <input type="text" class="form-input" id="config-url" placeholder="https://tenant.sharepoint.com/sites/.../Shared Documents/report.json"
                   style="flex:1" />
@@ -3365,12 +3365,12 @@ with this program. If not, see https://www.gnu.org/licenses/.
               </div>
             </div>
             <div class="form-group">
-              <label>Or upload a local dashboard file</label>
+              <label for="config-file">Or upload a local dashboard file</label>
               <input type="file" class="form-input" id="config-file" 
                     accept=".json,.JSON,.json5,.JSON5,text/json,application/json" />
             </div>
             <div class="form-group">
-              <label>Or paste JSON configuration</label>
+              <label for="config-json-input">Or paste JSON configuration</label>
               <textarea class="form-input" id="config-json-input" rows="4"
                 placeholder='{"_license":"", "dataSources": {}, "tables":{}, "queryColumns":{}, "design": {}, "sql": ""}'></textarea>
             </div>
