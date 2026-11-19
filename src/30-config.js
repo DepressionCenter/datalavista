@@ -456,23 +456,21 @@ const WIDGET_NUMBER_PROPS = {
 };
 
 async function loadConfig(cfg) {
-  if (!cfg.dataSources || typeof cfg.dataSources != 'object'|| !cfg.tables || typeof cfg.tables != 'object') throw new Error('Invalid report config — missing data sources or tables.');
-  // If the config provided is a string, try parsing it safely as JSON
-  if (cfg && typeof cfg == 'string')
-    {
-      let cfgString = cfg.trim();
-      if(cfgString.startsWith('{') && cfgString.endsWith('}')) {
-        try{
-          cfg = safeJSONParse(cfgString, 'Config');
-        } catch (e) {
-          throw new Error('Invalid report config — the report JSON is invalid.');
-        }
-      } else {
-        throw new Error('Invalid report config — the report JSON is invalid.');
-      }
+  // Parse text before inspecting the report's fields.
+  if (typeof cfg === 'string') {
+    try {
+      cfg = safeJSONParse(cfg.trim(), 'Config');
+    } catch (e) {
+      throw new Error('Invalid report config — the report JSON is invalid.');
     }
-  // At this point, cfg should be an object. If it's not, throw an error.
-  if (cfg && typeof cfg !== 'object') throw new Error('Invalid report config — no report JSON detected.');
+  }
+  if (!cfg || typeof cfg !== 'object' || Array.isArray(cfg)) {
+    throw new Error('Invalid report config — no report JSON detected.');
+  }
+  if (!cfg.dataSources || typeof cfg.dataSources !== 'object' || Array.isArray(cfg.dataSources) ||
+      !cfg.tables || typeof cfg.tables !== 'object' || Array.isArray(cfg.tables)) {
+    throw new Error('Invalid report config — missing data sources or tables.');
+  }
 
   if (!cfg._license) throw new Error('Invalid report config — missing _license key');
   // TODO: Check the new key, _min_version, and display a warning saying this report maybe incompatible with this version of DataLaVista, if the key doesn't exist or if it is <0.5.

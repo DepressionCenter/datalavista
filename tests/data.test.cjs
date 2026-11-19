@@ -81,3 +81,31 @@ test('conditioned SUM and Count series build the right SQL', () => {
   assert.match(sql, /SUM\(\[Budget\]\)/);
   assert.match(sql, /FROM \[dlv_results\] GROUP BY \[Grp\]/);
 });
+
+test('a serialized report loads like the same report object', async () => {
+  for (const asText of [false, true]) {
+    const app = loadSource();
+    app("document.getElementById = id => id === 'btn-save-config' ? {} : null");
+    app('DataLaVistaState.reportMode = "view"');
+    app('refreshDashboardPreview = renderFilterBar = updateConnectButton = updateDashboardTitleTooltipIcon = setStatus = () => {}');
+    const config = plain(app('buildConfig')());
+    config.design.title = 'Example report';
+    await app('loadConfig')(asText ? ' \n' + JSON.stringify(config) + '\n ' : config);
+    assert.equal(app('DataLaVistaState').design.title, 'Example report');
+  }
+});
+
+test('invalid report inputs reject before clearing the current dashboard', async () => {
+  const app = loadSource();
+  app('DataLaVistaState.design.title = "Keep this report"');
+  let cleared = 0;
+  app('CyberdynePipeline').clearAllViews = () => { cleared++; };
+  for (const value of [null, undefined, 12, [], 'broken', '{broken}', 'null',
+    { _license: 'test', dataSources: [], tables: {} },
+    { _license: 'test', dataSources: {}, tables: [] },
+    { _license: 'test', dataSources: {}, tables: null }]) {
+    await assert.rejects(app('loadConfig')(value), /Invalid report config/);
+    assert.equal(cleared, 0);
+    assert.equal(app('DataLaVistaState').design.title, 'Keep this report');
+  }
+});

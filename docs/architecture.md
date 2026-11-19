@@ -82,6 +82,13 @@ There is no backend service, no database of its own, and no server-side
 interface. Permissions come from the platform that hosts the page and the
 places that hold the data.
 
+### Loading a report from JavaScript
+
+The public `dlv.loadConfig(config)` method accepts a report object or its JSON
+text and returns a promise. Text is parsed before the required fields are
+checked. Invalid JSON or missing data-source and table objects are rejected
+before the current dashboard is cleared.
+
 ### Conclusion
 
 You now know the pieces inside the built script, the six stages data passes
